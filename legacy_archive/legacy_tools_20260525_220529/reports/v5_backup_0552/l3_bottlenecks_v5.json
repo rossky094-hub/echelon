@@ -1,0 +1,901 @@
+{
+  "clusters": 15,
+  "bottlenecks_count": 15,
+  "bottlenecks": [
+    {
+      "bottleneck_id": "01KR7T2VB9S7QHZ06ASWJ1H5J4",
+      "label": "在 multimodal ML 中,逆向设计的物理可解释性瓶颈",
+      "cluster_id": 0,
+      "main_topic": "T11714",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Multimodal Machine Learning Applications 中",
+      "supporting_papers": [
+        "01KR7T0WMHP8535J23J0F9EEJ9",
+        "01KR7T0WNSZ3BVK4SN6MEGKR7C",
+        "01KR7T0WNZW135PK26P86D0Q68",
+        "01KR7T0WK0150KHZADMG4FNAF6",
+        "01KR7T0X02B17F23CYBF9QEYMD"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WMHP8535J23J0F9EEJ9",
+        "01KR7T0WNSZ3BVK4SN6MEGKR7C",
+        "01KR7T0WNZW135PK26P86D0Q68"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2V5NANFESX6BD8KZVC6T",
+          "paper_id": "01KR7T0WMHP8535J23J0F9EEJ9",
+          "text": "Incremental decision making in real-world environments is one of the most challenging tasks in embodied artificial intelligence.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2V5W0NQ9HHCWVDCEYNHE",
+          "paper_id": "01KR7T0WNSZ3BVK4SN6MEGKR7C",
+          "text": "We propose VLM-Social-Nav, a novel Vision-Language Model (VLM) based navigation approach to compute a robot's motion in human-centered environments.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2V64ZVVE5RPRR2X132S9",
+          "paper_id": "01KR7T0WNZW135PK26P86D0Q68",
+          "text": "This paper proposes a new task that bridges these two trends, namely, multimodal planning problem specification.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 6,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VCJ218G99KFMRYP45P5",
+      "label": "在 RL-based world model 中,多模态对齐的泛化能力瓶颈",
+      "cluster_id": 1,
+      "main_topic": "T10462",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Reinforcement Learning in Robotics 中",
+      "supporting_papers": [
+        "01KR7T0X9T7N3JXG4V1YG6KQW8",
+        "01KR7T0XDEPQN648T38DAFC32M",
+        "01KR7T0X0NKFND3K6P5BTY1FPK",
+        "01KR7T0X1E9X2Q34FY0BJA7YWY",
+        "01KR7T0XAEBXEEFGEEDCRVQAMW"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0X9T7N3JXG4V1YG6KQW8",
+        "01KR7T0XDEPQN648T38DAFC32M",
+        "01KR7T0X0NKFND3K6P5BTY1FPK"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VBGZX84RTJSB0FZ1RGC",
+          "paper_id": "01KR7T0X9T7N3JXG4V1YG6KQW8",
+          "text": "Although it has been shown that PER is one of the most crucial components for the overall performance of deep RL methods in discrete action domains, many empirical studies indicate that it considerabl",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VBSXJ9N88HZRGGBZZYZ",
+          "paper_id": "01KR7T0XDEPQN648T38DAFC32M",
+          "text": "However, current recommendation systems have serious limitations, including the lack of effective artificial intelligence algorithms for long-term career planning, and the lack of efficient reinforcem",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VBYAYKPDQ4BV1PA2QEN",
+          "paper_id": "01KR7T0X0NKFND3K6P5BTY1FPK",
+          "text": "We study the benefit of sharing representations among tasks to enable the effective use of deep neural networks in Multi-Task Reinforcement Learning.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 5,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": true,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VFMRY0HABGQZZT8MACR",
+      "label": "在 robot manipulation 中,机器人操作的样本效率瓶颈",
+      "cluster_id": 2,
+      "main_topic": "T10653",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Robot Manipulation and Learning 中",
+      "supporting_papers": [
+        "01KR7T0WDG5XAJAHWRQC7WQGVG",
+        "01KR7T0W7JWX5N6E3NCZWFRDBK",
+        "01KR7T0W86JB5QNA5ZHTYE2Z5S",
+        "01KR7T0X2K4VCWXZCBTEQBAQM9",
+        "01KR7T0WH7HY34NMP1B8RHK0SC"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WDG5XAJAHWRQC7WQGVG",
+        "01KR7T0W7JWX5N6E3NCZWFRDBK",
+        "01KR7T0W86JB5QNA5ZHTYE2Z5S"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VCRQDTBZTV6ENRRT8MT",
+          "paper_id": "01KR7T0WDG5XAJAHWRQC7WQGVG",
+          "text": "Abstract This paper presents a learning-based method that uses simulation data to learn an object manipulation task using two model-free reinforcement learning (RL) algorithms.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VD7XC48YD0WPM31SN72",
+          "paper_id": "01KR7T0W7JWX5N6E3NCZWFRDBK",
+          "text": "However, enabling robots to learn language-guided DFG skills in real-world environments presents several challenges, including comprehending the complex relationship between task instructions and gras",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VDS5GCHZ2N480AS48MA",
+          "paper_id": "01KR7T0W86JB5QNA5ZHTYE2Z5S",
+          "text": "However, the manufacturing process using robots, especially in collaboration with humans, is highly intricate.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 8,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VJR8PME1NPZF2AS7H2F",
+      "label": "在 Robot Manipulation and Learning / Reinforcement Learning in Robotics 跨界中,强化学习的奖励工程瓶颈",
+      "cluster_id": 3,
+      "main_topic": "T10653",
+      "is_cross_topic": true,
+      "topic_prefix": "在 Robot Manipulation and Learning / Reinforcement Learning in Robotics 跨界中",
+      "supporting_papers": [
+        "01KR7T0W4J1QFC5CMNSSPYHGS8",
+        "01KR7T0W3M5SY1R6AV09CX7DAC",
+        "01KR7T0X7XDZ196QKZ3K6W9FW6",
+        "01KR7T0WBZ3HR5PJ6E7K95M7CT",
+        "01KR7T0X2ZVXVWGN13EHRK8CC1"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0W4J1QFC5CMNSSPYHGS8",
+        "01KR7T0W3M5SY1R6AV09CX7DAC",
+        "01KR7T0X7XDZ196QKZ3K6W9FW6"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VFWQFTQ03PYQWA9S4SE",
+          "paper_id": "01KR7T0W4J1QFC5CMNSSPYHGS8",
+          "text": "To generate context-aware motion trajectories while satisfying robot kinematics constraints, we present a novel kinematics-aware goal-conditioned control agent, Robot Kinematics Diffuser (RK-Diffuser)",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VGBVFGAKA1VHMYSXG8N",
+          "paper_id": "01KR7T0W3M5SY1R6AV09CX7DAC",
+          "text": "The measured results show that the steered beam from −30° to +30° can be obtained around 3.83 GHz with different coding matrices, and more than 10 dB RCS reduction from 3.70 to 3.84 GHz can be achieve",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VGM2ZZ1XCYTVQ65YRWP",
+          "paper_id": "01KR7T0X7XDZ196QKZ3K6W9FW6",
+          "text": "This paper utilizes parallel control to investigate the problem of event-triggered deep reinforcement learning and develops an event-triggered deep Q-network (ETDQN) for decision-making of autonomous ",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 9,
+      "semantic_evidence_count": 1,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VKYBJ42AA5D2QW9M9WX",
+      "label": "在 multimodal ML 中,元表面的宽带设计瓶颈",
+      "cluster_id": 4,
+      "main_topic": "T11714",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Multimodal Machine Learning Applications 中",
+      "supporting_papers": [
+        "01KR7T0WZGW1X45AXEGEWXWPY0",
+        "01KR7T0WPTF6QBDTC8YBF9C040",
+        "01KR7T0WY8QJSYHHBDE2BKJPZT",
+        "01KR7T0WXB1YFMJWFAZ3KT095M"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WZGW1X45AXEGEWXWPY0",
+        "01KR7T0WPTF6QBDTC8YBF9C040",
+        "01KR7T0WY8QJSYHHBDE2BKJPZT"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VK42K8NTB9KQKWMZJV1",
+          "paper_id": "01KR7T0WZGW1X45AXEGEWXWPY0",
+          "text": "Moreover, 3D-VisTA demonstrates superior data efficiency, obtaining strong performance even with limited annotations during downstream task fine-tuning.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VKAGAEETM4R5TP1Q3NF",
+          "paper_id": "01KR7T0WPTF6QBDTC8YBF9C040",
+          "text": "It is a fundamental but challenging task, as a successful solution requires the comprehensive understanding of a scene in multiple aspects including detection, localization, and recognition of objects",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VKJAT6CN8RPAD6Z6GFZ",
+          "paper_id": "01KR7T0WY8QJSYHHBDE2BKJPZT",
+          "text": "However, this success cannot be directly transferred to 3D scenarios due to the inaccessibility of large-scale 3D-text pairs.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 4,
+      "semantic_evidence_count": 1,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VNX1R789W1FC6B32P9X",
+      "label": "在 RL-based world model 中,视觉语言模型的幻觉问题瓶颈",
+      "cluster_id": 5,
+      "main_topic": "T10462",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Reinforcement Learning in Robotics 中",
+      "supporting_papers": [
+        "01KR7T0X423865RTFWMGXCZT30",
+        "01KR7T0X7QG05PGBH0NW8K85C6",
+        "01KR7T0W4D9KRBJWF2RRM30QVH",
+        "01KR7T0X088VA4QYNH0W21DMCA",
+        "01KR7T0X4QBX13RAK16ACGEXJZ"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0X423865RTFWMGXCZT30",
+        "01KR7T0X7QG05PGBH0NW8K85C6",
+        "01KR7T0W4D9KRBJWF2RRM30QVH"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VMCMJS1XX2S7M0MVQYG",
+          "paper_id": "01KR7T0X423865RTFWMGXCZT30",
+          "text": "However, they face challenges handling distribution shifts due to the lack of online interaction during training.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VMR22GD0332J7ET614R",
+          "paper_id": "01KR7T0X7QG05PGBH0NW8K85C6",
+          "text": "A challenging problem in robotics is how to control multiple robots cooperatively and safely in real-world applications.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VN1M3155WV8QMHXQN6B",
+          "paper_id": "01KR7T0W4D9KRBJWF2RRM30QVH",
+          "text": "However, current VLA models face significant challenges: they are slow during inference and require extensive pre-training on large amounts of robotic data, making real-world deployment difficult.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 6,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VRRTNAM272RCB3FCKNM",
+      "label": "在 RL-based world model 中,制造公差的仿真-实验差距瓶颈",
+      "cluster_id": 6,
+      "main_topic": "T10462",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Reinforcement Learning in Robotics 中",
+      "supporting_papers": [
+        "01KR7T0WBMV4YB8NPY57DXS81T",
+        "01KR7T0X22YRMERWVTPF6MQHGN",
+        "01KR7T0X9CNCEK7HXD7S07N6C3",
+        "01KR7T0X5Z88GB8ZN3VV27982F",
+        "01KR7T0WFAS8PG3344XZJWZ7YQ"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WBMV4YB8NPY57DXS81T",
+        "01KR7T0X22YRMERWVTPF6MQHGN",
+        "01KR7T0X9CNCEK7HXD7S07N6C3"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VP12YDR7TSDSRKSFG74",
+          "paper_id": "01KR7T0WBMV4YB8NPY57DXS81T",
+          "text": "The proposed framework can not only generate the grasp pose from the RGB-D images, but also predict the quality score of each grasp pose.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VPBA18ZFNP2VHR11ACY",
+          "paper_id": "01KR7T0X22YRMERWVTPF6MQHGN",
+          "text": "Sequential decision making is an important part of robotic problems that is receiving unprecedented attention from both academia and industry.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VPG3ATABR1DXJG8GKQD",
+          "paper_id": "01KR7T0X9CNCEK7HXD7S07N6C3",
+          "text": "Some works have compared them, highlighting their pros and cons, but an emerging trend combines them so as to benefit from the best of both worlds.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 10,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VWP6RAJ1BMXTS0T7SXS",
+      "label": "在 robot manipulation 中,跨模态检索的分布外泛化瓶颈",
+      "cluster_id": 7,
+      "main_topic": "T10653",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Robot Manipulation and Learning 中",
+      "supporting_papers": [
+        "01KR7T0WKE2X917YAZB00VBBWZ",
+        "01KR7T0W49XRBS9KXE6VN1Y09H",
+        "01KR7T0W54G1PC70TJ7H0TRZ6B",
+        "01KR7T0W4MRR1J2FTMZH7F16DE",
+        "01KR7T0WFKH9HBVSGN2Y0164ZN"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WKE2X917YAZB00VBBWZ",
+        "01KR7T0W49XRBS9KXE6VN1Y09H",
+        "01KR7T0W54G1PC70TJ7H0TRZ6B"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VS1FM3XC9JY1X8JNM4C",
+          "paper_id": "01KR7T0WKE2X917YAZB00VBBWZ",
+          "text": "However, current VLMs are limited in their understanding of the physical concepts (e.g., material, fragility) of common objects, which restricts their usefulness for robotic manipulation tasks that in",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VSA3Z5KVN6NFFM3TEZT",
+          "paper_id": "01KR7T0W49XRBS9KXE6VN1Y09H",
+          "text": "A key challenge for robotic manipulation in open domains is how to acquire diverse and generalizable skills for robots.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VSQKEC2YFZ9ED62HER4",
+          "paper_id": "01KR7T0W54G1PC70TJ7H0TRZ6B",
+          "text": "Developing robotic hands that adapt to real-world dynamics remains a fundamental challenge in robotics and machine intelligence.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 14,
+      "semantic_evidence_count": 1,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2VZ2QVTRF1APGA0F0ASP",
+      "label": "在 RL-based world model 中,机器人抓取的非结构化场景瓶颈",
+      "cluster_id": 8,
+      "main_topic": "T10462",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Reinforcement Learning in Robotics 中",
+      "supporting_papers": [
+        "01KR7T0X48ESGCZC6KF1M5RW90",
+        "01KR7T0X7AG9ANNW1GE0K9W635",
+        "01KR7T0X3W40FACCMYC42QXFHV",
+        "01KR7T0X3434Z01DV09KGP1PYW",
+        "01KR7T0WH9G7VJ02ZVSXYWW422"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0X48ESGCZC6KF1M5RW90",
+        "01KR7T0X7AG9ANNW1GE0K9W635",
+        "01KR7T0X3W40FACCMYC42QXFHV"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VWW9JKCQ69S03B5E5M8",
+          "paper_id": "01KR7T0X48ESGCZC6KF1M5RW90",
+          "text": "However, there are still significant drawbacks compared to traditional feedback control approaches for magnetic confinement.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VX3881Z733K791AYKMX",
+          "paper_id": "01KR7T0X7AG9ANNW1GE0K9W635",
+          "text": "The state-of-the-art decision and planning approaches for autonomous vehicles have moved away from manually designed systems, instead focusing on the utilisation of large-scale datasets of expert demo",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VXEY9YK1FZY6DYTCKEN",
+          "paper_id": "01KR7T0X3W40FACCMYC42QXFHV",
+          "text": "Domain randomization introduces perturbations in the simulation to make controllers less susceptible to the reality gap, which enables remarkable sim-to-real transfer on real quadruped robots.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 8,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W0EJ9HVCJ2D2Y6625S0",
+      "label": "在 metasurface design 中,世界模型的长时预测误差瓶颈",
+      "cluster_id": 9,
+      "main_topic": "T10245",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Metamaterials and Metasurfaces Applications 中",
+      "supporting_papers": [
+        "01KR7T0VSPJAE6CF31WZXWG4AW",
+        "01KR7T0VYYSFG9ANRACANPDMD5",
+        "01KR7T0VVJMBJBZ4P4J7SY66VM",
+        "01KR7T0VR1D775CSXZ3F3V44RX",
+        "01KR7T0VR8AJJY23SJHDCJW1GJ"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0VSPJAE6CF31WZXWG4AW",
+        "01KR7T0VYYSFG9ANRACANPDMD5",
+        "01KR7T0VVJMBJBZ4P4J7SY66VM"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2VZ8P725ESE3Q4S731PB",
+          "paper_id": "01KR7T0VSPJAE6CF31WZXWG4AW",
+          "text": "The prevalence of computer vision systems necessitates hardware-based approaches to relieve the high computational demand of deep neural networks in resource-limited applications.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VZHSN2QZ440PGXSJJSZ",
+          "paper_id": "01KR7T0VYYSFG9ANRACANPDMD5",
+          "text": "However, unit cells, or meta‐atoms, of metasurfaces are conventionally designed using regular shapes, limiting performance improvement.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2VZWBE3GE1HKKCHFC2WP",
+          "paper_id": "01KR7T0VVJMBJBZ4P4J7SY66VM",
+          "text": "However, current multiplexing meta-lenses lack spectral modulation, and crosstalk between different wavelengths hampers the imaging quality, especially for biological samples requiring precise wavelen",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 5,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": false,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W2B5Z93C5VX8Q0Z0JAB",
+      "label": "在 Multimodal Machine Learning Applications / Reinforcement Learning in Robotics 跨界中,新型材料的光电集成挑战瓶颈",
+      "cluster_id": 10,
+      "main_topic": "T11714",
+      "is_cross_topic": true,
+      "topic_prefix": "在 Multimodal Machine Learning Applications / Reinforcement Learning in Robotics 跨界中",
+      "supporting_papers": [
+        "01KR7T0WEG3RAD9BT1AAEGRAY6",
+        "01KR7T0WX1NSD2VXVG5SJGPABH",
+        "01KR7T0WYTB9CHPXG111FT7GCC",
+        "01KR7T0WSFEN4DQ2AEWK1XECGT",
+        "01KR7T0X75Q2DD686C17E2TMQA"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WEG3RAD9BT1AAEGRAY6",
+        "01KR7T0WX1NSD2VXVG5SJGPABH",
+        "01KR7T0WYTB9CHPXG111FT7GCC"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2W0Q3PE85AQ3KSAX5TPX",
+          "paper_id": "01KR7T0WEG3RAD9BT1AAEGRAY6",
+          "text": "Learning based 6D object pose estimation methods rely on computing large intermediate pose representations and/or iteratively refining an initial estimation with a slow render-compare pipeline.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W1022WMRDR0V0KBM3AS",
+          "paper_id": "01KR7T0WX1NSD2VXVG5SJGPABH",
+          "text": "We identify the two core obstacles that need to be tackled when incorporating these models into detector training: (1) the distribution mismatch that happens when applying a VL-model trained on whole ",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W1CH9Q04WAWZFVYXF6F",
+          "paper_id": "01KR7T0WYTB9CHPXG111FT7GCC",
+          "text": "However, previous studies only focus on capturing fragment-level relation within a sample from a particular modality, e.g., salient regions in an image or text words in a sentence, where they usually ",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 6,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": true,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W3AYH5TKFE1035K3VAA",
+      "label": "在 metasurface design 中,强化学习在真实世界中的部署差距瓶颈",
+      "cluster_id": 11,
+      "main_topic": "T10245",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Metamaterials and Metasurfaces Applications 中",
+      "supporting_papers": [
+        "01KR7T0VTCP4BA84RDCVTZVTH6",
+        "01KR7T0VQ8QM6MH3630RGXW6HN",
+        "01KR7T0VQ0VWCDTX5SN9B4BEVH"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0VTCP4BA84RDCVTZVTH6",
+        "01KR7T0VQ8QM6MH3630RGXW6HN",
+        "01KR7T0VQ0VWCDTX5SN9B4BEVH"
+      ],
+      "evidence_count": 3,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2W2PSGE0HGYR642ERDVY",
+          "paper_id": "01KR7T0VTCP4BA84RDCVTZVTH6",
+          "text": "In this work, we exploit SIM to enable transmit precoding and receiver combining in holographic multiple-input multiple-output (HMIMO) communications, and we study the achievable rate by formulating a",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W2ZV84W3CVMY5M1A0ZK",
+          "paper_id": "01KR7T0VQ8QM6MH3630RGXW6HN",
+          "text": "The current \"one-by-one design\" method is hindered by time-consuming, repeated testing within a confined space.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W397CM1911WG77HGYSR",
+          "paper_id": "01KR7T0VQ0VWCDTX5SN9B4BEVH",
+          "text": "Metasurfaces, composed of planar arrays of intricately designed meta-atom structures, possess remarkable capabilities in controlling electromagnetic waves in various ways.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 3,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W5ZMYXH2J5WRZ5WQR82",
+      "label": "在 multimodal ML 中,多模态大模型的计算效率瓶颈",
+      "cluster_id": 12,
+      "main_topic": "T11714",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Multimodal Machine Learning Applications 中",
+      "supporting_papers": [
+        "01KR7T0WRKTD2QFB7ZFMWKZ1V3",
+        "01KR7T0WXRHPZJPRBVMEKZZQ2V",
+        "01KR7T0WXQ6YVASTW4TMWGYMJK",
+        "01KR7T0WV1K0NTZMKRPJ65K85K",
+        "01KR7T0WYJGWYK3SCJ435Q1CCN"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WRKTD2QFB7ZFMWKZ1V3",
+        "01KR7T0WXRHPZJPRBVMEKZZQ2V",
+        "01KR7T0WXQ6YVASTW4TMWGYMJK"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2W3NTKEV1FW0ANHAZW6H",
+          "paper_id": "01KR7T0WRKTD2QFB7ZFMWKZ1V3",
+          "text": "However, recent research indicates that many VQA models rely primarily on learning the correlation between questions and answers in the training dataset rather than demonstrating actual reasoning abil",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W4892SQ5Q96JCGQPV1D",
+          "paper_id": "01KR7T0WXRHPZJPRBVMEKZZQ2V",
+          "text": "However, beyond the common difficulties faced in the natural image captioning, medical report generation specifically requires the model to describe a medical image with a fine-grained and semantic-co",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W4HEGFHE34N8H9D1WN0",
+          "paper_id": "01KR7T0WXQ6YVASTW4TMWGYMJK",
+          "text": "One limitation of existing solutions is that they capture relevant knowledge from text-only knowledge bases, which merely contain facts expressed by first-order predicates or language descriptions whi",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 7,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W76PWBPS21KVK5VHT2E",
+      "label": "在 metasurface design 中,机器人操作的语义理解瓶颈",
+      "cluster_id": 13,
+      "main_topic": "T10245",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Metamaterials and Metasurfaces Applications 中",
+      "supporting_papers": [
+        "01KR7T0VRATAKTRXABQ3S3XRX3",
+        "01KR7T0W0W12PHBBC2HRN87V77",
+        "01KR7T0VQNR5P6V0P2YB180X4R",
+        "01KR7T0W3WRB8NJJGV3FS27E6P"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0VRATAKTRXABQ3S3XRX3",
+        "01KR7T0W0W12PHBBC2HRN87V77",
+        "01KR7T0VQNR5P6V0P2YB180X4R"
+      ],
+      "evidence_count": 4,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2W66X6T3PPC3NY80TY3E",
+          "paper_id": "01KR7T0VRATAKTRXABQ3S3XRX3",
+          "text": "Abstract In recent years, 3D Dirac semimetals (DSM) with linear energy‐momentum dispersion near the Fermi points have emerged as promising material candidates for novel tunable metamaterial devices du",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W6CT5NT3ERPAF94QKB8",
+          "paper_id": "01KR7T0W0W12PHBBC2HRN87V77",
+          "text": "Metamaterial absorbers have been widely studied in the past decade and their performances have been incessantly improved in the practical applications.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W6T9AHX5J2310MCWMF0",
+          "paper_id": "01KR7T0VQNR5P6V0P2YB180X4R",
+          "text": "The versatile dynamic switching typically relies on a series of complex or incompatible multifield activations, with excessive system complexity, additional loss, slow modulation speed, and inertial t",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 4,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": false,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    },
+    {
+      "bottleneck_id": "01KR7T2W8FGCJXYBJK92SCN5W9",
+      "label": "在 multimodal ML 中,光学神经网络的训练稳定性瓶颈",
+      "cluster_id": 14,
+      "main_topic": "T11714",
+      "is_cross_topic": false,
+      "topic_prefix": "在 Multimodal Machine Learning Applications 中",
+      "supporting_papers": [
+        "01KR7T0WJG89E7HAT7S6ZJ1T8Z",
+        "01KR7T0WP6S53ZKRK9Y763FPK1",
+        "01KR7T0X0PBTRC2YDHSG4ZN0PR",
+        "01KR7T0X38GK2FE47D39P3BXVG",
+        "01KR7T0WZDBS848H66RVMJA0ZW"
+      ],
+      "prior_art_uuids": [
+        "01KR7T0WJG89E7HAT7S6ZJ1T8Z",
+        "01KR7T0WP6S53ZKRK9Y763FPK1",
+        "01KR7T0X0PBTRC2YDHSG4ZN0PR"
+      ],
+      "evidence_count": 5,
+      "evidence_atoms": [
+        {
+          "evidence_id": "01KR7T2W7DDE6B6JFNXMH5A36Q",
+          "paper_id": "01KR7T0WJG89E7HAT7S6ZJ1T8Z",
+          "text": "Furthermore, we present some early exploration of open problems in LMMs, including scaling to higher resolution inputs, compositional capabilities, and model hallucination, etc.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W7MJDAANJCWYN61JJRV",
+          "paper_id": "01KR7T0WP6S53ZKRK9Y763FPK1",
+          "text": "Large language models (LLMs)-based image captioning has the capability of describing objects not explicitly observed in training data; yet novel objects occur frequently, necessitating the requirement",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        },
+        {
+          "evidence_id": "01KR7T2W7Z47H93G64NMVF7E55",
+          "paper_id": "01KR7T0X0PBTRC2YDHSG4ZN0PR",
+          "text": "This demonstrates that our model not only exhibits competitive performance but is also more flexible and faster than existing multi-task models.",
+          "page_no": 1,
+          "page_no_in_pool": true,
+          "section_type": "abstract",
+          "track": "rule"
+        }
+      ],
+      "rule_evidence_count": 5,
+      "semantic_evidence_count": 0,
+      "has_attempted_circumvention": false,
+      "has_claimed_resolution": true,
+      "label_has_self_praise": false,
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true
+    }
+  ],
+  "total_evidence_count": 72,
+  "avg_evidence_per_cluster": 4.8,
+  "cross_topic_cluster_count": 2,
+  "cross_topic_label_uses_slash": 2,
+  "leiden_cpm_method": "kmeans_fallback",
+  "leiden_cpm_modularity": 0.0,
+  "leiden_cpm_best_gamma": null,
+  "leiden_cpm_gamma_search": [],
+  "attempted_circumvention_count": 2,
+  "claimed_resolution_count": 13,
+  "self_praise_filtered": 0,
+  "dual_track_recall_rule": 100,
+  "dual_track_recall_semantic": 3,
+  "minicheck_route_minicheck": 72,
+  "minicheck_route_hhem": 0,
+  "tiktoken_total_tokens": 2115,
+  "tiktoken_avg_tokens_per_evidence": 29.4,
+  "tiktoken_count_calls": 72,
+  "validation": {
+    "audit_015_all_page_no_valid": true,
+    "audit_016_all_prior_art_in_pool": true,
+    "audit_017_all_labels_no_praise": true
+  },
+  "audit_066_leiden_cpm": true,
+  "audit_018_ac_cr_split": true,
+  "audit_046_dual_track_recall": true,
+  "audit_058_self_praise_filtered": true,
+  "audit_071_minicheck_routing": true,
+  "audit_084_tiktoken_bpe": true
+}

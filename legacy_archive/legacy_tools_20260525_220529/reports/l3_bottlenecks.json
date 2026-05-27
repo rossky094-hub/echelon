@@ -1,0 +1,245 @@
+{
+  "clusters": 10,
+  "bottlenecks_count": 10,
+  "bottlenecks": [
+    {
+      "bottleneck_id": "01KR6RSE6NSGM01M73SS1CPAV8",
+      "label": "在 metasurface design 中,逆向设计的物理可解释性瓶颈",
+      "cluster_id": 0,
+      "main_topic": "T10245",
+      "supporting_papers": [
+        "01KR6RQDAZRSPB0D3BCR5A2D64",
+        "01KR6RQDADN8984DRPGKZRCDJJ",
+        "01KR6RQDA3YY7ZANT8ZYMM3QNX",
+        "01KR6RQDAX6DEBM54YC2796RXH"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDAZRSPB0D3BCR5A2D64",
+        "01KR6RQDADN8984DRPGKZRCDJJ",
+        "01KR6RQDA3YY7ZANT8ZYMM3QNX"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6QHEQJ76NW9MV7J5SZ",
+      "label": "在 metasurface design 中,多模态对齐的泛化能力瓶颈",
+      "cluster_id": 1,
+      "main_topic": "T10245",
+      "supporting_papers": [
+        "01KR6RQDEP7T95WVTR10E79N5H",
+        "01KR6RQDAAQQG7ZJKVYRNXMV3X",
+        "01KR6RQD9Y1PQQASX6B9BZ2JJ6",
+        "01KR6RQDA9M04JT856FA1T8HSP",
+        "01KR6RQDDYPPX8GWA0TWRG8301"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDEP7T95WVTR10E79N5H",
+        "01KR6RQDAAQQG7ZJKVYRNXMV3X",
+        "01KR6RQD9Y1PQQASX6B9BZ2JJ6"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6RM9CCYY5ZGDJP1B0W",
+      "label": "在 robot manipulation 中,机器人操作的样本效率瓶颈",
+      "cluster_id": 2,
+      "main_topic": "T10653",
+      "supporting_papers": [
+        "01KR6RQDBN39ZRCR8SWB53NXR9",
+        "01KR6RQDC6ENZNQ1C8KEQ29EFD",
+        "01KR6RQDBCKMM5BF76AQ9VJC6D",
+        "01KR6RQDDJ4KPPGP9E5W802WFG",
+        "01KR6RQDCB75SHFCX5CQR10G7P"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDBN39ZRCR8SWB53NXR9",
+        "01KR6RQDC6ENZNQ1C8KEQ29EFD",
+        "01KR6RQDBCKMM5BF76AQ9VJC6D"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6T1SQZR7TTDBAE5FM5",
+      "label": "在 robot manipulation 中,强化学习的奖励工程瓶颈",
+      "cluster_id": 3,
+      "main_topic": "T10653",
+      "supporting_papers": [
+        "01KR6RQDDF70TTWWAN3H82GPVP",
+        "01KR6RQDBWWES5Q5PVR5G7FXH8",
+        "01KR6RQDER3G9KBHSCF074SKZ9",
+        "01KR6RQDBGC2834MPXDZ83FTF1",
+        "01KR6RQDDG21H4E7TQ3QQT6C5H"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDDF70TTWWAN3H82GPVP",
+        "01KR6RQDBWWES5Q5PVR5G7FXH8",
+        "01KR6RQDER3G9KBHSCF074SKZ9"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6VY8TQDJB7X0HE3AWT",
+      "label": "在 multimodal ML 中,元表面的宽带设计瓶颈",
+      "cluster_id": 4,
+      "main_topic": "T11714",
+      "supporting_papers": [
+        "01KR6RQDD6HVP3C99ABMFZ8KM8",
+        "01KR6RQDDPSFPXKR1CRNSKTZD8",
+        "01KR6RQDEFMWBH5Q85RNVQ0C95",
+        "01KR6RQDDTQ051DD6CNGB4YF8K"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDD6HVP3C99ABMFZ8KM8",
+        "01KR6RQDDPSFPXKR1CRNSKTZD8",
+        "01KR6RQDEFMWBH5Q85RNVQ0C95"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6XRME3CMBBF9QRREAA",
+      "label": "在 RL-based world model 中,视觉语言模型的幻觉问题瓶颈",
+      "cluster_id": 5,
+      "main_topic": "T10462",
+      "supporting_papers": [
+        "01KR6RQDEJC3MVBKVFJM28Q6RV",
+        "01KR6RQDEMWH9YT108F46XJQR3",
+        "01KR6RQDEP7T95WVTR10E79N5J"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDEJC3MVBKVFJM28Q6RV",
+        "01KR6RQDEMWH9YT108F46XJQR3",
+        "01KR6RQDEP7T95WVTR10E79N5J"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6YG35VHX02027RJ4AK",
+      "label": "在 metasurface design 中,制造公差的仿真-实验差距瓶颈",
+      "cluster_id": 6,
+      "main_topic": "T10245",
+      "supporting_papers": [
+        "01KR6RQDA1V68YD74A5CW2G0JN",
+        "01KR6RQDA28220KY4QJ7RR2SYQ",
+        "01KR6RQD9Y1PQQASX6B9BZ2JJ8",
+        "01KR6RQDB6574DZBA8KWJCHB5Z",
+        "01KR6RQDAH3GSJ6GAK4S64M41V"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDA1V68YD74A5CW2G0JN",
+        "01KR6RQDA28220KY4QJ7RR2SYQ",
+        "01KR6RQD9Y1PQQASX6B9BZ2JJ8"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE6Z8CZA9HMMVRN6TME5",
+      "label": "在 multimodal ML 中,跨模态检索的分布外泛化瓶颈",
+      "cluster_id": 7,
+      "main_topic": "T11714",
+      "supporting_papers": [
+        "01KR6RQDCVY2NRWT8JCFA8GTY4",
+        "01KR6RQDDDBY6NQ44M958H2F97",
+        "01KR6RQDDPSFPXKR1CRNSKTZDA",
+        "01KR6RQDDBR8S1SFDZ2XAW781A",
+        "01KR6RQDDDBY6NQ44M958H2F93"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDCVY2NRWT8JCFA8GTY4",
+        "01KR6RQDDDBY6NQ44M958H2F97",
+        "01KR6RQDDPSFPXKR1CRNSKTZDA"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE71ASXT5JC8AD2JGZHP",
+      "label": "在 robot manipulation 中,机器人抓取的非结构化场景瓶颈",
+      "cluster_id": 8,
+      "main_topic": "T10653",
+      "supporting_papers": [
+        "01KR6RQDC9F65APS0ZQCB0H977",
+        "01KR6RQDCNX6CJ8XZYVNNAWPWY",
+        "01KR6RQDB802XN7KVJPGJE5BJ3",
+        "01KR6RQDBCKMM5BF76AQ9VJC6B",
+        "01KR6RQDCD680RH3SRGVE26218"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDC9F65APS0ZQCB0H977",
+        "01KR6RQDCNX6CJ8XZYVNNAWPWY",
+        "01KR6RQDB802XN7KVJPGJE5BJ3"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    },
+    {
+      "bottleneck_id": "01KR6RSE72HJSPGYQ67TAMC2ZF",
+      "label": "在 robot manipulation 中,世界模型的长时预测误差瓶颈",
+      "cluster_id": 9,
+      "main_topic": "T10653",
+      "supporting_papers": [
+        "01KR6RQDC5WMDDR208C5M1TJXB",
+        "01KR6RQDCXS02Q8HWG2MH8F4EH",
+        "01KR6RQDC27KMT0V18JAKB64ZX"
+      ],
+      "prior_art_uuids": [
+        "01KR6RQDC5WMDDR208C5M1TJXB",
+        "01KR6RQDCXS02Q8HWG2MH8F4EH",
+        "01KR6RQDC27KMT0V18JAKB64ZX"
+      ],
+      "evidence_count": 0,
+      "evidence_atoms": [],
+      "audit_015_page_no_valid": true,
+      "audit_016_prior_art_in_pool": true,
+      "audit_017_label_no_praise": true,
+      "audit_017_label_format_ok": true
+    }
+  ],
+  "validation": {
+    "audit_015_all_page_no_valid": true,
+    "audit_016_all_prior_art_in_pool": true,
+    "audit_017_all_labels_no_praise": true
+  }
+}

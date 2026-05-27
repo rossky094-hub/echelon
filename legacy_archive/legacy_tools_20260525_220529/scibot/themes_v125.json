@@ -1,0 +1,92 @@
+[
+  {
+    "challenge": "建立物理机制与深度学习模型间的逻辑映射",
+    "domain": "Metasurface",
+    "id": "T1",
+    "name": "可解释超表面逆向设计"
+  },
+  {
+    "challenge": "解决宽频段内相位补偿的精确控制与优化",
+    "domain": "Metasurface",
+    "id": "T2",
+    "name": "宽带超表面消色差设计"
+  },
+  {
+    "challenge": "突破微纳尺度下光电元件的高效耦合与调控",
+    "domain": "Metasurface",
+    "id": "T3",
+    "name": "光电集成超表面系统"
+  },
+  {
+    "challenge": "弥合仿真设计与实际加工误差间的性能鸿沟",
+    "domain": "Metasurface",
+    "id": "T4",
+    "name": "抗公差超表面鲁棒性设计"
+  },
+  {
+    "challenge": "提升机器人处理异构传感器信息的任务迁移能力",
+    "domain": "Robot",
+    "id": "T5",
+    "name": "多模态泛化机器人操作"
+  },
+  {
+    "challenge": "减少交互成本实现复杂技能的小样本获取",
+    "domain": "Robot",
+    "id": "T6",
+    "name": "高样本效率机器人学习"
+  },
+  {
+    "challenge": "解决杂乱场景下目标语义识别与位姿估算",
+    "domain": "Robot",
+    "id": "T7",
+    "name": "非结构化场景智能抓取"
+  },
+  {
+    "challenge": "增强指令理解与底层物理控制的映射一致性",
+    "domain": "Robot",
+    "id": "T8",
+    "name": "语义理解驱动的精细操作"
+  },
+  {
+    "challenge": "解决复杂任务奖励函数设计的稀疏与偏差",
+    "domain": "RL",
+    "id": "T9",
+    "name": "强化学习奖励函数自动化工程"
+  },
+  {
+    "challenge": "降低仿真到现实迁移时的性能损耗与风险",
+    "domain": "RL",
+    "id": "T10",
+    "name": "强化学习安全实机部署"
+  },
+  {
+    "challenge": "减少大规模预训练模型生成的跨模态事实错误",
+    "domain": "Multimodal",
+    "id": "T11",
+    "name": "视觉语言模型幻觉抑制"
+  },
+  {
+    "challenge": "提升模型对未见类别和域偏移数据的鲁棒性",
+    "domain": "Multimodal",
+    "id": "T12",
+    "name": "跨模态检索分布外泛化"
+  },
+  {
+    "challenge": "降低海量参数模型的推理延迟与资源消耗",
+    "domain": "Multimodal",
+    "id": "T13",
+    "name": "多模态大模型高效计算"
+  },
+  {
+    "challenge": "解决动态环境中误差累积导致的长程预测失效",
+    "domain": "RL",
+    "id": "T14",
+    "name": "长时预测世界模型建模"
+  },
+  {
+    "challenge": "克服光波计算物理噪声对梯度传播的影响",
+    "domain": "Metasurface",
+    "id": "T15",
+    "name": "稳态光学神经网络训练"
+  }
+]

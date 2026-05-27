@@ -1,0 +1,181 @@
+{
+  "scored_themes": [
+    {
+      "composite_score": 7.33,
+      "cross_domain_score": 7.0,
+      "id": "T1",
+      "name": "可解释超表面逆向设计",
+      "non_obviousness_score": 7.0,
+      "physical_depth_score": 8.0,
+      "reasoning": "将物理先验注入神经网络是EDA行业的共性痛点，不仅限于超表面，具有跨物理仿真领域的普适价值。"
+    },
+    {
+      "composite_score": 7.0,
+      "cross_domain_score": 6.0,
+      "id": "T2",
+      "name": "宽带超表面消色差设计",
+      "non_obviousness_score": 6.0,
+      "physical_depth_score": 9.0,
+      "reasoning": "触碰了因果律与色散控制的物理极限，是光学模组小型化的终极障碍，但其应用面相对集中在成像领域。"
+    },
+    {
+      "composite_score": 8.0,
+      "cross_domain_score": 8.0,
+      "id": "T3",
+      "name": "光电集成超表面系统",
+      "non_obviousness_score": 7.0,
+      "physical_depth_score": 9.0,
+      "reasoning": "不仅解决光学问题，更涉及CMOS兼容与电学调控的亚波长耦合，是未来片上系统的核心物理基础。"
+    },
+    {
+      "composite_score": 6.0,
+      "cross_domain_score": 5.0,
+      "id": "T4",
+      "name": "抗公差超表面鲁棒性设计",
+      "non_obviousness_score": 6.0,
+      "physical_depth_score": 7.0,
+      "reasoning": "属于工艺补丁类技术，虽对产业落地至关重要，但在物理深层突破上略显常规。"
+    },
+    {
+      "composite_score": 8.0,
+      "cross_domain_score": 9.0,
+      "id": "T5",
+      "name": "多模态泛化机器人操作",
+      "non_obviousness_score": 8.0,
+      "physical_depth_score": 7.0,
+      "reasoning": "流形对齐是具身智能走向通用的关键，其跨领域影响力从工业制造延伸至家庭服务。"
+    },
+    {
+      "composite_score": 7.67,
+      "cross_domain_score": 8.0,
+      "id": "T6",
+      "name": "高样本效率机器人学习",
+      "non_obviousness_score": 9.0,
+      "physical_depth_score": 6.0,
+      "reasoning": "小样本学习是AGI的圣杯之一，绕开大规模标注成本，对所有长尾任务具有极高价值。"
+    },
+    {
+      "composite_score": 6.33,
+      "cross_domain_score": 7.0,
+      "id": "T7",
+      "name": "非结构化场景智能抓取",
+      "non_obviousness_score": 6.0,
+      "physical_depth_score": 6.0,
+      "reasoning": "目前主流关注度较高，且逐步进入工程优化阶段，非显见性相对较低。"
+    },
+    {
+      "composite_score": 8.0,
+      "cross_domain_score": 9.0,
+      "id": "T8",
+      "name": "语义理解驱动的精细操作",
+      "non_obviousness_score": 8.0,
+      "physical_depth_score": 7.0,
+      "reasoning": "解决从符号逻辑到连续控制律的映射亏空，是实现人机协作的高维卡点。"
+    },
+    {
+      "composite_score": 7.0,
+      "cross_domain_score": 7.0,
+      "id": "T9",
+      "name": "强化学习奖励函数自动化工程",
+      "non_obviousness_score": 8.0,
+      "physical_depth_score": 6.0,
+      "reasoning": "自动化奖励设计极大降低了算法工程师的干预成本，是RL大规模规模化部署的前提。"
+    },
+    {
+      "composite_score": 7.33,
+      "cross_domain_score": 7.0,
+      "id": "T10",
+      "name": "强化学习安全实机部署",
+      "non_obviousness_score": 7.0,
+      "physical_depth_score": 8.0,
+      "reasoning": "涉及物理系统的硬约束与鲁棒控制，是RL从仿真走进矿山、化工厂等严苛场景的通行证。"
+    },
+    {
+      "composite_score": 7.33,
+      "cross_domain_score": 9.0,
+      "id": "T11",
+      "name": "视觉语言模型幻觉抑制",
+      "non_obviousness_score": 7.0,
+      "physical_depth_score": 6.0,
+      "reasoning": "多模态落地的最大信任危机，其解决将释放医疗、法律等严谨行业的应用潜力。"
+    },
+    {
+      "composite_score": 7.33,
+      "cross_domain_score": 8.0,
+      "id": "T12",
+      "name": "跨模态检索分布外泛化",
+      "non_obviousness_score": 7.0,
+      "physical_depth_score": 7.0,
+      "reasoning": "因果表征而非统计相关，是AI具备常识和适应变化环境的基础逻辑。"
+    },
+    {
+      "composite_score": 7.0,
+      "cross_domain_score": 9.0,
+      "id": "T13",
+      "name": "多模态大模型高效计算",
+      "non_obviousness_score": 6.0,
+      "physical_depth_score": 6.0,
+      "reasoning": "虽然是核心瓶颈，但属于工程热点，更多依赖芯片架构升级而非底层物理发现。"
+    },
+    {
+      "composite_score": 9.0,
+      "cross_domain_score": 9.0,
+      "id": "T14",
+      "name": "长时预测世界模型建模",
+      "non_obviousness_score": 9.0,
+      "physical_depth_score": 9.0,
+      "reasoning": "具身智能的终极范式，通过预测未来减小熵增，是模拟复杂物理现实的最高难度课题。"
+    },
+    {
+      "composite_score": 8.67,
+      "cross_domain_score": 8.0,
+      "id": "T15",
+      "name": "稳态光学神经网络训练",
+      "non_obviousness_score": 8.0,
+      "physical_depth_score": 10.0,
+      "reasoning": "挑战热力学噪声极限与梯度衰减，是实现超越冯诺依曼架构物理上限的颠覆性路径。"
+    }
+  ],
+  "top5": [
+    {
+      "commercial_window": "3-5年内，可创业方向为基于分层世界模型的数字化柔性工厂调度系统与自主导航控制底座。",
+      "falsification_condition": "若基于大规模离散Token的自回归模型在长程物理预测中的误差随时间呈指数级发散，且分层架构无法显著降低Lyapunov指数带来的不确定性。",
+      "investment_thesis": "世界模型通过学习物理规律而非简单的序列概率，是解决AI长距离推理与物理操作连贯性的唯一底层逻辑，具有极高的技术护城河。",
+      "rank": 1,
+      "theme_id": "T14",
+      "theme_name": "长时预测世界模型建模"
+    },
+    {
+      "commercial_window": "3-4年内，可开发低功耗边缘计算光学协处理器，专门用于毫秒级高速机器视觉识别与光互连接口。",
+      "falsification_condition": "若原生硬件梯度训练在包含热噪声的物理信道中无法收敛至优于4位量化的数字精度，或混合信号架构的能耗比优势低于同时期3nm算力平台。",
+      "investment_thesis": "在算力功耗瓶颈下，利用光物理层直接进行线性计算是跳出冯·诺依曼架构的必经之路，解决了AI推理的能耗极限问题。",
+      "rank": 2,
+      "theme_id": "T15",
+      "theme_name": "稳态光学神经网络训练"
+    },
+    {
+      "commercial_window": "3年内，针对高精度光刻、LiDAR探测及超薄变焦手机模组开发商用级动态超表面相位调控芯片。",
+      "falsification_condition": "若集成过程中电磁波的非局域效应导致串扰（Crosstalk）无法通过算法补偿，且CMOS集成成本始终高于传统微纳加工方案。",
+      "investment_thesis": "实现了物理层信息编码与电学控制的深度耦合，是继光纤通信后光学领域的第二次集成革命。",
+      "rank": 3,
+      "theme_id": "T3",
+      "theme_name": "光电集成超表面系统"
+    },
+    {
+      "commercial_window": "4-5年内，商业化落地于多模态传感器即插即用的通用工业机器人平台，支持无代码任务迁移。",
+      "falsification_condition": "若流形对齐（Manifold Alignment）在高维非线性模组下无法解决“灾难性遗忘”，导致跨模态迁移的泛化精度低于专用小模型。",
+      "investment_thesis": "打破了传感器专用的孤岛效应，通过多模态统一基底使机器人具备通用理解能力，极大地扩张了机器人的应用边界。",
+      "rank": 4,
+      "theme_id": "T5",
+      "theme_name": "多模态泛化机器人操作"
+    },
+    {
+      "commercial_window": "3-5年内，核心方向为高复杂度柔性物装配任务（如电缆理线、精密电子组装）的智能协作终端。",
+      "falsification_condition": "若语义层提供的低熵信息无法在物理层转化成闭合的、具有利普希茨连续性的力矩指令，导致精细操作出现物理不一致性。",
+      "investment_thesis": "解决了语言模型从“会说到会做”的关键跨越，填补了宏观任务逻辑与微观物理控制之间的映射空白。",
+      "rank": 5,
+      "theme_id": "T8",
+      "theme_name": "语义理解驱动的精细操作"
+    }
+  ]
+}

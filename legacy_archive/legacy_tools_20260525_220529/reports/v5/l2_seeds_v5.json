@@ -1,0 +1,165 @@
+{
+  "candidates": 2000,
+  "passed_cross_domain_gate_v5": 392,
+  "cross_domain_v5_mature_pass": 386,
+  "cross_domain_v5_new_paper_pass": 6,
+  "passed_physical_depth": 825,
+  "physical_depth_path_breakdown": {
+    "path_1": 49,
+    "path_2a": 48,
+    "path_2b": 5,
+    "path_2c": 0,
+    "path_2d": 16,
+    "path_3": 778,
+    "path_4": 10,
+    "path_2_total": 69,
+    "path_2_pct_of_depth": 0.0836
+  },
+  "passed_both_gates": 180,
+  "selected_seeds": 100,
+  "seeds_by_topic": {
+    "T11714": 23,
+    "T10245": 11,
+    "T10653": 36,
+    "T10462": 30
+  },
+  "top10_seeds": [
+    {
+      "paper_id": "01KR873PHDF814KSCW1N2F94Z0",
+      "title": "Physically Grounded Vision-Language Models for Robotic Manipulation",
+      "topic": "T11714",
+      "score": 0.6666273877900772,
+      "z_score": 2.6142001271530413,
+      "review_subtype": "review"
+    },
+    {
+      "paper_id": "01KR873P25TGFSNDJG8CA40Q0V",
+      "title": "RH20T: A Comprehensive Robotic Dataset for Learning Diverse Skills in One-Shot",
+      "topic": "T10653",
+      "score": 0.6502858173323799,
+      "z_score": 14.057084499226026,
+      "review_subtype": "review"
+    },
+    {
+      "paper_id": "01KR873NQCXDAPTP26B7HTFFCW",
+      "title": "Broadband and large-aperture metasurface edge encoders for incoherent infrared radiation",
+      "topic": "T10245",
+      "score": 0.6465914845869389,
+      "z_score": 5.094116268731119,
+      "review_subtype": "non_review"
+    },
+    {
+      "paper_id": "01KR873PGEZXFGHGEQPP0RGAHQ",
+      "title": "Improved Baselines with Visual Instruction Tuning",
+      "topic": "T11714",
+      "score": 0.6309921108249738,
+      "z_score": 0.7525847848593858,
+      "review_subtype": "outlook"
+    },
+    {
+      "paper_id": "01KR873Q29X2Y625FBWGVM410N",
+      "title": "Diffusion Policies for Out-of-Distribution Generalization in Offline Reinforcement Learning",
+      "topic": "T10462",
+      "score": 0.6281230447914766,
+      "z_score": 3.376602148019679,
+      "review_subtype": "survey"
+    },
+    {
+      "paper_id": "01KR873P2EHDD2DBTQESE6G8ZB",
+      "title": "Hierarchical Diffusion Policy for Kinematics-Aware Multi-Task Robotic Manipulation",
+      "topic": "T10653",
+      "score": 0.624531609843157,
+      "z_score": 4.891610882238821,
+      "review_subtype": "survey"
+    },
+    {
+      "paper_id": "01KR873P2GD266HHX2K9NVKHP9",
+      "title": "Grasp-Anything: Large-scale Grasp Dataset from Foundation Models",
+      "topic": "T10653",
+      "score": 0.6240920737981468,
+      "z_score": 3.678389317821292,
+      "review_subtype": "non_review"
+    },
+    {
+      "paper_id": "01KR873PBNBEG83EY7MMWBVKWV",
+      "title": "Goal-Conditioned Imitation Learning using Score-based Diffusion Policies",
+      "topic": "T10653",
+      "score": 0.6236415146011647,
+      "z_score": 1.8215802103398595,
+      "review_subtype": "survey"
+    },
+    {
+      "paper_id": "01KR873P295C3J0P7HM5Z53GXH",
+      "title": "TinyVLA: Toward Fast, Data-Efficient Vision-Language-Action Models for Robotic Manipulation",
+      "topic": "T10653",
+      "score": 0.6234706994035614,
+      "z_score": 2.812349614708213,
+      "review_subtype": "perspective"
+    },
+    {
+      "paper_id": "01KR873P36C5ZW9H6DQBHZ99H9",
+      "title": "SERL: A Software Suite for Sample-Efficient Robotic Reinforcement Learning",
+      "topic": "T10653",
+      "score": 0.6222452082263452,
+      "z_score": 1.028091901074666,
+      "review_subtype": "survey"
+    }
+  ],
+  "cross_domain_v5_pass": 392,
+  "cross_domain_v5_distribution": {
+    "mature_track": 386,
+    "new_paper_track": 6
+  },
+  "review_subtype_distribution": {
+    "roadmap": 7,
+    "non_review": 1220,
+    "outlook": 84,
+    "survey": 486,
+    "review": 110,
+    "tutorial": 22,
+    "perspective": 71
+  },
+  "c_team_disrupt_by_type": {
+    "experiment": {
+      "count": 1548,
+      "mean": 0.5,
+      "std": 0.0
+    },
+    "simulation": {
+      "count": 386,
+      "mean": 0.5,
+      "std": 0.0
+    },
+    "theory": {
+      "count": 66,
+      "mean": 0.5,
+      "std": 0.0
+    }
+  },
+  "smooth_score_0_5_distribution": {
+    "[0.09,0.12)": 166,
+    "[0.22,0.27]": 538,
+    "[0.12,0.15)": 386,
+    "[0.15,0.18)": 466,
+    "[0.18,0.22)": 444
+  },
+  "severity_trimmed_mean_avg": 0.6688,
+  "audit_043_cosine_floor_applied": true,
+  "keystone_score_std": 0.06394376885712447,
+  "keystone_score_mean": 0.5107738312027289,
+  "keystone_score_top10_range": 0.05893673195231919,
+  "keystone_score_top10_max": 0.6855008690578565,
+  "keystone_score_top10_min": 0.6265641371055373,
+  "c_venue_v4_std": 0.2859055458396835,
+  "v11_4_baseline_top10_range": 0.047181989666023494,
+  "v11_5_vs_v11_4_top10_range_factor": 1.249,
+  "audit_013_cross_domain_v5": true,
+  "audit_034_review_subtype_penalty": true,
+  "audit_035_c_team_disrupt_v5": true,
+  "audit_083_n_authors_zero_neutral": true,
+  "audit_005_smooth_score_v5": true,
+  "audit_048_discrete_1_to_5": true,
+  "audit_004_trimmed_mean": true,
+  "audit_043_mmr_cosine_floor": true,
+  "audit_085_topic_aware_prompt": true
+}

@@ -1,0 +1,115 @@
+{
+  "candidates": 1000,
+  "passed_cross_domain_gate": 244,
+  "passed_physical_depth_gate": 425,
+  "passed_physical_depth_path1_optics": 24,
+  "passed_physical_depth_path2_cs": 108,
+  "passed_physical_depth_path3_compare": 395,
+  "passed_both_gates": 101,
+  "selected_seeds": 50,
+  "audit_068_no_complex": true,
+  "audit_068_no_nan": true,
+  "audit_069_no_valueerror": true,
+  "audit_002_mmr_lambda": 0.7,
+  "audit_002_max_penalty": 0.29602484899080833,
+  "seeds_by_topic": {
+    "T10653": 19,
+    "T10462": 15,
+    "T11714": 12,
+    "T10245": 4
+  },
+  "top10_seeds": [
+    {
+      "paper_id": "01KR7M221Q0GRD6T7B35A16JYY",
+      "title": "Efficient Grasp Detection Network With Gaussian-Based Grasp Representation for Robotic Manipulation",
+      "topic": "T10653",
+      "score": 0.708768958060618,
+      "z_score": 2.985117843850069
+    },
+    {
+      "paper_id": "01KR7M2243Q5DW2QMS0DMZVB2G",
+      "title": "3D-VisTA: Pre-trained Transformer for 3D Vision and Text Alignment",
+      "topic": "T11714",
+      "score": 0.6749415385289373,
+      "z_score": 1.8135309037779808
+    },
+    {
+      "paper_id": "01KR7M224RB8SJ0DD3HE8XDHXT",
+      "title": "Actor Prioritized Experience Replay",
+      "topic": "T10462",
+      "score": 0.674857480498003,
+      "z_score": 0.029038121803973485
+    },
+    {
+      "paper_id": "01KR7M2223VQMAJYHBS9X39S6A",
+      "title": "CRT-6D: Fast 6D Object Pose Estimation with Cascaded Refinement Transformers",
+      "topic": "T10653",
+      "score": 0.6734312141868939,
+      "z_score": 1.746931184784268
+    },
+    {
+      "paper_id": "01KR7M223ZEJMZSKR3KQ26MEQ1",
+      "title": "Learning Semantic Relationship among Instances for Image-Text Matching",
+      "topic": "T11714",
+      "score": 0.6673730123010079,
+      "z_score": 2.007753342806106
+    },
+    {
+      "paper_id": "01KR7M224FA6E6HS3NZ14G65XB",
+      "title": "Fear-Neuro-Inspired Reinforcement Learning for Safe Autonomous Driving",
+      "topic": "T10462",
+      "score": 0.6537300471162056,
+      "z_score": 0.22804490598297766
+    },
+    {
+      "paper_id": "01KR7M2247TM9FAVFDYTFMQQ3W",
+      "title": "DETRs with Collaborative Hybrid Assignments Training",
+      "topic": "T10462",
+      "score": 0.6508277859708721,
+      "z_score": 1.4626532651179198
+    },
+    {
+      "paper_id": "01KR7M221XXBN38M30MMS9M5GK",
+      "title": "Goal-Conditioned Imitation Learning using Score-based Diffusion Policies",
+      "topic": "T10653",
+      "score": 0.6463131818132224,
+      "z_score": 0.3071867328985958
+    },
+    {
+      "paper_id": "01KR7M223QQX6EJ4E0YTEMBJB1",
+      "title": "CORA: Adapting CLIP for Open-Vocabulary Detection with Region Prompting and Anchor Pre-Matching",
+      "topic": "T11714",
+      "score": 0.6448605329446759,
+      "z_score": 1.21007380823452
+    },
+    {
+      "paper_id": "01KR7M221PEH59DCFZVG4PRQZS",
+      "title": "Hybrid Robotic Grasping With a Soft Multimodal Gripper and a Deep Multistage Learning Scheme",
+      "topic": "T10653",
+      "score": 0.6351034290436599,
+      "z_score": 0.7948973230175965
+    }
+  ],
+  "keystone_score_std": 0.06842108108310818,
+  "keystone_score_mean": 0.5377370531646536,
+  "keystone_score_top10_range": 0.04472091492854302,
+  "keystone_score_top10_max": 0.708768958060618,
+  "keystone_score_top10_min": 0.664048043132075,
+  "t11714_physical_depth_pass": 153,
+  "t11714_physical_depth_path2": 60,
+  "hotfix_r1": {
+    "score_std": 0.06842108108310818,
+    "score_mean": 0.5377370531646536,
+    "top10_range": 0.04472091492854302,
+    "v11_2_top10_range": 0.028,
+    "improvement_factor": 1.5971755331622508
+  },
+  "hotfix_r5": {
+    "path1_optics": 24,
+    "path2_cs": 108,
+    "path3_compare": 395,
+    "total_pass": 425,
+    "t11714_pass": 153,
+    "t11714_via_path2": 60
+  }
+}

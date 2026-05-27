@@ -1,0 +1,85 @@
+# Echelon V14-B 依赖清单
+# 平台: macOS Apple Silicon (M1/M2/M3) + Python 3.11+
+# 安装: pip install -r requirements-v14b.txt
+
+# -----------------------------------------------------------------------
+# 基础(V13 已有,锁定版本)
+# -----------------------------------------------------------------------
+networkx>=3.2,<4.0
+scikit-learn>=1.4,<2.0
+numpy>=1.26,<2.0
+pandas>=2.2,<3.0
+
+# -----------------------------------------------------------------------
+# V14-B 新增
+# -----------------------------------------------------------------------
+
+# PyTorch — 必须支持 MPS (Apple Silicon)
+# 安装时使用 Apple 推荐的 channel:
+#   pip install torch torchvision torchaudio
+# (不要用 --index-url https://download.pytorch.org/whl/cu118 — 那是 CUDA 版)
+torch>=2.2,<3.0
+torchvision>=0.17,<1.0
+torchaudio>=2.2,<3.0
+
+# PyG (PyTorch Geometric) — VGAE
+# 安装说明见: https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
+# Apple Silicon 推荐:
+#   pip install torch-geometric
+torch-geometric>=2.5,<3.0
+
+# Transformers + SciBERT
+transformers>=4.40,<5.0
+sentence-transformers>=2.7,<3.0
+tokenizers>=0.19,<1.0
+accelerate>=0.30,<1.0
+
+# UMAP
+umap-learn>=0.5,<1.0
+
+# Visual graph acceleration (Step 10)
+# hnswlib is used for high-throughput semantic kNN when available.
+# NetworkX remains the fallback for community detection; igraph/leidenalg can
+# be added later for larger-than-optics graph partitions.
+hnswlib>=0.8,<1.0
+
+# 进度条
+tqdm>=4.66
+
+# -----------------------------------------------------------------------
+# LLM Providers
+# -----------------------------------------------------------------------
+
+# Anthropic (claude-sonnet-4-6)
+anthropic>=0.30,<1.0
+
+# OpenAI (gpt-4o / o3-mini)
+openai>=1.30,<2.0
+
+# Ollama (本地模型 HTTP 客户端)
+httpx>=0.27,<1.0
+
+# -----------------------------------------------------------------------
+# OpenAlex
+# -----------------------------------------------------------------------
+pyalex>=0.13,<1.0
+
+# -----------------------------------------------------------------------
+# 数据验证
+# -----------------------------------------------------------------------
+pydantic>=2.6,<3.0
+
+# -----------------------------------------------------------------------
+# V14B API / visual graph service
+# -----------------------------------------------------------------------
+fastapi>=0.111,<1.0
+uvicorn[standard]>=0.30,<1.0
+pytest>=8.0,<9.0
+
+# -----------------------------------------------------------------------
+# 其他工具
+# -----------------------------------------------------------------------
+python-dotenv>=1.0,<2.0     # .env 文件支持
+aiohttp>=3.9,<4.0           # 异步 HTTP
+lxml>=5.0,<6.0              # arXiv OAI-PMH XML 解析
+tenacity>=8.2,<9.0          # 重试装饰器(可选)

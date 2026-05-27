@@ -1,0 +1,89 @@
+{
+  "nodes": 1000,
+  "edges": {
+    "cite_direct": 510,
+    "co_citation": 56308,
+    "bib_couple": 26764,
+    "semantic_bridge": 7,
+    "total": 56382
+  },
+  "cross_topic_bridges": 7,
+  "by_topic": {
+    "T10245": 250,
+    "T10653": 250,
+    "T11714": 250,
+    "T10462": 250
+  },
+  "centrality_top10": [
+    {
+      "paper_id": "01KR6RQDAZRSPB0D3BCR5A2D65",
+      "title": "Electromagnetic metamaterial agent",
+      "topic": "T10245",
+      "bridging_centrality": 0.0477725045856206,
+      "z_score": 13.02694515854027
+    },
+    {
+      "paper_id": "01KR6RQDADN8984DRPGKZRCDJM",
+      "title": "Realization of high-performance optical metasurfaces over a large area: a review",
+      "topic": "T10245",
+      "bridging_centrality": 0.04376552847785299,
+      "z_score": 11.9030437746063
+    },
+    {
+      "paper_id": "01KR6RQD9VS35DKCKSMM934CHP",
+      "title": "A guidance to intelligent metamaterials and metamaterials intelligence",
+      "topic": "T10245",
+      "bridging_centrality": 0.04036227375152022,
+      "z_score": 10.948477889027261
+    },
+    {
+      "paper_id": "01KR6RQDACKCSBY8K9BA873KP3",
+      "title": "Recent advances in the metamaterial and metasurface-based biosensor in the gigah",
+      "topic": "T10245",
+      "bridging_centrality": 0.03208889981742641,
+      "z_score": 8.627910916764558
+    },
+    {
+      "paper_id": "01KR6RQDE6VDE3HHBBNPGMKM0R",
+      "title": "Agentic AI: The age of reasoning—A review",
+      "topic": "T10462",
+      "bridging_centrality": 0.025273658904382594,
+      "z_score": 6.716330091721716
+    },
+    {
+      "paper_id": "01KR6RQDA3YY7ZANT8ZYMM3QNP",
+      "title": "Metasurface-based computational imaging: a review",
+      "topic": "T10245",
+      "bridging_centrality": 0.024788530669473643,
+      "z_score": 6.580258330888737
+    },
+    {
+      "paper_id": "01KR6RQDBH9V6T1KJ0XB7XBQHN",
+      "title": "Machine learning meets advanced robotic manipulation",
+      "topic": "T10653",
+      "bridging_centrality": 0.024328669582789016,
+      "z_score": 6.451273655701797
+    },
+    {
+      "paper_id": "01KR6RQDATMG3KHFGXVF75FMK7",
+      "title": "Thermally tunable binary‐phase VO <sub>2</sub> metasurfaces for switchable holog",
+      "topic": "T10245",
+      "bridging_centrality": 0.01941791809099185,
+      "z_score": 5.07387577526833
+    },
+    {
+      "paper_id": "01KR6RQDE9SVPRXVXCMFBXA5C1",
+      "title": "Unsupervised Representation Learning in Deep Reinforcement Learning: A Review",
+      "topic": "T10462",
+      "bridging_centrality": 0.018807250960729098,
+      "z_score": 4.902592090423085
+    },
+    {
+      "paper_id": "01KR6RQDAMPP9GCZET626W8N5C",
+      "title": "Meta‐Attention Deep Learning for Smart Development of Metasurface Sensors",
+      "topic": "T10245",
+      "bridging_centrality": 0.018543356872232814,
+      "z_score": 4.828573448111238
+    }
+  ]
+}

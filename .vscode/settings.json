@@ -1,0 +1,7 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "test": true,
+        "make": true
+    },
+    "debug.allowBreakpointsEverywhere": true
+}

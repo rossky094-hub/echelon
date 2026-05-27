@@ -1,0 +1,925 @@
+[
+  {
+    "theme_id": "T01",
+    "title": "超构光学器件的微分优化与自动设计",
+    "is_cross_domain": true,
+    "physical_depth": 5,
+    "non_obviousness": 4,
+    "commercial_value": "加速下一代微纳光学器件的研发效率，显著降低高性能光学表面的设计与仿真成本。",
+    "paper_ids": [
+      "01KR7T0VQ0VWCDTX5SN9B4BEVH",
+      "01KR7T0VQ8QM6MH3630RGXW6HN",
+      "01KR7T0VR8AJJY23SJHDCJW1GJ"
+    ],
+    "papers": [
+      {
+        "bid": 1,
+        "paper_id": "01KR7T0VQ0VWCDTX5SN9B4BEVH",
+        "title": "Genetic algorithm assisted meta-atom design for high-performance metasurface optics",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 105,
+        "abstract_snippet": "Metasurfaces, composed of planar arrays of intricately designed meta-atom structures, possess remarkable capabilities in controlling electromagnetic waves in various ways. A critical aspect of metasurface design involves selecting suitable meta-atoms to achieve target functionalities such as phase r",
+        "bottleneck": "传统的超原子设计高度依赖手动参数扫描，这种方式不仅计算成本高昂，且过于依赖设计者的先验经验和直觉判断。",
+        "evidence_quote": "Conventional design processes often involve extensive parameter sweeping, a laborious and computationally intensive task heavily reliant on designer expertise and judgement.",
+        "physical_depth_signal": "相位延迟、振幅调制和偏振转换等电磁响应与超原子几何结构参数之间的映射关系",
+        "category": "compute_efficiency"
+      },
+      {
+        "bid": 2,
+        "paper_id": "01KR7T0VQ8QM6MH3630RGXW6HN",
+        "title": "Deep‐Learning Empowered Customized Chiral Metasurface for Calibration‐Free Biosensing",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 98,
+        "abstract_snippet": "As a 2D metamaterial, metasurfaces offer an unprecedented avenue to facilitate light-matter interactions. The current \"one-by-one design\" method is hindered by time-consuming, repeated testing within a confined space. However, intelligent design strategies for metasurfaces, limited by data-driven pr",
+        "bottleneck": "智能设计手性超表面受限于数据驱动特性，现有模拟方法难以在广阔的设计空间中高效获取具有高圆二色性（CD）物理响应的高质量数据。",
+        "evidence_quote": "intelligent design strategies for metasurfaces, limited by data-driven properties, have rarely been explored.",
+        "physical_depth_signal": "手性超表面的圆二色性（Circular Dichroism, CD）响应强度及全设计空间结构参数映射",
+        "category": "data_quality"
+      },
+      {
+        "bid": 5,
+        "paper_id": "01KR7T0VR8AJJY23SJHDCJW1GJ",
+        "title": "Broadband thermal imaging using meta-optics",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 63,
+        "abstract_snippet": "Subwavelength diffractive optics known as meta-optics have demonstrated the potential to significantly miniaturize imaging systems. However, despite impressive demonstrations, most meta-optical imaging systems suffer from strong chromatic aberrations, limiting their utilities. Here, we employ invers",
+        "bottleneck": "传统超构光学成像系统在宽波段（如长波红外）范围内存在严重的色差问题，且缺乏能将微观元原子相位工程与宏观全局散射体设计相统一的微分优化框架。",
+        "evidence_quote": "most meta-optical imaging systems suffer from strong chromatic aberrations, limiting their utilities.",
+        "physical_depth_signal": "调制传递函数(MTF)曲面下的波长平均体积以及8-12μm长波红外波段的相位响应",
+        "category": "physical_grounding"
+      }
+    ],
+    "detailed_analysis": "当前超构光学设计正从专家经验驱动转向数据驱动与微分优化。SOTA方案利用遗传算法或深度学习优化超原子，但核心卡点在于高维参数空间下的电磁响应（如相位、振幅及圆二色性CD）计算极其耗时。传统“逐个设计”模式由于缺乏微观结构与宏观全局散射体（如LWIR波段相位响应）的统一优化框架，导致宽波段色差严重。这急需光学物理与AI微分算子、自动化流程融合，通过物理增强的神经网络替代昂贵的FDTD仿真，实现跨波段MTF曲面体积的微分优化。深入物理层面，需通过数学关系精准映射8-12μm波段的相位工程。解决此卡点将使微纳光学研发效率质变，消费级AR/VR模组商、红外热成像及高灵敏度生物传感设备商将极大受益。"
+  },
+  {
+    "theme_id": "T02",
+    "title": "宽谱段多维光信息解耦与片上集成",
+    "is_cross_domain": true,
+    "physical_depth": 4,
+    "non_obviousness": 4,
+    "commercial_value": "支撑微型化高光谱成像与超快光调制器的开发，在消费电子和安防监测中有巨大潜力。",
+    "paper_ids": [
+      "01KR7T0VQNR5P6V0P2YB180X4R",
+      "01KR7T0VR1D775CSXZ3F3V44RX",
+      "01KR7T0VSPJAE6CF31WZXWG4AW"
+    ],
+    "papers": [
+      {
+        "bid": 3,
+        "paper_id": "01KR7T0VQNR5P6V0P2YB180X4R",
+        "title": "Photon‐Induced Ultrafast Multitemporal Programming of Terahertz Metadevices",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 81,
+        "abstract_snippet": "Dynamic terahertz (THz) metasurface can feature modulated and multiplexed electromagnetic functionalities, important for wave-based computation, six-generation communications, and other applications. The versatile dynamic switching typically relies on a series of complex or incompatible multifield a",
+        "bottleneck": "动态太赫兹超表面的多模态切换通常依赖复杂且不兼容的多场激励，导致系统复杂度高、损耗大且调制速度受限，难以实现超快且独立的时域编程演化。",
+        "evidence_quote": "The versatile dynamic switching typically relies on a series of complex or incompatible multifield activations, with excessive system complexity, additional loss, slow modulation speed, and inertial time-varying properties, limiting more widespread applications.",
+        "physical_depth_signal": "硅（Si）与锗（Ge）杂化超表面在0.6-2 THz频段的载流子动力学以及1.25至4.75 ps量级的极化相关时域响应机制。",
+        "category": "hardware_constraint"
+      },
+      {
+        "bid": 4,
+        "paper_id": "01KR7T0VR1D775CSXZ3F3V44RX",
+        "title": "Metasurface-enabled broadband multidimensional photodetectors",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 70,
+        "abstract_snippet": "Light encodes multidimensional information, such as intensity, polarization, and spectrum. Traditional extraction of this light information requires discrete optical components by subdividing the detection area into many \"one-to-one\" functional pixels. The broadband photodetection of high-dimensiona",
+        "bottleneck": "如何通过单一集成片上探测器在极宽光谱范围内实现高维光信息（如偏振和波长）的精准解耦与同步检测，克服传统方法对离散光学组件和多像素阵列的依赖。",
+        "evidence_quote": "The broadband photodetection of high-dimensional optical information with a single integrated on-chip detector is highly sought after, yet it poses significant challenges.",
+        "physical_depth_signal": "基于双极性极化率（bipolar polarizability）编码的矢量光电流极性与振幅变化，以及在1-8 μm宽波段内的自旋-波长区分机制。",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 6,
+        "paper_id": "01KR7T0VSPJAE6CF31WZXWG4AW",
+        "title": "Broadband and large-aperture metasurface edge encoders for incoherent infrared radiation",
+        "topic": "Metamaterials and Metasurfaces Applications",
+        "cited_by": 47,
+        "abstract_snippet": "The prevalence of computer vision systems necessitates hardware-based approaches to relieve the high computational demand of deep neural networks in resource-limited applications. One solution would be to off-load low-level image feature extraction, such as edge detection, from the digital network t",
+        "bottleneck": "在资源受限应用中，如何在大口径、非相干且宽波段的长波红外（LWIR）成像系统中，通过超构表面实现高质量的光学预处理（如边缘检测）以替代数字层的高计算开销。",
+        "evidence_quote": "The prevalence of computer vision systems necessitates hardware-based approaches to relieve the high computational demand of deep neural networks in resource-limited applications.",
+        "physical_depth_signal": "7.5至13.5μm长波红外波段的非相干宽带波前整形与拉普拉斯响应函数",
+        "category": "compute_efficiency"
+      }
+    ],
+    "detailed_analysis": "当前SOTA已在太赫兹及红外波段实现皮秒级(1.25-4.75 ps)时域编程与非相干宽频成像，但核心卡点在于单一像素内多维信息（偏振、波长）的精准解耦机制，以及多场激励下调制速度与系统损耗的权衡。这促使光学超构表面与AI/计算机视觉深度融合，通过硬件级光学预处理（如拉普拉斯响应边缘提取）替代数字前端的高能耗计算。物理层面，利用双极性极化率编码矢量光电流，结合1-8 μm宽波段自旋-波长区分机制，构建了载流子动力学与波前整形的数学关联。该突破将赋能消费电子及安防监测领域，使高性能、微型化高光谱成像与超快光调制器成为可能，显著降低移动端视觉AI系统的计算负载。"
+  },
+  {
+    "theme_id": "T03",
+    "title": "灵巧手高精度触觉反馈与空间感知",
+    "is_cross_domain": true,
+    "physical_depth": 3,
+    "non_obviousness": 4,
+    "commercial_value": "实现精细化工业操作与服务机器人复杂交互，提升柔性制造的自动化水平。",
+    "paper_ids": [
+      "01KR7T0W49XRBS9KXE6VN1Y09H",
+      "01KR7T0W54G1PC70TJ7H0TRZ6B",
+      "01KR7T0WBZ3HR5PJ6E7K95M7CT"
+    ],
+    "papers": [
+      {
+        "bid": 7,
+        "paper_id": "01KR7T0W49XRBS9KXE6VN1Y09H",
+        "title": "RH20T: A Comprehensive Robotic Dataset for Learning Diverse Skills in One-Shot",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 54,
+        "abstract_snippet": "A key challenge for robotic manipulation in open domains is how to acquire diverse and generalizable skills for robots. Recent progress in one-shot imitation learning and robotic foundation models have shown promise in transferring trained policies to new tasks based on demonstrations. This feature ",
+        "bottleneck": "当前机器人操纵研究受限于训练数据集的局限性，主要集中在仅依赖视觉引导的简单任务，缺乏解决复杂接触型任务所需的视觉、触觉等多模态感知的深度整合。",
+        "evidence_quote": "due to limitations in the training dataset, the current focus of the community has mainly been on simple cases, such as push or pick-place tasks, relying solely on visual guidance. In reality, there are many complex skills, some of which may even require both visual and tactile perception to solve.",
+        "physical_depth_signal": "多模态感知中的力觉信号（force）与视觉、动作序列在接触密集型操纵中的物理耦合与对齐。",
+        "category": "data_quality"
+      },
+      {
+        "bid": 11,
+        "paper_id": "01KR7T0W54G1PC70TJ7H0TRZ6B",
+        "title": "Embedding high-resolution touch across robotic hands enables adaptive human-like grasping",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 31,
+        "abstract_snippet": "Developing robotic hands that adapt to real-world dynamics remains a fundamental challenge in robotics and machine intelligence. Despite notable advances in replicating human-hand kinematics and control algorithms, robotic systems still struggle to match human capabilities in dynamic environments, p",
+        "bottleneck": "机器人在动态环境中难以匹配人类能力，核心在于难以在不牺牲手部机械运动范围的情况下，集成高分辨率且大面积覆盖的触觉反馈系统。",
+        "evidence_quote": "overcome traditional challenges in integrating high-resolution tactile sensors while preserving the full range of motion",
+        "physical_depth_signal": "0.1-mm 空间分辨率、70% 表面积覆盖度以及全量程运动学自由度 (full range of motion)",
+        "category": "hardware_constraint"
+      },
+      {
+        "bid": 14,
+        "paper_id": "01KR7T0WBZ3HR5PJ6E7K95M7CT",
+        "title": "Learning high-DOF reaching-and-grasping via dynamic representation of gripper-object interaction",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 93,
+        "abstract_snippet": "We approach the problem of high-DOF reaching-and-grasping via learning joint planning of grasp and motion with deep reinforcement learning. To resolve the sample efficiency issue in learning the high-dimensional and complex control of dexterous grasping, we propose an effective representation of gra",
+        "bottleneck": "在高自由度灵巧抓取任务中，深度强化学习面临由于控制空间维度极高且缺乏能精细表征抓取器与物体间复杂空间交互的有效状态表示，从而导致的采样效率极低的问题。",
+        "evidence_quote": "To resolve the sample efficiency issue in learning the high-dimensional and complex control of dexterous grasping, we propose an effective representation of grasping state characterizing the spatial interaction between the gripper and the target object.",
+        "physical_depth_signal": "基于Voronoi图的交互平分面(IBS)所刻画的抓取器与物体间的三维几何拓扑与空间距离场关系",
+        "category": "sample_efficiency"
+      }
+    ],
+    "detailed_analysis": "当前灵巧手操纵的SOTA水平仍受限于视觉引导的简单任务，核心卡点在于如何在不牺牲关节运动自由度的前提下，实现具备0.1mm空间分辨率及70%表面覆盖的高集成度触觉反馈。这种高维控制空间与复杂接触力信号的物理耦合，导致强化学习采样效率极低。为此，急需光学（如高精度光学触觉）、AI与机器人学的跨界融合，利用多模态大模型（VLM）将视觉语义与精细力学感知对齐。物理层面上，需引入基于Voronoi图的交互平分面（IBS）来数学化刻画抓取器与物体间的动态三维几何拓扑与空间距离场关系。若能解决该卡点，柔性制造与精密组装企业将率先受益，推动服务机器人在复杂非结构化环境中实现人类级的精细化交互操作。"
+  },
+  {
+    "theme_id": "T04",
+    "title": "具身智能中的物理一致性拓扑建模",
+    "is_cross_domain": true,
+    "physical_depth": 5,
+    "non_obviousness": 3,
+    "commercial_value": "解决线缆布线等柔性体操作难题，提升人形机器人在家庭与工厂中的任务成功率。",
+    "paper_ids": [
+      "01KR7T0W4J1QFC5CMNSSPYHGS8",
+      "01KR7T0WFAS8PG3344XZJWZ7YQ",
+      "01KR7T0WFKH9HBVSGN2Y0164ZN"
+    ],
+    "papers": [
+      {
+        "bid": 9,
+        "paper_id": "01KR7T0W4J1QFC5CMNSSPYHGS8",
+        "title": "Hierarchical Diffusion Policy for Kinematics-Aware Multi-Task Robotic Manipulation",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 37,
+        "abstract_snippet": "This paper introduces Hierarchical Diffusion Policy (HDP), a hierarchical agent for multi-task robotic manipulation. HDP factorises a manipulation policy into a hierarchical structure: a high-level task-planning agent which predicts a distant next-best end-effector pose (NBP), and a low-level goal-c",
+        "bottleneck": "在多任务机器人操纵中，难以在生成上下文感知的运动轨迹时同时满足底层的机器人运动学约束，即末端执行器路径规划与关节空间动力学可行性之间存在脱节。",
+        "evidence_quote": "To generate context-aware motion trajectories while satisfying robot kinematics constraints, we present a novel kinematics-aware goal-conditioned control agent, Robot Kinematics Diffuser (RK-Diffuser).",
+        "physical_depth_signal": "机器人运动学约束(Kinematics constraints)与可微运动学(Differentiable kinematics)模型",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 17,
+        "paper_id": "01KR7T0WFAS8PG3344XZJWZ7YQ",
+        "title": "Robotic Cable Routing with Spatial Representation",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 43,
+        "abstract_snippet": "Cable routing is a challenging task for robotic automation. To accomplish the task, it requires a high-level path planner to generate a sequence of cable configurations from the initial state to the target state and a low-level manipulation planner to plan the robot motion commands to transit betwee",
+        "bottleneck": "当前在线缆布线任务中，缺乏能够同时建模柔性线缆与环境物体（如夹具）之间复杂拓扑关系的空间表示方法，这严重阻碍了高层路径规划与底层操作控制的协同设计。",
+        "evidence_quote": "However, there are yet no proper representations to model the cable with the environment objects, impeding the design of both high-level path planning and low-level manipulation planning.",
+        "physical_depth_signal": "柔性线缆相对于环境几何实体的空间拓扑关系与动力学约束",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 18,
+        "paper_id": "01KR7T0WFKH9HBVSGN2Y0164ZN",
+        "title": "Learning Human-to-Robot Handovers from Point Clouds",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 42,
+        "abstract_snippet": "We propose the first framework to learn control policies for vision-based human-to-robot handovers, a critical task for human-robot interaction. While research in Embodied AI has made significant progress in training robot agents in simulated environments, interacting with humans remains challenging",
+        "bottleneck": "在人机交互抓取任务中，由于人体运动的高维度和动态复杂性，现有仿真环境难以真实建模人类递送物体的行为，导致训练数据与现实交互存在物理一致性鸿沟。",
+        "evidence_quote": "interacting with humans remains challenging due to the difficulties of simulating humans.",
+        "physical_depth_signal": "人体运动学闭链约束与动态抓取过程中的多体接触力学。",
+        "category": "physical_grounding"
+      }
+    ],
+    "detailed_analysis": "当前具身智能SOTA模型如HDP已能通过扩散策略实现多任务规划，但核心卡点在于末端轨迹规划与关节空间动力学（如位姿P与关节角q的非线性映射）间的物理一致性脱节，尤其是柔性线缆布线中复杂拓扑关系的数学表征缺失。这需要融合光学感知的点云表征、机器人学的微分运动学模型以及VLM的环境语义理解，以解决动态交互中的感知闭环。物理深度上，需构建柔性体相对于环境几何的空间拓扑流形，并引入可微运动学约束满足多体接触力学方程。攻克此卡点将为人形机器人厂商带来技术突破，使其在家庭布线、工业组装及复杂人机协作任务中具备极高的商业应用价值。"
+  },
+  {
+    "theme_id": "T05",
+    "title": "跨场景机器人运动控制的零样本泛化",
+    "is_cross_domain": false,
+    "physical_depth": 3,
+    "non_obviousness": 4,
+    "commercial_value": "减少针对特定任务的重复训练，降低协作机器人在碎片化场景下的部署门槛。",
+    "paper_ids": [
+      "01KR7T0W7JWX5N6E3NCZWFRDBK",
+      "01KR7T0W86JB5QNA5ZHTYE2Z5S",
+      "01KR7T0WDG5XAJAHWRQC7WQGVG",
+      "01KR7T0WH7HY34NMP1B8RHK0SC"
+    ],
+    "papers": [
+      {
+        "bid": 12,
+        "paper_id": "01KR7T0W7JWX5N6E3NCZWFRDBK",
+        "title": "Language-Guided Dexterous Functional Grasping by LLM Generated Grasp Functionality and Synergy for Humanoid Manipulation",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 16,
+        "abstract_snippet": "Dexterous Functional Grasping (DFG) is the crucial first step for humanoid robots to perform generalized manipulation tasks. However, enabling robots to learn language-guided DFG skills in real-world environments presents several challenges, including comprehending the complex relationship between t",
+        "bottleneck": "现有灵巧功能抓取（DFG）系统难以将开放式自然语言指令直接映射为适用于高自由度手部协同的具体物理动作，尤其是在处理未预定义的物体类别和复杂操作任务时，跨语义与物理控制的泛化能力显著不足。",
+        "evidence_quote": "Furthermore, they are restricted to pre-defined functional concepts and cannot be generalized to novel object classes and manipulation tasks within natural language.",
+        "physical_depth_signal": "高自由度手部协同（high-DoF hand synergies）与功能性抓取约束的动力学映射",
+        "category": "generalization"
+      },
+      {
+        "bid": 13,
+        "paper_id": "01KR7T0W86JB5QNA5ZHTYE2Z5S",
+        "title": "Learning-based adaption of robotic friction models",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 14,
+        "abstract_snippet": "In the Fourth Industrial Revolution, wherein artificial intelligence and the automation of machines occupy a central role, the deployment of robots is indispensable. However, the manufacturing process using robots, especially in collaboration with humans, is highly intricate. In particular, modeling",
+        "bottleneck": "传统的模型驱动和数据驱动方法在建模机器人关节摩擦力矩时，难以在数据稀缺的情况下实现跨动力学场景（如从对称摩擦到非对称摩擦）的泛化。",
+        "evidence_quote": "model-based and data-driven models often exhibit limitations in their ability to generalize beyond the specific dynamics they were trained on",
+        "physical_depth_signal": "关节转动速度与摩擦力矩之间的非线性耦合关系及动力学对称性破缺",
+        "category": "generalization"
+      },
+      {
+        "bid": 15,
+        "paper_id": "01KR7T0WDG5XAJAHWRQC7WQGVG",
+        "title": "Continuous control actions learning and adaptation for robotic manipulation through reinforcement learning",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 61,
+        "abstract_snippet": "Abstract This paper presents a learning-based method that uses simulation data to learn an object manipulation task using two model-free reinforcement learning (RL) algorithms. The learning performance is compared across on-policy and off-policy algorithms: Proximal Policy Optimization (PPO) and Sof",
+        "bottleneck": "传统的强化学习控制策略在面对机器人操作任务中的环境变化或任务参数局部修改时，缺乏持续适应能力，难以在不重新训练的情况下实现快速微调。",
+        "evidence_quote": "the fine-tuning procedure is proposed that demonstrates the continuous adaptation of on-policy RL to new environments, allowing the learned policy to adapt and execute the (partially) modified task.",
+        "physical_depth_signal": "机械臂连续动作空间(continuous control actions)与多变物体几何形状(object geometries)及初始配置间的非线性映射与动力学约束。",
+        "category": "generalization"
+      },
+      {
+        "bid": 19,
+        "paper_id": "01KR7T0WH7HY34NMP1B8RHK0SC",
+        "title": "Reinforcement Learning for Collaborative Robots Pick-and-Place Applications: A Case Study",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 35,
+        "abstract_snippet": "The number of applications in which industrial robots share their working environment with people is increasing. Robots appropriate for such applications are equipped with safety systems according to ISO/TS 15066:2016 and are often referred to as collaborative robots (cobots). Due to the nature of h",
+        "bottleneck": "协作机器人在人机协作环境中面临环境动态变化和未知物体操作的灵活性瓶颈，现有视觉系统通常依赖对物体的预验知识。",
+        "evidence_quote": "Vision systems are often used to increase the adaptability of cobots, but they usually require knowledge of the objects to be manipulated.",
+        "physical_depth_signal": "基于RGB-D深度图像的几何空间信息与机械臂抓取位姿Q值的映射关系",
+        "category": "generalization"
+      }
+    ],
+    "detailed_analysis": "当前机器人运动控制SOTA虽引入大模型，但核心卡点在于高自由度手部协同（high-DoF synergies）与功能性抓取约束间的动力学映射。算法瓶颈在于处理关节转动速度与摩擦力矩的非线性耦合时，常因动力学对称性破缺导致跨场景泛化失效。这要求VLM的语义指令、光学RGB-D感知的几何信息与底层控制策略跨界融合，以解决“语义-物理”映射中的零样本适应问题。物理深度上，需构建机械臂连续动作空间与复杂物体几何形态间的非线性映射，并考虑从对称到非对称摩擦环境的动力学演化。若实现突破，协作机器人（Cobots）将在碎片化制造与物流场景实现即插即用，显著降低中小企业部署自动化设备的重训练成本。"
+  },
+  {
+    "theme_id": "T06",
+    "title": "开放场景下的物体示能性与几何关联",
+    "is_cross_domain": false,
+    "physical_depth": 2,
+    "non_obviousness": 3,
+    "commercial_value": "使机器人能够处理未见物体，极大扩展了移动机器人和仓储物流的应用边界。",
+    "paper_ids": [
+      "01KR7T0W4MRR1J2FTMZH7F16DE",
+      "01KR7T0WP6S53ZKRK9Y763FPK1",
+      "01KR7T0WPTF6QBDTC8YBF9C040",
+      "01KR7T0WX1NSD2VXVG5SJGPABH"
+    ],
+    "papers": [
+      {
+        "bid": 10,
+        "paper_id": "01KR7T0W4MRR1J2FTMZH7F16DE",
+        "title": "Grasp-Anything: Large-scale Grasp Dataset from Foundation Models",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 35,
+        "abstract_snippet": "Foundation models such as ChatGPT have made significant strides in robotic tasks due to their universal representation of real-world domains. In this paper, we leverage foundation models to tackle grasp detection, a persistent challenge in robotics with broad industrial applications. Despite numerou",
+        "bottleneck": "机器人抓取检测面临的主要挑战是现有抓取数据集在物体多样性上与现实世界相比存在显著局限，导致模型难以泛化到海量的日常物体。",
+        "evidence_quote": "Despite numerous grasp datasets, their object diversity remains limited compared to real-world figures.",
+        "physical_depth_signal": "物体三维几何形貌与机械臂抓取位姿（Pose）之间的力学接触映射关系",
+        "category": "data_quality"
+      },
+      {
+        "bid": 26,
+        "paper_id": "01KR7T0WP6S53ZKRK9Y763FPK1",
+        "title": "Evcap: Retrieval-Augmented Image Captioning with External Visual-Name Memory for Open-World Comprehension",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 33,
+        "abstract_snippet": "Large language models (LLMs)-based image captioning has the capability of describing objects not explicitly observed in training data; yet novel objects occur frequently, necessitating the requirement of sustaining up-to-date object knowledge for open-world comprehension. Instead of relying on large",
+        "bottleneck": "在开放世界理解中，由于新颖物体频繁出现，现有图像描述模型难以在不依赖大规模数据重训练或扩张模型参数的情况下，实现低成本、实时的物体知识更新。",
+        "evidence_quote": "novel objects occur frequently, necessitating the requirement of sustaining up-to-date object knowledge for open-world comprehension.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "generalization"
+      },
+      {
+        "bid": 27,
+        "paper_id": "01KR7T0WPTF6QBDTC8YBF9C040",
+        "title": "AffordanceLLM: Grounding Affordance from Vision Language Models",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 28,
+        "abstract_snippet": "Affordance grounding refers to the task of finding the area of an object with which one can interact. It is a fundamental but challenging task, as a successful solution requires the comprehensive understanding of a scene in multiple aspects including detection, localization, and recognition of objec",
+        "bottleneck": "现有的示能性接地（Affordance Grounding）受限于有限的标注数据集，难以捕捉到超越图像表层内容的隐藏知识（如物体3D形状、物理机制及复杂交互逻辑），导致模型在处理非受限场景及未见物体/动作时泛化性能受限。",
+        "evidence_quote": "Much of the knowledge is hidden and beyond the image content with the supervised labels from a limited training set.",
+        "physical_depth_signal": "物体的3D形状、物理属性（physics）以及场景的空间布局与功能性配置。",
+        "category": "generalization"
+      },
+      {
+        "bid": 30,
+        "paper_id": "01KR7T0WX1NSD2VXVG5SJGPABH",
+        "title": "CORA: Adapting CLIP for Open-Vocabulary Detection with Region Prompting and Anchor Pre-Matching",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 130,
+        "abstract_snippet": "Open-vocabulary detection (OVD) is an object detection task aiming at detecting objects from novel categories beyond the base categories on which the detector is trained. Recent OVD methods rely on large-scale visual-language pre-trained models, such as CLIP, for recognizing novel objects. We identi",
+        "bottleneck": "将基于全图预训练的视觉语言模型应用于局部区域识别时存在分布失配，且模型难以对训练集中未出现的类别进行泛化定位。",
+        "evidence_quote": "the distribution mismatch that happens when applying a VL-model trained on whole images to region recognition tasks; (2) the difficulty of localizing objects of unseen classes.",
+        "physical_depth_signal": "全图尺度特征与局部区域特征之间的空间分布不一致性",
+        "category": "generalization"
+      }
+    ],
+    "detailed_analysis": "当前SOTA利用视觉语言大模型（VLM）在开放域识别上取得显著进展，但核心卡点在于物体三维几何形貌与机械臂抓取位姿（Pose）之间的力学接触映射精度不足。算法瓶颈主要体现为全图预训练特征与局部区域识别间的空间分布失配（Distribution Mismatch）。这要求引入跨界信号：利用VLM提取物体的语义示能性（Affordance），结合Robotics的动力学反馈及高精度三维感知，弥补有限标注数据集无法覆盖的隐藏物理知识。在物理深度上，需建立从非结构化3D形状到接触力学平衡及空间功能性配置的数学映射。若能解决该卡点，将彻底释放仓储物流及柔性制造中移动机器人的泛化潜力，使其具备处理海量未见物体的“零样本”操作能力。"
+  },
+  {
+    "theme_id": "T07",
+    "title": "复杂极端环境下的视觉鲁棒感知",
+    "is_cross_domain": true,
+    "physical_depth": 2,
+    "non_obviousness": 3,
+    "commercial_value": "提升在建筑施工、医疗影像及暗光环境下的感知精度，降低视觉算法的失效风险。",
+    "paper_ids": [
+      "01KR7T0WEG3RAD9BT1AAEGRAY6",
+      "01KR7T0WH9G7VJ02ZVSXYWW422",
+      "01KR7T0WXRHPZJPRBVMEKZZQ2V"
+    ],
+    "papers": [
+      {
+        "bid": 16,
+        "paper_id": "01KR7T0WEG3RAD9BT1AAEGRAY6",
+        "title": "CRT-6D: Fast 6D Object Pose Estimation with Cascaded Refinement Transformers",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 50,
+        "abstract_snippet": "Learning based 6D object pose estimation methods rely on computing large intermediate pose representations and/or iteratively refining an initial estimation with a slow render-compare pipeline. This paper introduces a novel method we call Cascaded Pose Refinement Transformers, or CRT-6D. We replace ",
+        "bottleneck": "在实现实时6D位姿估计时，稀疏特征采样虽能显著提升推理速度，但在预测精度上仍无法完全弥补与高计算量渲染比对流程或稠密中间表示法之间的性能差距。",
+        "evidence_quote": "falling slightly behind methods with inference runtimes one order of magnitude higher.",
+        "physical_depth_signal": "6D位姿参数（3D旋转与3D平移）与物体表面关键点特征（OSKFs）的几何变换关系",
+        "category": "compute_efficiency"
+      },
+      {
+        "bid": 20,
+        "paper_id": "01KR7T0WH9G7VJ02ZVSXYWW422",
+        "title": "Visual Spatial Attention and Proprioceptive Data-Driven Reinforcement Learning for Robust Peg-in-Hole Task Under Variable Conditions",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 35,
+        "abstract_snippet": "Anchor-bolt insertion is a peg-in-hole task performed in the construction field for holes in concrete. Efforts have been made to automate this task, but the variable lighting and hole surface conditions, as well as the requirements for short setup and task execution time make the automation challeng",
+        "bottleneck": "混凝土施工环境中的锚栓插入任务面临剧烈波动的光照（如干扰阴影）和复杂的孔洞表面纹理挑战，现有的模型难以在保持高采样效率的同时确保对动态视觉环境的鲁棒性。",
+        "evidence_quote": "variable lighting and hole surface conditions, as well as the requirements for short setup and task execution time make the automation challenging.",
+        "physical_depth_signal": "机器人本体感受数据与视觉空间注意力在应对混凝土孔洞复杂几何约束与光影干扰时的跨模态融合机制",
+        "category": "robustness"
+      },
+      {
+        "bid": 32,
+        "paper_id": "01KR7T0WXRHPZJPRBVMEKZZQ2V",
+        "title": "Auxiliary signal-guided knowledge encoder-decoder for medical report generation",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 115,
+        "abstract_snippet": "Medical reports have significant clinical value to radiologists and specialists, especially during a pandemic like COVID. However, beyond the common difficulties faced in the natural image captioning, medical report generation specifically requires the model to describe a medical image with a fine-g",
+        "bottleneck": "医学影像报告生成中存在严重的全局图像噪声干扰和由于大量“正常”描述导致的文本数据偏向，使得模型难以有效识别局部细微病变并倾向于生成重复的冗余信息。",
+        "evidence_quote": "there are many similar sentences used in each medical report to describe the normal regions of the image, which causes serious data bias.",
+        "physical_depth_signal": "局部病灶区域的空间视觉特征与医学逻辑/常识的语义映射关系",
+        "category": "data_quality"
+      }
+    ],
+    "detailed_analysis": "当前视觉感知SOTA在实时性与高精度位姿估计间面临权衡。核心瓶颈在于稀疏特征采样与高算量渲染比对间的精度鸿沟，以及在混凝土施工、医疗影像等极端场景中，由光影剧烈波动和数据分布偏向（如正常描述覆盖细微病灶）引发的感知失效。跨界信号显示，需融合光学成像、机器人本体感受数据与视觉语言模型（VLM），利用多模态信号纠正纯视觉在极端噪声下的逻辑判断偏差。在物理深度上，该卡点涉及6D位姿参数（3D旋转与平移）与物体表面关键点（OSKF）的几何变换，以及空间注意力机制在复杂几何约束下的映射关系。若能实现突破，将直接受益建筑施工自动化、高精度医疗辅助诊断及全天候自主导航系统，大幅降低视觉系统在恶劣工况下的失效风险。"
+  },
+  {
+    "theme_id": "T08",
+    "title": "视觉语言模型的物理常识与逻辑落地",
+    "is_cross_domain": true,
+    "physical_depth": 4,
+    "non_obviousness": 4,
+    "commercial_value": "赋予AI模型真实世界物理法则理解力，是实现通用人工智能与环境安全交互的关键。",
+    "paper_ids": [
+      "01KR7T0WKE2X917YAZB00VBBWZ",
+      "01KR7T0WMHP8535J23J0F9EEJ9",
+      "01KR7T0WNSZ3BVK4SN6MEGKR7C",
+      "01KR7T0WNZW135PK26P86D0Q68"
+    ],
+    "papers": [
+      {
+        "bid": 22,
+        "paper_id": "01KR7T0WKE2X917YAZB00VBBWZ",
+        "title": "Physically Grounded Vision-Language Models for Robotic Manipulation",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 77,
+        "abstract_snippet": "Recent advances in vision-language models (VLMs) have led to improved performance on tasks such as visual question answering and image captioning. Consequently, these models are now well-positioned to reason about the physical world, particularly within domains such as robotic manipulation. However,",
+        "bottleneck": "当前视觉语言模型(VLM)在理解物体物理概念(如材质、易碎性)方面存在局限，无法仅凭视觉外观准确捕捉物理属性的人类先验，从而阻碍了其在机器人操纵任务中的物理推理能力。",
+        "evidence_quote": "However, current VLMs are limited in their understanding of the physical concepts (e.g., material, fragility) of common objects, which restricts their usefulness for robotic manipulation tasks that involve interaction and physical reasoning about such objects.",
+        "physical_depth_signal": "物体材质(material)与易碎性(fragility)等物理属性与视觉特征之间的映射关系及其在动力学规划中的应用。",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 23,
+        "paper_id": "01KR7T0WMHP8535J23J0F9EEJ9",
+        "title": "VELMA: Verbalization Embodiment of LLM Agents for Vision and Language Navigation in Street View",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 48,
+        "abstract_snippet": "Incremental decision making in real-world environments is one of the most challenging tasks in embodied artificial intelligence. One particularly demanding scenario is Vision and Language Navigation (VLN) which requires visual and natural language understanding as well as spatial and temporal reason",
+        "bottleneck": "如何有效地将大语言模型（LLM）与动态交互式视觉环境连接，以实现导航指令在物理空间和时间推理上的精确落地。",
+        "evidence_quote": "it is an ongoing problem of how to best connect them with an interactive visual environment.",
+        "physical_depth_signal": "基于全景视图的地标可见性判定以及空间轨迹的序列推理",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 24,
+        "paper_id": "01KR7T0WNSZ3BVK4SN6MEGKR7C",
+        "title": "VLM-Social-Nav: Socially Aware Robot Navigation Through Scoring Using Vision-Language Models",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 36,
+        "abstract_snippet": "We propose VLM-Social-Nav, a novel Vision-Language Model (VLM) based navigation approach to compute a robot's motion in human-centered environments. Our goal is to make real-time decisions on robot actions that are socially compliant with human expectations. We utilize a perception model to detect i",
+        "bottleneck": "如何将抽象且语境依赖的社会规范（Social Norms）实时转化为机器人路径规划器可用的量化代价函数，且不依赖大规模社交行为训练数据集。",
+        "evidence_quote": "VLM-Social-Nav uses a VLM-based scoring module that computes a cost term that ensures socially appropriate and effective robot actions generated by the underlying planner.",
+        "physical_depth_signal": "基于语义实体的机器人导航代价函数（cost term）与运动规划约束的映射关系",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 25,
+        "paper_id": "01KR7T0WNZW135PK26P86D0Q68",
+        "title": "Vision-Language Interpreter for Robot Task Planning",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 34,
+        "abstract_snippet": "Large language models (LLMs) are accelerating the development of language-guided robot planners. Meanwhile, symbolic planners offer the advantage of interpretability. This paper proposes a new task that bridges these two trends, namely, multimodal planning problem specification. The aim is to genera",
+        "bottleneck": "机器人符号化规划描述生成中存在语法正确性与规划有效性之间的脱节，即模型虽能生成符合语法的描述文件，但难以捕捉支撑有效任务执行所需的深层物理逻辑和环境约束。",
+        "evidence_quote": "Experimental results show that ViLaIn can generate syntactically correct problems with more than 99% accuracy and valid plans with more than 58% accuracy.",
+        "physical_depth_signal": "机器人任务规划中的逻辑有效性与多模态环境感知的约束映射",
+        "category": "physical_grounding"
+      }
+    ],
+    "detailed_analysis": "当前SOTA模型在视觉描述上表现优异，但在“物理落地”层面存在核心卡点：VLM难以将视觉特征直接映射为物体内在的材质（Material）与易碎性（Fragility）等动力学先验，导致语义指令与底层路径规划的代价函数（Cost Function）存在量化断层。这种“感知-动作”脱节反映了模型缺乏对环境约束及物理逻辑的深层表征能力。跨界融合AI、机器人学与传感器物理至关重要，因为单纯的视觉训练无法习得力学反馈与空间时序推理。在物理深度上，需构建从语义实体到运动规划空间约束的映射关系，将抽象规范转化为数学上的代价项。商业上，该突破将直接赋能通用服务机器人与精密工业物流，使其具备在复杂社交环境或易碎品搬运中的高可靠安全作业能力。"
+  },
+  {
+    "theme_id": "T09",
+    "title": "多模态大模型的高效表征与时序压缩",
+    "is_cross_domain": false,
+    "physical_depth": 1,
+    "non_obviousness": 3,
+    "commercial_value": "优化长视频处理与多轮对话的计算开销，直接改善端侧AI产品的响应速度与续航。",
+    "paper_ids": [
+      "01KR7T0WK0150KHZADMG4FNAF6",
+      "01KR7T0WSFEN4DQ2AEWK1XECGT",
+      "01KR7T0WYTB9CHPXG111FT7GCC"
+    ],
+    "papers": [
+      {
+        "bid": 21,
+        "paper_id": "01KR7T0WK0150KHZADMG4FNAF6",
+        "title": "LLaVA-MR: Large Language-and-Vision Assistant for Video Moment Retrieval",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 103,
+        "abstract_snippet": "Multimodal Large Language Models (MLLMs) are widely used for visual perception, understanding, and reasoning. However, long video processing and precise moment retrieval remain challenging due to LLMs’ limited context size and coarse frame extraction. We propose the Large Language-and-Vision Assista",
+        "bottleneck": "现有大语言模型在处理长视频时，由于受限于有限的上下文窗口和粗粒度的关键帧提取，导致无法精准捕捉视频中的短促视觉信号与运动模式。",
+        "evidence_quote": "However, long video processing and precise moment retrieval remain challenging due to LLMs’ limited context size and coarse frame extraction.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "scalability"
+      },
+      {
+        "bid": 29,
+        "paper_id": "01KR7T0WSFEN4DQ2AEWK1XECGT",
+        "title": "VisionZip: Longer is Better but Not Necessary in Vision Language Models",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 19,
+        "abstract_snippet": "Recent advancements in vision-language models have enhanced performance by increasing the length of visual tokens, making them much longer than text tokens and significantly raising computational costs. However, we observe that the visual tokens generated by popular vision encoders, such as CLIP and",
+        "bottleneck": "当前视觉语言模型过度依赖增加视觉Token长度来提升性能，导致视觉特征存在严重冗余并大幅增加了计算开销，尤其在多轮对话等复杂实际场景中难以兼顾效率与性能。",
+        "evidence_quote": "Recent advancements in vision-language models have enhanced performance by increasing the length of visual tokens, making them much longer than text tokens and significantly raising computational costs.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "compute_efficiency"
+      },
+      {
+        "bid": 34,
+        "paper_id": "01KR7T0WYTB9CHPXG111FT7GCC",
+        "title": "Learning Semantic Relationship among Instances for Image-Text Matching",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 97,
+        "abstract_snippet": "Image-text matching, a bridge connecting image and language, is an important task, which generally learns a holistic cross-modal embedding to achieve a high-quality semantic alignment between the two modalities. However, previous studies only focus on capturing fragment-level relation within a sampl",
+        "bottleneck": "目前的图文匹配研究主要关注样本内部的局部片段关系（如图像区域与单词），缺乏对跨样本、跨模态的实例级（instance-level）全局交互建模，导致难以区分语义极相近的负样本。",
+        "evidence_quote": "they usually pay less attention to capturing instance-level interactions among samples and modalities, e.g., multiple images and texts.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "generalization"
+      }
+    ],
+    "detailed_analysis": "当前多模态大模型(MLLM)的SOTA状态主要受限于视觉Token冗余与长序列处理的计算复杂度。核心卡点在于视觉编码器（如CLIP）生成的特征在空间与时域上存在高度冗余，且Transformer的注意力机制随Token数量呈平方级增长，导致长视频处理时上下文窗口不足且计算开销巨大。跨界融合方面，亟需引入光学传感的主动采样技术与机器人运动学的时空先验，以减少无效特征输入，实现VLM与底层硬件的联合优化。物理深度上，卡点体现为信息熵流与硬件吞吐量的失配，涉及时间分辨率与比特率的非线性平衡关系。若突破此瓶颈，智能终端、安防监控及自动驾驶厂商将直接受益，显著降低端侧推理功耗并提升多轮对话响应速度。"
+  },
+  {
+    "theme_id": "T10",
+    "title": "3D视觉语言模型的统一表征与对齐",
+    "is_cross_domain": false,
+    "physical_depth": 2,
+    "non_obviousness": 4,
+    "commercial_value": "填补2D图像与3D空间语义鸿沟，助力数字孪生、混合现实及精细三维重建。",
+    "paper_ids": [
+      "01KR7T0WXB1YFMJWFAZ3KT095M",
+      "01KR7T0WY8QJSYHHBDE2BKJPZT",
+      "01KR7T0WZGW1X45AXEGEWXWPY0"
+    ],
+    "papers": [
+      {
+        "bid": 31,
+        "paper_id": "01KR7T0WXB1YFMJWFAZ3KT095M",
+        "title": "CLIP2Point: Transfer CLIP to Point Cloud Classification with Image-Depth Pre-Training",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 122,
+        "abstract_snippet": "Pre-training across 3D vision and language remains under development because of limited training data. Recent works attempt to transfer vision-language (V-L) pre-training methods to 3D vision. However, the domain gap between 3D and images is unsolved, so that V-L pre-trained models are restricted in",
+        "bottleneck": "目前的3D视觉与语言预训练受限于数据规模，且2D图像与3D数据之间的领域差距（domain gap）尚未有效解决，阻碍了视觉-语言模型知识向3D下游任务的有效迁移。",
+        "evidence_quote": "the domain gap between 3D and images is unsolved, so that V-L pre-trained models are restricted in 3D downstream tasks.",
+        "physical_depth_signal": "3D物体的深度渲染设置及其与2D投影之间的几何映射关系",
+        "category": "generalization"
+      },
+      {
+        "bid": 33,
+        "paper_id": "01KR7T0WY8QJSYHHBDE2BKJPZT",
+        "title": "PLA: Language-Driven Open-Vocabulary 3D Scene Understanding",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 106,
+        "abstract_snippet": "Open-vocabulary scene understanding aims to localize and recognize unseen categories beyond the annotated label space. The recent breakthrough of 2D open-vocabulary perception is largely driven by Internet-scale paired image-text data with rich vocabulary concepts. However, this success cannot be di",
+        "bottleneck": "大规模3D-文本配对数据的缺失，使得2D领域成熟的开放词汇感知模型无法直接迁移并有效关联3D几何与语义丰富的文本概念。",
+        "evidence_quote": "this success cannot be directly transferred to 3D scenarios due to the inaccessibility of large-scale 3D-text pairs.",
+        "physical_depth_signal": "3D场景与多视图图像之间的几何约束（geometric constraints）",
+        "category": "data_quality"
+      },
+      {
+        "bid": 36,
+        "paper_id": "01KR7T0WZGW1X45AXEGEWXWPY0",
+        "title": "3D-VisTA: Pre-trained Transformer for 3D Vision and Text Alignment",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 87,
+        "abstract_snippet": "3D vision-language grounding (3D-VL) is an emerging field that aims to connect the 3D physical world with natural language, which is crucial for achieving embodied intelligence. Current 3D-VL models rely heavily on sophisticated modules, auxiliary losses, and optimization tricks, which calls for a s",
+        "bottleneck": "现有的3D视觉-语言模型过度依赖复杂的任务特定模块、辅助损失函数和优化技巧，缺乏一个能够统一处理多种下游任务的简化模型架构。",
+        "evidence_quote": "Current 3D-VL models rely heavily on sophisticated modules, auxiliary losses, and optimization tricks, which calls for a simple and unified model.",
+        "physical_depth_signal": "3D室内场景的RGB-D几何扫描数据与自然语言描述之间的跨模态语义对齐机制。",
+        "category": "generalization"
+      }
+    ],
+    "detailed_analysis": "当前3D视觉语言模型(VLM)的SOTA状态受限于大规模3D-文本配对数据的匮乏及2D图像与3D几何间的领域偏置。核心卡点在于如何将2D投影语义通过几何映射有效迁移至3D点云，且现有模型过度依赖复杂的任务特定模块。这迫切需要光学感知（深度渲染）、机器人学（环境交互）与VLM的深度融合，将RGB-D几何扫描中的物理深度信息转化为语义一致性。物理机制涉及3D场景与多视图图像间的几何约束方程以及深度图到点云的坐标变换。攻克此瓶颈将直接赋能数字孪生、AR/VR及精细三维重建厂商，实现从感知到语义理解的跨越。"
+  },
+  {
+    "theme_id": "T11",
+    "title": "增强型跨模态知识检索与推理偏差修正",
+    "is_cross_domain": false,
+    "physical_depth": 1,
+    "non_obviousness": 3,
+    "commercial_value": "通过整合非文本知识提升RAG系统的深度检索能力，解决LLM模型中的虚假推理问题。",
+    "paper_ids": [
+      "01KR7T0WRKTD2QFB7ZFMWKZ1V3",
+      "01KR7T0WZDBS848H66RVMJA0ZW"
+    ],
+    "papers": [
+      {
+        "bid": 28,
+        "paper_id": "01KR7T0WRKTD2QFB7ZFMWKZ1V3",
+        "title": "Enhancing robust VQA via contrastive and self-supervised learning",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 21,
+        "abstract_snippet": "Visual Question Answering (VQA) aims to evaluate the reasoning abilities of an intelligent agent using visual and textual information. However, recent research indicates that many VQA models rely primarily on learning the correlation between questions and answers in the training dataset rather than ",
+        "bottleneck": "VQA模型主要依赖于学习训练集中问题与答案之间的统计相关性（语言偏见），而非展示出真正的跨模态逻辑推理能力。",
+        "evidence_quote": "many VQA models rely primarily on learning the correlation between questions and answers in the training dataset rather than demonstrating actual reasoning ability.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "robustness"
+      },
+      {
+        "bid": 35,
+        "paper_id": "01KR7T0WZDBS848H66RVMJA0ZW",
+        "title": "MuRAG: Multimodal Retrieval-Augmented Generator for Open Question Answering over Images and Text",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 89,
+        "abstract_snippet": "While language Models store a massive amount of world knowledge implicitly in their parameters, even very large models often fail to encode information about rare entities and events, while incurring huge computational costs. Recently, retrieval-augmented models, such as REALM, RAG, and RETRO, have ",
+        "bottleneck": "现有的检索增强模型（RAG）受限于仅能检索文本知识，无法访问和利用图像等非文本模态中包含的大量互补世界知识。",
+        "evidence_quote": "However, these methods are restricted to retrieving only textual knowledge, neglecting the ubiquitous amount of knowledge in other modalities like images – much of which contains information not covered by any text.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "generalization"
+      }
+    ],
+    "detailed_analysis": "当前多模态检索与推理（如MuRAG）已能整合图文，但核心卡点在于VQA系统的“语言偏见”机制，即模型过度依赖统计相关性而非因果逻辑，导致在处理罕见科研样本时推理崩塌。跨界信号显示，AI4Science需要将光学传感产生的原始观测与机器人执行器的本体感知融合，才能补齐文本模态缺失的底层物理约束。物理深度体现在将实验观测到的守恒律、能级跃迁等物理常数转化为多模态向量空间的拓扑约束，修正纯概率生成的偏差。若攻克此关，医药研发企业与高精度材料实验室将能建立具备“物理直觉”的深度RAG系统，使知识检索从单纯的语义匹配进化为支撑实验决策的逻辑引擎。"
+  },
+  {
+    "theme_id": "T12",
+    "title": "工业级精密物理系统的强化学习控制",
+    "is_cross_domain": true,
+    "physical_depth": 5,
+    "non_obviousness": 5,
+    "commercial_value": "支撑托卡马克等高壁垒物理装置的自动控制，实现在工业级精度标准下的AI替代。",
+    "paper_ids": [
+      "01KR7T0X48ESGCZC6KF1M5RW90",
+      "01KR7T0X7XDZ196QKZ3K6W9FW6",
+      "01KR7T0XAEBXEEFGEEDCRVQAMW"
+    ],
+    "papers": [
+      {
+        "bid": 45,
+        "paper_id": "01KR7T0X48ESGCZC6KF1M5RW90",
+        "title": "Towards practical reinforcement learning for tokamak magnetic control",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 13,
+        "abstract_snippet": "Reinforcement learning (RL) has shown promising results for real-time control systems, including the domain of plasma magnetic control. However, there are still significant drawbacks compared to traditional feedback control approaches for magnetic confinement. In this work, we address key drawbacks ",
+        "bottleneck": "强化学习在托卡马克等离子体磁控中面临控制精度不足、长时电流稳态误差显著以及新任务学习效率低下的瓶颈，导致其在实际工业级控制标准下仍存在局限性。",
+        "evidence_quote": "address key drawbacks of the RL method; achieving higher control accuracy for desired plasma properties, reducing the steady-state error, and decreasing the required time to learn new tasks.",
+        "physical_depth_signal": "等离子体形状精度与等离子体电流的长时稳态偏差（long-term bias）",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 50,
+        "paper_id": "01KR7T0X7XDZ196QKZ3K6W9FW6",
+        "title": "Event-Triggered Deep Reinforcement Learning Using Parallel Control: A Case Study in Autonomous Driving",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 97,
+        "abstract_snippet": "This paper utilizes parallel control to investigate the problem of event-triggered deep reinforcement learning and develops an event-triggered deep Q-network (ETDQN) for decision-making of autonomous driving, <italic xmlns:mml=\"http://www.w3.org/1998/Math/MathML\" xmlns:xlink=\"http://www.w3.org/1999/",
+        "bottleneck": "在自动驾驶的事件触发深度强化学习中，如何在不预设或训练显式触发条件的情况下，有效平衡控制动作的更新频率与通信损耗之间的关系。",
+        "evidence_quote": "without training an explicit triggering condition",
+        "physical_depth_signal": "动作的变化率 (variation rate of the action) 与增强马尔可夫决策过程 (augmented MDP) 的状态转移特征",
+        "category": "physical_grounding"
+      },
+      {
+        "bid": 53,
+        "paper_id": "01KR7T0XAEBXEEFGEEDCRVQAMW",
+        "title": "Model-free mean-field reinforcement learning: Mean-field MDP and mean-field Q-learning",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 37,
+        "abstract_snippet": "We study infinite horizon discounted mean field control (MFC) problems with common noise through the lens of mean field Markov decision processes (MFMDP). We allow the agents to use actions that are randomized not only at the individual level but also at the level of the population. This common rand",
+        "bottleneck": "在均值场控制（MFC）强化学习中，处理作为策略和价值函数输入的高维群体状态（population state）是核心技术难点，这直接影响了算法在连续空间中的收敛性与扩展性。",
+        "evidence_quote": "The main difficulty is the treatment of the population state, which is an input of the policy and the value function.",
+        "physical_depth_signal": "群体分布状态在单纯形（simplex）空间中的离散化与连续映射关系",
+        "category": "scalability"
+      }
+    ],
+    "detailed_analysis": "当前强化学习在精密物理系统（如托卡马克）控制中的SOTA水平仍面临长时电流稳态误差显著、高维群体状态处理效率低及控制精度不足等核心瓶颈。物理机制上的卡点在于等离子体形状精度与电流长时稳态偏差的非线性耦合，以及在单纯形空间中群体分布状态映射的离散化难题。跨界信号显示，需将机器人学的并行控制框架、自动驾驶的事件触发机制与均值场博弈论融合，以平衡控制频率与通信损耗。物理深度体现在需量化动作变化率与增强MDP状态转移特征之间的数学关系。若能突破该卡点，将直接支撑核聚变托卡马克等高壁垒物理装置的工业级自主控制，实现在能源、航天等精密物理场景下对传统PID或专家控制的AI替代，为清洁能源等领域带来巨额商业收益。"
+  },
+  {
+    "theme_id": "T13",
+    "title": "稀疏奖励下的强化学习采样效率优化",
+    "is_cross_domain": false,
+    "physical_depth": 2,
+    "non_obviousness": 4,
+    "commercial_value": "降低长周期决策链条的学习难度，加速无人机搜救与复杂路由规划的收敛过程。",
+    "paper_ids": [
+      "01KR7T0X02B17F23CYBF9QEYMD",
+      "01KR7T0X1E9X2Q34FY0BJA7YWY",
+      "01KR7T0X2K4VCWXZCBTEQBAQM9",
+      "01KR7T0XDEPQN648T38DAFC32M"
+    ],
+    "papers": [
+      {
+        "bid": 37,
+        "paper_id": "01KR7T0X02B17F23CYBF9QEYMD",
+        "title": "L3MVN: Leveraging Large Language Models for Visual Target Navigation",
+        "topic": "Multimodal Machine Learning Applications",
+        "cited_by": 80,
+        "abstract_snippet": "Visual target navigation in unknown environments is a crucial problem in robotics. Despite extensive investigation of classical and learning-based approaches in the past, robots lack common-sense knowledge about household objects and layouts. Prior state-of-the-art approaches to this task rely on le",
+        "bottleneck": "现有的视觉导航方法缺乏对家庭物体和环境布局的常识性认知，导致在训练过程中学习这些空间先验知识需要耗费大量的计算资源和时间。",
+        "evidence_quote": "Prior state-of-the-art approaches to this task rely on learning the priors during the training and typically require significant expensive resources and time for learning.",
+        "physical_depth_signal": "语义地图中的候选前沿点（frontier）与目标物体在家庭布局中的空间拓扑关联",
+        "category": "sample_efficiency"
+      },
+      {
+        "bid": 38,
+        "paper_id": "01KR7T0X1E9X2Q34FY0BJA7YWY",
+        "title": "Path Planning for Unmanned Aerial Vehicle via Off-Policy Reinforcement Learning With Enhanced Exploration",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 31,
+        "abstract_snippet": "Unmanned aerial vehicles (UAVs) are widely used in urban search and rescue, where path planning plays a critical role. This paper proposes an approach using off-policy reinforcement learning (RL) with an improved exploration mechanism (IEM) based on prioritized experience replay (PER) and curiosity-",
+        "bottleneck": "在复杂未知环境下的无人机搜救任务中，off-policy强化学习算法在满足严苛时间约束的同时，面临着在稀疏奖励环境下采样效率低下且易陷入局部最优的瓶颈。",
+        "evidence_quote": "certain off-policy RL algorithms often get trapped in local optima in environments with sparse rewards",
+        "physical_depth_signal": "无人机搜救任务的时间约束（Time-constrained）与环境状态空间探索中的未访问时长（unvisited time）量化指标。",
+        "category": "sample_efficiency"
+      },
+      {
+        "bid": 40,
+        "paper_id": "01KR7T0X2K4VCWXZCBTEQBAQM9",
+        "title": "Dynamic robot routing optimization: State–space decomposition for operations research-informed reinforcement learning",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 18,
+        "abstract_snippet": "There is a growing interest in implementing artificial intelligence for operations research in the industrial environment. While numerous classic operations research solvers ensure optimal solutions, they often struggle with real-time dynamic objectives and environments, such as dynamic routing prob",
+        "bottleneck": "深度强化学习在处理工业动态路由优化时，由于高维状态空间的复杂性和极长的训练周期，导致其在实时动态环境中的学习效率和实用性受限。",
+        "evidence_quote": "the real-world applications of reinforcement learning are relatively limited due to lengthy training time and inefficiency in high-dimensional state spaces.",
+        "physical_depth_signal": "动态路由优化中高维状态空间向低维潜在空间的映射，以及工业机器人焊接路径的运动学约束。",
+        "category": "sample_efficiency"
+      },
+      {
+        "bid": 54,
+        "paper_id": "01KR7T0XDEPQN648T38DAFC32M",
+        "title": "Intelligent career planning via stochastic subsampling reinforcement learning",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 23,
+        "abstract_snippet": "Career planning consists of a series of decisions that will significantly impact one's life. However, current recommendation systems have serious limitations, including the lack of effective artificial intelligence algorithms for long-term career planning, and the lack of efficient reinforcement lea",
+        "bottleneck": "现有的职业规划推荐系统在处理长期决策序列时，缺乏针对复杂动态系统的高效强化学习算法和长期规划机制。",
+        "evidence_quote": "current recommendation systems have serious limitations, including the lack of effective artificial intelligence algorithms for long-term career planning, and the lack of efficient reinforcement learning (RL) methods for dynamic systems.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "sample_efficiency"
+      }
+    ],
+    "detailed_analysis": "当前SOTA强化学习在搜救、动态路由等复杂场景下，核心卡点在于稀疏奖励导致采样效率极低且易陷局部最优。其算法瓶颈在于高维状态空间$S$与极长决策链的映射难题，以及系统对环境布局常识的缺失。跨界信号显示，亟需结合VLM引入语义地图先验，将LLM的逻辑推理与机器人的运动控制融合，通过空间拓扑关联引导探索方向。物理深度上，需量化无人机搜救的时间约束$T$与“未访问时长”量化指标，并利用状态空间分解建立运动学约束下的低维潜在流形映射。解决该卡点将使工业协作机器人、无人机搜救系统及长周期决策平台受益，实现从高复杂度未知环境到实时路径规划的快速收敛与算力节省。"
+  },
+  {
+    "theme_id": "T14",
+    "title": "多智能体协同的学习稳定性与安全性",
+    "is_cross_domain": false,
+    "physical_depth": 3,
+    "non_obviousness": 4,
+    "commercial_value": "保障多自主飞行器与机器人集群的协同任务安全，是未来智慧城市与物流集群的技术底座。",
+    "paper_ids": [
+      "01KR7T0X2ZVXVWGN13EHRK8CC1",
+      "01KR7T0X3434Z01DV09KGP1PYW",
+      "01KR7T0X7QG05PGBH0NW8K85C6"
+    ],
+    "papers": [
+      {
+        "bid": 41,
+        "paper_id": "01KR7T0X2ZVXVWGN13EHRK8CC1",
+        "title": "Effective Multi-Agent Deep Reinforcement Learning Control With Relative Entropy Regularization",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 17,
+        "abstract_snippet": "This paper focused on developing an effective Multi-Agent Reinforcement Learning (MARL) approach that quickly explores optimal control policies of multiple agents through interactions with unknown environments. Multi-Agent Continuous Dynamic Policy Gradient (MACDPP) was proposed to tackle the issues",
+        "bottleneck": "在多智能体强化学习中，各智能体策略更新的不一致性以及在有限交互次数下的样本效率低下，限制了其在复杂物理系统中的协作学习能力。",
+        "evidence_quote": "Multi-Agent Continuous Dynamic Policy Gradient (MACDPP) was proposed to tackle the issues of limited capability and sample efficiency in the current MARL approaches.",
+        "physical_depth_signal": "通过相对熵（Relative Entropy）正则化约束多智能体在连续动作空间中的策略分布更新。",
+        "category": "sample_efficiency"
+      },
+      {
+        "bid": 42,
+        "paper_id": "01KR7T0X3434Z01DV09KGP1PYW",
+        "title": "AAV Swarm Cooperative Search Based on Scalable Multiagent Deep Reinforcement Learning With Digital Twin-Enabled Sim-to-Real Transfer",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 17,
+        "abstract_snippet": "Cooperative target search (CTS) technology is highly desirable in various multi-autonomous aerial vehicle (AAV) applications. However, searching for unknown targets in a dynamic threatening environment is a challenging problem, especially for AAVs with limited sensing range and communication capabil",
+        "bottleneck": "多自主飞行器（AAV）在动态威胁环境下协同搜索时，受限的感知与通信能力导致系统缺乏可扩展性，且在数字孪生驱动的训练中难以兼顾训练速度与环境保真度。",
+        "evidence_quote": "traditional searching methods lack scalability and efficient collaboration among the AAV swarm in dynamic environments.",
+        "physical_depth_signal": "AAV集群的有限感知范围、通信带宽约束以及3D物理引擎中的动力学环境保真度。",
+        "category": "scalability"
+      },
+      {
+        "bid": 49,
+        "paper_id": "01KR7T0X7QG05PGBH0NW8K85C6",
+        "title": "Safe multi-agent reinforcement learning for multi-robot control",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 115,
+        "abstract_snippet": "A challenging problem in robotics is how to control multiple robots cooperatively and safely in real-world applications. Yet, developing multi-robot control methods from the perspective of safe multi-agent reinforcement learning (MARL) has merely been studied. To fill this gap, in this study, we inv",
+        "bottleneck": "在多机器人协作任务中，如何构建一个既能保证奖励函数单调提升，又能同时满足个体与全局安全性约束的理论框架，并解决缺乏标准化安全MARL基准测试集的问题。",
+        "evidence_quote": "developing multi-robot control methods from the perspective of safe multi-agent reinforcement learning (MARL) has merely been studied.",
+        "physical_depth_signal": "约束马尔可夫博弈(Constrained Markov Games)中的安全性指标与机器人运动学约束",
+        "category": "robustness"
+      }
+    ],
+    "detailed_analysis": "目前多智能体强化学习(MARL)虽在MACDPP等架构上取得进展，但核心卡点在于有限交互次数下的样本效率低下及多智能体策略更新的不一致性，特别是在受限感知范围与通信带宽约束下的扩展性问题。跨界信号显示，单纯依靠数据驱动难以处理动态威胁，亟需融合VLM的高层语义感知与机器人动力学模型，利用光学传感器补足通信失效时的协作感知。物理深度体现在利用相对熵(Relative Entropy)正则化约束连续动作空间的策略分布，并在约束马尔可夫博弈框架下通过数学模型处理机器人运动学安全性指标。商业突破点在于保障复杂环境下集群任务的确定性，将使智慧城市运营方与自动化物流集群(如无人机配送网)受益，为其大规模协同提供底座级安全保障。"
+  },
+  {
+    "theme_id": "T15",
+    "title": "离线与跨域强化学习的分布漂移修正",
+    "is_cross_domain": false,
+    "physical_depth": 3,
+    "non_obviousness": 4,
+    "commercial_value": "解决Sim-to-Real过程中的精度损失，使AI在离线数据驱动下仍能生成高性能控制器。",
+    "paper_ids": [
+      "01KR7T0X3W40FACCMYC42QXFHV",
+      "01KR7T0X423865RTFWMGXCZT30",
+      "01KR7T0X9T7N3JXG4V1YG6KQW8"
+    ],
+    "papers": [
+      {
+        "bid": 43,
+        "paper_id": "01KR7T0X3W40FACCMYC42QXFHV",
+        "title": "Learning Locomotion for Quadruped Robots via Distributional Ensemble Actor-Critic",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 14,
+        "abstract_snippet": "Domain randomization introduces perturbations in the simulation to make controllers less susceptible to the reality gap, which enables remarkable sim-to-real transfer on real quadruped robots. However, aleatoric uncertainty originating from perturbations could often lead to suboptimal controllers. I",
+        "bottleneck": "域随机化通过引入仿真扰动来弥合sim-to-real差距，但由此产生的随机不确定性常导致强化学习生成的控制器性能陷入次优，缺乏对误差的细粒度控制。",
+        "evidence_quote": "However, aleatoric uncertainty originating from perturbations could often lead to suboptimal controllers.",
+        "physical_depth_signal": "仿真扰动引发的随机不确定性与强化学习中值分布（Value distribution）的下界量化关系",
+        "category": "robustness"
+      },
+      {
+        "bid": 44,
+        "paper_id": "01KR7T0X423865RTFWMGXCZT30",
+        "title": "Diffusion Policies for Out-of-Distribution Generalization in Offline Reinforcement Learning",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 13,
+        "abstract_snippet": "Offline Reinforcement Learning (RL) methods leverage previous experiences to learn better policies than the behavior policy used for data collection. However, they face challenges handling distribution shifts due to the lack of online interaction during training. To this end, we propose a novel meth",
+        "bottleneck": "离线强化学习中的扩散策略由于缺乏在线交互，在面对训练数据未覆盖的分布外（OOD）状态时，难以学习到具备强泛化能力的表征以缓解分布偏移问题。",
+        "evidence_quote": "However, they face challenges handling distribution shifts due to the lack of online interaction during training.",
+        "physical_depth_signal": "6-DoF机械臂运动学约束与多模态上下文环境下的状态空间动力学表征",
+        "category": "generalization"
+      },
+      {
+        "bid": 52,
+        "paper_id": "01KR7T0X9T7N3JXG4V1YG6KQW8",
+        "title": "Actor Prioritized Experience Replay",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 45,
+        "abstract_snippet": "A widely-studied deep reinforcement learning (RL) technique known as Prioritized Experience Replay (PER) allows agents to learn from transitions sampled with non-uniform probability proportional to their temporal-difference (TD) error. Although it has been shown that PER is one of the most crucial c",
+        "bottleneck": "现有的优先经验回放（PER）在离线策略 Actor-Critic 算法中表现不佳，其核心问题在于高 TD 误差的样本会导致 Actor 网络的近似策略梯度与基于最优 Q 函数的真实梯度发生严重偏离。",
+        "evidence_quote": "We theoretically show that actor networks cannot be effectively trained with transitions that have large TD errors. As a result, the approximate policy gradient computed under the Q-network diverges from the actual gradient computed under the optimal Q-function.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "robustness"
+      }
+    ],
+    "detailed_analysis": "当前SOTA离线强化学习在Sim-to-Real迁移中面临核心卡点：域随机化引入的仿真扰动导致随机不确定性增加，使值分布下界受限；且在处理分布外（OOD）状态时，高TD误差样本引发Actor网络近似梯度与基于最优Q函数的真实梯度严重偏离。跨界信号显示，需融合VLM的多模态语义理解与Robotics的6-DoF运动学约束，结合光学视觉反馈动态修正状态空间动力学表征。物理深度上，需深入量化TD误差对策略梯度散度的数学影响，并建模控制器在复杂动力学环境下的流形约束以修正分布漂移。商业突破点在于，该卡点的解决将使工业自动化与具身智能机器人厂商受益，实现在无在线交互、仅靠离线数据驱动下生成高性能、高鲁棒性的工业级控制器。"
+  },
+  {
+    "theme_id": "T16",
+    "title": "高维任务空间的强化学习算法架构优化",
+    "is_cross_domain": false,
+    "physical_depth": 2,
+    "non_obviousness": 4,
+    "commercial_value": "克服维度灾难，实现在标准硬件上高效运行复杂游戏级或工业级大规模序列决策。",
+    "paper_ids": [
+      "01KR7T0X22YRMERWVTPF6MQHGN",
+      "01KR7T0X5Z88GB8ZN3VV27982F",
+      "01KR7T0X75Q2DD686C17E2TMQA",
+      "01KR7T0X9CNCEK7HXD7S07N6C3"
+    ],
+    "papers": [
+      {
+        "bid": 39,
+        "paper_id": "01KR7T0X22YRMERWVTPF6MQHGN",
+        "title": "Mobile robot sequential decision making using a deep reinforcement learning hyper-heuristic approach",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 21,
+        "abstract_snippet": "Sequential decision making is an important part of robotic problems that is receiving unprecedented attention from both academia and industry. Recently, Deep Reinforcement Learning (DRL) has shown its promising capabilities in decision making problems. However, traditional DRL algorithms directly op",
+        "bottleneck": "传统深度强化学习算法在处理机器人序列决策时，因直接在底层动作空间进行搜索，导致计算复杂度随环境维度增加呈指数级增长（维度灾难）。",
+        "evidence_quote": "it can easily result in an exponential growth of computational complexity and suffer from the “curse of dimensionality”, becoming less efficient as the dimensionality of the environment increases.",
+        "physical_depth_signal": "机器人高维动作空间维度与搜索空间计算复杂度的非线性映射关系",
+        "category": "scalability"
+      },
+      {
+        "bid": 47,
+        "paper_id": "01KR7T0X5Z88GB8ZN3VV27982F",
+        "title": "Towards safe and sustainable reinforcement learning for real-time strategy games",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 10,
+        "abstract_snippet": "Combining Deep Neural Networks with Reinforcement Learning, known as Deep Reinforcement Learning (DRL), is revolutionizing fields like medicine, industry, and gaming. DRL has achieved groundbreaking results, particularly in complex Real-Time Strategy (RTS) games such as StarCraft II and Dota 2, serv",
+        "bottleneck": "深度强化学习在处理复杂实时策略游戏时面临极高的计算成本，导致其算法在超级计算机与标准硬件之间存在巨大的部署鸿沟，且缺乏风险规避机制限制了其在安全关键系统中的应用。",
+        "evidence_quote": "DRL algorithms face challenges, including high computational costs and a lack of safety-aware approaches. Training these algorithms requires extensive computational resources, leading to a significant divide between algorithms developed on supercomputers and those feasible on standard hardware.",
+        "physical_depth_signal": "算法训练所需的计算量、标准硬件的计算约束以及CO2排放量之间的量化关系。",
+        "category": "compute_efficiency"
+      },
+      {
+        "bid": 48,
+        "paper_id": "01KR7T0X75Q2DD686C17E2TMQA",
+        "title": "DETRs with Collaborative Hybrid Assignments Training",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 474,
+        "abstract_snippet": "In this paper, we provide the observation that too few queries assigned as positive samples in DETR with one-to-one set matching leads to sparse supervision on the encoder’s output which considerably hurt the discriminative feature learning of the encoder and vice visa for attention learning in the ",
+        "bottleneck": "DETR中一对一集合匹配导致的查询正样本分配过少，造成编码器输出的监督信号稀疏，进而削弱了编码器判别性特征的学习能力。",
+        "evidence_quote": "too few queries assigned as positive samples in DETR with one-to-one set matching leads to sparse supervision on the encoder’s output which considerably hurt the discriminative feature learning of the encoder",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "sample_efficiency"
+      },
+      {
+        "bid": 51,
+        "paper_id": "01KR7T0X9CNCEK7HXD7S07N6C3",
+        "title": "Combining Evolution and Deep Reinforcement Learning for Policy Search: A Survey",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 48,
+        "abstract_snippet": "Deep neuroevolution and deep Reinforcement Learning have received a lot of attention over the past few years. Some works have compared them, highlighting their pros and cons, but an emerging trend combines them so as to benefit from the best of both worlds. In this article, we provide a survey of th",
+        "bottleneck": "在深度神经进化与强化学习融合领域，缺乏统一的通用框架来描述不同算法间的结合机制，导致难以系统分析不同方法间的内在联系并存在关键性的对比缺失。",
+        "evidence_quote": "outlining missing useful comparisons and suggesting new combinations of mechanisms",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "evaluation_gap"
+      }
+    ],
+    "detailed_analysis": "当前强化学习在复杂博弈与机器人控制领域虽达SOTA，但核心卡点在于高维动作空间引发的“维度灾难”，导致计算复杂度随环境维度呈指数级增长。算法层面，如DETR类架构存在一对一匹配导致的监督信号稀疏瓶颈。跨界信号显示，亟需结合计算机视觉（VLM）进行语义降维，并引入神经进化算法实现全局与局部搜索的协同。在物理深度上，需量化处理高维空间维度与搜索计算量的非线性映射关系，通过混合分配机制提升特征编码器的监督效率。若能攻克此卡点，实现在标准硬件上高效运行工业级大规模序列决策，将使人形机器人厂商、自动化工厂及游戏开发者直接受益，显著降低部署成本与能耗。"
+  },
+  {
+    "theme_id": "T17",
+    "title": "具身智能实时的端侧部署与推理优化",
+    "is_cross_domain": false,
+    "physical_depth": 2,
+    "non_obviousness": 3,
+    "commercial_value": "解决大模型推理延迟问题，推动实时响应级机器人产品在消费端的大规模落地。",
+    "paper_ids": [
+      "01KR7T0W4D9KRBJWF2RRM30QVH",
+      "01KR7T0X4QBX13RAK16ACGEXJZ"
+    ],
+    "papers": [
+      {
+        "bid": 8,
+        "paper_id": "01KR7T0W4D9KRBJWF2RRM30QVH",
+        "title": "TinyVLA: Toward Fast, Data-Efficient Vision-Language-Action Models for Robotic Manipulation",
+        "topic": "Robot Manipulation and Learning",
+        "cited_by": 46,
+        "abstract_snippet": "Vision-Language-Action (VLA) models have shown remarkable potential in visuomotor control and instruction comprehension through end-to-end learning processes. However, current VLA models face significant challenges: they are slow during inference and require extensive pre-training on large amounts o",
+        "bottleneck": "当前的视觉-语言-动作（VLA）模型由于推理延迟高且极度依赖大规模机器人数据预训练，导致其难以在对实时性要求严苛的物理机器人上进行有效部署。",
+        "evidence_quote": "they are slow during inference and require extensive pre-training on large amounts of robotic data, making real-world deployment difficult.",
+        "physical_depth_signal": "机器人控制回路的闭环实时频率与大规模多模态模型推理耗时之间的物理失配。",
+        "category": "compute_efficiency"
+      },
+      {
+        "bid": 46,
+        "paper_id": "01KR7T0X4QBX13RAK16ACGEXJZ",
+        "title": "Decentralized multi-agent reinforcement learning based on best-response policies",
+        "topic": "Reinforcement Learning in Robotics",
+        "cited_by": 12,
+        "abstract_snippet": "We evaluate our presented method using the proposed behavior models within a sparsely rewarded simulated multi-agent environment. Although our approach already outperforms the state-of-the-art learners, we conclude this article by outlining possible extensions of our algorithm that future research m",
+        "bottleneck": "无明确卡点",
+        "evidence_quote": "we conclude this article by outlining possible extensions of our algorithm that future research may build upon.",
+        "physical_depth_signal": "无物理深度信号 (纯算法)",
+        "category": "未明确"
+      }
+    ],
+    "detailed_analysis": "当前具身智能SOTA模型（如VLA）在语义理解上表现优异，但核心卡点在于大规模多模态推理的高时延与机器人实时闭环控制频率（通常需50Hz以上）之间的物理失配。这不仅是算法效率问题，更涉及跨领域融合：需结合光学传感的高速采样、机器人动力学的精细控制与VLM的逻辑推理，以打破端侧算力限制与实时性要求的悖论。在物理机制上，控制滞后时间τ与系统采样周期T的数学关系决定了动态操控任务的稳定性，当τ大于T时将诱发控制震荡甚至任务失败。实现端侧部署的推理优化将成为商业突破点，直接助力消费级实时响应机器人（如家用服务机器人）的规模化落地，使机器人硬件商与端侧AI算力芯片供应商成为核心受益者。"
+  }
+]

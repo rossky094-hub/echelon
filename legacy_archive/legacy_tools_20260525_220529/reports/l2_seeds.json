@@ -1,0 +1,90 @@
+{
+  "candidates": 1000,
+  "passed_cross_domain_gate": 232,
+  "passed_physical_depth_gate": 268,
+  "passed_both_gates": 54,
+  "selected_seeds": 50,
+  "audit_068_no_complex": true,
+  "audit_068_no_nan": true,
+  "audit_069_no_valueerror": true,
+  "audit_002_mmr_lambda": 0.7,
+  "audit_002_max_penalty": 0.45446167885274497,
+  "seeds_by_topic": {
+    "T10462": 10,
+    "T10245": 13,
+    "T10653": 15,
+    "T11714": 12
+  },
+  "top10_seeds": [
+    {
+      "paper_id": "01KR6RQDEJC3MVBKVFJM28Q6RV",
+      "title": "A novel multi-agent dynamic portfolio optimization learning system based on hierarchical deep reinfo",
+      "topic": "T10462",
+      "score": 0.683167884646091,
+      "z_score": 0.3328544745358509
+    },
+    {
+      "paper_id": "01KR6RQDC5WMDDR208C5M1TJXB",
+      "title": "Generalizable whole-body global manipulation of deformable linear objects by dual-arm robot in 3-D c",
+      "topic": "T10653",
+      "score": 0.67974772895234,
+      "z_score": 0.2992180336330643
+    },
+    {
+      "paper_id": "01KR6RQDC9F65APS0ZQCB0H977",
+      "title": "Learning-based adaption of robotic friction models",
+      "topic": "T10653",
+      "score": 0.6674990309360791,
+      "z_score": 1.333651060754055
+    },
+    {
+      "paper_id": "01KR6RQDDF70TTWWAN3H82GPVP",
+      "title": "Fast, Accurate, and Lightweight Memory-Enhanced Embedding Learning Framework for Image-Text Retrieva",
+      "topic": "T11714",
+      "score": 0.6558647326725763,
+      "z_score": 0.040311828158314876
+    },
+    {
+      "paper_id": "01KR6RQDEP7T95WVTR10E79N5H",
+      "title": "Physics-Informed Multiagent Reinforcement Learning for Distributed Multirobot Problems",
+      "topic": "T10462",
+      "score": 0.6502303212125257,
+      "z_score": 2.201489096990114
+    },
+    {
+      "paper_id": "01KR6RQDC6ENZNQ1C8KEQ29EFD",
+      "title": "Language-Guided Dexterous Functional Grasping by LLM Generated Grasp Functionality and Synergy for H",
+      "topic": "T10653",
+      "score": 0.6494630306155078,
+      "z_score": 0.028685468855897414
+    },
+    {
+      "paper_id": "01KR6RQDAZRSPB0D3BCR5A2D64",
+      "title": "Physics‐Informed Inverse Design of Programmable Metasurfaces",
+      "topic": "T10245",
+      "score": 0.6477296429020393,
+      "z_score": 0.7752137559325738
+    },
+    {
+      "paper_id": "01KR6RQDER3G9KBHSCF074SKZ9",
+      "title": "EpiTESTER: Testing Autonomous Vehicles With Epigenetic Algorithm and Attention Mechanism",
+      "topic": "T10462",
+      "score": 0.6463164439218103,
+      "z_score": 1.873804094791697
+    },
+    {
+      "paper_id": "01KR6RQDBN39ZRCR8SWB53NXR9",
+      "title": "Embedding high-resolution touch across robotic hands enables adaptive human-like grasping",
+      "topic": "T10653",
+      "score": 0.635331652076262,
+      "z_score": 0.16633557941993635
+    },
+    {
+      "paper_id": "01KR6RQDDYPPX8GWA0TWRG8301",
+      "title": "Reinforcement Learning Control of Double-Layer Markov Jump Systems With PDT-Switched Transition Prob",
+      "topic": "T10462",
+      "score": 0.6344175953741588,
+      "z_score": 0.31386250585466796
+    }
+  ]
+}

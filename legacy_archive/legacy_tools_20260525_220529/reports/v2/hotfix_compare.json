@@ -1,0 +1,264 @@
+{
+  "config": {
+    "v11_2": {
+      "data": "raw/",
+      "time_window": "2024-01 ~ 2026-05",
+      "code": "V11.2",
+      "papers": 1000
+    },
+    "v11_3": {
+      "data": "raw_v2/",
+      "time_window": "2022-01 ~ 2023-12",
+      "code": "V11.3 hotfix",
+      "papers": 1000
+    }
+  },
+  "L1_metrics": {
+    "edges_cite_direct": [
+      510,
+      1042,
+      "+104.3%"
+    ],
+    "edges_co_citation": [
+      56308,
+      41718,
+      "-25.9%"
+    ],
+    "edges_co_citation_all_pairs_before_filter": [
+      "N/A",
+      72945,
+      ""
+    ],
+    "edges_co_citation_after_min_weight_2": [
+      "N/A (all kept)",
+      41718,
+      "only weight≥2 edges kept (41718/72945=57.2%)"
+    ],
+    "edges_bib_couple": [
+      26764,
+      37093,
+      "+38.6%"
+    ],
+    "edges_semantic_bridge": [
+      7,
+      94,
+      "+1242.9%"
+    ],
+    "cross_topic_bridges": [
+      7,
+      94,
+      "+1242.9%"
+    ],
+    "cross_topic_bridges_optics_to_ml": [
+      1,
+      3,
+      "+200.0%"
+    ],
+    "bridge_keyword_forced_edges": [
+      "N/A",
+      89,
+      ""
+    ],
+    "bridge_keyword_papers_count": [
+      "N/A",
+      6,
+      ""
+    ]
+  },
+  "L2_metrics": {
+    "candidates": [
+      1000,
+      1000,
+      "0%"
+    ],
+    "passed_cross_domain_gate": [
+      232,
+      244,
+      "+5.2%"
+    ],
+    "passed_physical_depth_gate": [
+      268,
+      425,
+      "+58.6%"
+    ],
+    "passed_physical_depth_path1_optics": [
+      "N/A",
+      24,
+      ""
+    ],
+    "passed_physical_depth_path2_cs": [
+      "N/A",
+      108,
+      ""
+    ],
+    "passed_physical_depth_path3_compare": [
+      "N/A",
+      395,
+      ""
+    ],
+    "passed_both_gates": [
+      54,
+      101,
+      "+87.0%"
+    ],
+    "selected_seeds": [
+      50,
+      50,
+      "0%"
+    ],
+    "keystone_score_std": [
+      0.042,
+      0.0684,
+      "+62.9%"
+    ],
+    "keystone_score_top10_range": [
+      0.0488,
+      0.0447,
+      "-8.3%"
+    ],
+    "seeds_topic_distribution": [
+      {
+        "T10462": 10,
+        "T10245": 13,
+        "T10653": 15,
+        "T11714": 12
+      },
+      {
+        "T10653": 19,
+        "T10462": 15,
+        "T11714": 12,
+        "T10245": 4
+      },
+      ""
+    ],
+    "mmr_max_penalty": [
+      0.4545,
+      0.296,
+      "-34.9%"
+    ],
+    "t11714_physical_depth_pass": [
+      25,
+      153,
+      "+512.0%"
+    ]
+  },
+  "L3_metrics": {
+    "clusters": [
+      10,
+      10,
+      "0%"
+    ],
+    "bottlenecks_total_evidence": [
+      0,
+      50,
+      "+50 (从0到50)"
+    ],
+    "bottlenecks_avg_evidence_per_cluster": [
+      0,
+      5.0,
+      "+5.00"
+    ],
+    "bottlenecks_cross_topic_label_count": [
+      "N/A",
+      2,
+      ""
+    ],
+    "bottlenecks_cross_topic_label_uses_slash": [
+      "N/A",
+      2,
+      ""
+    ],
+    "audit_017_label_no_praise": [
+      "100%",
+      "100%",
+      ""
+    ]
+  },
+  "hotfix_validation": {
+    "R1_keystone_no_collapse": {
+      "description": "KeystoneScore 对数空间几何平均 + 0.05 平滑",
+      "v11_2_top10_range": 0.0488,
+      "v11_3_top10_range": 0.0447,
+      "v11_2_score_std": 0.042,
+      "v11_3_score_std": 0.0684,
+      "improvement_factor": 0.92,
+      "std_improvement_factor": 1.63,
+      "verified": false,
+      "note": "top10_range: 0.0488 → 0.0447 (目标 ≥ 2x=0.0975)"
+    },
+    "R2_evidence_not_empty": {
+      "description": "pysbd abstract 分句提取 EvidenceAtom",
+      "v11_2_total_evidence": 0,
+      "v11_3_total_evidence": 50,
+      "v11_3_avg_per_cluster": 5.0,
+      "verified": true,
+      "note": "总 evidence 50 ≥ 30: True"
+    },
+    "R3_cross_topic_label_uses_slash": {
+      "description": "跨 topic cluster 标签用 '/' 连接两个领域",
+      "cross_topic_clusters_v11_3": 2,
+      "labels_with_slash": 2,
+      "verified": true,
+      "note": "2 个跨 topic 聚类, 全部使用 '/' 标签: True"
+    },
+    "R4_optics_ml_bridge_increase": {
+      "description": "Optics↔AI 38 条桥词强制建边",
+      "v11_2_cross_topic_bridges": 7,
+      "v11_3_cross_topic_bridges": 94,
+      "v11_2_optics_ml_specific": 1,
+      "v11_3_optics_ml_specific": 3,
+      "v11_3_bridge_keyword_forced": 89,
+      "improvement_factor": 13.4,
+      "verified": true,
+      "note": "跨topic桥: 7 → 94 (13.4x); Optics↔ML: 1 → 3"
+    },
+    "R5_cs_papers_pass_depth": {
+      "description": "OR 化物理深度门 (Path1 OR Path2 OR Path3)",
+      "v11_2_T11714_pass_count": 25,
+      "v11_3_T11714_pass_count": 153,
+      "v11_3_passed_via_path2_cs": 60,
+      "improvement_factor": 6.1,
+      "verified": true,
+      "note": "T11714 深度通过: 25 → 153 (6.1x)"
+    },
+    "R6_mmr_still_ok": {
+      "description": "MMR λ=0.7 多样性验证 (无需改动)",
+      "v11_2_max_penalty": 0.4545,
+      "v11_3_max_penalty": 0.296,
+      "verified": true,
+      "note": "MMR 惩罚项 ∈ [0,1] 继续有效"
+    },
+    "R7_cocite_min_weight_2_effect": {
+      "description": "co_citation 共被引次数 ≥ 2 才建边",
+      "v11_2_cocite_total_edges": 56308,
+      "v11_3_cocite_all_pairs": 72945,
+      "v11_3_cocite_after_filter": 41718,
+      "noise_removed": 31227,
+      "noise_removed_pct": 42.8,
+      "v11_3_vs_v11_2": "-25.9%",
+      "verified": true,
+      "note": "原始配对 72945, 过滤后 41718, 去噪 31227 (42.8%)"
+    }
+  },
+  "summary": {
+    "verified_hotfixes": 6,
+    "expected_value": 7,
+    "hotfixes": {
+      "R1": false,
+      "R2": true,
+      "R3": true,
+      "R4": true,
+      "R5": true,
+      "R6": true,
+      "R7": true
+    },
+    "all_pass": false
+  },
+  "_notes": {
+    "data_age_difference": "V11.3 数据 (2022-2023) 比 V11.2 数据 (2024-2026) 老 2 年",
+    "citation_count_effect": "更老的数据 cited_by_count 更高 (论文有更多时间积累引用), 影响 c_venue 和 c_recent_burst 分量",
+    "cite_direct_increase": "cite_direct 从 510 → 1042 (+532), 因为 2022-2023 数据之间互引更丰富 (论文已有 1-3 年互引时间)",
+    "bib_couple_increase": "bib_couple 从 26764 → 37093 (+10329), 老语料共同参考文献更多",
+    "t11714_seed_count": "T11714 在金种子中占比: V11.2=12, V11.3=12 (R5 OR化有效提升 VLM 入选率)"
+  }
+}

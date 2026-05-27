@@ -1,0 +1,47 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python/cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# macOS/editor noise
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+
+# Local databases and runtime state
+db/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# Logs and generated runtime output
+logs/
+*.log
+
+# Large/generated audit artifacts
+reports/v14b_pilot/*
+!reports/v14b_pilot/
+!reports/v14b_pilot/*.md
+
+# Keep source from legacy archive, but not archived DB/runtime payloads.
+legacy_archive/**/db/
+legacy_archive/**/*.db
+legacy_archive/**/*.sqlite
+legacy_archive/**/*.sqlite3
+
+# Frontend dependency/build folders
+node_modules/
+dist/
+build/

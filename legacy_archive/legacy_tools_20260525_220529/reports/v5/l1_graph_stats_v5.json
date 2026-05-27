@@ -1,0 +1,139 @@
+{
+  "nodes": 2000,
+  "edges": {
+    "cite_direct": 4608,
+    "co_citation_after_filter": 129857,
+    "co_citation_all_pairs": 249953,
+    "bib_couple": 97053,
+    "semantic_bridge": 21865,
+    "bridge_keyword_forced": 21836,
+    "total": 169701
+  },
+  "cross_topic_bridges": 21865,
+  "bridge_by_category": {
+    "OPTICS_AI": 9,
+    "ROBOTICS_ML": 146,
+    "VLM_WORLD_MODEL": 8,
+    "GENERIC_AI4SCIENCE": 12
+  },
+  "bridge_edge_by_category": {
+    "OPTICS_AI": 135,
+    "GENERIC_AI4SCIENCE": 2360,
+    "ROBOTICS_ML": 17988,
+    "VLM_WORLD_MODEL": 1353
+  },
+  "corpus_avg_age_months": 32.640674342105264,
+  "cite_direct_weight": 1.0,
+  "cocite_weight": 0.7419915707236842,
+  "cocite_threshold_used": 2,
+  "by_topic": {
+    "T10245": 500,
+    "T10653": 500,
+    "T11714": 500,
+    "T10462": 500
+  },
+  "centrality_top10": [
+    {
+      "paper_id": "01KR873P0VW7E6N8HJJ6W2F4CE",
+      "title": "Quantitative phase contrast imaging with a nonlocal angle-selective metasurface",
+      "topic": "T10245",
+      "bridging_centrality": 0.08024047026130356,
+      "z_score": 19.89150970642881,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873PYEZBNW2EJSNZ2XXG8T",
+      "title": "Diffusion policy: Visuomotor policy learning via action diffusion",
+      "topic": "T10462",
+      "bridging_centrality": 0.06075650614223923,
+      "z_score": 14.99519198204723,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873P25TGFSNDJG8CA40Q0V",
+      "title": "RH20T: A Comprehensive Robotic Dataset for Learning Diverse Skills in One-Shot",
+      "topic": "T10653",
+      "bridging_centrality": 0.05702348603120821,
+      "z_score": 14.057084499226026,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873PPTVXRV60FWDJX53B9Y",
+      "title": "CoT-VLA: Visual Chain-of-Thought Reasoning for Vision-Language-Action Models",
+      "topic": "T11714",
+      "bridging_centrality": 0.05143071936127492,
+      "z_score": 12.651622940839623,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873PQHF1XJ57K9HGBZXJPY",
+      "title": "VisionZip: Longer is Better but Not Necessary in Vision Language Models",
+      "topic": "T11714",
+      "bridging_centrality": 0.04144699847477625,
+      "z_score": 10.14271514193789,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873Q1NHCME7B3ZJV56QW1M",
+      "title": "Cooperative Path Following Control in Autonomous Vehicles Graphical Games: A Dat",
+      "topic": "T10462",
+      "bridging_centrality": 0.04049304014870084,
+      "z_score": 9.90298553497797,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873P035EWZQHDR5Q3DBT14",
+      "title": "In Situ Customized Illusion Enabled by Global Metasurface Reconstruction",
+      "topic": "T10245",
+      "bridging_centrality": 0.0373461210617396,
+      "z_score": 9.112165165543676,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873NT2T4VMN17M08RGMM8Y",
+      "title": "Electromagnetic metamaterial agent",
+      "topic": "T10245",
+      "bridging_centrality": 0.034776780888232765,
+      "z_score": 8.466490304174073,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873Q23SBWQ4462VJW1NPKN",
+      "title": "Learning Locomotion for Quadruped Robots via Distributional Ensemble Actor-Criti",
+      "topic": "T10462",
+      "bridging_centrality": 0.03303240460473195,
+      "z_score": 8.028128764258343,
+      "is_outlier": false
+    },
+    {
+      "paper_id": "01KR873Q16NDVGTE159Y8WE6G1",
+      "title": "Effective Multi-Agent Deep Reinforcement Learning Control With Relative Entropy ",
+      "topic": "T10462",
+      "bridging_centrality": 0.029686770103436767,
+      "z_score": 7.1873712362784135,
+      "is_outlier": false
+    }
+  ],
+  "outlier_count": 7,
+  "outlier_paper_ids": [
+    "01KR873NQ1KRCS18ZGTHZCWDBX",
+    "01KR873QAQW1V6B3KPS33BD70X",
+    "01KR873PT60FRF2RG9QRCAKCN3",
+    "01KR873NTEP0NYF96NZE2E49G7",
+    "01KR873P28D3SGYAY9YDHM5W3H",
+    "01KR873PW3MZ8XSQZW0JX53PB8",
+    "01KR873PWBR3S8SK00TEGJ8E4T"
+  ],
+  "bridging_dual_gate_pass": 387,
+  "bridging_dual_gate_total": 2000,
+  "bridging_dual_gate_pct": 0.1935,
+  "cocite_no_pagerank": true,
+  "local_pagerank_with_sink_verified": true,
+  "semantic_bridge_cross_topic_prefilter_verified": true,
+  "audit_049_dual_gate_pass": 387,
+  "audit_049_bc_threshold": 5e-05,
+  "audit_050_outlier_count": 7,
+  "audit_012_cocite_no_pagerank": true,
+  "audit_076_local_pr_with_sink": true,
+  "audit_077_pre_filter_cross_topic": true
+}

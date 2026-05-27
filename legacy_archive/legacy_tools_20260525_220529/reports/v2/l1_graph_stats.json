@@ -1,0 +1,103 @@
+{
+  "nodes": 1000,
+  "edges": {
+    "cite_direct": 1042,
+    "co_citation": 41718,
+    "co_citation_all_pairs": 72945,
+    "bib_couple": 37093,
+    "semantic_bridge": 94,
+    "bridge_keyword_forced": 89,
+    "total": 47638
+  },
+  "cross_topic_bridges": 94,
+  "optics_ml_bridges": 3,
+  "bridge_papers_count": 6,
+  "by_topic": {
+    "T10245": 250,
+    "T10653": 250,
+    "T11714": 250,
+    "T10462": 250
+  },
+  "centrality_top10": [
+    {
+      "paper_id": "01KR7M22133G2TDQZ8TWQZCP68",
+      "title": "Quantitative phase contrast imaging with a nonlocal angle-selective metasurface",
+      "topic": "T10245",
+      "bridging_centrality": 0.21577686172987887,
+      "z_score": 26.196330241294458
+    },
+    {
+      "paper_id": "01KR7M222NQJR9G1DQX0H0B8Q9",
+      "title": "Reinforcement Learning for Collaborative Robots Pick-and-Place Applications: A C",
+      "topic": "T10653",
+      "bridging_centrality": 0.06395607364211238,
+      "z_score": 7.569784516947929
+    },
+    {
+      "paper_id": "01KR7M2258300FPZ8M2KQXQ3N3",
+      "title": "Relative Entropy Regularized Sample-Efficient Reinforcement Learning With Contin",
+      "topic": "T10462",
+      "bridging_centrality": 0.0439298648299984,
+      "z_score": 5.112814698634822
+    },
+    {
+      "paper_id": "01KR7M22078ZQYXP5ZGV3TR4FW",
+      "title": "Intelligent metasurface system for automatic tracking of moving targets and wire",
+      "topic": "T10245",
+      "bridging_centrality": 0.041455015469711524,
+      "z_score": 4.809181083298796
+    },
+    {
+      "paper_id": "01KR7M220JZG8D8QGRXPTMVMT2",
+      "title": "Circularly polarized light-sensitive, hot electron transistor with chiral plasmo",
+      "topic": "T10245",
+      "bridging_centrality": 0.0267829619867028,
+      "z_score": 3.009100353159699
+    },
+    {
+      "paper_id": "01KR7M221Q0GRD6T7B35A16JYY",
+      "title": "Efficient Grasp Detection Network With Gaussian-Based Grasp Representation for R",
+      "topic": "T10653",
+      "bridging_centrality": 0.026587485943125325,
+      "z_score": 2.985117843850069
+    },
+    {
+      "paper_id": "01KR7M2259VX29NJYQSVNS1XYF",
+      "title": "IPAPRec: A Promising Tool for Learning High-Performance Mapless Navigation Skill",
+      "topic": "T10462",
+      "bridging_centrality": 0.026376612348349423,
+      "z_score": 2.9592462441526677
+    },
+    {
+      "paper_id": "01KR7M222PQJR9G1DQX0H0B8QB",
+      "title": "Visual Spatial Attention and Proprioceptive Data-Driven Reinforcement Learning f",
+      "topic": "T10653",
+      "bridging_centrality": 0.024205782377681728,
+      "z_score": 2.6929120733337917
+    },
+    {
+      "paper_id": "01KR7M223X4T4897J50QYQ4E94",
+      "title": "Image captioning model using attention and object features to mimic human image ",
+      "topic": "T11714",
+      "bridging_centrality": 0.022862764791065835,
+      "z_score": 2.5281403131500606
+    },
+    {
+      "paper_id": "01KR7M22172R9JV2F00J14WKWX",
+      "title": "Metasurface with dynamic chiral meta-atoms for spin multiplexing hologram and lo",
+      "topic": "T10245",
+      "bridging_centrality": 0.021970456316927036,
+      "z_score": 2.4186650245343806
+    }
+  ],
+  "hotfix_r7": {
+    "cocite_all_pairs": 72945,
+    "cocite_after_min_weight_2": 41718,
+    "noise_removed": 31227
+  },
+  "hotfix_r4": {
+    "bridge_keyword_papers": 6,
+    "bridge_keyword_optics_papers": 6,
+    "bridge_keyword_forced_edges": 89
+  }
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Echelon V14B Visual Graph</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <strong>Echelon V14B</strong>
+          <span>Optics Evolution Graph</span>
+        </div>
+        <label class="api-field">
+          <span>API</span>
+          <input id="apiBase" value="http://127.0.0.1:8000" />
+        </label>
+        <button id="loadBtn" class="primary">Load Graph</button>
+        <button id="storyBtn">Story</button>
+        <button id="mainPathBtn">Main Path</button>
+        <button id="futureBtn">Future</button>
+        <div id="statusText" class="status">Waiting for API</div>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel">
+          <form id="searchForm" class="search">
+            <input id="searchInput" placeholder="Search topic, paper, limitation..." />
+            <button type="submit">Search</button>
+          </form>
+          <div class="metrics" id="metrics"></div>
+          <div class="tabs">
+            <button class="tab active" data-tab="paper">Paper</button>
+            <button class="tab" data-tab="clusters">Branches</button>
+            <button class="tab" data-tab="story">Story</button>
+          </div>
+          <div id="paperPane" class="pane active"></div>
+          <div id="clusterPane" class="pane"></div>
+          <div id="storyPane" class="pane"></div>
+        </aside>
+
+        <section class="stage">
+          <canvas id="edgeCanvas"></canvas>
+          <canvas id="graphCanvas"></canvas>
+          <div class="legend">
+            <span><i class="dot main"></i>Main path</span>
+            <span><i class="dot future"></i>Future anchor</span>
+            <span><i class="dot bottleneck"></i>Limitation</span>
+            <span><i class="dot paper"></i>Paper</span>
+          </div>
+          <div id="hoverCard" class="hover-card hidden"></div>
+        </section>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

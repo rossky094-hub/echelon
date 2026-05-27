@@ -1,0 +1,138 @@
+{
+  "nodes": 2000,
+  "edges": {
+    "cite_direct": 4608,
+    "co_citation_after_filter": 129857,
+    "co_citation_all_pairs": 249953,
+    "bib_couple": 97053,
+    "semantic_bridge": 2654,
+    "bridge_keyword_forced": 2625,
+    "total": 234172
+  },
+  "cross_topic_bridges": 2654,
+  "bridge_by_category": {
+    "OPTICS_AI": 9,
+    "ROBOTICS_ML": 146,
+    "VLM_WORLD_MODEL": 8,
+    "GENERIC_AI4SCIENCE": 12
+  },
+  "bridge_edge_by_category": {
+    "OPTICS_AI": 135,
+    "GENERIC_AI4SCIENCE": 180,
+    "ROBOTICS_ML": 2190,
+    "VLM_WORLD_MODEL": 120
+  },
+  "corpus_avg_age_months": 32.640674342105264,
+  "v1_avg_age_months": 22.431243421052635,
+  "v2_avg_age_months": 42.85118421052632,
+  "cite_direct_weight": 1.0,
+  "cocite_weight": 0.7419915707236842,
+  "cocite_threshold_used": 2,
+  "cocite_distribution": {
+    "p25": 1,
+    "p50": 2,
+    "p75": 3,
+    "max": 132,
+    "total_pairs": 249953
+  },
+  "by_topic": {
+    "T10245": 500,
+    "T10653": 500,
+    "T11714": 500,
+    "T10462": 500
+  },
+  "centrality_top10": [
+    {
+      "paper_id": "01KR7PP00886DTHCFTXYR6CD9F",
+      "title": "Quantitative phase contrast imaging with a nonlocal angle-selective metasurface",
+      "topic": "T10245",
+      "bridging_centrality": 0.08042887906569751,
+      "z_score": 28.56197093105784
+    },
+    {
+      "paper_id": "01KR7PNZZ2S5JWTXZG6PVEYKSC",
+      "title": "Electromagnetic metamaterial agent",
+      "topic": "T10245",
+      "bridging_centrality": 0.04610127469473809,
+      "z_score": 16.233403616065928
+    },
+    {
+      "paper_id": "01KR7PNZZ0GDV7KEF51JQJ1D4P",
+      "title": "Thermally tunable binary‐phase VO <sub>2</sub> metasurfaces for switchable holog",
+      "topic": "T10245",
+      "bridging_centrality": 0.030438308910878533,
+      "z_score": 10.60813696675414
+    },
+    {
+      "paper_id": "01KR7PNZYME79P87R82CKZ9B4J",
+      "title": "Autonomous aeroamphibious invisibility cloak with stochastic-evolution learning",
+      "topic": "T10245",
+      "bridging_centrality": 0.022468182706635274,
+      "z_score": 7.745710671107348
+    },
+    {
+      "paper_id": "01KR7PP0034DAVXVX5DHGREJS7",
+      "title": "In Situ Customized Illusion Enabled by Global Metasurface Reconstruction",
+      "topic": "T10245",
+      "bridging_centrality": 0.02054140600497112,
+      "z_score": 7.053719583971642
+    },
+    {
+      "paper_id": "01KR7PP00A0Q6WN6YGY064D9B9",
+      "title": "Eye accommodation-inspired neuro-metasurface focusing",
+      "topic": "T10245",
+      "bridging_centrality": 0.019431011802197397,
+      "z_score": 6.654927710028532
+    },
+    {
+      "paper_id": "01KR7PP00224AXPR5EMKZ1Y1CD",
+      "title": "Homeostatic neuro-metasurfaces for dynamic wireless channel management",
+      "topic": "T10245",
+      "bridging_centrality": 0.018545392148860553,
+      "z_score": 6.336862359657625
+    },
+    {
+      "paper_id": "01KR7PP058GQTYSVVE2ACJ5VKD",
+      "title": "An Offline-Transfer-Online Framework for Cloud-Edge Collaborative Distributed Re",
+      "topic": "T10462",
+      "bridging_centrality": 0.017494391172897094,
+      "z_score": 5.959401231282194
+    },
+    {
+      "paper_id": "01KR7PP06QHC33BYSGAPSK2QRE",
+      "title": "IPAPRec: A Promising Tool for Learning High-Performance Mapless Navigation Skill",
+      "topic": "T10462",
+      "bridging_centrality": 0.015590252583749332,
+      "z_score": 5.2755404957733205
+    },
+    {
+      "paper_id": "01KR7PP02DBJDR280Z30S4G0HR",
+      "title": "Reinforcement Learning for Collaborative Robots Pick-and-Place Applications: A C",
+      "topic": "T10653",
+      "bridging_centrality": 0.015483784601676884,
+      "z_score": 5.237303114868816
+    }
+  ],
+  "n1_validation": {
+    "corpus_avg_age": 32.640674342105264,
+    "v1_avg_age": 22.431243421052635,
+    "v2_avg_age": 42.85118421052632,
+    "cite_direct_weight": 1.0,
+    "cocite_weight": 0.7419915707236842,
+    "cite_direct_weight_in_range_0_7_to_0_9": true
+  },
+  "n3_validation": {
+    "threshold_used": 2,
+    "in_set_2_or_3": true
+  },
+  "n5_validation": {
+    "bridge_by_category": {
+      "OPTICS_AI": 9,
+      "ROBOTICS_ML": 146,
+      "VLM_WORLD_MODEL": 8,
+      "GENERIC_AI4SCIENCE": 12
+    },
+    "all_four_categories_ge5": true
+  },
+  "_v11_4_bugfix_1_note": "co_citation 从错误的 4603(只算语料内引用)修正为 129857(包含语料外引用,符合 co_citation 的语义)"
+}

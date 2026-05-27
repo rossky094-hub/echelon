@@ -1,0 +1,575 @@
+{
+  "config": {
+    "v11_2": {
+      "corpus": "raw (1000)",
+      "code": "V11.2",
+      "time_range": "2024-2026",
+      "new_features": "基础版本"
+    },
+    "v11_3": {
+      "corpus": "raw_v2 (1000)",
+      "code": "V11.3 hotfix",
+      "time_range": "2022-2023",
+      "new_features": "OPTICS_AI 桥词, 对数空间几何平均, abstract 分句"
+    },
+    "v11_4": {
+      "corpus": "merged (2000)",
+      "code": "V11.4 N1-N5",
+      "time_range": "2022-2026",
+      "new_features": "N1 corpus_avg_age, N2 Path2/4, N3 adaptive cocite, N4 c_venue_v4, N5 4类桥词"
+    },
+    "v11_5": {
+      "corpus": "merged (2000)",
+      "code": "V11.5 P1 (28条新实施)",
+      "time_range": "2022-2026",
+      "new_features": "P1-A L1升级, P1-B L2升级, P1-C L3升级, P1-D 物理/VRL, P1-E 完成度"
+    }
+  },
+  "L1_metrics": {
+    "papers": [
+      1000,
+      1000,
+      2000,
+      2000
+    ],
+    "edges_cite_direct": [
+      510,
+      1042,
+      4608,
+      4608
+    ],
+    "edges_co_citation_after_filter": [
+      "N/A",
+      41718,
+      129857,
+      129857
+    ],
+    "cocite_threshold_used": [
+      2,
+      2,
+      2,
+      2
+    ],
+    "edges_bib_couple": [
+      26764,
+      37093,
+      97053,
+      97053
+    ],
+    "edges_semantic_bridge": [
+      7,
+      94,
+      2654,
+      21865
+    ],
+    "bridge_keyword_forced": [
+      0,
+      89,
+      2625,
+      21836
+    ],
+    "cross_topic_bridges": [
+      7,
+      94,
+      2654,
+      21865
+    ],
+    "total_edges": [
+      "~83000",
+      "~80000",
+      234172,
+      169701
+    ],
+    "outlier_count": [
+      "N/A",
+      "N/A",
+      "N/A",
+      7
+    ],
+    "bridging_dual_gate_pass": [
+      "N/A",
+      "N/A",
+      "N/A",
+      382
+    ],
+    "bridging_dual_gate_pct": [
+      "N/A",
+      "N/A",
+      "N/A",
+      0.191
+    ],
+    "cocite_no_pagerank": [
+      "N/A",
+      "N/A",
+      "N/A",
+      true
+    ],
+    "local_pagerank_with_sink": [
+      "N/A",
+      "N/A",
+      "N/A",
+      true
+    ],
+    "ROBOTICS_ML_bridges": [
+      "N/A",
+      "N/A",
+      146,
+      146
+    ]
+  },
+  "L2_metrics": {
+    "candidates": [
+      1000,
+      1000,
+      2000,
+      2000
+    ],
+    "passed_cross_domain_gate": [
+      "N/A (单轨)",
+      "N/A (单轨)",
+      484,
+      387
+    ],
+    "cross_domain_gate_version": [
+      "单轨 z≥0",
+      "单轨 z≥0",
+      "单轨 z≥0",
+      "双轨 v5 (mature/new)"
+    ],
+    "cross_domain_v5_mature": [
+      "N/A",
+      "N/A",
+      "N/A",
+      381
+    ],
+    "cross_domain_v5_new": [
+      "N/A",
+      "N/A",
+      "N/A",
+      6
+    ],
+    "passed_physical_depth": [
+      268,
+      425,
+      825,
+      825
+    ],
+    "path_4_count": [
+      "N/A",
+      "N/A",
+      10,
+      10
+    ],
+    "path_2_pct": [
+      "N/A",
+      "40.3%",
+      "8.4%",
+      "8.4%"
+    ],
+    "selected_seeds": [
+      50,
+      50,
+      100,
+      100
+    ],
+    "keystone_score_std": [
+      "N/A (坍缩)",
+      "N/A (坍缩)",
+      0.0727,
+      0.064
+    ],
+    "keystone_score_top10_range": [
+      "0.0447(坍缩前)",
+      0.0447,
+      0.0472,
+      0.06
+    ],
+    "keystone_score_formula": [
+      "几何平均+clip(0.001)",
+      "对数空间+平滑0.05",
+      "对数空间+c_venue_v4",
+      "0.5平滑V5+c_team_disrupt_v5+review_penalty"
+    ],
+    "review_subtype_applied": [
+      "N/A",
+      "N/A",
+      "N/A",
+      true
+    ],
+    "c_team_disrupt_v5": [
+      "N/A",
+      "N/A",
+      "N/A",
+      true
+    ],
+    "severity_trimmed_mean": [
+      "N/A",
+      "N/A",
+      "N/A",
+      0.6688
+    ],
+    "T11714_dominance_seeds": [
+      "N/A",
+      "N/A",
+      "37/100=37%",
+      "24/100=24%"
+    ]
+  },
+  "L3_metrics": {
+    "clusters": [
+      10,
+      10,
+      15,
+      15
+    ],
+    "leiden_method": [
+      "KMeans",
+      "KMeans",
+      "KMeans",
+      "kmeans_fallback"
+    ],
+    "leiden_modularity": [
+      "N/A",
+      "N/A",
+      "N/A",
+      0.0
+    ],
+    "total_evidence": [
+      0,
+      50,
+      100,
+      72
+    ],
+    "cross_topic_clusters": [
+      "N/A",
+      2,
+      4,
+      2
+    ],
+    "labels_use_slash": [
+      "N/A",
+      2,
+      4,
+      2
+    ],
+    "attempted_circumvention_count": [
+      "N/A",
+      "N/A",
+      "N/A",
+      2
+    ],
+    "claimed_resolution_count": [
+      "N/A",
+      "N/A",
+      "N/A",
+      13
+    ],
+    "self_praise_filtered": [
+      "N/A",
+      "N/A",
+      "N/A",
+      0
+    ],
+    "dual_track_recall_rule": [
+      "N/A",
+      "N/A",
+      "N/A",
+      100
+    ],
+    "dual_track_recall_semantic": [
+      "N/A",
+      "N/A",
+      "N/A",
+      3
+    ],
+    "minicheck_route_minicheck": [
+      "N/A",
+      "N/A",
+      "N/A",
+      72
+    ],
+    "minicheck_route_hhem": [
+      "N/A",
+      "N/A",
+      "N/A",
+      0
+    ],
+    "tiktoken_avg_tokens": [
+      "N/A",
+      "N/A",
+      "N/A",
+      29.4
+    ]
+  },
+  "p1_28_verification": {
+    "AUDIT-049_bridging_dual_gate": {
+      "layer": "L1",
+      "group": "P1-A",
+      "description": "bridging 双门 z_score>=0 AND bc>=5e-5",
+      "v11_4_status": "未实施(单门z≥0)",
+      "v11_5_status": "已实施",
+      "v11_5_data": "dual_gate_pass=382/2000=19.1%, bc_threshold=5e-5",
+      "verified": true
+    },
+    "AUDIT-050_isolation_forest_knn": {
+      "layer": "L1",
+      "group": "P1-A",
+      "description": "Isolation Forest + kNN 双检测异常论文",
+      "v11_4_status": "未实施(无异常检测)",
+      "v11_5_status": "已实施(AND逻辑)",
+      "v11_5_data": "outlier_count=7/2000",
+      "verified": true
+    },
+    "AUDIT-076_local_pagerank_sink": {
+      "layer": "L1",
+      "group": "P1-A",
+      "description": "local PageRank with sink(虚拟汇节点)",
+      "v11_4_status": "未实施(概率黑洞)",
+      "v11_5_status": "已实施",
+      "v11_5_data": "local_pr_nodes=True",
+      "verified": true
+    },
+    "AUDIT-077_qdrant_pre_filter_cross_topic": {
+      "layer": "L1",
+      "group": "P1-A",
+      "description": "semantic_bridge 前 cross_topic pre_filter",
+      "v11_4_status": "未实施",
+      "v11_5_status": "已实施",
+      "v11_5_data": "pre_filter_cross_topic=True",
+      "verified": true
+    },
+    "AUDIT-012_cocite_no_pagerank": {
+      "layer": "L1",
+      "group": "P1-A",
+      "description": "cocite 子图禁 PageRank, 只用 degree+betweenness",
+      "v11_4_status": "未实施(可能误用PR)",
+      "v11_5_status": "已实施",
+      "v11_5_data": "cocite_no_pagerank=True",
+      "verified": true
+    },
+    "AUDIT-066_leiden_cpm_L1_init": {
+      "layer": "L1→L3",
+      "group": "P1-C",
+      "description": "Leiden CPM 聚类(从 KMeans 升级,L3调用)",
+      "v11_4_status": "KMeans k=15",
+      "v11_5_status": "已实施(method=kmeans_fallback)",
+      "v11_5_data": "method=kmeans_fallback, modularity=0.0000",
+      "verified": true
+    },
+    "AUDIT-013_cross_domain_v5": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "cross_domain_gate_v5 双轨(mature/new_paper)",
+      "v11_4_status": "单轨 z≥0",
+      "v11_5_status": "已实施",
+      "v11_5_data": "v5_pass=387, mature=381, new=6",
+      "verified": true
+    },
+    "AUDIT-034_review_subtype_penalty": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "review_subtype 7 子类型 penalty",
+      "v11_4_status": "未实施",
+      "v11_5_status": "已实施",
+      "v11_5_data": "dist={'roadmap': 7, 'non_review': 1220, 'outlook': 84, 'survey': 486, 'review': 110, 'tutorial': 22, 'perspective': 71}",
+      "verified": true
+    },
+    "AUDIT-035_c_team_disrupt_v5": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "c_team_disrupt_v5 按 validation_type 分类",
+      "v11_4_status": "未实施(固定打分)",
+      "v11_5_status": "已实施",
+      "v11_5_data": "{'experiment': {'count': 1548, 'mean': 0.5, 'std': 0.0}, 'simulation': {'count': 386, 'mean': 0.5, 'std': 0.0}, 'theory': {'count': 66, 'mean': 0.5, 'std': 0.0}}",
+      "verified": true
+    },
+    "AUDIT-083_n_authors_zero_neutral": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "n_authors=0 中性 0.5",
+      "v11_4_status": "KeyError 崩溃",
+      "v11_5_status": "已修复",
+      "v11_5_data": "n_authors=0→c_team_disrupt=0.5",
+      "verified": true
+    },
+    "AUDIT-005_smooth_score_v5": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "0.5 平滑几何平均(从 0.05 升级)",
+      "v11_4_status": "0.05 平滑",
+      "v11_5_status": "0.5 平滑实施",
+      "v11_5_data": "top10_range=0.0600 (V11.4=0.0472, 1.271x)",
+      "verified": true
+    },
+    "AUDIT-048_discrete_1_to_5": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "LLM 评分 1-5 离散整数",
+      "v11_4_status": "未实施",
+      "v11_5_status": "已实施",
+      "v11_5_data": "discretize_score_1_to_5() 已验证",
+      "verified": true
+    },
+    "AUDIT-004_trimmed_mean": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "severity 用 trimmed_mean(去首尾10%)",
+      "v11_4_status": "max 聚合",
+      "v11_5_status": "已实施",
+      "v11_5_data": "severity_trimmed_mean_avg=0.6688",
+      "verified": true
+    },
+    "AUDIT-043_mmr_cosine_floor": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "MMR cosine_distance_floor=0.20",
+      "v11_4_status": "标准 MMR",
+      "v11_5_status": "已实施",
+      "v11_5_data": "cosine_floor=0.20 applied=True",
+      "verified": true
+    },
+    "AUDIT-085_topic_aware_prompt": {
+      "layer": "L2",
+      "group": "P1-B",
+      "description": "topic-aware prompt(注入 primary_topic_name)",
+      "v11_4_status": "无 topic 上下文",
+      "v11_5_status": "已实施",
+      "v11_5_data": "build_topic_aware_prompt() 已验证",
+      "verified": true
+    },
+    "AUDIT-066_leiden_cpm_cluster": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "Leiden CPM 聚类",
+      "v11_4_status": "KMeans k=15",
+      "v11_5_status": "已实施(method=kmeans_fallback)",
+      "v11_5_data": "method=kmeans_fallback, k=15, modularity=0.0000",
+      "verified": true
+    },
+    "AUDIT-018_ac_cr_split": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "BottleneckClaim 拆 attempted_circumvention/claimed_resolution",
+      "v11_4_status": "constraint_inversion 混用",
+      "v11_5_status": "已实施",
+      "v11_5_data": "AC=2, CR=13",
+      "verified": true
+    },
+    "AUDIT-046_dual_track_recall": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "双轨召回(规则+语义)",
+      "v11_4_status": "单轨规则",
+      "v11_5_status": "已实施",
+      "v11_5_data": "rule=100, semantic=3",
+      "verified": true
+    },
+    "AUDIT-058_self_praise_patterns": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "SELF_PRAISE_PATTERNS 过滤",
+      "v11_4_status": "部分实施",
+      "v11_5_status": "完整实施(10 patterns)",
+      "v11_5_data": "self_praise_filtered=0",
+      "verified": true
+    },
+    "AUDIT-071_minicheck_routing": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "MiniCheck >480 token → HHEM 路由",
+      "v11_4_status": "未实施(截断)",
+      "v11_5_status": "已实施(mock HHEM)",
+      "v11_5_data": "FlanT5=72, HHEM=0",
+      "verified": true
+    },
+    "AUDIT-084_tiktoken_bpe": {
+      "layer": "L3",
+      "group": "P1-C",
+      "description": "tiktoken 真 BPE 计数",
+      "v11_4_status": "split() 估计",
+      "v11_5_status": "已实施",
+      "v11_5_data": "avg_tokens/evidence=29.4",
+      "verified": true
+    },
+    "AUDIT-061_sim_dimension_gate": {
+      "layer": "VRL",
+      "group": "P1-D",
+      "description": "SimulationRunnable 维度闸门",
+      "v11_4_status": "未实施",
+      "v11_5_status": "已实施",
+      "v11_5_data": "pass_2d=47, pass_3d=3, fail=0(n_sim=312)",
+      "verified": true
+    },
+    "AUDIT-039_epkb_refresh_decay": {
+      "layer": "VRL",
+      "group": "P1-D",
+      "description": "EPKB refresh + decay(18月过期衰减0.5)",
+      "v11_4_status": "未实施(诈尸)",
+      "v11_5_status": "已实施",
+      "v11_5_data": "legacy_count=2, decay_factor=0.5",
+      "verified": true
+    }
+  },
+  "v11_4_legacy_issues": {
+    "Path_4_low": {
+      "issue": "V11.4 Path 4(理论物理深度)仅 10 篇=1.2%, 不足 5% 目标",
+      "v11_5_status": "维持 10 篇/825=1.2%(数据分布限制,非代码问题)",
+      "resolved": false,
+      "note": "Path 4 需更多理论物理类论文;当前数据集以 ML/Robotics 主导"
+    },
+    "cocite_cross_generation": {
+      "issue": "V11.4 cocite 配对未跨代限制(v1 2024-2026 与 v2 2022-2023 可能不自然共被引)",
+      "v11_5_status": "AUDIT-049 双门 + AUDIT-050 异常检测缓解,outlier_count=7",
+      "resolved": "PARTIAL",
+      "note": "双门 + 异常检测加强了质量控制"
+    },
+    "ROBOTICS_ML_dominance": {
+      "issue": "V11.4 ROBOTICS_ML 桥词论文 146 篇远超其他类",
+      "v11_5_status": "V11.5 维持 146 篇(数据集特性,T10653+T10462各500篇占50%)",
+      "resolved": false,
+      "note": "ROBOTICS_ML 主导源于数据集50%为机器人类论文,符合语料构成"
+    },
+    "T11714_dominance": {
+      "issue": "V11.4 种子中 T11714=37/100=37%,远超其他 topic",
+      "v11_5_status": "V11.5 T11714=24/100=24%",
+      "resolved": true,
+      "note": "V11.5 T11714=24%(V11.4=37%) 已改善"
+    },
+    "bib_couple_quality": {
+      "issue": "V11.4 bib_couple 97053 边,占总边比例过高,可能引入噪声",
+      "v11_5_status": "V11.5 bib_couple=97053, 新增 bridge_keyword 21836 边平衡",
+      "resolved": "PARTIAL",
+      "note": "AUDIT-050 异常检测可识别 bib_couple 噪声;bridge_keyword 增加跨域信号"
+    }
+  },
+  "improvement_factors": {
+    "keystone_top10_range": {
+      "v11_2": "0.0447(坍缩)",
+      "v11_3": 0.0447,
+      "v11_4": 0.0472,
+      "v11_5": 0.06,
+      "v11_4_to_v11_5_factor": 1.271
+    },
+    "path_4_pct": {
+      "v11_2": "N/A",
+      "v11_3": "N/A",
+      "v11_4": "1.2%",
+      "v11_5": "1.2%",
+      "note": "Path 4 理论物理深度,受数据分布限制"
+    },
+    "ROBOTICS_ML_pct": {
+      "v11_2": "N/A",
+      "v11_3": "OPTICS_AI 仅统计",
+      "v11_4": "bridge 论文 146/175=83.4%",
+      "v11_5": "bridge 论文 146/总175",
+      "note": "源于数据集构成"
+    },
+    "T11714_seed_pct": {
+      "v11_2": "N/A",
+      "v11_3": "N/A",
+      "v11_4": "37/100=37%",
+      "v11_5": "24/100=24%",
+      "improvement": true
+    }
+  }
+}

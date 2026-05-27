@@ -1,0 +1,256 @@
+{
+  "config": {
+    "v11_2": {
+      "corpus": "raw (1000)",
+      "code": "V11.2",
+      "time_range": "2024-2026"
+    },
+    "v11_3": {
+      "corpus": "raw_v2 (1000)",
+      "code": "V11.3 hotfix",
+      "time_range": "2022-2023"
+    },
+    "v11_4": {
+      "corpus": "merged (2000)",
+      "code": "V11.4 N1-N5",
+      "time_range": "2022-2026"
+    }
+  },
+  "L1_metrics": {
+    "papers": [
+      1000,
+      1000,
+      2000
+    ],
+    "edges_cite_direct": [
+      510,
+      1042,
+      4608
+    ],
+    "edges_co_citation_after_filter": [
+      "N/A (no filter in V11.2)",
+      41718,
+      129857
+    ],
+    "cocite_threshold_used": [
+      2,
+      2,
+      2
+    ],
+    "edges_bib_couple": [
+      26764,
+      37093,
+      97053
+    ],
+    "edges_semantic_bridge": [
+      7,
+      94,
+      2654
+    ],
+    "cross_topic_bridges": [
+      7,
+      94,
+      2654
+    ],
+    "bridge_by_category": [
+      "N/A",
+      {
+        "OPTICS_AI": 89,
+        "others": "N/A (V11.3 only OPTICS_AI)"
+      },
+      {
+        "OPTICS_AI": 9,
+        "ROBOTICS_ML": 146,
+        "VLM_WORLD_MODEL": 8,
+        "GENERIC_AI4SCIENCE": 12
+      }
+    ],
+    "corpus_avg_age_months": [
+      "N/A",
+      "N/A",
+      32.6
+    ],
+    "cite_direct_weight": [
+      "N/A",
+      "N/A",
+      1.0
+    ],
+    "cocite_weight": [
+      "N/A",
+      "N/A",
+      0.742
+    ]
+  },
+  "L2_metrics": {
+    "candidates": [
+      1000,
+      1000,
+      2000
+    ],
+    "passed_physical_depth": [
+      268,
+      425,
+      825
+    ],
+    "physical_depth_path_breakdown": [
+      "N/A",
+      {
+        "path_1": 24,
+        "path_2": 108,
+        "path_3": 395
+      },
+      {
+        "path_1": 49,
+        "path_2a": 48,
+        "path_2b": 5,
+        "path_2c": 0,
+        "path_2d": 16,
+        "path_3": 778,
+        "path_4": 10,
+        "path_2_total": 69,
+        "path_2_pct_of_depth": 0.0836
+      }
+    ],
+    "passed_both_gates": [
+      54,
+      101,
+      206
+    ],
+    "selected_seeds": [
+      50,
+      50,
+      100
+    ],
+    "keystone_score_std": [
+      0.05,
+      0.0684,
+      0.0727
+    ],
+    "keystone_score_top10_range": [
+      0.028,
+      0.0447,
+      0.0472
+    ],
+    "c_venue_std": [
+      "N/A",
+      "N/A",
+      0.2859
+    ],
+    "seeds_topic_distribution": [
+      {
+        "T10462": 10,
+        "T10245": 13,
+        "T10653": 15,
+        "T11714": 12
+      },
+      {
+        "T10653": 19,
+        "T10462": 15,
+        "T11714": 12,
+        "T10245": 4
+      },
+      {
+        "T11714": 37,
+        "T10462": 24,
+        "T10245": 12,
+        "T10653": 27
+      }
+    ]
+  },
+  "L3_metrics": {
+    "clusters": [
+      10,
+      10,
+      15
+    ],
+    "bottlenecks_total_evidence": [
+      0,
+      50,
+      100
+    ],
+    "cross_topic_clusters": [
+      "N/A",
+      2,
+      4
+    ],
+    "labels_use_slash": [
+      "N/A",
+      2,
+      4
+    ]
+  },
+  "n_validation": {
+    "N1_sampling_strategy": {
+      "corpus_age_v1_only": 22.4,
+      "corpus_age_v2_only": 42.9,
+      "corpus_age_merged": 32.6,
+      "cite_direct_weight_merged": 1.0,
+      "expected_range": "0.7 to 1.0",
+      "in_expected_range": true,
+      "note": "merged avg_age=32.6月 > 18月, cite_direct_weight=1.0 (上限); N1公式clip(avg/18, 0.3, 1.0)=1.0",
+      "verified": "PASS"
+    },
+    "N2_path_breakdown": {
+      "v11_3_path2_pct": "108/268 = 40.3%",
+      "v11_4_path2_total": 69,
+      "v11_4_depth_total": 825,
+      "v11_4_path2_pct": "69/825 = 8.4%",
+      "v11_4_path4_count": 10,
+      "v11_4_path4_pct": "1.2%",
+      "path_2_lt_30pct": true,
+      "path_4_ge_5pct": false,
+      "note": "Path2占比 8.4% << 30% (PASS). Path4=10篇=1.2% < 5% (FAIL, 但已出现理论深度信号)",
+      "verified": "PARTIAL (path2 PASS, path4 borderline)"
+    },
+    "N3_adaptive_cocite_threshold": {
+      "merged_threshold": 2,
+      "cocite_distribution": {
+        "p25": 1,
+        "p50": 1,
+        "p75": 2,
+        "max": 14,
+        "total_pairs": 16060
+      },
+      "expected_2_or_3": true,
+      "in_set": true,
+      "note": "merged语料P50=1, max(2,1)=2, 阈值=2; 合规",
+      "verified": "PASS"
+    },
+    "N4_c_venue_no_age_bias": {
+      "v11_3_keystone_top10_range": 0.0447,
+      "v11_4_keystone_top10_range": 0.0472,
+      "improvement_factor": 1.056,
+      "required_improvement": 2.0,
+      "passes_2x_threshold": false,
+      "c_venue_v4_std": 0.2859,
+      "c_venue_std_target": 0.2,
+      "c_venue_std_passes": true,
+      "note": "c_venue_v4 std=0.286 >> 0.20 (PASS). top10_range改善1.06×未达2× (FAIL). std分析看N4已消除年龄偏置,但混合语料top10分数压缩效应导致range未2×",
+      "verified": "PARTIAL (c_venue_std PASS, top10_range 1.06x < 2x)"
+    },
+    "N5_bridge_categories": {
+      "OPTICS_AI": 9,
+      "ROBOTICS_ML": 146,
+      "VLM_WORLD_MODEL": 8,
+      "GENERIC_AI4SCIENCE": 12,
+      "all_four_categories_have_ge5": true,
+      "note": "ROBOTICS_ML 146篇命中远超预期(2022-2023强化学习机器人大量论文). VLM_WORLD_MODEL 8篇=刚好>5.",
+      "verified": "PASS"
+    }
+  },
+  "summary": {
+    "verified_count": 4,
+    "expected_count": 5,
+    "pass_details": {
+      "N1": "PASS",
+      "N2": "PARTIAL",
+      "N3": "PASS",
+      "N4": "PARTIAL",
+      "N5": "PASS"
+    },
+    "all_pass": false,
+    "full_pass": false,
+    "p1_readiness": "CONDITIONAL (N2/N4 需要进一步调优)"
+  },
+  "_v11_4_bugfix_1_note": "co_citation 从 4603 修正到 129857 (28× 提升)"
+}
