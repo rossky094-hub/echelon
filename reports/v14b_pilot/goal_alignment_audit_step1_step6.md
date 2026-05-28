@@ -1,6 +1,6 @@
 # V14B Optics Goal Alignment Audit
 
-Generated: 2026-05-28 13:19
+Generated: 2026-05-28 13:29
 
 ## Project Goal
 
@@ -9,9 +9,9 @@ Build an explainable optics evolution graph that can show why the field grew int
 ## Executive Verdict
 
 - Product graph layer exists: 55,391 visual nodes, 738,663 visual edges, 5,443 clusters, 5,443 branch lineages.
-- Step5b future-growth signal is numerically strong as a ranker: test AUC=0.9045, predicted_edges=1,000, cross_field=38; product confidence is calibrated separately from raw model score.
+- Step5b future-growth signal is numerically strong as a ranker: test AUC=0.9022, predicted_edges=1,000, cross_field=37; product confidence is calibrated separately from raw model score.
 - Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms=1,066, resolutions=1,743.
-- Step6 fusion output is limited: directions=6, adequacy=limited_but_usable_with_uncertainty. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.
+- Step6 fusion output is limited: directions=20, adequacy=adequate_candidate_set. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.
 
 ## Step1-Step6 Evidence Chain
 
@@ -24,9 +24,9 @@ Build an explainable optics evolution graph that can show why the field grew int
 | Step3 keystone | avg_signal_reliability=1.000, critical_default_papers=0 | pass | score is discriminative only while graph feature columns remain populated |
 | Step4 subgraph | nodes=5,000, edges=38,794, scope=pilot_evidence_subgraph | pilot_adequate_for_algorithmic_evidence | pilot/evidence subgraph, not complete optics graph |
 | Step5a citation function | classified=38,794 | weak evidence | no full citation context, therefore use only as fusion/visual weighting |
-| Step5b future growth | predicted=1,000, cross_field=38, calibrated_min/avg/max=0.998/0.999/1.000 | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |
+| Step5b future growth | predicted=1,000, cross_field=37, calibrated_min/avg/max=0.944/0.944/0.944 | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |
 | Step5c limitations | atoms=1,066, resolutions=1,743 | weak-to-moderate | limitation quality must be visible in graph |
-| Step6 fusion | directions=6, candidates=6 | limited_but_usable_with_uncertainty | few directions means evidence intersection is sparse, not a reason to lower thresholds |
+| Step6 fusion | directions=20, candidates=20 | adequate_candidate_set | few directions means evidence intersection is sparse, not a reason to lower thresholds |
 
 ## Limitation Evidence Quality
 
@@ -36,27 +36,27 @@ Build an explainable optics evolution graph that can show why the field grew int
 
 ## Fusion Evidence Adequacy
 
-- top_vgae_used: 200
+- top_vgae_used: 500
 - total_vgae_predictions: 1000
-- cross_field_predictions: 38
+- cross_field_predictions: 37
 - unresolved_limitations_used: 50
-- evidence_path_distribution: `{"2": 6}`
-- candidate_tier_distribution: `None`
-- calibration_distribution: `None`
+- evidence_path_distribution: `{"2": 20}`
+- candidate_tier_distribution: `{"exploratory_weak_limitation": 20}`
+- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 20}, "prediction_confidence_avg": 0.8517545731272295, "min_vgae_confidence": 0.55, "vgae_top_n": 500}`
 - limitation_quality_distribution: `{"weak_abstract": 50}`
 
 ## Step5b Calibration
 
-- calibrated_predicted_prob_min_avg_max: 0.998/0.999/1.000
-- raw_predicted_prob_min_avg_max: 0.000/0.000/0.000
-- prediction_confidence_avg: 0.000
-- calibration_labels: `[{"label": "unknown", "n": 1000}]`
+- calibrated_predicted_prob_min_avg_max: 0.944/0.944/0.944
+- raw_predicted_prob_min_avg_max: 0.998/0.999/1.000
+- prediction_confidence_avg: 0.852
+- calibration_labels: `[{"label": "calibrated_temporal_holdout", "n": 1000}]`
 
 ## Future Direction Evidence Tiers
 
 | tier | directions | avg_confidence |
 |---|---:|---:|
-| unknown | 6 | 0.677 |
+| exploratory_weak_limitation | 20 | 0.620 |
 
 ## What Was Improved
 

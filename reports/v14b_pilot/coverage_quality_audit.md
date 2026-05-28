@@ -1,6 +1,6 @@
 # V14B Optics Coverage / Quality Audit
 
-- Generated: 2026-05-27T05:32:36.599986+00:00
+- Generated: 2026-05-28T05:22:03.570177+00:00
 - Overall status: **FAIL**
 
 ## Core Metrics

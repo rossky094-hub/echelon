@@ -81,7 +81,7 @@ def ensure_edit_schema(conn: sqlite3.Connection) -> None:
             target_type TEXT NOT NULL,
             target_id TEXT NOT NULL,
             action TEXT NOT NULL,
-            payload_json TEXT,
+            payload TEXT,
             rationale TEXT,
             expert_id TEXT NOT NULL,
             timestamp TEXT,
@@ -97,6 +97,21 @@ def ensure_edit_schema(conn: sqlite3.Connection) -> None:
             ON graph_visual_edits(target_type, target_id);
         """
     )
+    columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(graph_visual_edits)").fetchall()
+    }
+    if "payload" not in columns:
+        conn.execute("ALTER TABLE graph_visual_edits ADD COLUMN payload TEXT")
+        columns.add("payload")
+    if "payload_json" in columns:
+        conn.execute(
+            """
+            UPDATE graph_visual_edits
+            SET payload = COALESCE(payload, payload_json)
+            WHERE payload IS NULL AND payload_json IS NOT NULL
+            """
+        )
     conn.commit()
 
 
@@ -106,7 +121,7 @@ def submit_visual_edit(edit: GraphVisualEdit) -> dict:
         conn.execute(
             """
             INSERT OR IGNORE INTO graph_visual_edits
-                (edit_id, target_type, target_id, action, payload_json, rationale,
+                (edit_id, target_type, target_id, action, payload, rationale,
                  expert_id, timestamp, version, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'accepted')
             """,
@@ -144,7 +159,7 @@ def get_visual_edit_status(edit_id: str) -> dict:
         ensure_edit_schema(conn)
         row = conn.execute(
             """
-            SELECT edit_id, target_type, target_id, action, payload_json, rationale,
+            SELECT edit_id, target_type, target_id, action, payload, rationale,
                    expert_id, timestamp, version, status, created_at, updated_at
             FROM graph_visual_edits
             WHERE edit_id = ?
@@ -158,7 +173,7 @@ def get_visual_edit_status(edit_id: str) -> dict:
             "status": "not_found",
         }
     data = dict(row)
-    data["payload"] = _loads(data.pop("payload_json", None), {})
+    data["payload"] = _loads(data.get("payload"), {})
     data["schema_version"] = SCHEMA_VERSION
     return data
 
@@ -168,7 +183,7 @@ def get_visual_edit_history(expert_id: str, limit: int = 100) -> dict:
         ensure_edit_schema(conn)
         rows = conn.execute(
             """
-            SELECT edit_id, target_type, target_id, action, payload_json, rationale,
+            SELECT edit_id, target_type, target_id, action, payload, rationale,
                    expert_id, timestamp, version, status, created_at, updated_at
             FROM graph_visual_edits
             WHERE expert_id = ?
@@ -180,7 +195,7 @@ def get_visual_edit_history(expert_id: str, limit: int = 100) -> dict:
     edits = []
     for row in rows:
         item = dict(row)
-        item["payload"] = _loads(item.pop("payload_json", None), {})
+        item["payload"] = _loads(item.get("payload"), {})
         edits.append(item)
     return {
         "schema_version": SCHEMA_VERSION,

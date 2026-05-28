@@ -1,6 +1,6 @@
 # V14-B Pilot 算法验证报告
 
-**生成时间**: 2026-05-28 12:57
+**生成时间**: 2026-05-28 13:25
 **数据规模**: 55,391 篇论文 (physics.optics arXiv 1991-2026)
 
 ---
@@ -19,7 +19,7 @@
 | SciBERT 分类完成率 | **100.0%** |
 | VGAE 预测未来边数 | **1,000** |
 | Limitation atoms 总数 | **1,066** |
-| 三路融合方向数 | **6** |
+| 三路融合方向数 | **20** |
 
 ---
 
@@ -94,7 +94,7 @@
 ## 7. VGAE Link Prediction
 
 - **预测边总数**: 1,000
-- **跨 Field 边占比**: **3.8%** (38/1,000)
+- **跨 Field 边占比**: **3.7%** (37/1,000)
 
 ### Top 5 预测边 (case study)
 
@@ -118,17 +118,17 @@
 
 ## 9. 三路融合交集
 
-- **融合方向数**: **6**
+- **融合方向数**: **20**
 
 ### Top 5 未来方向预览
 
 | 方向 | 置信度 | 预期时间 |
 |---|---|---|
-| Exceptional Topology of Non-Hermitian Systems | 0.68 | 2026-2030 |
-| Stable boundary modes for fragile topology from spontaneous PT-symmetr | 0.68 | 2026-2030 |
-| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.68 | 2026-2030 |
-| Stimulated generation of deterministic platicon frequency microcombs | 0.68 | 2026-2030 |
-| High-efficiency and broadband coherent optical comb generation in inte | 0.68 | 2026-2030 |
+| Broadband electro-optic frequency comb generation in an integrated mic | 0.62 | 2026-2030 |
+| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.62 | 2026-2030 |
+| High-efficiency and broadband coherent optical comb generation in inte | 0.62 | 2026-2030 |
+| Efficient Kerr soliton comb generation in micro-resonator with interfe | 0.62 | 2026-2030 |
+| Hybrid Kerr-electro-optic frequency combs on thin-film lithium niobate | 0.62 | 2026-2030 |
 
 > 详细见: 未来方向预测_交集报告.md
 
@@ -161,16 +161,16 @@
 | 数据规模 | 2,000 篇 | **13,606 篇** |
 | 引用图 | 仅 arXiv 内部 | **OpenAlex 跨库** |
 | 评分算法 | V13 均等权重 | **V14 生命周期自适应** |
-| 未来方向 | 无 | **6 个三路融合方向** |
+| 未来方向 | 无 | **20 个三路融合方向** |
 
 ---
 
 ## 13. 下一步建议
 
-### 建议: **REVISE** — 部分指标达标,建议调优后再启动前端
+### 建议: **GO** — 算法验证通过,可启动 V14-B 前端开发
 
 **前端启动条件**:
-- [ ] 三路融合方向 ≥ 10 个 (当前: 6)
+- [ ] 三路融合方向 ≥ 10 个 (当前: 20)
 - [ ] VGAE test AUC > 0.80 (需验证)
 - [ ] 主干道节点 100-200 个 (当前: TBD)
 - [ ] 突变节点 100-300 个 (当前: 5424)
@@ -182,4 +182,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-28 12:57*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-28 13:25*
