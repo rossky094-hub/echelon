@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 import sqlite3
 import sys
 import time
@@ -221,6 +222,15 @@ def ensure_enrich_tables(conn: sqlite3.Connection) -> None:
 
 def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
     """Map external reference IDs to library ULIDs using provider-aware IDs."""
+    def doi_to_arxiv(doi_value: Optional[str]) -> Optional[str]:
+        doi_norm = normalize_doi(doi_value)
+        if not doi_norm:
+            return None
+        m = re.match(r"^10\.48550/arxiv\.(.+)$", doi_norm, flags=re.I)
+        if not m:
+            return None
+        return normalize_arxiv_id(m.group(1))
+
     before = conn.execute(
         "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL"
     ).fetchone()[0]
@@ -255,6 +265,11 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
             id_maps["s2"].setdefault(legacy_s2, pid)
         if doi:
             id_maps["doi"].setdefault(doi, pid)
+            # arXiv DOIs appear in reference lists frequently. Keep this alias
+            # so DOI-form references can relink to arXiv-only papers.
+            arxiv_alias = doi_to_arxiv(doi)
+            if arxiv_alias:
+                id_maps["arxiv"].setdefault(arxiv_alias, pid)
         if arxiv_id:
             id_maps["arxiv"].setdefault(str(arxiv_id).strip(), pid)
 
@@ -293,6 +308,16 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
         else:
             provider, norm = classify_external_id(external)
         target_id = id_maps.get(provider or "", {}).get(norm or "")
+        if not target_id and provider == "doi":
+            arxiv_alias = doi_to_arxiv(norm)
+            if arxiv_alias:
+                target_id = id_maps["arxiv"].get(arxiv_alias)
+        if not target_id and (provider in (None, "other") or not norm):
+            p2, n2 = classify_external_id(external)
+            if p2 and n2:
+                if has_ref_norm and (provider != p2 or norm != n2):
+                    norm_updates.append((p2, n2, citing_id, external))
+                target_id = id_maps.get(p2, {}).get(n2)
         if target_id:
             internal_updates.append((target_id, citing_id, external))
 

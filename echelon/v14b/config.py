@@ -220,8 +220,39 @@ VGAE_MIN_YEAR_GAP: int = 1
 # Step 5c: Limitation Tracking
 # ---------------------------------------------------------------------------
 
+# Step 5s: Section-level evidence ingestion (arXiv/Sci-Bot/PDF)
+SECTION_INGEST_TOP_N: int = int(
+    os.environ.get("V14B_SECTION_INGEST_TOP_N", "1200")
+)
+SECTION_INGEST_CONCURRENCY: int = int(
+    os.environ.get("V14B_SECTION_INGEST_CONCURRENCY", "2")
+)
+SECTION_INGEST_TIMEOUT_SEC: float = float(
+    os.environ.get("V14B_SECTION_INGEST_TIMEOUT_SEC", "60")
+)
+SECTION_INGEST_MIN_CHARS: int = int(
+    os.environ.get("V14B_SECTION_INGEST_MIN_CHARS", "160")
+)
+SECTION_INGEST_MAX_CHARS: int = int(
+    os.environ.get("V14B_SECTION_INGEST_MAX_CHARS", "12000")
+)
+SECTION_INGEST_REQUIRE_ARXIV: bool = (
+    os.environ.get("V14B_SECTION_INGEST_REQUIRE_ARXIV", "true").lower()
+    in ("1", "true", "yes")
+)
+
 # Sci-Bot 抽取 top N 论文
 LIMITATION_TOP_N: int = 1000
+
+# Step5c 默认严格要求 section-level 证据。若必须兼容旧库可显式放开 fallback。
+LIMITATION_REQUIRE_SECTION_EVIDENCE: bool = (
+    os.environ.get("V14B_LIMITATION_REQUIRE_SECTION_EVIDENCE", "true").lower()
+    in ("1", "true", "yes")
+)
+LIMITATION_ALLOW_ABSTRACT_FALLBACK: bool = (
+    os.environ.get("V14B_LIMITATION_ALLOW_ABSTRACT_FALLBACK", "false").lower()
+    in ("1", "true", "yes")
+)
 
 # LLM 提取的 limitation atoms 数量限制
 LIMITATION_MAX_ATOMS_PER_PAPER: int = 5

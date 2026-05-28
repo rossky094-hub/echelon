@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae section-evidence limitation \
         fusion mutation layout report visual-graph goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
 
 # Python 解释器
@@ -140,6 +140,15 @@ vgae:
 		--db-v14 $(DB_V14) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
+## Step 5s: 章节证据入库 (paper_sections)
+section-evidence:
+	@echo ">>> Step 5s: Section evidence ingestion..."
+	$(PYTHON) -m echelon.v14b.step5s_section_ingest \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--top-n $${V14B_SECTION_INGEST_TOP_N:-1200} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
 ## Step 5c: Limitation Tracking (~4h, ~$40 LLM 费用)
 limitation:
 	@echo ">>> Step 5c: Limitation Tracking..."
@@ -222,7 +231,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 交付目标产物链路: 不等待 OpenAlex backfill, 从现有 library 推进图谱产品
-product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae limitation fusion mutation layout report visual-graph goal-audit
+product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion mutation layout report visual-graph goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Visual Graph 产品链路完成!"
@@ -237,7 +246,7 @@ product-chain: id-repair graph-features embeddings quality-audit reset-pilot mai
 pilot: pilot-graph
 
 ## 从当前 library 干净重跑图谱 (enrich 已单独完成时使用)
-pilot-graph: id-repair openalex-backfill graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae limitation fusion mutation layout report
+pilot-graph: id-repair openalex-backfill graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion mutation layout report
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Pilot 图谱重跑完成!"

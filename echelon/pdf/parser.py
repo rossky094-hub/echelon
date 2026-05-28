@@ -65,17 +65,15 @@ def parse_pdf_pages(pdf_path: str) -> list[PageBlock]:
     Returns:
         List of PageBlock objects ordered by page.
     """
+    blocks: list[PageBlock] = []
+    parser_used = None
+
     try:
         import pdfplumber  # type: ignore
-    except ImportError:
-        logger.warning("pdfplumber not installed; returning empty page list")
-        return []
-
-    blocks: list[PageBlock] = []
-    try:
+        parser_used = "pdfplumber"
         with pdfplumber.open(pdf_path) as pdf:
             for idx, page in enumerate(pdf.pages):
-                # [AUDIT-015] page_no = pdfplumber index (1-based)
+                # [AUDIT-015] page_no = parser index (1-based)
                 page_no = idx + 1
                 text = page.extract_text()
                 if not text:
@@ -89,9 +87,39 @@ def parse_pdf_pages(pdf_path: str) -> list[PageBlock]:
                         break
 
                 blocks.append(PageBlock(page_no=page_no, text=text, section_hint=section))
-
+    except ImportError:
+        pass
     except Exception as exc:
-        logger.error(f"Failed to parse PDF {pdf_path!r}: {exc}")
+        logger.warning("pdfplumber parse failed for %r: %s", pdf_path, exc)
+
+    if not blocks:
+        try:
+            from pypdf import PdfReader  # type: ignore
+            parser_used = "pypdf"
+            reader = PdfReader(pdf_path)
+            for idx, page in enumerate(reader.pages):
+                page_no = idx + 1
+                text = page.extract_text() or ""
+                if not text.strip():
+                    continue
+                section = "body"
+                for sec_name, pattern in _SECTION_PATTERNS.items():
+                    if pattern.search(text[:200]):
+                        section = sec_name
+                        break
+                blocks.append(PageBlock(page_no=page_no, text=text, section_hint=section))
+        except ImportError:
+            pass
+        except Exception as exc:
+            logger.warning("pypdf parse failed for %r: %s", pdf_path, exc)
+
+    if not blocks:
+        logger.warning(
+            "No PDF parser available (install pdfplumber or pypdf), or parsing failed for %r",
+            pdf_path,
+        )
+    elif parser_used:
+        logger.debug("Parsed PDF %r with %s (%d pages with text)", pdf_path, parser_used, len(blocks))
 
     return blocks
 

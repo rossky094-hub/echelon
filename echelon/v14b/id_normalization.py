@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import unquote
 from typing import Optional
 
 
@@ -28,6 +29,12 @@ def normalize_doi(value: Optional[str]) -> Optional[str]:
             break
     if doi.upper().startswith("DOI:"):
         doi = doi[4:].strip()
+    doi = unquote(doi)
+    doi = doi.strip().strip("<>").strip("\"'")
+    doi = doi.split("?", 1)[0].split("#", 1)[0]
+    doi = re.sub(r"[\s]+", "", doi)
+    doi = re.sub(r"[.,;:]+$", "", doi)
+    doi = doi.strip("()[]{}")
     return doi.lower() or None
 
 

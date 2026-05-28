@@ -92,6 +92,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     """)
 
     step5b = load_checkpoint("step5b_vgae")
+    rolling_backtest = step5b.get("rolling_backtest") or {}
     predicted_total = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0)
     predicted_cross = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges WHERE is_cross_field=1") or 0)
     pred_min = float(scalar(conn_v14, "SELECT COALESCE(MIN(predicted_prob),0) FROM predicted_future_edges") or 0.0)
@@ -126,6 +127,32 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     """)
     limitation_atoms = int(scalar(conn_v14, "SELECT COUNT(*) FROM limitation_atoms") or 0)
     limitation_resolutions = int(scalar(conn_v14, "SELECT COUNT(*) FROM limitation_resolutions") or 0)
+    section_table_exists = int(
+        scalar(
+            conn_main,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('paper_sections','scibot_sections','paper_fulltext_sections')",
+        ) or 0
+    ) > 0
+    section_primary_papers = 0
+    section_rows_total = 0
+    if section_table_exists:
+        table_name = rows(
+            conn_main,
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('paper_sections','scibot_sections','paper_fulltext_sections') ORDER BY CASE name WHEN 'paper_sections' THEN 1 WHEN 'scibot_sections' THEN 2 ELSE 3 END LIMIT 1",
+        )
+        sec_table = table_name[0]["name"] if table_name else "paper_sections"
+        section_rows_total = int(
+            scalar(conn_main, f"SELECT COUNT(*) FROM {sec_table}") or 0
+        )
+        section_primary_papers = int(
+            scalar(
+                conn_main,
+                f"""
+                SELECT COUNT(DISTINCT paper_id) FROM {sec_table}
+                WHERE lower(section_name) IN ('limitations','limitation','discussion','conclusion','conclusions','future work')
+                """,
+            ) or 0
+        )
 
     fusion_audit_rows = rows(conn_v14, "SELECT * FROM fusion_evidence_audit ORDER BY created_at DESC LIMIT 1")
     fusion_audit = fusion_audit_rows[0] if fusion_audit_rows else {}
@@ -176,6 +203,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"- Product graph layer exists: {visual_nodes:,} visual nodes, {visual_edges:,} visual edges, {clusters:,} clusters, {lineages:,} branch lineages.",
         f"- Step5b future-growth signal is numerically strong as a ranker: test AUC={float(step5b.get('test_auc') or 0):.4f}, predicted_edges={predicted_total:,}, cross_field={predicted_cross:,}; product confidence is calibrated separately from raw model score.",
         f"- Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,}.",
+        f"- Section evidence inventory: table_present={section_table_exists}, rows={section_rows_total:,}, primary-section papers={section_primary_papers:,}.",
         f"- Step6 fusion output is limited: directions={future_dirs:,}, adequacy={fusion_audit.get('adequacy_label', 'unknown')}. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.",
         "",
         "## Step1-Step6 Evidence Chain",
@@ -220,6 +248,9 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"- raw_predicted_prob_min_avg_max: {raw_min:.3f}/{raw_avg:.3f}/{raw_max:.3f}" if raw_min is not None else "- raw_predicted_prob_min_avg_max: n/a",
         f"- prediction_confidence_avg: {conf_avg:.3f}" if conf_avg is not None else "- prediction_confidence_avg: n/a",
         f"- calibration_labels: `{json.dumps(calibration_labels, ensure_ascii=False)}`",
+        f"- rolling_backtest_avg_raw_auc: {float(rolling_backtest.get('avg_raw_auc') or 0):.4f}",
+        f"- rolling_backtest_avg_calibrated_auc: {float(rolling_backtest.get('avg_calibrated_auc') or 0):.4f}",
+        f"- rolling_backtest_years: `{json.dumps(rolling_backtest.get('years') or [], ensure_ascii=False)}`",
         "",
         "## Future Direction Evidence Tiers",
         "",
@@ -246,7 +277,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "",
         "1. Linked-reference coverage is still the largest graph-bone risk. The internal citation DAG is large enough to run, but linked_refs/raw_refs is still coverage-limited.",
         "2. OpenAlex Field/Topic coverage is partial. Cross-field color, bridge, and future direction claims should expose uncertainty until field coverage improves.",
-        "3. Step5b now has internal calibration, but it is still based on sampled temporal holdouts. Before user-facing confidence claims, add rolling held-out-year backtests and LLM/human audit calibration.",
+        "3. Step5b now includes calibration + rolling held-out-year checks, but user-facing confidence still needs external LLM/human stratified audit calibration.",
         "4. Step5c is weak when based on abstracts. Section-level `paper_sections` / Sci-Bot sections are needed before limitation-driven bottleneck claims become strong.",
         "5. Step6 evidence tiers improve transparency, but exploratory directions remain hypotheses. The next improvement should strengthen branch lineage and candidate generation with stronger external validation, not just lower thresholds.",
         "6. Branch lineage now exposes support ratios and alternative parents, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.",

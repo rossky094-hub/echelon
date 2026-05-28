@@ -387,16 +387,13 @@ def fit_probability_calibrator(
     positive_scores: np.ndarray,
     negative_scores: np.ndarray,
     *,
-    bins: int = 12,
+    bins: int | None = None,
 ) -> dict:
     """
-    Fit a light-weight monotonic histogram calibrator.
+    Fit a probability calibrator from chronological holdout scores.
 
-    VGAE dot-product scores are useful for ranking but can be badly
-    overconfident.  The calibrator uses chronological validation positives and
-    temporal negative samples to turn raw scores into empirical product
-    confidence.  This is deliberately conservative: it should reduce user-facing
-    certainty before we have external/LLM edge audit.
+    Preferred calibrator is 1D Platt scaling (logistic regression on raw VGAE
+    scores). We keep a histogram fallback if sklearn is unavailable.
     """
     positive_scores = np.asarray(positive_scores, dtype=np.float32)
     negative_scores = np.asarray(negative_scores, dtype=np.float32)
@@ -414,34 +411,61 @@ def fit_probability_calibrator(
         np.ones_like(positive_scores, dtype=np.float32),
         np.zeros_like(negative_scores, dtype=np.float32),
     ])
+    prior = float(labels.mean())
+    support = int(len(scores))
+
+    try:
+        from sklearn.linear_model import LogisticRegression
+
+        x = scores.reshape(-1, 1)
+        y = labels.astype(np.int32)
+        # Mild regularization keeps probabilities conservative on small holdouts.
+        clf = LogisticRegression(
+            solver="lbfgs",
+            max_iter=800,
+            C=6.0,
+            class_weight="balanced",
+            random_state=42,
+        )
+        clf.fit(x, y)
+        coef = float(clf.coef_[0][0])
+        intercept = float(clf.intercept_[0])
+        return {
+            "method": "temporal_platt_logistic",
+            "coef": coef,
+            "intercept": intercept,
+            "support": support,
+            "base_rate": prior,
+            "label": "calibrated_temporal_holdout",
+            "score_min": float(scores.min()),
+            "score_max": float(scores.max()),
+        }
+    except Exception:
+        pass
+
+    # Fallback histogram calibration.
     order = np.argsort(scores)
     scores = scores[order]
     labels = labels[order]
-
     n = len(scores)
-    n_bins = max(2, min(int(bins), n))
-    prior = float(labels.mean())
+    desired_bins = int(bins) if bins is not None else (n // 40 if n >= 160 else n)
+    n_bins = max(4, min(20, desired_bins))
     raw_bins: list[CalibrationBin] = []
     for idxs in np.array_split(np.arange(n), n_bins):
         if len(idxs) == 0:
             continue
         pos = float(labels[idxs].sum())
-        support = int(len(idxs))
-        # Beta prior smoothing keeps tiny or all-positive bins from becoming
-        # false 1.0 confidence.
-        prob = (pos + prior * 4.0) / (support + 4.0)
+        bin_support = int(len(idxs))
+        prob = (pos + prior * 4.0) / (bin_support + 4.0)
         raw_bins.append(
             CalibrationBin(
                 low=float(scores[idxs[0]]),
                 high=float(scores[idxs[-1]]),
                 prob=float(prob),
-                support=support,
+                support=bin_support,
             )
         )
 
-    # Enforce monotonicity with a simple cumulative max. This is less precise
-    # than full isotonic regression but has no extra dependency and is stable
-    # for repeated production runs.
     calibrated_bins = []
     running = 0.0
     for b in raw_bins:
@@ -458,7 +482,7 @@ def fit_probability_calibrator(
     return {
         "method": "temporal_quantile_histogram_laplace",
         "bins": calibrated_bins,
-        "support": int(n),
+        "support": support,
         "base_rate": prior,
         "label": "calibrated_temporal_holdout",
     }
@@ -466,6 +490,22 @@ def fit_probability_calibrator(
 
 def apply_probability_calibration(raw_score: float, calibrator: dict) -> tuple[float, int, str]:
     """Map a raw VGAE score to calibrated product confidence."""
+    method = calibrator.get("method")
+    if method == "temporal_platt_logistic":
+        coef = float(calibrator.get("coef") or 0.0)
+        intercept = float(calibrator.get("intercept") or 0.0)
+        base_rate = float(calibrator.get("base_rate") or 0.5)
+        support = int(calibrator.get("support") or 0)
+        score = float(raw_score)
+        logit = coef * score + intercept
+        calibrated = 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, logit))))
+        # Conservative shrinkage toward the empirical base rate for small
+        # calibration support.
+        shrink = min(1.0, support / 800.0)
+        calibrated = base_rate + (calibrated - base_rate) * shrink
+        calibrated = max(0.01, min(0.995, calibrated))
+        return calibrated, support, calibrator.get("label", "calibrated")
+
     bins = calibrator.get("bins") or []
     if not bins:
         score = max(0.0, min(1.0, float(raw_score)))
@@ -498,6 +538,130 @@ def calibration_summary(
         "positive_calibrated_avg": float(np.mean(pos)) if pos else 0.0,
         "negative_calibrated_avg": float(np.mean(neg)) if neg else 0.0,
         "n_bins": len(calibrator.get("bins") or []),
+    }
+
+
+def sample_temporal_negative_edges_for_year(
+    node_years: list[int],
+    positive_pairs: set[tuple[int, int]],
+    target_year: int,
+    n_samples: int,
+    device,
+    seed: int = 42,
+):
+    """Sample temporal non-edges constrained to a specific destination year."""
+    import torch
+
+    older_nodes = [i for i, y in enumerate(node_years) if y and y < target_year]
+    target_nodes = [i for i, y in enumerate(node_years) if y == target_year]
+    if not older_nodes or not target_nodes or n_samples <= 0:
+        return torch.empty((2, 0), dtype=torch.long, device=device)
+
+    rng = np.random.default_rng(seed)
+    samples: set[tuple[int, int]] = set()
+    max_attempts = max(2000, n_samples * 300)
+    attempts = 0
+    while len(samples) < n_samples and attempts < max_attempts:
+        attempts += 1
+        src = older_nodes[int(rng.integers(0, len(older_nodes)))]
+        dst = target_nodes[int(rng.integers(0, len(target_nodes)))]
+        if src == dst:
+            continue
+        if (src, dst) in positive_pairs or (src, dst) in samples:
+            continue
+        samples.add((src, dst))
+
+    if not samples:
+        return torch.empty((2, 0), dtype=torch.long, device=device)
+    arr = np.array(sorted(samples), dtype=np.int64).T
+    return torch.tensor(arr, dtype=torch.long, device=device)
+
+
+def rolling_year_backtest(
+    *,
+    z,
+    holdout_records: list[EvolutionEdge],
+    node_years: list[int],
+    positive_pairs: set[tuple[int, int]],
+    calibrator: dict,
+    device,
+    max_years: int = 6,
+    min_positives: int = 20,
+) -> dict:
+    """
+    Run rolling held-out-year temporal checks on validation/test holdout edges.
+    """
+    if not holdout_records:
+        return {"years": [], "avg_raw_auc": 0.0, "avg_calibrated_auc": 0.0}
+
+    by_year: dict[int, list[EvolutionEdge]] = {}
+    for rec in holdout_records:
+        by_year.setdefault(rec.dst_year, []).append(rec)
+    candidate_years = sorted(by_year.keys())
+    if len(candidate_years) > max_years:
+        candidate_years = candidate_years[-max_years:]
+
+    rows = []
+    seed = 140
+    for year in candidate_years:
+        pos_records = by_year.get(year, [])
+        if len(pos_records) < min_positives:
+            continue
+        pos_edge_index = edge_index_from_records(pos_records, device)
+        neg_edge_index = sample_temporal_negative_edges_for_year(
+            node_years=node_years,
+            positive_pairs=positive_pairs,
+            target_year=year,
+            n_samples=len(pos_records),
+            device=device,
+            seed=seed,
+        )
+        seed += 1
+        if neg_edge_index.numel() == 0:
+            continue
+
+        pos_raw = edge_scores_from_latent(z, pos_edge_index)
+        neg_raw = edge_scores_from_latent(z, neg_edge_index)
+        if pos_raw.size == 0 or neg_raw.size == 0:
+            continue
+
+        labels = np.concatenate([
+            np.ones_like(pos_raw, dtype=np.float32),
+            np.zeros_like(neg_raw, dtype=np.float32),
+        ])
+        raw_scores = np.concatenate([pos_raw, neg_raw])
+        cal_scores = np.array(
+            [apply_probability_calibration(float(s), calibrator)[0] for s in raw_scores],
+            dtype=np.float32,
+        )
+
+        try:
+            from sklearn.metrics import roc_auc_score
+
+            raw_auc = float(roc_auc_score(labels, raw_scores))
+            cal_auc = float(roc_auc_score(labels, cal_scores))
+        except Exception:
+            raw_auc = 0.0
+            cal_auc = 0.0
+
+        rows.append(
+            {
+                "year": int(year),
+                "positives": int(len(pos_records)),
+                "negatives": int(neg_raw.size),
+                "raw_auc": raw_auc,
+                "calibrated_auc": cal_auc,
+                "raw_avg": float(np.mean(raw_scores)),
+                "calibrated_avg": float(np.mean(cal_scores)),
+            }
+        )
+
+    if not rows:
+        return {"years": [], "avg_raw_auc": 0.0, "avg_calibrated_auc": 0.0}
+    return {
+        "years": rows,
+        "avg_raw_auc": float(np.mean([r["raw_auc"] for r in rows])),
+        "avg_calibrated_auc": float(np.mean([r["calibrated_auc"] for r in rows])),
     }
 
 
@@ -643,6 +807,15 @@ def train_vgae(
         test_neg_scores if test_neg_scores.size else val_neg_scores,
     )
     logger.info("VGAE calibration: %s", cal_summary)
+    rolling_backtest = rolling_year_backtest(
+        z=z,
+        holdout_records=val_records + test_records,
+        node_years=node_years,
+        positive_pairs=all_positive_pairs,
+        calibrator=calibrator,
+        device=device,
+    )
+    logger.info("VGAE rolling held-out-year backtest: %s", rolling_backtest)
 
     # Link Prediction
     predicted_edges = predict_future_links(
@@ -667,6 +840,7 @@ def train_vgae(
         "val_edges": len(val_records),
         "test_edges": len(test_records),
         "calibration": cal_summary,
+        "rolling_backtest": rolling_backtest,
     }
 
 
@@ -831,6 +1005,7 @@ def run_vgae(
         "predicted_edges": n_predicted,
         "cross_field_edges": cross_field_n,
         "calibration": train_result.get("calibration", {}),
+        "rolling_backtest": train_result.get("rolling_backtest", {}),
         "prediction_confidence_avg": (
             sum(float(e.get("prediction_confidence") or 0.0) for e in predicted) / max(1, n_predicted)
         ),

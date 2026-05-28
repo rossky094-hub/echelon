@@ -83,3 +83,5 @@ python-dotenv>=1.0,<2.0     # .env 文件支持
 aiohttp>=3.9,<4.0           # 异步 HTTP
 lxml>=5.0,<6.0              # arXiv OAI-PMH XML 解析
 tenacity>=8.2,<9.0          # 重试装饰器(可选)
+pypdf>=5.0,<6.0             # PDF 文本解析 fallback
+pdfplumber>=0.11,<1.0       # PDF 页面结构解析(优先)

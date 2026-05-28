@@ -30,6 +30,7 @@ from echelon.v14b.config import (
     LIMITATION_TOP_N, LIMITATION_MAX_ATOMS_PER_PAPER,
     LIMITATION_MAX_RESOLVERS, LIMITATION_TOP_UNRESOLVED,
     SKIP_LIMITATION_RESOLUTION, LIMITATION_USE_LLM,
+    LIMITATION_REQUIRE_SECTION_EVIDENCE, LIMITATION_ALLOW_ABSTRACT_FALLBACK,
     LIMIT,
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
@@ -44,6 +45,26 @@ LIMITATION_EVIDENCE_PROFILES = {
     "structured_sections": ("section_level", 0.75),
     "abstract": ("weak_abstract", 0.35),
 }
+
+PRIMARY_LIMITATION_SECTION_NAMES = (
+    "limitations",
+    "limitation",
+    "discussion",
+    "conclusion",
+    "conclusions",
+    "future work",
+)
+
+SECONDARY_CONTEXT_SECTION_NAMES = (
+    "results",
+    "result",
+    "error analysis",
+    "ablation",
+    "method",
+    "methods",
+    "methodology",
+    "experiments",
+)
 
 LIMITATION_TERMS = re.compile(
     r"\b(limit(?:ation)?s?|challenge[sd]?|bottleneck|drawback|constraint|"
@@ -157,16 +178,15 @@ def get_top_papers_for_limitation(
     if section_table:
         ids = [p["id"] for p in papers]
         ph = ",".join("?" * len(ids))
+        target_sections = PRIMARY_LIMITATION_SECTION_NAMES + SECONDARY_CONTEXT_SECTION_NAMES
+        sec_placeholders = ",".join("?" * len(target_sections))
         try:
             rows = conn_main.execute(f"""
                 SELECT paper_id, section_name, section_text
                 FROM {section_table}
                 WHERE paper_id IN ({ph})
-                  AND lower(section_name) IN (
-                      'limitations', 'limitation', 'discussion',
-                      'conclusion', 'conclusions', 'future work'
-                  )
-            """, ids).fetchall()
+                  AND lower(section_name) IN ({sec_placeholders})
+            """, (*ids, *target_sections)).fetchall()
             by_paper: dict[str, list[str]] = {}
             section_names_by_paper: dict[str, list[str]] = {}
             for row in rows:
@@ -182,6 +202,22 @@ def get_top_papers_for_limitation(
                     )[:200]
         except sqlite3.Error as exc:
             logger.warning("Structured section lookup failed: %s", exc)
+
+    section_ready = [p for p in papers if p.get("limitation_evidence_source") == "structured_sections"]
+    if LIMITATION_REQUIRE_SECTION_EVIDENCE:
+        if not section_table:
+            logger.warning(
+                "Step5c strict mode: no section table found; limitation extraction will return 0 "
+                "until Step5s paper_sections/scibot_sections is ingested."
+            )
+        papers = section_ready
+    elif not LIMITATION_ALLOW_ABSTRACT_FALLBACK:
+        # Soft strict mode: do not consume abstract-only evidence, but keep
+        # pipeline compatibility by returning any section-ready papers.
+        papers = section_ready
+
+    if not papers:
+        return []
 
     for paper in papers:
         source = paper.get("limitation_evidence_source") or "abstract"
@@ -576,6 +612,18 @@ def run_limitation(
         ORDER BY n DESC
     """).fetchall()
     evidence_quality = [dict(r) for r in evidence_quality_rows]
+    has_section_quality = any(
+        (r.get("evidence_quality") == "section_level" or r.get("evidence_source") == "structured_sections")
+        and int(r.get("n") or 0) > 0
+        for r in evidence_quality
+    )
+    remaining_risk = (
+        "Section-level limitation evidence is active; continue expanding coverage "
+        "for better branch-level bottleneck confidence."
+        if has_section_quality else
+        "Limitation evidence is still abstract-dominant. Keep Step5s ingestion "
+        "enabled and expand paper_sections/Sci-Bot sections before strong claims."
+    )
     meta = {
         "total_atoms": total_atoms,
         "total_resolutions": total_resolutions,
@@ -583,10 +631,7 @@ def run_limitation(
         "records_n": total_atoms,
         "skipped_resolution": SKIP_LIMITATION_RESOLUTION,
         "evidence_quality": evidence_quality,
-        "remaining_risk": (
-            "Abstract-only limitations are weak evidence; visual graph must expose "
-            "evidence_quality and later ingest paper_sections/Sci-Bot sections."
-        ),
+        "remaining_risk": remaining_risk,
     }
     upsert_step_meta(
         conn_v14,
