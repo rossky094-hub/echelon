@@ -13,7 +13,7 @@
 # ========================================================
 
 .PHONY: setup id-repair openalex-backfill graph-features embeddings graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae section-evidence limitation \
-        fusion mutation layout report visual-graph goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
+        fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
 
 # Python 解释器
 PYTHON := python3
@@ -198,6 +198,14 @@ visual-graph:
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 	@echo ">>> Visual graph tables ready: visual_nodes / visual_edges / visual_clusters / branch_lineages / visual_tiles / visual_search_fts"
 
+## Step 13: 第一性原理 + 卡点历史脉络
+first-principles:
+	@echo ">>> Step 13: 第一性原理 + 卡点历史脉络..."
+	$(PYTHON) -m echelon.v14b.step13_first_principles_history \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot
+
 ## Step 12: 目标对齐审计报告
 goal-audit:
 	@echo ">>> Step 12: Goal alignment audit..."
@@ -231,7 +239,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 交付目标产物链路: 不等待 OpenAlex backfill, 从现有 library 推进图谱产品
-product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion mutation layout report visual-graph goal-audit
+product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion mutation layout report visual-graph first-principles goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Visual Graph 产品链路完成!"
@@ -265,7 +273,7 @@ pilot-full: enrich pilot-visual
 	@echo "======================================"
 
 ## 干净重跑图谱并构建 2.5D 可视化产品层
-pilot-visual: pilot-graph visual-graph goal-audit
+pilot-visual: pilot-graph visual-graph first-principles goal-audit
 
 # 快速调试流程 (前 100 篇)
 pilot-debug:

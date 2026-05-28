@@ -170,6 +170,27 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     visual_edges = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_edges") or 0)
     clusters = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_clusters") or 0)
     lineages = int(scalar(conn_v14, "SELECT COUNT(*) FROM branch_lineages") or 0)
+    step13 = load_checkpoint("step13_first_principles_history")
+    fp_principles = int(
+        step13.get("principles")
+        or scalar(conn_v14, "SELECT COUNT(*) FROM first_principles_principles")
+        or 0
+    )
+    fp_atoms = int(
+        step13.get("atoms_total")
+        or scalar(
+            conn_v14,
+            "SELECT COALESCE(SUM(unresolved_atoms + resolved_atoms), 0) FROM first_principles_principles",
+        )
+        or 0
+    )
+    fp_high_risk = int(
+        scalar(
+            conn_v14,
+            "SELECT COUNT(*) FROM first_principles_principles WHERE risk_label='high_unresolved_pressure'",
+        )
+        or 0
+    )
 
     linked_ratio = linked_refs / max(total_refs, 1)
     field_ratio = field_cov / max(total_papers, 1)
@@ -186,6 +207,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "fusion_adequacy": fusion_audit.get("adequacy_label"),
         "visual_nodes": visual_nodes,
         "visual_edges": visual_edges,
+        "first_principles": fp_principles,
     }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -205,6 +227,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"- Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,}.",
         f"- Section evidence inventory: table_present={section_table_exists}, rows={section_rows_total:,}, primary-section papers={section_primary_papers:,}.",
         f"- Step6 fusion output is limited: directions={future_dirs:,}, adequacy={fusion_audit.get('adequacy_label', 'unknown')}. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.",
+        f"- Step13 first-principles bottleneck lineage: principles={fp_principles:,}, atoms_covered={fp_atoms:,}, high_risk_principles={fp_high_risk:,}.",
         "",
         "## Step1-Step6 Evidence Chain",
         "",
@@ -272,6 +295,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "- Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.",
         "- Step6 now writes evidence tiers and claim scopes, making sparse/exploratory evidence an explicit product signal.",
         "- Step10 propagates limitation and calibrated future-edge evidence into visual node/edge flags and detail JSON.",
+        "- Step13 reconnects first-principles + bottleneck-history analysis into current V14B evidence chain (non-LLM deterministic baseline).",
         "",
         "## Remaining Risk",
         "",
@@ -282,6 +306,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "5. Step6 evidence tiers improve transparency, but exploratory directions remain hypotheses. The next improvement should strengthen branch lineage and candidate generation with stronger external validation, not just lower thresholds.",
         "6. Branch lineage now exposes support ratios and alternative parents, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.",
         "7. LLM/Doubao audit is planned but not executed. The visual graph should present unaudited future/main/branch edges with uncertainty until the stratified audit is run.",
+        "8. First-principles lineage is now connected, but still constrained by section evidence coverage and linked-reference coverage; unresolved-high-risk principles should remain hypothesis-level until section-level evidence expands.",
         "",
         "## Recommendation",
         "",
