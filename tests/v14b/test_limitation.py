@@ -52,6 +52,8 @@ class TestExtractLimitationAtoms:
         assert atoms[0]["paper_id"] == 42
         assert atoms[0]["keyword"] == "cryogenic"
         assert atoms[0]["severity"] == "high"
+        assert atoms[0]["evidence_quality"] == "weak_abstract"
+        assert atoms[0]["evidence_weight"] == pytest.approx(0.35)
         assert atoms[1]["keyword"] == "scalability"
 
     def test_extract_empty_limitations(self):
@@ -98,6 +100,23 @@ class TestExtractLimitationAtoms:
         # 空描述应被过滤
         assert len(atoms) == 1
         assert atoms[0]["keyword"] == "real"
+
+    def test_structured_section_evidence_is_marked_stronger(self):
+        paper = {
+            "id": 9,
+            "title": "Paper",
+            "abstract": "Short abstract",
+            "limitation_text": "However, fabrication remains difficult and limits scalability.",
+            "limitation_evidence_source": "structured_sections",
+            "limitation_evidence_quality": "section_level",
+            "limitation_evidence_weight": 0.75,
+            "limitation_source_section_name": "discussion",
+        }
+        atoms = extract_limitation_atoms(paper, None)
+        assert atoms
+        assert atoms[0]["evidence_source"] == "structured_sections"
+        assert atoms[0]["evidence_quality"] == "section_level"
+        assert atoms[0]["evidence_weight"] == pytest.approx(0.75)
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,11 @@ Step 2: SPC Main Path Analysis
 
 输出: v14_pilot.sqlite3 的 main_path_edges 表
 
+兼容说明:
+  main_path_edges.citing_id/cited_id 是历史列名。V14B 的真实语义已经是
+  source_paper_id → target_paper_id, 即 cited/older → citing/newer 的时间前向演化边。
+  后续 API/产品层应使用 source_paper_id/target_paper_id。
+
 CLI:
     python -m echelon.v14b.step2_mainpath --help
     python -m echelon.v14b.step2_mainpath
@@ -388,6 +393,9 @@ def compute_main_path_weights(
         edges.append({
             "citing_id": u,
             "cited_id": v,
+            "source_paper_id": u,
+            "target_paper_id": v,
+            "edge_direction": "time_forward_cited_to_citing",
             "spc": spc_val,
             "v13_weight": v13_w,
             "main_path_weight": mpw,
@@ -424,8 +432,10 @@ def write_main_path_edges(
         batch = edges[i: i + batch_size]
         conn_v14.executemany("""
             INSERT OR REPLACE INTO main_path_edges
-                (citing_id, cited_id, spc, v13_weight, main_path_weight, is_main_path)
-            VALUES (:citing_id, :cited_id, :spc, :v13_weight, :main_path_weight, :is_main_path)
+                (citing_id, cited_id, source_paper_id, target_paper_id, edge_direction,
+                 spc, v13_weight, main_path_weight, is_main_path)
+            VALUES (:citing_id, :cited_id, :source_paper_id, :target_paper_id, :edge_direction,
+                    :spc, :v13_weight, :main_path_weight, :is_main_path)
         """, batch)
         conn_v14.commit()
         written += len(batch)

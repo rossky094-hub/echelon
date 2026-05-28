@@ -7,7 +7,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from echelon.v14b.step3_keystone_v14 import keystone_score_v14
+from echelon.v14b.step3_keystone_v14 import keystone_score_v14, quality_adjusted_keystone_score
 from echelon.v14b.config import LIFECYCLE_WEIGHTS_V14
 
 
@@ -172,3 +172,10 @@ class TestKeystoneScoreV14Cases:
             for paper in [FreshPaper(), GrowingPaper(), MaturePaper()]:
                 score, _ = keystone_score_v14(signals, paper)
                 assert 0.0 <= score <= 1.0
+
+    def test_low_signal_quality_dampens_extreme_scores(self):
+        raw_high = 0.9
+        raw_low = 0.1
+        assert quality_adjusted_keystone_score(raw_high, 0.25) == pytest.approx(0.6)
+        assert quality_adjusted_keystone_score(raw_low, 0.25) == pytest.approx(0.4)
+        assert quality_adjusted_keystone_score(raw_high, 1.0) == pytest.approx(raw_high)

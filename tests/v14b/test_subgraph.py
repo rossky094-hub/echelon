@@ -180,3 +180,24 @@ class TestSubgraphConstruction:
             ratio = has_in_degree / len(node_ids)
             # 测试数据中有 70% 以上有被引 (除了 paper 20 没有被引用)
             assert ratio > 0.5, f"Expected > 50% nodes with in_degree>=1, got {ratio:.1%}"
+
+    def test_subgraph_scope_audit_marks_pilot_when_capped(self, tmp_path):
+        from echelon.v14b.step4_subgraph import evaluate_subgraph_scope
+
+        db_path, conn_main = create_test_db(tmp_path)
+        db_v14_path = tmp_path / "test_v14.sqlite3"
+        conn_v14 = init_v14b_db(db_v14_path)
+
+        audit = evaluate_subgraph_scope(
+            conn_main,
+            conn_v14,
+            configured_max_size=5,
+            selected_nodes=5,
+            selected_edges=2,
+        )
+        conn_main.close()
+        conn_v14.close()
+
+        assert audit["conclusion_scope"] == "pilot_evidence_subgraph"
+        assert audit["recommended_max_size"] >= 5
+        assert "pilot" in audit["adequacy_label"]

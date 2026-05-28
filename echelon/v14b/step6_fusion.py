@@ -23,6 +23,8 @@ import argparse
 import json
 import logging
 import sqlite3
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Set
 
@@ -34,7 +36,7 @@ from echelon.v14b.config import (
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.llm_client import LLMClient
-from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args
+from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, table_columns
 
 logger = logging.getLogger("echelon.v14b.step6_fusion")
 
@@ -74,21 +76,24 @@ def load_main_path_terminals(
     """
     加载主干道末端节点(在 main_path 上且是新论文)。
     """
-    rows = conn_v14.execute("""
-        SELECT DISTINCT cited_id AS paper_id
+    cols = table_columns(conn_v14, "main_path_edges")
+    src_expr = "source_paper_id" if "source_paper_id" in cols else "citing_id"
+    dst_expr = "target_paper_id" if "target_paper_id" in cols else "cited_id"
+    rows = conn_v14.execute(f"""
+        SELECT DISTINCT {dst_expr} AS paper_id
         FROM main_path_edges
         WHERE is_main_path = 1
-        -- 末端: 不作为任何主干道边的 citing_id
-        AND cited_id NOT IN (
-            SELECT citing_id FROM main_path_edges WHERE is_main_path = 1
+        -- 末端: time-forward target, not used again as a source.
+        AND {dst_expr} NOT IN (
+            SELECT {src_expr} FROM main_path_edges WHERE is_main_path = 1
         )
     """).fetchall()
     terminal_ids = [row[0] for row in rows]
 
     if not terminal_ids:
         # 降级: 取所有主干道上的 2022+ 节点
-        rows = conn_v14.execute("""
-            SELECT DISTINCT citing_id AS paper_id
+        rows = conn_v14.execute(f"""
+            SELECT DISTINCT {dst_expr} AS paper_id
             FROM main_path_edges WHERE is_main_path = 1
         """).fetchall()
         terminal_ids = [row[0] for row in rows]
@@ -124,6 +129,7 @@ def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
     rows = conn_v14.execute("""
         SELECT
             a.atom_id, a.paper_id, a.description, a.keyword, a.severity,
+            a.evidence_source, a.evidence_quality, a.evidence_weight,
             COUNT(r.atom_id) AS n_resolutions
         FROM limitation_atoms a
         LEFT JOIN limitation_resolutions r
@@ -163,6 +169,11 @@ def compute_direction_clusters(
     limit_keywords: List[str] = list(dict.fromkeys(
         a["keyword"].lower() for a in unresolved if a.get("keyword")
     ))
+    limitations_by_keyword: dict[str, list[dict]] = {}
+    for atom in unresolved:
+        kw = (atom.get("keyword") or "").lower()
+        if kw:
+            limitations_by_keyword.setdefault(kw, []).append(atom)
 
     # 读取 VGAE 预测涉及的 dst 论文标题
     dst_ids = list({p["dst_paper_id"] for p in vgae_preds})
@@ -207,7 +218,27 @@ def compute_direction_clusters(
         matched_keywords = [kw for kw in limit_keywords if kw and kw in text_to_search]
         if matched_keywords:
             evidence_paths += 1
-            limitation_evidence = f"关联未解决限制: {', '.join(matched_keywords[:3])}"
+            matched_atoms = [
+                atom
+                for kw in matched_keywords
+                for atom in limitations_by_keyword.get(kw, [])
+            ]
+            weights = [
+                float(atom.get("evidence_weight") or 0.35)
+                for atom in matched_atoms
+            ]
+            qualities = sorted({
+                atom.get("evidence_quality") or "unknown"
+                for atom in matched_atoms
+            })
+            limitation_weight = sum(weights) / max(1, len(weights))
+            limitation_evidence = (
+                f"关联未解决限制: {', '.join(matched_keywords[:3])}; "
+                f"evidence_quality={','.join(qualities[:3]) or 'unknown'}"
+            )
+        else:
+            limitation_weight = 0.0
+            qualities = []
 
         if evidence_paths >= FUSION_MIN_EVIDENCE_PATHS:
             direction_candidates.append({
@@ -219,6 +250,8 @@ def compute_direction_clusters(
                 "main_path_evidence": main_path_evidence,
                 "vgae_evidence": vgae_evidence,
                 "limitation_evidence": limitation_evidence,
+                "limitation_evidence_weight": limitation_weight,
+                "limitation_evidence_quality": qualities,
                 "field_id": dst_paper.get("primary_field_id"),
                 "src_ids": [src_id],
             })
@@ -236,6 +269,10 @@ def compute_direction_clusters(
             # 合并到已有方向
             existing = seen_fields[field_key]
             existing["evidence_paths"] = max(existing["evidence_paths"], cand["evidence_paths"])
+            existing["limitation_evidence_weight"] = max(
+                existing.get("limitation_evidence_weight") or 0.0,
+                cand.get("limitation_evidence_weight") or 0.0,
+            )
             for src_id in cand["src_ids"]:
                 if src_id not in existing["src_ids"]:
                     existing["src_ids"].append(src_id)
@@ -283,7 +320,9 @@ def name_directions(
 
         direction_name = anchor_title[:80]
         expected_period = "2026-2030"
-        confidence = min(1.0, 0.45 + 0.15 * cand["evidence_paths"])
+        limitation_weight = float(cand.get("limitation_evidence_weight") or 0.0)
+        limitation_factor = 0.85 + 0.15 * limitation_weight if cand.get("limitation_evidence") else 1.0
+        confidence = min(1.0, (0.45 + 0.15 * cand["evidence_paths"]) * limitation_factor)
 
         if llm_client is not None:
             prompt = DIRECTION_NAMING_PROMPT.format(
@@ -336,6 +375,67 @@ def write_future_directions(
     return len(directions)
 
 
+def write_fusion_evidence_audit(
+    conn_v14: sqlite3.Connection,
+    *,
+    terminals: list[dict],
+    vgae_preds: list[dict],
+    unresolved: list[dict],
+    candidates: list[dict],
+    n_directions: int,
+) -> dict:
+    total_predicted = conn_v14.execute("SELECT COUNT(*) FROM predicted_future_edges").fetchone()[0]
+    cross_field_total = conn_v14.execute(
+        "SELECT COUNT(*) FROM predicted_future_edges WHERE is_cross_field = 1"
+    ).fetchone()[0]
+    quality_counts = Counter(
+        atom.get("evidence_quality") or "unknown"
+        for atom in unresolved
+    )
+    path_counts = Counter(int(c.get("evidence_paths") or 0) for c in candidates)
+    if n_directions == 0:
+        adequacy = "no_user_facing_claim"
+    elif n_directions < 5:
+        adequacy = "sparse_evidence"
+    elif n_directions < 10:
+        adequacy = "limited_but_usable_with_uncertainty"
+    else:
+        adequacy = "adequate_candidate_set"
+
+    remaining_risk = (
+        "If Step5b/Step5c evidence remains sparse, Step6 should output few or zero "
+        "directions. Do not lower thresholds blindly; improve branch-lineage, "
+        "candidate generation, limitation section evidence, and calibration first."
+    )
+    audit = {
+        "run_id": datetime.utcnow().strftime("%Y%m%dT%H%M%SZ"),
+        "n_terminals": len(terminals),
+        "n_vgae_preds_top": len(vgae_preds),
+        "n_vgae_preds_total": int(total_predicted),
+        "n_cross_field_total": int(cross_field_total),
+        "n_unresolved": len(unresolved),
+        "n_candidates": len(candidates),
+        "n_directions": int(n_directions),
+        "limitation_quality_json": json.dumps(dict(quality_counts), ensure_ascii=False),
+        "evidence_path_json": json.dumps(dict(path_counts), ensure_ascii=False),
+        "adequacy_label": adequacy,
+        "remaining_risk": remaining_risk,
+    }
+    conn_v14.execute("DELETE FROM fusion_evidence_audit")
+    conn_v14.execute("""
+        INSERT OR REPLACE INTO fusion_evidence_audit
+            (run_id, n_terminals, n_vgae_preds_top, n_vgae_preds_total,
+             n_cross_field_total, n_unresolved, n_candidates, n_directions,
+             limitation_quality_json, evidence_path_json, adequacy_label, remaining_risk)
+        VALUES
+            (:run_id, :n_terminals, :n_vgae_preds_top, :n_vgae_preds_total,
+             :n_cross_field_total, :n_unresolved, :n_candidates, :n_directions,
+             :limitation_quality_json, :evidence_path_json, :adequacy_label, :remaining_risk)
+    """, audit)
+    conn_v14.commit()
+    return audit
+
+
 # ---------------------------------------------------------------------------
 # 主函数
 # ---------------------------------------------------------------------------
@@ -386,8 +486,22 @@ def run_fusion(
         directions = []
 
     n_written = write_future_directions(conn_v14, directions)
+    audit = write_fusion_evidence_audit(
+        conn_v14,
+        terminals=terminals,
+        vgae_preds=vgae_preds,
+        unresolved=unresolved,
+        candidates=candidates,
+        n_directions=n_written,
+    )
 
-    upsert_step_meta(conn_v14, step_name, "done", records_n=n_written)
+    upsert_step_meta(
+        conn_v14,
+        step_name,
+        "done",
+        records_n=n_written,
+        notes=json.dumps(audit, ensure_ascii=False),
+    )
     conn_main.close()
     conn_v14.close()
 
@@ -396,6 +510,7 @@ def run_fusion(
         "n_terminals": len(terminals),
         "n_vgae_preds": len(vgae_preds),
         "n_unresolved": len(unresolved),
+        "fusion_audit": audit,
         "records_n": n_written,
     }
     ck.mark_done(records_n=n_written, meta=stats)

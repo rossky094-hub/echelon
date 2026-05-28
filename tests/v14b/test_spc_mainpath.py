@@ -13,6 +13,7 @@ from echelon.v14b.step2_mainpath import (
     compute_spc,
     expand_component_spc_to_edges,
     load_citation_graph,
+    write_main_path_edges,
 )
 
 
@@ -97,6 +98,30 @@ class TestSPCAlgorithm:
         v13_weight = 1.0
         result = math.log(spc_val + 1) * v13_weight
         assert result == pytest.approx(0.0)
+
+    def test_main_path_edges_have_time_forward_canonical_columns(self, tmp_path):
+        from echelon.v14b.db_schema import init_v14b_db
+
+        conn = init_v14b_db(tmp_path / "v14.sqlite3")
+        write_main_path_edges(conn, [{
+            "citing_id": "old",
+            "cited_id": "new",
+            "source_paper_id": "old",
+            "target_paper_id": "new",
+            "edge_direction": "time_forward_cited_to_citing",
+            "spc": 1.0,
+            "v13_weight": 1.0,
+            "main_path_weight": 0.7,
+            "is_main_path": 1,
+        }])
+        row = conn.execute(
+            "SELECT source_paper_id, target_paper_id, edge_direction FROM main_path_edges"
+        ).fetchone()
+        conn.close()
+
+        assert row["source_paper_id"] == "old"
+        assert row["target_paper_id"] == "new"
+        assert row["edge_direction"] == "time_forward_cited_to_citing"
 
     def test_empty_graph(self):
         """空图 SPC 返回空字典"""

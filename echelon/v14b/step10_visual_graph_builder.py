@@ -551,9 +551,18 @@ def load_citation_edges(conn: sqlite3.Connection, allowed: set[str]) -> list[tup
 
 def load_main_path_edges(conn_v14: sqlite3.Connection) -> dict[tuple[str, str], dict]:
     try:
+        cols = table_columns(conn_v14, "main_path_edges")
+        src_expr = "source_paper_id" if "source_paper_id" in cols else "citing_id"
+        dst_expr = "target_paper_id" if "target_paper_id" in cols else "cited_id"
         rows = conn_v14.execute(
-            """
-            SELECT citing_id, cited_id, spc, main_path_weight, is_main_path
+            f"""
+            SELECT {src_expr} AS source_paper_id,
+                   {dst_expr} AS target_paper_id,
+                   citing_id,
+                   cited_id,
+                   spc,
+                   main_path_weight,
+                   is_main_path
             FROM main_path_edges
             """
         ).fetchall()
@@ -561,7 +570,7 @@ def load_main_path_edges(conn_v14: sqlite3.Connection) -> dict[tuple[str, str], 
         return {}
     out = {}
     for r in rows:
-        out[(r["citing_id"], r["cited_id"])] = dict(r)
+        out[(r["source_paper_id"], r["target_paper_id"])] = dict(r)
     return out
 
 
@@ -885,10 +894,15 @@ def load_future_predictions(conn_v14: sqlite3.Connection) -> list[dict]:
 
 def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> dict[str, list[dict]]:
     try:
+        cols = table_columns(conn_v14, "limitation_atoms")
+        evidence_cols = ""
+        if {"evidence_source", "evidence_quality", "evidence_weight"} <= cols:
+            evidence_cols = ", a.evidence_source, a.evidence_quality, a.evidence_weight"
         rows = conn_v14.execute(
-            """
+            f"""
             SELECT a.atom_id, a.paper_id, a.description, a.keyword, a.severity,
                    COUNT(r.atom_id) AS n_resolutions
+                   {evidence_cols}
             FROM limitation_atoms a
             LEFT JOIN limitation_resolutions r
               ON r.atom_id = a.atom_id AND r.confidence > 0.6
@@ -984,10 +998,15 @@ def write_visual_nodes(
     for i, p in enumerate(papers):
         pid = p["id"]
         cid = assignment.get(pid, "C9999")
+        lims = limitations.get(pid, [])
+        lim_weights = [float(l.get("evidence_weight") or 0.35) for l in lims]
+        lim_qualities = sorted({l.get("evidence_quality") or "unknown" for l in lims})
         flags = {
             "is_main_path": pid in main_nodes,
             "is_future_anchor": pid in future_nodes,
             "has_unresolved_limitation": pid in limitations,
+            "limitation_evidence_quality": ",".join(lim_qualities) if lim_qualities else None,
+            "limitation_evidence_weight": sum(lim_weights) / max(1, len(lim_weights)) if lim_weights else None,
             "is_keystone": (p.get("keystone_score_v14") or 0) >= 0.75,
             "lifecycle": p.get("lifecycle_v14"),
         }
@@ -1043,12 +1062,19 @@ def write_visual_edges(
     semantic_edges: list[tuple[str, str, float]],
     future_predictions: list[dict],
 ) -> None:
-    rows = []
+    rows_by_id = {}
+
+    def add_row(row: tuple) -> None:
+        edge_key = row[0]
+        existing = rows_by_id.get(edge_key)
+        if existing is None or (row[8] and not existing[8]):
+            rows_by_id[edge_key] = row
+
     for src, dst in citation_edges:
         m = main_edges.get((src, dst)) or main_edges.get((dst, src))
         is_main = int(bool(m and m.get("is_main_path")))
         weight = float(m.get("main_path_weight") if m else 1.0)
-        rows.append(
+        add_row(
             (
                 edge_id("citation", src, dst),
                 src,
@@ -1065,7 +1091,7 @@ def write_visual_edges(
             )
         )
     for src, dst, w in cocitation_edges:
-        rows.append(
+        add_row(
             (
                 edge_id("cocitation", src, dst),
                 src,
@@ -1082,7 +1108,7 @@ def write_visual_edges(
             )
         )
     for src, dst, sim in semantic_edges:
-        rows.append(
+        add_row(
             (
                 edge_id("semantic", src, dst),
                 src,
@@ -1101,7 +1127,7 @@ def write_visual_edges(
     for pred in future_predictions:
         src = pred["src_paper_id"]
         dst = pred["dst_paper_id"]
-        rows.append(
+        add_row(
             (
                 edge_id("future", src, dst),
                 src,
@@ -1117,6 +1143,7 @@ def write_visual_edges(
                 jdumps({**pred, "why": "VGAE/temporal prediction candidate"}),
             )
         )
+    rows = list(rows_by_id.values())
     conn_v14.executemany(
         """
         INSERT OR REPLACE INTO visual_edges
@@ -1128,7 +1155,13 @@ def write_visual_edges(
         rows,
     )
     conn_v14.commit()
-    logger.info("visual_edges written: %d", len(rows))
+    actual = conn_v14.execute("SELECT COUNT(*) FROM visual_edges").fetchone()[0]
+    logger.info(
+        "visual_edges written: %d unique (attempted=%d actual_table=%d)",
+        len(rows),
+        len(citation_edges) + len(cocitation_edges) + len(semantic_edges) + len(future_predictions),
+        actual,
+    )
 
 
 def write_clusters_and_lineage(

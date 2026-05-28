@@ -21,6 +21,17 @@ def test_step5a_heuristic_classifier_is_bounded_and_deterministic():
     assert 0.0 <= conf <= 0.65
 
 
+def test_step5a_no_context_labels_are_weak_evidence():
+    from echelon.v14b.step5a_scibert import (
+        citation_function_evidence_level,
+        citation_function_evidence_weight,
+    )
+
+    assert citation_function_evidence_level(False) == "weak_paper_metadata"
+    assert citation_function_evidence_weight(0.95, False) <= 0.25
+    assert citation_function_evidence_weight(0.95, True) > citation_function_evidence_weight(0.95, False)
+
+
 def test_step5b_builds_time_forward_evolution_edges(tmp_path):
     from echelon.v14b.step5b_vgae import build_evolution_edge_records
 

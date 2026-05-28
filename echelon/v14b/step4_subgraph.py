@@ -16,8 +16,10 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, Set
 
@@ -27,7 +29,7 @@ from echelon.v14b.config import (
     SUBGRAPH_MAX_SIZE, LIMIT,
 )
 from echelon.v14b.db_schema import ensure_v14b_text_paper_ids, get_v14b_conn, upsert_step_meta
-from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, make_progress
+from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, make_progress, table_columns
 
 logger = logging.getLogger("echelon.v14b.step4_subgraph")
 
@@ -86,6 +88,9 @@ def expand_to_neighbors(
     Returns:
         neighbors_only set (不含 seed_ids)
     """
+    if not seed_ids:
+        return set()
+
     neighbors = set()
 
     # 找所有 citing 邻居(seed 论文引用了谁)
@@ -145,12 +150,21 @@ def select_subgraph_edges(
     # 读取主干道边权
     main_path_weights: dict[tuple[str, str], tuple[float, int]] = {}
     try:
-        rows = conn_v14.execute("""
-            SELECT citing_id, cited_id, main_path_weight, is_main_path
+        cols = table_columns(conn_v14, "main_path_edges")
+        src_expr = "source_paper_id" if "source_paper_id" in cols else "citing_id"
+        dst_expr = "target_paper_id" if "target_paper_id" in cols else "cited_id"
+        rows = conn_v14.execute(f"""
+            SELECT {src_expr} AS source_paper_id,
+                   {dst_expr} AS target_paper_id,
+                   main_path_weight,
+                   is_main_path
             FROM main_path_edges
         """).fetchall()
         for row in rows:
-            main_path_weights[(row[0], row[1])] = (row[2], row[3])
+            main_path_weights[(row["source_paper_id"], row["target_paper_id"])] = (
+                row["main_path_weight"],
+                row["is_main_path"],
+            )
     except Exception:
         logger.info("main_path_edges 不存在,边权默认 1.0")
 
@@ -164,20 +178,28 @@ def select_subgraph_edges(
           AND cited_paper_id_internal IN ({placeholders})
     """, node_list + node_list).fetchall()
 
-    edges = []
+    edges_by_pair: dict[tuple[str, str], dict] = {}
     for row in rows:
         citing_id = row[0]
         cited_id = row[1]
         mpw_data = main_path_weights.get((cited_id, citing_id))  # cited→citing direction
         mpw = mpw_data[0] if mpw_data else 1.0
-        edges.append({
+        key = (citing_id, cited_id)
+        if key in edges_by_pair:
+            continue
+        edges_by_pair[key] = {
             "citing_id": citing_id,
             "cited_id": cited_id,
             "citation_function": None,
             "citation_function_confidence": None,
+            "citation_function_method": None,
+            "citation_function_evidence_level": None,
+            "citation_context_available": 0,
+            "citation_function_weight": None,
             "main_path_weight": mpw,
-        })
+        }
 
+    edges = list(edges_by_pair.values())
     logger.info("子图边数: %d", len(edges))
     return edges
 
@@ -255,14 +277,97 @@ def write_subgraph_edges(
         conn_v14.executemany("""
             INSERT OR REPLACE INTO subgraph_edges
                 (citing_id, cited_id, citation_function,
-                 citation_function_confidence, main_path_weight)
+                 citation_function_confidence, citation_function_method,
+                 citation_function_evidence_level, citation_context_available,
+                 citation_function_weight, main_path_weight)
             VALUES
                 (:citing_id, :cited_id, :citation_function,
-                 :citation_function_confidence, :main_path_weight)
+                 :citation_function_confidence, :citation_function_method,
+                 :citation_function_evidence_level, :citation_context_available,
+                 :citation_function_weight, :main_path_weight)
         """, batch)
         conn_v14.commit()
         written += len(batch)
-    return written
+    actual = conn_v14.execute("SELECT COUNT(*) FROM subgraph_edges").fetchone()[0]
+    if actual != written:
+        logger.warning("subgraph_edges write count changed after PK de-dup: attempted=%d actual=%d", written, actual)
+    return actual
+
+
+def evaluate_subgraph_scope(
+    conn_main: sqlite3.Connection,
+    conn_v14: sqlite3.Connection,
+    *,
+    configured_max_size: int,
+    selected_nodes: int,
+    selected_edges: int,
+) -> dict:
+    """Audit whether Step4 should be interpreted as pilot evidence or full graph."""
+    total_papers = conn_main.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
+    total_linked_refs = conn_main.execute("""
+        SELECT COUNT(*)
+        FROM paper_references
+        WHERE cited_paper_id_internal IS NOT NULL
+    """).fetchone()[0]
+
+    node_coverage = selected_nodes / max(1, total_papers)
+    edge_coverage = selected_edges / max(1, total_linked_refs)
+    edge_density = selected_edges / max(1, selected_nodes)
+
+    if total_papers <= configured_max_size and selected_nodes >= total_papers * 0.95:
+        conclusion_scope = "complete_graph"
+        adequacy_label = "complete"
+        recommended_max_size = total_papers
+    else:
+        conclusion_scope = "pilot_evidence_subgraph"
+        baseline = max(3000, int(total_papers * 0.08))
+        recommended_max_size = min(total_papers, max(configured_max_size, baseline))
+        if selected_nodes < 3000 or selected_edges < selected_nodes * 0.5:
+            adequacy_label = "pilot_sparse_increase_or_use_step10_full_graph"
+            recommended_max_size = min(total_papers, max(recommended_max_size, 8000))
+        elif configured_max_size < recommended_max_size:
+            adequacy_label = "pilot_usable_but_cap_below_recommended"
+        else:
+            adequacy_label = "pilot_adequate_for_algorithmic_evidence"
+
+    notes = {
+        "interpretation": (
+            "Step4 supports expensive downstream evidence extraction. "
+            "Claims about the complete optics graph must come from Step10 visual graph."
+        ),
+        "configured_max_size_rationale": (
+            "5000 is acceptable as a memory-conscious pilot for ~55k papers when Step10 "
+            "separately positions all papers; increase if subgraph edge density is sparse."
+        ),
+    }
+    audit = {
+        "run_id": datetime.utcnow().strftime("%Y%m%dT%H%M%SZ"),
+        "total_papers": int(total_papers),
+        "total_linked_refs": int(total_linked_refs),
+        "configured_max_size": int(configured_max_size),
+        "recommended_max_size": int(recommended_max_size),
+        "selected_nodes": int(selected_nodes),
+        "selected_edges": int(selected_edges),
+        "node_coverage": float(node_coverage),
+        "edge_coverage": float(edge_coverage),
+        "edge_density": float(edge_density),
+        "conclusion_scope": conclusion_scope,
+        "adequacy_label": adequacy_label,
+        "notes_json": json.dumps(notes, ensure_ascii=False),
+    }
+    conn_v14.execute("DELETE FROM subgraph_scope_audit")
+    conn_v14.execute("""
+        INSERT OR REPLACE INTO subgraph_scope_audit
+            (run_id, total_papers, total_linked_refs, configured_max_size,
+             recommended_max_size, selected_nodes, selected_edges, node_coverage,
+             edge_coverage, edge_density, conclusion_scope, adequacy_label, notes_json)
+        VALUES
+            (:run_id, :total_papers, :total_linked_refs, :configured_max_size,
+             :recommended_max_size, :selected_nodes, :selected_edges, :node_coverage,
+             :edge_coverage, :edge_density, :conclusion_scope, :adequacy_label, :notes_json)
+    """, audit)
+    conn_v14.commit()
+    return audit
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +421,13 @@ def run_subgraph(
     # 选取并写入边
     edges = select_subgraph_edges(conn_main, conn_v14, all_nodes)
     n_edges = write_subgraph_edges(conn_v14, edges)
+    scope_audit = evaluate_subgraph_scope(
+        conn_main,
+        conn_v14,
+        configured_max_size=max_size,
+        selected_nodes=n_nodes,
+        selected_edges=n_edges,
+    )
 
     # 验收检查
     conn_main.close()
@@ -325,10 +437,17 @@ def run_subgraph(
         "keystone_nodes": len(keystone_ids),
         "fresh_nodes": len(fresh_ids),
         "neighbor_nodes": len(neighbor_ids),
+        "scope_audit": scope_audit,
         "records_n": n_nodes,
     }
 
-    upsert_step_meta(conn_v14, step_name, "done", records_n=n_nodes)
+    upsert_step_meta(
+        conn_v14,
+        step_name,
+        "done",
+        records_n=n_nodes,
+        notes=json.dumps(scope_audit, ensure_ascii=False),
+    )
     conn_v14.close()
 
     ck.mark_done(records_n=n_nodes, meta=stats)

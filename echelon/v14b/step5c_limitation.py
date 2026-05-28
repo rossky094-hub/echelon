@@ -40,6 +40,11 @@ from echelon.v14b.utils import (
 
 logger = logging.getLogger("echelon.v14b.step5c_limitation")
 
+LIMITATION_EVIDENCE_PROFILES = {
+    "structured_sections": ("section_level", 0.75),
+    "abstract": ("weak_abstract", 0.35),
+}
+
 LIMITATION_TERMS = re.compile(
     r"\b(limit(?:ation)?s?|challenge[sd]?|bottleneck|drawback|constraint|"
     r"remain(?:s|ing)?|future work|open question|not yet|however|although|"
@@ -163,14 +168,27 @@ def get_top_papers_for_limitation(
                   )
             """, ids).fetchall()
             by_paper: dict[str, list[str]] = {}
+            section_names_by_paper: dict[str, list[str]] = {}
             for row in rows:
                 by_paper.setdefault(row[0], []).append(row[2] or "")
+                section_names_by_paper.setdefault(row[0], []).append(row[1] or "")
             for paper in papers:
                 sections = "\n\n".join(by_paper.get(paper["id"], []))
                 if sections.strip():
                     paper["limitation_text"] = sections[:6000]
+                    paper["limitation_evidence_source"] = "structured_sections"
+                    paper["limitation_source_section_name"] = ",".join(
+                        sorted(set(section_names_by_paper.get(paper["id"], [])))
+                    )[:200]
         except sqlite3.Error as exc:
             logger.warning("Structured section lookup failed: %s", exc)
+
+    for paper in papers:
+        source = paper.get("limitation_evidence_source") or "abstract"
+        quality, weight = LIMITATION_EVIDENCE_PROFILES[source]
+        paper["limitation_evidence_source"] = source
+        paper["limitation_evidence_quality"] = quality
+        paper["limitation_evidence_weight"] = weight
 
     return papers
 
@@ -189,6 +207,8 @@ def extract_limitation_atoms(
     text = (paper.get("limitation_text") or paper.get("abstract", "") or "")[:6000]
     if llm_client is None:
         return heuristic_limitation_atoms(paper, text)
+
+    common = _limitation_evidence_common(paper, "llm")
 
     prompt = LIMITATION_EXTRACT_PROMPT.format(
         title=paper.get("title", "")[:200],
@@ -211,6 +231,7 @@ def extract_limitation_atoms(
                 "description": desc,
                 "keyword": lim.get("keyword", "").strip()[:100],
                 "severity": lim.get("severity", "medium").lower(),
+                **common,
             })
         return atoms
     except Exception as exc:
@@ -218,8 +239,24 @@ def extract_limitation_atoms(
         return []
 
 
+def _limitation_evidence_common(paper: dict, method: str) -> dict:
+    source = paper.get("limitation_evidence_source") or "abstract"
+    quality = paper.get("limitation_evidence_quality")
+    weight = paper.get("limitation_evidence_weight")
+    if quality is None or weight is None:
+        quality, weight = LIMITATION_EVIDENCE_PROFILES.get(source, LIMITATION_EVIDENCE_PROFILES["abstract"])
+    return {
+        "evidence_source": source,
+        "evidence_quality": quality,
+        "evidence_weight": float(weight),
+        "source_section_name": paper.get("limitation_source_section_name"),
+        "extractor_method": method,
+    }
+
+
 def heuristic_limitation_atoms(paper: dict, text: str) -> List[dict]:
     """Algorithmic limitation extraction used by the product chain by default."""
+    common = _limitation_evidence_common(paper, "heuristic")
     sentences = [
         s.strip()
         for s in re.split(r"(?<=[.!?])\s+", text or "")
@@ -248,6 +285,7 @@ def heuristic_limitation_atoms(paper: dict, text: str) -> List[dict]:
             "description": sent[:500],
             "keyword": keyword[:100],
             "severity": severity,
+            **common,
         })
         if len(atoms) >= LIMITATION_MAX_ATOMS_PER_PAPER:
             break
@@ -260,13 +298,19 @@ def write_atoms(conn_v14: sqlite3.Connection, atoms: List[dict]) -> List[int]:
     for atom in atoms:
         cursor = conn_v14.execute("""
             INSERT OR IGNORE INTO limitation_atoms
-                (paper_id, description, keyword, severity)
-            VALUES (?, ?, ?, ?)
+                (paper_id, description, keyword, severity, evidence_source,
+                 evidence_quality, evidence_weight, source_section_name, extractor_method)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             atom["paper_id"],
             atom["description"],
             atom["keyword"],
             atom["severity"],
+            atom.get("evidence_source", "abstract"),
+            atom.get("evidence_quality", "weak_abstract"),
+            float(atom.get("evidence_weight", 0.35)),
+            atom.get("source_section_name"),
+            atom.get("extractor_method"),
         ))
         atom_id = cursor.lastrowid
         if atom_id:
@@ -427,6 +471,10 @@ def run_limitation(
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
+    if not resume:
+        conn_v14.execute("DELETE FROM limitation_resolutions")
+        conn_v14.execute("DELETE FROM limitation_atoms")
+        conn_v14.commit()
 
     llm_client = LLMClient.from_env() if LIMITATION_USE_LLM else None
 
@@ -452,7 +500,9 @@ def run_limitation(
             if existing > 0 and resume:
                 # 已处理,从 DB 加载
                 rows = conn_v14.execute(
-                    "SELECT atom_id, paper_id, description, keyword, severity "
+                    "SELECT atom_id, paper_id, description, keyword, severity, "
+                    "evidence_source, evidence_quality, evidence_weight, "
+                    "source_section_name, extractor_method "
                     "FROM limitation_atoms WHERE paper_id = ?",
                     (paper["id"],)
                 ).fetchall()
@@ -516,14 +566,36 @@ def run_limitation(
     unresolved = rank_unresolved_limitations(conn_v14, top_n=LIMITATION_TOP_UNRESOLVED)
     logger.info("Phase 4: top %d 未解决 limitations", len(unresolved))
 
-    upsert_step_meta(conn_v14, step_name, "done", records_n=total_atoms)
-    ck.mark_done(records_n=total_atoms, meta={
+    evidence_quality_rows = conn_v14.execute("""
+        SELECT COALESCE(evidence_quality, 'unknown') AS evidence_quality,
+               COALESCE(evidence_source, 'unknown') AS evidence_source,
+               COUNT(*) AS n,
+               AVG(COALESCE(evidence_weight, 0)) AS avg_weight
+        FROM limitation_atoms
+        GROUP BY evidence_quality, evidence_source
+        ORDER BY n DESC
+    """).fetchall()
+    evidence_quality = [dict(r) for r in evidence_quality_rows]
+    meta = {
         "total_atoms": total_atoms,
         "total_resolutions": total_resolutions,
         "unresolved_top": len(unresolved),
         "records_n": total_atoms,
         "skipped_resolution": SKIP_LIMITATION_RESOLUTION,
-    })
+        "evidence_quality": evidence_quality,
+        "remaining_risk": (
+            "Abstract-only limitations are weak evidence; visual graph must expose "
+            "evidence_quality and later ingest paper_sections/Sci-Bot sections."
+        ),
+    }
+    upsert_step_meta(
+        conn_v14,
+        step_name,
+        "done",
+        records_n=total_atoms,
+        notes=json.dumps(meta, ensure_ascii=False),
+    )
+    ck.mark_done(records_n=total_atoms, meta=meta)
     conn_main.close()
     conn_v14.close()
 
@@ -531,6 +603,7 @@ def run_limitation(
         "total_atoms": total_atoms,
         "total_resolutions": total_resolutions,
         "unresolved_top": len(unresolved),
+        "evidence_quality": evidence_quality,
         "records_n": total_atoms,
     }
     logger.info(

@@ -186,6 +186,24 @@ class TestFusion:
         conn_v14.close()
         assert n == 1
 
+    def test_write_fusion_evidence_audit_marks_limited_output(self, tmp_path):
+        from echelon.v14b.step6_fusion import write_fusion_evidence_audit
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        audit = write_fusion_evidence_audit(
+            conn_v14,
+            terminals=[{"paper_id": "4"}],
+            vgae_preds=[{"src_paper_id": "4", "dst_paper_id": "5"}],
+            unresolved=[{"evidence_quality": "weak_abstract"}],
+            candidates=[{"evidence_paths": 2}],
+            n_directions=1,
+        )
+        row = conn_v14.execute("SELECT adequacy_label FROM fusion_evidence_audit").fetchone()
+        conn_v14.close()
+
+        assert audit["adequacy_label"] == "sparse_evidence"
+        assert row[0] == "sparse_evidence"
+
 
 # ---------------------------------------------------------------------------
 # 突变标记测试

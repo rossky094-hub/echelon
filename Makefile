@@ -13,7 +13,7 @@
 # ========================================================
 
 .PHONY: setup id-repair openalex-backfill graph-features embeddings graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae limitation \
-        fusion mutation layout report visual-graph llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
+        fusion mutation layout report visual-graph goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
 
 # Python 解释器
 PYTHON := python3
@@ -188,6 +188,14 @@ visual-graph:
 		--db-v14 $(DB_V14) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 	@echo ">>> Visual graph tables ready: visual_nodes / visual_edges / visual_clusters / branch_lineages / visual_tiles / visual_search_fts"
+
+## Step 12: 目标对齐审计报告
+goal-audit:
+	@echo ">>> Step 12: Goal alignment audit..."
+	$(PYTHON) -m echelon.v14b.step12_goal_alignment_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot
 
 ## Step 11a: 分层 LLM/Doubao 审边计划与预算,不调用 API
 llm-edge-audit-plan:

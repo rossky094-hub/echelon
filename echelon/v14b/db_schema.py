@@ -23,15 +23,18 @@ class MainPathEdge(BaseModel):
     """main_path_edges 表 - SPC 主干道边"""
     citing_id: str
     cited_id: str
+    source_paper_id: Optional[str] = None
+    target_paper_id: Optional[str] = None
+    edge_direction: Optional[str] = "time_forward_cited_to_citing"
     spc: float = Field(ge=0.0)
     v13_weight: float = Field(ge=0.0)
     main_path_weight: float = Field(ge=0.0)
     is_main_path: bool = False
 
-    @field_validator("citing_id", "cited_id", mode="before")
+    @field_validator("citing_id", "cited_id", "source_paper_id", "target_paper_id", mode="before")
     @classmethod
     def _coerce_paper_id(cls, value):
-        return str(value)
+        return None if value is None else str(value)
 
 
 class SubgraphNode(BaseModel):
@@ -59,6 +62,10 @@ class SubgraphEdge(BaseModel):
     cited_id: str
     citation_function: Optional[str] = None
     citation_function_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    citation_function_method: Optional[str] = None
+    citation_function_evidence_level: Optional[str] = None
+    citation_context_available: bool = False
+    citation_function_weight: Optional[float] = Field(None, ge=0.0, le=1.0)
     main_path_weight: Optional[float] = Field(None, ge=0.0)
 
 
@@ -115,9 +122,16 @@ DDL_STATEMENTS = """
 -- ================================================================
 
 -- 主干道边 (Step 2 输出)
+-- Historical citing_id/cited_id columns are retained for compatibility.
+-- Their values are time-forward SPC endpoints, equivalent to
+-- source_paper_id -> target_paper_id (cited/older -> citing/newer).
+-- New API/product code should prefer source_paper_id/target_paper_id.
 CREATE TABLE IF NOT EXISTS main_path_edges (
     citing_id             TEXT NOT NULL,
     cited_id              TEXT NOT NULL,
+    source_paper_id       TEXT,
+    target_paper_id       TEXT,
+    edge_direction        TEXT NOT NULL DEFAULT 'time_forward_cited_to_citing',
     spc                   REAL    NOT NULL DEFAULT 0,
     v13_weight            REAL    NOT NULL DEFAULT 0,
     main_path_weight      REAL    NOT NULL DEFAULT 0,
@@ -197,12 +211,35 @@ CREATE TABLE IF NOT EXISTS subgraph_edges (
     cited_id                        TEXT NOT NULL,
     citation_function               TEXT,
     citation_function_confidence    REAL,
+    citation_function_method        TEXT,
+    citation_function_evidence_level TEXT,
+    citation_context_available      BOOLEAN DEFAULT 0,
+    citation_function_weight        REAL,
     main_path_weight                REAL,
     PRIMARY KEY (citing_id, cited_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_subgraph_edges_function
     ON subgraph_edges (citation_function);
+
+-- Step 4 subgraph scope audit. Step4 is a pilot/evidence subgraph for heavier
+-- algorithms. Step10 visual graph is the full product graph.
+CREATE TABLE IF NOT EXISTS subgraph_scope_audit (
+    run_id                TEXT PRIMARY KEY,
+    total_papers          INTEGER NOT NULL,
+    total_linked_refs     INTEGER NOT NULL,
+    configured_max_size   INTEGER NOT NULL,
+    recommended_max_size  INTEGER NOT NULL,
+    selected_nodes        INTEGER NOT NULL,
+    selected_edges        INTEGER NOT NULL,
+    node_coverage         REAL NOT NULL,
+    edge_coverage         REAL NOT NULL,
+    edge_density          REAL NOT NULL,
+    conclusion_scope      TEXT NOT NULL,
+    adequacy_label        TEXT NOT NULL,
+    notes_json            TEXT,
+    created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 -- 原子化局限性 (Step 5c 输出)
 CREATE TABLE IF NOT EXISTS limitation_atoms (
@@ -211,6 +248,11 @@ CREATE TABLE IF NOT EXISTS limitation_atoms (
     description   TEXT     NOT NULL,
     keyword       TEXT,
     severity      TEXT,
+    evidence_source TEXT,
+    evidence_quality TEXT,
+    evidence_weight REAL,
+    source_section_name TEXT,
+    extractor_method TEXT,
     extracted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -260,6 +302,23 @@ CREATE TABLE IF NOT EXISTS future_directions (
     vgae_evidence        TEXT,
     limitation_evidence  TEXT,
     paper_ids_json       TEXT
+);
+
+-- Step 6 evidence sparsity/adequacy audit.
+CREATE TABLE IF NOT EXISTS fusion_evidence_audit (
+    run_id                    TEXT PRIMARY KEY,
+    n_terminals               INTEGER NOT NULL,
+    n_vgae_preds_top          INTEGER NOT NULL,
+    n_vgae_preds_total        INTEGER NOT NULL,
+    n_cross_field_total       INTEGER NOT NULL,
+    n_unresolved              INTEGER NOT NULL,
+    n_candidates              INTEGER NOT NULL,
+    n_directions              INTEGER NOT NULL,
+    limitation_quality_json   TEXT,
+    evidence_path_json        TEXT,
+    adequacy_label            TEXT NOT NULL,
+    remaining_risk            TEXT,
+    created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 运行元数据 (各 step 完成标记)
@@ -341,6 +400,25 @@ def _column_sql_type(conn: sqlite3.Connection, table: str, column: str) -> Optio
     return None
 
 
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    return _column_sql_type(conn, table, column) is not None
+
+
+def _add_column_if_missing(
+    conn: sqlite3.Connection,
+    table: str,
+    column: str,
+    ddl_type: str,
+    *,
+    default_sql: str | None = None,
+) -> bool:
+    if _column_exists(conn, table, column):
+        return False
+    suffix = f" DEFAULT {default_sql}" if default_sql is not None else ""
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}{suffix}")
+    return True
+
+
 def _run_ddl_fragment(conn: sqlite3.Connection, ddl: str) -> None:
     for stmt in ddl.split(";"):
         stmt = stmt.strip()
@@ -392,6 +470,10 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
             cited_id                        TEXT NOT NULL,
             citation_function               TEXT,
             citation_function_confidence    REAL,
+            citation_function_method        TEXT,
+            citation_function_evidence_level TEXT,
+            citation_context_available      BOOLEAN DEFAULT 0,
+            citation_function_weight        REAL,
             main_path_weight                REAL,
             PRIMARY KEY (citing_id, cited_id)
         );
@@ -409,6 +491,11 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
                 description   TEXT     NOT NULL,
                 keyword       TEXT,
                 severity      TEXT,
+                evidence_source TEXT,
+                evidence_quality TEXT,
+                evidence_weight REAL,
+                source_section_name TEXT,
+                extractor_method TEXT,
                 extracted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_limitation_atoms_paper
@@ -458,6 +545,9 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
         CREATE TABLE main_path_edges (
             citing_id             TEXT NOT NULL,
             cited_id              TEXT NOT NULL,
+            source_paper_id       TEXT,
+            target_paper_id       TEXT,
+            edge_direction        TEXT NOT NULL DEFAULT 'time_forward_cited_to_citing',
             spc                   REAL    NOT NULL DEFAULT 0,
             v13_weight            REAL    NOT NULL DEFAULT 0,
             main_path_weight      REAL    NOT NULL DEFAULT 0,
@@ -465,7 +555,8 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
             PRIMARY KEY (citing_id, cited_id)
         );
         INSERT INTO main_path_edges
-            SELECT citing_id, cited_id, spc, v13_weight, main_path_weight, is_main_path
+            SELECT citing_id, cited_id, citing_id, cited_id, 'time_forward_cited_to_citing',
+                   spc, v13_weight, main_path_weight, is_main_path
             FROM main_path_edges_old;
         DROP TABLE main_path_edges_old;
         CREATE INDEX IF NOT EXISTS idx_main_path_edges_is_main
@@ -474,6 +565,40 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
             ON main_path_edges (main_path_weight DESC)
         """)
         changed = True
+
+    for col, ddl_type, default_sql in (
+        ("source_paper_id", "TEXT", None),
+        ("target_paper_id", "TEXT", None),
+        ("edge_direction", "TEXT NOT NULL", "'time_forward_cited_to_citing'"),
+    ):
+        if _add_column_if_missing(conn, "main_path_edges", col, ddl_type, default_sql=default_sql):
+            changed = True
+    conn.execute("""
+        UPDATE main_path_edges
+        SET source_paper_id = COALESCE(source_paper_id, citing_id),
+            target_paper_id = COALESCE(target_paper_id, cited_id),
+            edge_direction = COALESCE(edge_direction, 'time_forward_cited_to_citing')
+    """)
+    changed = True
+
+    for col, ddl_type, default_sql in (
+        ("citation_function_method", "TEXT", None),
+        ("citation_function_evidence_level", "TEXT", None),
+        ("citation_context_available", "BOOLEAN", "0"),
+        ("citation_function_weight", "REAL", None),
+    ):
+        if _add_column_if_missing(conn, "subgraph_edges", col, ddl_type, default_sql=default_sql):
+            changed = True
+
+    for col, ddl_type, default_sql in (
+        ("evidence_source", "TEXT", "'abstract'"),
+        ("evidence_quality", "TEXT", "'weak_abstract'"),
+        ("evidence_weight", "REAL", "0.35"),
+        ("source_section_name", "TEXT", None),
+        ("extractor_method", "TEXT", None),
+    ):
+        if _add_column_if_missing(conn, "limitation_atoms", col, ddl_type, default_sql=default_sql):
+            changed = True
 
     if changed:
         conn.commit()

@@ -15,6 +15,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sqlite3
 from datetime import date
@@ -32,6 +33,32 @@ from echelon.seeds.lifecycle_weights import (
 )
 
 logger = logging.getLogger("echelon.v14b.step3_keystone_v14")
+
+SIGNAL_DEFAULTS = {
+    "c_recency": 0.5,
+    "c_venue": 0.5,
+    "c_team_disrupt": 0.5,
+    "c_recent_burst": 0.5,
+    "c_review_filter": 0.0,
+    "c_bib_breadth": 0.5,
+    "c_cocite_breadth": None,
+    "c_bridging_centrality": 0.5,
+    "c_cd_subdomain": None,
+    "c_semantic_outlier": 0.5,
+    "c_breakthrough_lang": 0.5,
+    "c_mechanism_novelty": 0.5,
+}
+
+# These signals carry much of the "why this paper matters for evolution" burden.
+# If they silently fall back to defaults, the score should be pulled toward
+# neutral instead of pretending to be strongly discriminative.
+KEYSTONE_CRITICAL_SIGNALS = {
+    "c_recent_burst",
+    "c_cocite_breadth",
+    "c_bridging_centrality",
+    "c_cd_subdomain",
+    "c_semantic_outlier",
+}
 
 # ---------------------------------------------------------------------------
 # V14 评分核心函数
@@ -110,6 +137,9 @@ def ensure_v14_columns(conn: sqlite3.Connection) -> None:
     for col_def in [
         ("keystone_score_v14", "REAL"),
         ("lifecycle_v14",      "TEXT"),
+        ("keystone_signal_quality_v14", "REAL"),
+        ("keystone_signal_coverage_v14", "REAL"),
+        ("keystone_signal_flags_v14", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE papers ADD COLUMN {col_def[0]} {col_def[1]}")
@@ -131,20 +161,6 @@ def load_papers_with_signals(
     from echelon.v14b.utils import table_columns
 
     paper_cols = table_columns(conn, "papers")
-    signal_defaults = {
-        "c_recency": 0.5,
-        "c_venue": 0.5,
-        "c_team_disrupt": 0.5,
-        "c_recent_burst": 0.5,
-        "c_review_filter": 0.0,
-        "c_bib_breadth": 0.5,
-        "c_cocite_breadth": None,
-        "c_bridging_centrality": 0.5,
-        "c_cd_subdomain": None,
-        "c_semantic_outlier": 0.5,
-        "c_breakthrough_lang": 0.5,
-        "c_mechanism_novelty": 0.5,
-    }
     base_cols = [
         "p.id",
         "p.publication_date",
@@ -152,16 +168,11 @@ def load_papers_with_signals(
         "p.primary_field_id",
     ]
     signal_select = []
-    for col, default in signal_defaults.items():
+    for col in SIGNAL_DEFAULTS:
         if col in paper_cols:
-            if default is None:
-                signal_select.append(f"p.{col}")
-            else:
-                signal_select.append(f"COALESCE(p.{col}, {default}) AS {col}")
-        elif default is None:
-            signal_select.append(f"NULL AS {col}")
+            signal_select.append(f"p.{col} AS {col}")
         else:
-            signal_select.append(f"{default} AS {col}")
+            signal_select.append(f"NULL AS {col}")
 
     q = f"""
         SELECT
@@ -173,14 +184,55 @@ def load_papers_with_signals(
         q += f" LIMIT {limit}"
 
     rows = conn.execute(q).fetchall()
-    return [dict(r) for r in rows]
+    out = []
+    for row in rows:
+        rec = dict(row)
+        observed = 0
+        critical_observed = 0
+        defaults_used = []
+        missing_columns = []
+        for signal, default in SIGNAL_DEFAULTS.items():
+            column_present = signal in paper_cols
+            has_value = rec.get(signal) is not None
+            if column_present and has_value:
+                observed += 1
+                if signal in KEYSTONE_CRITICAL_SIGNALS:
+                    critical_observed += 1
+                continue
+            if not column_present:
+                missing_columns.append(signal)
+            defaults_used.append(signal)
+            rec[signal] = default
+
+        coverage = observed / max(1, len(SIGNAL_DEFAULTS))
+        critical_coverage = critical_observed / max(1, len(KEYSTONE_CRITICAL_SIGNALS))
+        reliability = max(0.20, min(1.0, 0.45 * coverage + 0.55 * critical_coverage))
+        if coverage >= 0.95 and critical_coverage >= 0.95:
+            reliability = 1.0
+        flags = {
+            "coverage": coverage,
+            "critical_coverage": critical_coverage,
+            "reliability": reliability,
+            "defaults_used": defaults_used,
+            "missing_columns": missing_columns,
+            "critical_defaults": sorted(set(defaults_used) & KEYSTONE_CRITICAL_SIGNALS),
+        }
+        rec["__signal_quality"] = flags
+        out.append(rec)
+    return out
+
+
+def quality_adjusted_keystone_score(raw_score: float, reliability: float) -> float:
+    """Pull low-quality signal scores toward neutral instead of overclaiming."""
+    reliability = max(0.0, min(1.0, float(reliability)))
+    return _safe_clip_v6(0.5 + (float(raw_score) - 0.5) * reliability)
 
 
 def compute_and_write_v14_scores(
     conn: sqlite3.Connection,
     papers: list[dict],
     batch_size: int = 500,
-) -> tuple[int, dict]:
+) -> tuple[int, dict, dict]:
     """
     批量计算 V14 KeystoneScore 并写入 DB。
 
@@ -189,6 +241,8 @@ def compute_and_write_v14_scores(
     """
     lifecycle_counts = {"fresh": 0, "growing": 0, "mature": 0}
     updates = []
+    quality_values = []
+    critical_default_counts = 0
 
     with make_progress(papers, desc="V14 KeystoneScore") as pbar:
         for p in pbar:
@@ -227,22 +281,48 @@ def compute_and_write_v14_scores(
             else:
                 paper_obj.publication_date = pub_date
 
-            score, lifecycle = keystone_score_v14(signals, paper_obj)
+            raw_score, lifecycle = keystone_score_v14(signals, paper_obj)
+            signal_quality = p.get("__signal_quality") or {}
+            reliability = float(signal_quality.get("reliability", 1.0))
+            score = quality_adjusted_keystone_score(raw_score, reliability)
             lifecycle_counts[lifecycle] = lifecycle_counts.get(lifecycle, 0) + 1
-            updates.append((score, lifecycle, p["id"]))
+            quality_values.append(reliability)
+            if signal_quality.get("critical_defaults"):
+                critical_default_counts += 1
+            updates.append((
+                score,
+                lifecycle,
+                reliability,
+                float(signal_quality.get("coverage", 1.0)),
+                json.dumps(signal_quality, ensure_ascii=False),
+                p["id"],
+            ))
 
     # 批量写入
     written = 0
     for i in range(0, len(updates), batch_size):
         batch = updates[i: i + batch_size]
         conn.executemany(
-            "UPDATE papers SET keystone_score_v14 = ?, lifecycle_v14 = ? WHERE id = ?",
+            """
+            UPDATE papers
+            SET keystone_score_v14 = ?,
+                lifecycle_v14 = ?,
+                keystone_signal_quality_v14 = ?,
+                keystone_signal_coverage_v14 = ?,
+                keystone_signal_flags_v14 = ?
+            WHERE id = ?
+            """,
             batch,
         )
         conn.commit()
         written += len(batch)
 
-    return written, lifecycle_counts
+    quality_summary = {
+        "avg_signal_reliability": sum(quality_values) / max(1, len(quality_values)),
+        "min_signal_reliability": min(quality_values) if quality_values else 0.0,
+        "critical_default_papers": critical_default_counts,
+    }
+    return written, lifecycle_counts, quality_summary
 
 
 # ---------------------------------------------------------------------------
@@ -276,14 +356,21 @@ def run_keystone_v14(
     papers = load_papers_with_signals(conn, limit=limit)
     logger.info("加载论文: %d 篇", len(papers))
 
-    n_written, lifecycle_dist = compute_and_write_v14_scores(conn, papers)
+    n_written, lifecycle_dist, quality_summary = compute_and_write_v14_scores(conn, papers)
     conn.close()
 
     stats = {
         "records_n": n_written,
         "lifecycle_distribution": lifecycle_dist,
+        "signal_quality": quality_summary,
     }
-    upsert_step_meta(conn_v14, step_name, "done", records_n=n_written)
+    upsert_step_meta(
+        conn_v14,
+        step_name,
+        "done",
+        records_n=n_written,
+        notes=json.dumps(quality_summary, ensure_ascii=False),
+    )
     conn_v14.close()
     ck.mark_done(records_n=n_written, meta=stats)
     logger.info(

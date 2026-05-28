@@ -1,6 +1,6 @@
 # V14-B Pilot 算法验证报告
 
-**生成时间**: 2026-05-28 00:11
+**生成时间**: 2026-05-28 12:57
 **数据规模**: 55,391 篇论文 (physics.optics arXiv 1991-2026)
 
 ---
@@ -14,10 +14,11 @@
 | 引用关系总数 | **3,016,141** |
 | 主干道边数 (top 1%) | **2,771** / 277,195 |
 | 子图节点数 | **5,000** |
-| 子图边数 | **38,778** |
+| 子图边数 | **38,794** |
+| 子图结论范围 | **pilot_evidence_subgraph** |
 | SciBERT 分类完成率 | **100.0%** |
 | VGAE 预测未来边数 | **1,000** |
-| Limitation atoms 总数 | **1,063** |
+| Limitation atoms 总数 | **1,066** |
 | 三路融合方向数 | **6** |
 
 ---
@@ -59,7 +60,14 @@
 | Keystone 节点 | **1,000** |
 | Fresh (2024+) 节点 | **500** |
 | 1 度邻居节点 | **3,500** |
-| 子图边数 | **38,778** |
+| 子图边数 | **38,794** |
+
+**结论边界**: Step4 是 `pilot_evidence_subgraph`；任何只来自该子图的结论必须标为 pilot/evidence，完整 optics 图谱以 Step10 visual graph 为准。
+
+- 节点覆盖率: 9.0%
+- 边覆盖率: 9.4%
+- 适配性: `pilot_adequate_for_algorithmic_evidence`
+- 推荐子图上限: 5,000
 
 ---
 
@@ -67,20 +75,26 @@
 
 | 引用功能 | 边数 | 占比 |
 |---|---|---|
-| usage | 19,886 | 51.3% |
-| background | 9,889 | 25.5% |
-| similarity | 4,752 | 12.3% |
+| usage | 19,890 | 51.3% |
+| background | 9,899 | 25.5% |
+| similarity | 4,754 | 12.3% |
 | extension | 3,384 | 8.7% |
 | motivation | 867 | 2.2% |
 
 **高权重 (extension+motivation+usage) 总占比**: 62.2%
+
+**证据解释**: citation function 在没有全文 citation context 时是弱证据层，只应用作 fusion / visual evidence 的权重修正，不能当作真实引用意图的 ground truth。
+
+| 证据等级 | 边数 | 平均权重 |
+|---|---:|---:|
+| weak_paper_metadata | 38,794 | 0.222 |
 
 ---
 
 ## 7. VGAE Link Prediction
 
 - **预测边总数**: 1,000
-- **跨 Field 边占比**: **4.1%** (41/1,000)
+- **跨 Field 边占比**: **3.8%** (38/1,000)
 
 ### Top 5 预测边 (case study)
 
@@ -91,7 +105,7 @@
 
 ## 8. Limitation Tracking
 
-- **Limitation atoms 总数**: 1,063
+- **Limitation atoms 总数**: 1,066
 - **高严重性 atoms**: 191
 - **Resolution 记录数**: 1,743
 
@@ -110,11 +124,11 @@
 
 | 方向 | 置信度 | 预期时间 |
 |---|---|---|
-| Exceptional Topology of Non-Hermitian Systems | 0.75 | 2026-2030 |
-| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.75 | 2026-2030 |
-| Stable boundary modes for fragile topology from spontaneous PT-symmetr | 0.75 | 2026-2030 |
-| All-Optical Machine Learning Using Diffractive Deep Neural Networks | 0.75 | 2026-2030 |
-| Stimulated generation of deterministic platicon frequency microcombs | 0.75 | 2026-2030 |
+| Exceptional Topology of Non-Hermitian Systems | 0.68 | 2026-2030 |
+| Stable boundary modes for fragile topology from spontaneous PT-symmetr | 0.68 | 2026-2030 |
+| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.68 | 2026-2030 |
+| Stimulated generation of deterministic platicon frequency microcombs | 0.68 | 2026-2030 |
+| High-efficiency and broadband coherent optical comb generation in inte | 0.68 | 2026-2030 |
 
 > 详细见: 未来方向预测_交集报告.md
 
@@ -124,10 +138,10 @@
 
 | 类型 | 数量 | 含义 |
 |---|---|---|
-| 🔴 红色 (CD-index 突变) | **1,951** | mature 论文 CD-index > 0.3 |
-| 🟠 橙色 (跨 Field 桥接) | **1,761** | 跨领域桥接分数 > p90 |
-| 🟣 紫色 (Burstiness) | **1,706** | 18 月内被引突增 > p95 |
-| **合计** | **5,418** | 子图 5,000 节点中的 108.4% |
+| 🔴 红色 (CD-index 突变) | **1,954** | mature 论文 CD-index > 0.3 |
+| 🟠 橙色 (跨 Field 桥接) | **1,762** | 跨领域桥接分数 > p90 |
+| 🟣 紫色 (Burstiness) | **1,708** | 18 月内被引突增 > p95 |
+| **合计** | **5,424** | 子图 5,000 节点中的 108.5% |
 
 ---
 
@@ -159,7 +173,7 @@
 - [ ] 三路融合方向 ≥ 10 个 (当前: 6)
 - [ ] VGAE test AUC > 0.80 (需验证)
 - [ ] 主干道节点 100-200 个 (当前: TBD)
-- [ ] 突变节点 100-300 个 (当前: 5418)
+- [ ] 突变节点 100-300 个 (当前: 5424)
 
 **重型算法调优建议**:
 1. SciBERT: 如 extension+motivation+usage 占比 < 40%,考虑换 LLM 分类
@@ -168,4 +182,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-28 00:11*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-28 12:57*

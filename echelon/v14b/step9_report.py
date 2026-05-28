@@ -93,6 +93,22 @@ def generate_algo_report(
         GROUP BY citation_function
         ORDER BY n DESC
     """)
+    citation_evidence = safe_query(conn_v14, """
+        SELECT citation_function_evidence_level AS level,
+               COUNT(*) AS n,
+               AVG(COALESCE(citation_function_weight, 0)) AS avg_weight
+        FROM subgraph_edges
+        WHERE citation_function IS NOT NULL
+        GROUP BY citation_function_evidence_level
+        ORDER BY n DESC
+    """)
+    subgraph_scope = safe_query(conn_v14, """
+        SELECT *
+        FROM subgraph_scope_audit
+        ORDER BY created_at DESC
+        LIMIT 1
+    """)
+    subgraph_scope_row = subgraph_scope[0] if subgraph_scope else {}
 
     # VGAE 统计
     predicted_edges = safe_count(conn_v14, "predicted_future_edges")
@@ -178,6 +194,7 @@ def generate_algo_report(
         f"| 主干道边数 (top 1%) | **{main_path_core:,}** / {main_path_edges:,} |",
         f"| 子图节点数 | **{subgraph_nodes:,}** |",
         f"| 子图边数 | **{subgraph_edges:,}** |",
+        f"| 子图结论范围 | **{subgraph_scope_row.get('conclusion_scope', 'pilot/evidence')}** |",
         f"| SciBERT 分类完成率 | **{classification_rate}** |",
         f"| VGAE 预测未来边数 | **{predicted_edges:,}** |",
         f"| Limitation atoms 总数 | **{total_atoms:,}** |",
@@ -231,6 +248,14 @@ def generate_algo_report(
         f"| 1 度邻居节点 | **{subgraph_nodes - keystone_nodes - fresh_nodes:,}** |",
         f"| 子图边数 | **{subgraph_edges:,}** |",
         f"",
+        f"**结论边界**: Step4 是 `{subgraph_scope_row.get('conclusion_scope', 'pilot_evidence_subgraph')}`；"
+        f"任何只来自该子图的结论必须标为 pilot/evidence，完整 optics 图谱以 Step10 visual graph 为准。",
+        f"",
+        f"- 节点覆盖率: {float(subgraph_scope_row.get('node_coverage') or 0) * 100:.1f}%",
+        f"- 边覆盖率: {float(subgraph_scope_row.get('edge_coverage') or 0) * 100:.1f}%",
+        f"- 适配性: `{subgraph_scope_row.get('adequacy_label', 'unknown')}`",
+        f"- 推荐子图上限: {int(subgraph_scope_row.get('recommended_max_size') or 0):,}",
+        f"",
         f"---",
         f"",
         f"## 6. SciBERT 引用功能分布",
@@ -247,6 +272,19 @@ def generate_algo_report(
         f"",
         f"**高权重 (extension+motivation+usage) 总占比**: "
         + f"{sum(d['n'] for d in func_dist if d['citation_function'] in ('extension','motivation','usage')) / max(1, classified_edges) * 100:.1f}%",
+        f"",
+        f"**证据解释**: citation function 在没有全文 citation context 时是弱证据层，"
+        f"只应用作 fusion / visual evidence 的权重修正，不能当作真实引用意图的 ground truth。",
+        f"",
+        f"| 证据等级 | 边数 | 平均权重 |",
+        f"|---|---:|---:|",
+    ]
+
+    for d in citation_evidence:
+        level = d.get("level") or "unknown"
+        lines.append(f"| {level} | {d.get('n', 0):,} | {float(d.get('avg_weight') or 0):.3f} |")
+
+    lines += [
         f"",
         f"---",
         f"",

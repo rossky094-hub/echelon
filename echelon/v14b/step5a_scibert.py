@@ -17,6 +17,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import re
 import sqlite3
@@ -31,7 +32,7 @@ from echelon.v14b.config import (
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import (
-    setup_logging, Checkpoint, add_common_args, make_progress, get_torch_device
+    setup_logging, Checkpoint, add_common_args, make_progress, get_torch_device, table_columns
 )
 
 logger = logging.getLogger("echelon.v14b.step5a_scibert")
@@ -237,6 +238,32 @@ def heuristic_classify_edge(edge: dict, metadata: dict[str, dict]) -> tuple[str,
     return "background", 0.45
 
 
+def citation_function_evidence_weight(confidence: float, context_available: bool) -> float:
+    """
+    Convert a citation-function label into a weak fusion weight.
+
+    Sentence/full-text context can support a moderate edge-level claim.  Title
+    and abstract metadata only supports a weak prior, so it is capped well below
+    1.0 and should never be treated as ground truth.
+    """
+    conf = max(0.0, min(1.0, float(confidence or 0.0)))
+    if context_available:
+        return min(0.75, conf)
+    return min(0.25, conf * 0.40)
+
+
+def citation_function_evidence_level(context_available: bool) -> str:
+    return "moderate_citation_context" if context_available else "weak_paper_metadata"
+
+
+def classifier_method_name(use_llm: bool) -> str:
+    if use_llm:
+        return "llm_title_abstract_no_context"
+    if CITATION_CLASSIFIER_MODE == "heuristic":
+        return "heuristic_title_abstract_no_context"
+    return "zero_shot_title_no_context"
+
+
 def load_subgraph_edges_with_context(
     conn_v14: sqlite3.Connection,
     conn_main: sqlite3.Connection,
@@ -260,6 +287,8 @@ def load_subgraph_edges_with_context(
     for e in edges:
         all_ids.add(e["citing_id"])
         all_ids.add(e["cited_id"])
+        e["context_sentence"] = None
+        e["context_available"] = False
 
     metadata = {}
     if all_ids:
@@ -272,6 +301,24 @@ def load_subgraph_edges_with_context(
             row[0]: {"title": row[1] or "", "abstract": row[2] or ""}
             for row in rows
         }
+
+    if table_columns(conn_main, "citation_contexts"):
+        ctx_cols = table_columns(conn_main, "citation_contexts")
+        required = {"citing_id", "cited_id", "context_sentence"}
+        if required <= ctx_cols and edges:
+            for edge in edges:
+                row = conn_main.execute(
+                    """
+                    SELECT context_sentence
+                    FROM citation_contexts
+                    WHERE citing_id=? AND cited_id=?
+                    LIMIT 1
+                    """,
+                    (edge["citing_id"], edge["cited_id"]),
+                ).fetchone()
+                if row and row["context_sentence"]:
+                    edge["context_sentence"] = row["context_sentence"]
+                    edge["context_available"] = True
 
     return edges, metadata
 
@@ -341,11 +388,22 @@ def write_classification_results(
     conn_v14: sqlite3.Connection,
     edges: List[dict],
     results: List[Tuple[str, float]],
+    *,
+    method: str,
     batch_size: int = 500,
 ) -> int:
     """将分类结果写回 subgraph_edges 表"""
     updates = [
-        (func, conf, e["citing_id"], e["cited_id"])
+        (
+            func,
+            conf,
+            method,
+            citation_function_evidence_level(bool(e.get("context_available"))),
+            int(bool(e.get("context_available"))),
+            citation_function_evidence_weight(conf, bool(e.get("context_available"))),
+            e["citing_id"],
+            e["cited_id"],
+        )
         for e, (func, conf) in zip(edges, results)
     ]
 
@@ -355,7 +413,11 @@ def write_classification_results(
         conn_v14.executemany("""
             UPDATE subgraph_edges
             SET citation_function = ?,
-                citation_function_confidence = ?
+                citation_function_confidence = ?,
+                citation_function_method = ?,
+                citation_function_evidence_level = ?,
+                citation_context_available = ?,
+                citation_function_weight = ?
             WHERE citing_id = ? AND cited_id = ?
         """, batch)
         conn_v14.commit()
@@ -390,7 +452,7 @@ def run_scibert(
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
 
-    edges, titles = load_subgraph_edges_with_context(conn_v14, conn_main, limit=limit)
+    edges, metadata = load_subgraph_edges_with_context(conn_v14, conn_main, limit=limit)
     logger.info("待分类边: %d", len(edges))
 
     if not edges:
@@ -398,21 +460,34 @@ def run_scibert(
         ck.mark_done(records_n=0)
         return {"records_n": 0}
 
-    results = classify_edges(edges, titles, use_llm=use_llm)
-    n_written = write_classification_results(conn_v14, edges, results)
+    results = classify_edges(edges, metadata, use_llm=use_llm)
+    method = classifier_method_name(use_llm)
+    n_written = write_classification_results(conn_v14, edges, results, method=method)
 
     # 统计分类分布
     from collections import Counter
     func_counts = Counter(func for func, _ in results)
+    evidence_counts = Counter(
+        citation_function_evidence_level(bool(e.get("context_available")))
+        for e in edges
+    )
+    avg_weight = sum(
+        citation_function_evidence_weight(conf, bool(e.get("context_available")))
+        for e, (_, conf) in zip(edges, results)
+    ) / max(1, len(results))
 
     conn_main.close()
-    conn_v14.close()
 
     stats = {
         "records_n": n_written,
         "function_distribution": dict(func_counts),
+        "evidence_distribution": dict(evidence_counts),
+        "method": method,
+        "avg_citation_function_weight": avg_weight,
+        "interpretation": "weak evidence layer unless citation_context_available=1",
     }
-    upsert_step_meta(conn_v14, step_name, "done", records_n=n_written)
+    upsert_step_meta(conn_v14, step_name, "done", records_n=n_written, notes=json.dumps(stats, ensure_ascii=False))
+    conn_v14.close()
     ck.mark_done(records_n=n_written, meta=stats)
     logger.info("Step5a 完成: %d edges classified, dist=%s", n_written, dict(func_counts))
     return stats
