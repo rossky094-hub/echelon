@@ -13,7 +13,7 @@
 # ========================================================
 
 .PHONY: setup id-repair openalex-backfill graph-features embeddings graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae limitation \
-        fusion mutation layout report visual-graph product-chain pilot pilot-graph pilot-visual pilot-full clean help
+        fusion mutation layout report visual-graph llm-edge-audit-plan llm-edge-audit-run product-chain pilot pilot-graph pilot-visual pilot-full clean help
 
 # Python 解释器
 PYTHON := python3
@@ -188,6 +188,26 @@ visual-graph:
 		--db-v14 $(DB_V14) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 	@echo ">>> Visual graph tables ready: visual_nodes / visual_edges / visual_clusters / branch_lineages / visual_tiles / visual_search_fts"
+
+## Step 11a: 分层 LLM/Doubao 审边计划与预算,不调用 API
+llm-edge-audit-plan:
+	@echo ">>> Step 11a: Stratified LLM edge audit plan (no API calls)..."
+	$(PYTHON) -m echelon.v14b.step11_llm_edge_audit \
+		--db-v14 $(DB_V14) \
+		--sample-per-layer $${V14B_LLM_EDGE_AUDIT_LAYER_SAMPLE:-2000} \
+		--extra-sample $${V14B_LLM_EDGE_AUDIT_EXTRA_SAMPLE:-8000} \
+		--branch-mode $${V14B_LLM_EDGE_AUDIT_BRANCH_MODE:-all} \
+		--branch-sample $${V14B_LLM_EDGE_AUDIT_BRANCH_SAMPLE:-3000}
+
+## Step 11b: 执行分层 LLM/Doubao 审边,默认最多 100 条; V14B_LLM_EDGE_AUDIT_MAX_CALLS=0 表示跑完
+llm-edge-audit-run:
+	@echo ">>> Step 11b: Execute stratified LLM edge audit..."
+	$(PYTHON) -m echelon.v14b.step11_llm_edge_audit \
+		--db-v14 $(DB_V14) \
+		--job-id "$${V14B_LLM_EDGE_AUDIT_JOB_ID:?Set V14B_LLM_EDGE_AUDIT_JOB_ID from llm-edge-audit-plan}" \
+		--provider $${LLM_PROVIDER:-doubao} \
+		--execute \
+		--max-calls $${V14B_LLM_EDGE_AUDIT_MAX_CALLS:-100}
 
 # -------------------------------------------------------
 # 一键流程
