@@ -97,6 +97,23 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     pred_min = float(scalar(conn_v14, "SELECT COALESCE(MIN(predicted_prob),0) FROM predicted_future_edges") or 0.0)
     pred_avg = float(scalar(conn_v14, "SELECT COALESCE(AVG(predicted_prob),0) FROM predicted_future_edges") or 0.0)
     pred_max = float(scalar(conn_v14, "SELECT COALESCE(MAX(predicted_prob),0) FROM predicted_future_edges") or 0.0)
+    pred_cols = table_columns(conn_v14, "predicted_future_edges")
+    raw_min = raw_avg = raw_max = None
+    conf_avg = None
+    calibration_labels = []
+    if "raw_predicted_prob" in pred_cols:
+        raw_min = float(scalar(conn_v14, "SELECT COALESCE(MIN(raw_predicted_prob),0) FROM predicted_future_edges") or 0.0)
+        raw_avg = float(scalar(conn_v14, "SELECT COALESCE(AVG(raw_predicted_prob),0) FROM predicted_future_edges") or 0.0)
+        raw_max = float(scalar(conn_v14, "SELECT COALESCE(MAX(raw_predicted_prob),0) FROM predicted_future_edges") or 0.0)
+    if "prediction_confidence" in pred_cols:
+        conf_avg = float(scalar(conn_v14, "SELECT COALESCE(AVG(prediction_confidence),0) FROM predicted_future_edges") or 0.0)
+    if "calibration_label" in pred_cols:
+        calibration_labels = rows(conn_v14, """
+            SELECT COALESCE(calibration_label, 'unknown') AS label, COUNT(*) AS n
+            FROM predicted_future_edges
+            GROUP BY label
+            ORDER BY n DESC
+        """)
 
     limitation_quality = rows(conn_v14, """
         SELECT COALESCE(evidence_quality, 'unknown') AS quality,
@@ -113,6 +130,14 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     fusion_audit_rows = rows(conn_v14, "SELECT * FROM fusion_evidence_audit ORDER BY created_at DESC LIMIT 1")
     fusion_audit = fusion_audit_rows[0] if fusion_audit_rows else {}
     future_dirs = int(scalar(conn_v14, "SELECT COUNT(*) FROM future_directions") or 0)
+    direction_tiers = rows(conn_v14, """
+        SELECT COALESCE(evidence_tier, 'unknown') AS tier,
+               COUNT(*) AS n,
+               AVG(COALESCE(confidence,0)) AS avg_confidence
+        FROM future_directions
+        GROUP BY tier
+        ORDER BY n DESC
+    """)
 
     visual_nodes = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_nodes") or 0)
     visual_edges = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_edges") or 0)
@@ -149,7 +174,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "## Executive Verdict",
         "",
         f"- Product graph layer exists: {visual_nodes:,} visual nodes, {visual_edges:,} visual edges, {clusters:,} clusters, {lineages:,} branch lineages.",
-        f"- Step5b future-growth signal is numerically strong: test AUC={float(step5b.get('test_auc') or 0):.4f}, predicted_edges={predicted_total:,}, cross_field={predicted_cross:,}.",
+        f"- Step5b future-growth signal is numerically strong as a ranker: test AUC={float(step5b.get('test_auc') or 0):.4f}, predicted_edges={predicted_total:,}, cross_field={predicted_cross:,}; product confidence is calibrated separately from raw model score.",
         f"- Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,}.",
         f"- Step6 fusion output is limited: directions={future_dirs:,}, adequacy={fusion_audit.get('adequacy_label', 'unknown')}. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.",
         "",
@@ -164,7 +189,7 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"| Step3 keystone | avg_signal_reliability={float(step3_notes.get('avg_signal_reliability') or 0):.3f}, critical_default_papers={step3_notes.get('critical_default_papers', 'n/a')} | pass | score is discriminative only while graph feature columns remain populated |",
         f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | pilot/evidence subgraph, not complete optics graph |",
         f"| Step5a citation function | classified={sum(int(r.get('n') or 0) for r in citation_evidence):,} | weak evidence | no full citation context, therefore use only as fusion/visual weighting |",
-        f"| Step5b future growth | predicted={predicted_total:,}, cross_field={predicted_cross:,}, prob_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works, but probability calibration is overconfident/compressed |",
+        f"| Step5b future growth | predicted={predicted_total:,}, cross_field={predicted_cross:,}, calibrated_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |",
         f"| Step5c limitations | atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,} | weak-to-moderate | limitation quality must be visible in graph |",
         f"| Step6 fusion | directions={future_dirs:,}, candidates={fusion_audit.get('n_candidates', 'n/a')} | {fusion_audit.get('adequacy_label', 'unknown')} | few directions means evidence intersection is sparse, not a reason to lower thresholds |",
         "",
@@ -185,7 +210,26 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"- cross_field_predictions: {fusion_audit.get('n_cross_field_total', predicted_cross)}",
         f"- unresolved_limitations_used: {fusion_audit.get('n_unresolved', 'n/a')}",
         f"- evidence_path_distribution: `{fusion_audit.get('evidence_path_json', '{}')}`",
+        f"- candidate_tier_distribution: `{fusion_audit.get('candidate_tier_json', '{}')}`",
+        f"- calibration_distribution: `{fusion_audit.get('calibration_json', '{}')}`",
         f"- limitation_quality_distribution: `{fusion_audit.get('limitation_quality_json', '{}')}`",
+        "",
+        "## Step5b Calibration",
+        "",
+        f"- calibrated_predicted_prob_min_avg_max: {pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f}",
+        f"- raw_predicted_prob_min_avg_max: {raw_min:.3f}/{raw_avg:.3f}/{raw_max:.3f}" if raw_min is not None else "- raw_predicted_prob_min_avg_max: n/a",
+        f"- prediction_confidence_avg: {conf_avg:.3f}" if conf_avg is not None else "- prediction_confidence_avg: n/a",
+        f"- calibration_labels: `{json.dumps(calibration_labels, ensure_ascii=False)}`",
+        "",
+        "## Future Direction Evidence Tiers",
+        "",
+        "| tier | directions | avg_confidence |",
+        "|---|---:|---:|",
+    ]
+    for r in direction_tiers:
+        lines.append(f"| {r.get('tier')} | {int(r.get('n') or 0):,} | {float(r.get('avg_confidence') or 0):.3f} |")
+
+    lines += [
         "",
         "## What Was Improved",
         "",
@@ -194,17 +238,18 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         "- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node subgraph as pilot/evidence and evaluating whether the cap is adequate.",
         "- Step5a now writes method/evidence-level/weight, so title/abstract-only citation-function labels cannot masquerade as ground truth.",
         "- Step5c now writes limitation evidence source, quality, weight, section name, and extractor method.",
-        "- Step6 now writes `fusion_evidence_audit`, making sparse evidence an explicit product signal.",
-        "- Step10 propagates limitation evidence quality into visual node flags and limitation detail JSON.",
+        "- Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.",
+        "- Step6 now writes evidence tiers and claim scopes, making sparse/exploratory evidence an explicit product signal.",
+        "- Step10 propagates limitation and calibrated future-edge evidence into visual node/edge flags and detail JSON.",
         "",
         "## Remaining Risk",
         "",
         "1. Linked-reference coverage is still the largest graph-bone risk. The internal citation DAG is large enough to run, but linked_refs/raw_refs is still coverage-limited.",
         "2. OpenAlex Field/Topic coverage is partial. Cross-field color, bridge, and future direction claims should expose uncertainty until field coverage improves.",
-        "3. Step5b ranks plausible future edges, but predicted probabilities are highly compressed near 1.0. Before user-facing confidence claims, add temporal calibration curves, held-out-year backtests, and probability calibration.",
+        "3. Step5b now has internal calibration, but it is still based on sampled temporal holdouts. Before user-facing confidence claims, add rolling held-out-year backtests and LLM/human audit calibration.",
         "4. Step5c is weak when based on abstracts. Section-level `paper_sections` / Sci-Bot sections are needed before limitation-driven bottleneck claims become strong.",
-        "5. Step6 producing only a small number of directions is an honest result. The next improvement should strengthen branch lineage, candidate generation, and calibrated future growth, not lower thresholds blindly.",
-        "6. Branch lineage currently gives a product-ready scaffold, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.",
+        "5. Step6 evidence tiers improve transparency, but exploratory directions remain hypotheses. The next improvement should strengthen branch lineage and candidate generation with stronger external validation, not just lower thresholds.",
+        "6. Branch lineage now exposes support ratios and alternative parents, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.",
         "7. LLM/Doubao audit is planned but not executed. The visual graph should present unaudited future/main/branch edges with uncertainty until the stratified audit is run.",
         "",
         "## Recommendation",

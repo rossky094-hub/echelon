@@ -93,6 +93,12 @@ class PredictedFutureEdge(BaseModel):
     src_paper_id: str
     dst_paper_id: str
     predicted_prob: float = Field(ge=0.0, le=1.0)
+    raw_predicted_prob: Optional[float] = Field(None, ge=0.0, le=1.0)
+    calibrated_prob: Optional[float] = Field(None, ge=0.0, le=1.0)
+    calibration_method: Optional[str] = None
+    calibration_support: Optional[int] = None
+    prediction_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    calibration_label: Optional[str] = None
     src_year: Optional[int] = None
     dst_year: Optional[int] = None
     is_cross_field: bool = False
@@ -108,6 +114,11 @@ class FutureDirection(BaseModel):
     vgae_evidence: Optional[str] = None
     limitation_evidence: Optional[str] = None
     paper_ids_json: Optional[str] = None    # JSON array of paper_ids
+    evidence_paths: Optional[int] = None
+    evidence_tier: Optional[str] = None
+    claim_scope: Optional[str] = None
+    calibration_label: Optional[str] = None
+    evidence_json: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +292,12 @@ CREATE TABLE IF NOT EXISTS predicted_future_edges (
     src_paper_id    TEXT NOT NULL,
     dst_paper_id    TEXT NOT NULL,
     predicted_prob  REAL    NOT NULL,
+    raw_predicted_prob REAL,
+    calibrated_prob REAL,
+    calibration_method TEXT,
+    calibration_support INTEGER,
+    prediction_confidence REAL,
+    calibration_label TEXT,
     src_year        INTEGER,
     dst_year        INTEGER,
     is_cross_field  BOOLEAN DEFAULT 0,
@@ -301,7 +318,12 @@ CREATE TABLE IF NOT EXISTS future_directions (
     main_path_evidence   TEXT,
     vgae_evidence        TEXT,
     limitation_evidence  TEXT,
-    paper_ids_json       TEXT
+    paper_ids_json       TEXT,
+    evidence_paths       INTEGER,
+    evidence_tier        TEXT,
+    claim_scope          TEXT,
+    calibration_label    TEXT,
+    evidence_json        TEXT
 );
 
 -- Step 6 evidence sparsity/adequacy audit.
@@ -316,6 +338,8 @@ CREATE TABLE IF NOT EXISTS fusion_evidence_audit (
     n_directions              INTEGER NOT NULL,
     limitation_quality_json   TEXT,
     evidence_path_json        TEXT,
+    candidate_tier_json       TEXT,
+    calibration_json          TEXT,
     adequacy_label            TEXT NOT NULL,
     remaining_risk            TEXT,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -524,6 +548,12 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
                 src_paper_id    TEXT NOT NULL,
                 dst_paper_id    TEXT NOT NULL,
                 predicted_prob  REAL    NOT NULL,
+                raw_predicted_prob REAL,
+                calibrated_prob REAL,
+                calibration_method TEXT,
+                calibration_support INTEGER,
+                prediction_confidence REAL,
+                calibration_label TEXT,
                 src_year        INTEGER,
                 dst_year        INTEGER,
                 is_cross_field  BOOLEAN DEFAULT 0,
@@ -532,7 +562,9 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS idx_pred_edges_prob
                 ON predicted_future_edges (predicted_prob DESC);
             CREATE INDEX IF NOT EXISTS idx_pred_edges_cross_field
-                ON predicted_future_edges (is_cross_field)
+                ON predicted_future_edges (is_cross_field);
+            CREATE INDEX IF NOT EXISTS idx_pred_edges_confidence
+                ON predicted_future_edges (prediction_confidence DESC)
         """),
     ):
         if _column_sql_type(conn, table, col) == "INTEGER":
@@ -598,6 +630,38 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
         ("extractor_method", "TEXT", None),
     ):
         if _add_column_if_missing(conn, "limitation_atoms", col, ddl_type, default_sql=default_sql):
+            changed = True
+
+    for col, ddl_type in (
+        ("raw_predicted_prob", "REAL"),
+        ("calibrated_prob", "REAL"),
+        ("calibration_method", "TEXT"),
+        ("calibration_support", "INTEGER"),
+        ("prediction_confidence", "REAL"),
+        ("calibration_label", "TEXT"),
+    ):
+        if _add_column_if_missing(conn, "predicted_future_edges", col, ddl_type):
+            changed = True
+    _run_ddl_fragment(conn, """
+        CREATE INDEX IF NOT EXISTS idx_pred_edges_confidence
+            ON predicted_future_edges (prediction_confidence DESC)
+    """)
+
+    for col, ddl_type in (
+        ("evidence_paths", "INTEGER"),
+        ("evidence_tier", "TEXT"),
+        ("claim_scope", "TEXT"),
+        ("calibration_label", "TEXT"),
+        ("evidence_json", "TEXT"),
+    ):
+        if _add_column_if_missing(conn, "future_directions", col, ddl_type):
+            changed = True
+
+    for col, ddl_type in (
+        ("candidate_tier_json", "TEXT"),
+        ("calibration_json", "TEXT"),
+    ):
+        if _add_column_if_missing(conn, "fusion_evidence_audit", col, ddl_type):
             changed = True
 
     if changed:

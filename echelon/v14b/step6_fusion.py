@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sqlite3
 from collections import Counter
 from datetime import datetime
@@ -39,6 +40,9 @@ from echelon.v14b.llm_client import LLMClient
 from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, table_columns
 
 logger = logging.getLogger("echelon.v14b.step6_fusion")
+
+FUSION_VGAE_TOP_N = int(os.environ.get("V14B_FUSION_VGAE_TOP_N", "500"))
+FUSION_MIN_VGAE_CONFIDENCE = float(os.environ.get("V14B_FUSION_MIN_VGAE_CONFIDENCE", "0.55"))
 
 # Prompt: 命名 future direction
 DIRECTION_NAMING_PROMPT = """\
@@ -115,12 +119,32 @@ def load_main_path_terminals(
 
 def load_vgae_predictions(conn_v14: sqlite3.Connection) -> List[dict]:
     """加载 VGAE 预测的未来边"""
-    rows = conn_v14.execute("""
+    cols = table_columns(conn_v14, "predicted_future_edges")
+    optional_cols = []
+    for col in (
+        "raw_predicted_prob",
+        "calibrated_prob",
+        "calibration_method",
+        "calibration_support",
+        "prediction_confidence",
+        "calibration_label",
+    ):
+        if col in cols:
+            optional_cols.append(col)
+    optional_sql = ", " + ", ".join(optional_cols) if optional_cols else ""
+    order_expr = (
+        "COALESCE(prediction_confidence, predicted_prob) DESC, "
+        "COALESCE(raw_predicted_prob, predicted_prob) DESC"
+        if "prediction_confidence" in cols
+        else "predicted_prob DESC"
+    )
+    rows = conn_v14.execute(f"""
         SELECT src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field
+               {optional_sql}
         FROM predicted_future_edges
-        ORDER BY predicted_prob DESC
-        LIMIT 200
-    """).fetchall()
+        ORDER BY {order_expr}
+        LIMIT ?
+    """, (FUSION_VGAE_TOP_N,)).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -187,7 +211,9 @@ def compute_direction_clusters(
     """, dst_ids).fetchall()
     dst_meta = {row[0]: dict(row) for row in rows}
 
-    # 对每个 VGAE 预测边,计算三路证据分数
+    # 对每个 VGAE 预测边,计算证据分层。Step6 now keeps exploratory
+    # candidates when evidence is useful, but labels them explicitly instead of
+    # promoting them into strong claims.
     direction_candidates = []
     for pred in vgae_preds:
         dst_id = pred["dst_paper_id"]
@@ -198,7 +224,19 @@ def compute_direction_clusters(
 
         evidence_paths = 0
         main_path_evidence = ""
-        vgae_evidence = f"VGAE pred: prob={pred['predicted_prob']:.3f}"
+        raw_prob = float(pred.get("raw_predicted_prob") or pred.get("predicted_prob") or 0.0)
+        calibrated_prob = float(pred.get("calibrated_prob") or pred.get("predicted_prob") or 0.0)
+        prediction_confidence = float(
+            pred.get("prediction_confidence")
+            if pred.get("prediction_confidence") is not None
+            else calibrated_prob
+        )
+        calibration_label = pred.get("calibration_label") or "legacy_raw"
+        vgae_evidence = (
+            f"VGAE pred: calibrated={calibrated_prob:.3f}, "
+            f"raw={raw_prob:.3f}, confidence={prediction_confidence:.3f}, "
+            f"calibration={calibration_label}"
+        )
         limitation_evidence = ""
 
         # 路径 1: 主干道支持.  With corrected Step5b semantics, src is the
@@ -210,7 +248,11 @@ def compute_direction_clusters(
         # 路径 2: VGAE only counts when above the calibrated product threshold.
         # Low-confidence edges stay available to Step10 as visual uncertainty,
         # but should not manufacture a future direction by themselves.
-        if float(pred["predicted_prob"] or 0.0) >= VGAE_PREDICT_THRESHOLD:
+        vgae_supported = (
+            prediction_confidence >= FUSION_MIN_VGAE_CONFIDENCE
+            and calibrated_prob >= min(VGAE_PREDICT_THRESHOLD, FUSION_MIN_VGAE_CONFIDENCE)
+        )
+        if vgae_supported:
             evidence_paths += 1
 
         # 路径 3: Limitation 关联
@@ -241,11 +283,23 @@ def compute_direction_clusters(
             qualities = []
 
         if evidence_paths >= FUSION_MIN_EVIDENCE_PATHS:
+            evidence_tier = direction_evidence_tier(
+                evidence_paths=evidence_paths,
+                limitation_quality=qualities,
+                prediction_confidence=prediction_confidence,
+                has_main_path=bool(main_path_evidence),
+            )
             direction_candidates.append({
                 "anchor_paper_id": dst_id,
                 "anchor_title": dst_title,
                 "evidence_paths": evidence_paths,
+                "evidence_tier": evidence_tier,
+                "claim_scope": claim_scope_for_tier(evidence_tier),
                 "predicted_prob": pred["predicted_prob"],
+                "raw_predicted_prob": raw_prob,
+                "calibrated_prob": calibrated_prob,
+                "prediction_confidence": prediction_confidence,
+                "calibration_label": calibration_label,
                 "is_cross_field": pred["is_cross_field"],
                 "main_path_evidence": main_path_evidence,
                 "vgae_evidence": vgae_evidence,
@@ -260,7 +314,14 @@ def compute_direction_clusters(
     # not collapse all unknown-field candidates into one bucket.
     seen_fields: Dict[str, dict] = {}
     merged_candidates = []
-    for cand in sorted(direction_candidates, key=lambda x: -x["evidence_paths"]):
+    for cand in sorted(
+        direction_candidates,
+        key=lambda x: (
+            -int(x["evidence_paths"]),
+            -(x.get("prediction_confidence") or 0.0),
+            -(x.get("limitation_evidence_weight") or 0.0),
+        ),
+    ):
         field_key = cand["field_id"] or f"anchor:{cand['anchor_paper_id']}"
         if field_key not in seen_fields:
             seen_fields[field_key] = cand
@@ -276,8 +337,56 @@ def compute_direction_clusters(
             for src_id in cand["src_ids"]:
                 if src_id not in existing["src_ids"]:
                     existing["src_ids"].append(src_id)
+            existing["prediction_confidence"] = max(
+                existing.get("prediction_confidence") or 0.0,
+                cand.get("prediction_confidence") or 0.0,
+            )
+            existing["evidence_tier"] = max_evidence_tier(existing["evidence_tier"], cand["evidence_tier"])
+            existing["claim_scope"] = claim_scope_for_tier(existing["evidence_tier"])
 
     return merged_candidates[:FUSION_TOP_DIRECTIONS]
+
+
+def direction_evidence_tier(
+    *,
+    evidence_paths: int,
+    limitation_quality: list[str],
+    prediction_confidence: float,
+    has_main_path: bool,
+) -> str:
+    qualities = set(limitation_quality or [])
+    has_section = bool(qualities & {"section_level", "structured_sections"})
+    has_weak_limitation = "weak_abstract" in qualities or not qualities
+    if evidence_paths >= 3 and prediction_confidence >= 0.70 and has_section and has_main_path:
+        return "triangulated_strong"
+    if evidence_paths >= 3 and prediction_confidence >= 0.60:
+        return "triangulated_limited"
+    if evidence_paths >= 2 and has_weak_limitation:
+        return "exploratory_weak_limitation"
+    if evidence_paths >= 2:
+        return "exploratory"
+    return "insufficient"
+
+
+def max_evidence_tier(left: str, right: str) -> str:
+    rank = {
+        "insufficient": 0,
+        "exploratory_weak_limitation": 1,
+        "exploratory": 2,
+        "triangulated_limited": 3,
+        "triangulated_strong": 4,
+    }
+    return left if rank.get(left, 0) >= rank.get(right, 0) else right
+
+
+def claim_scope_for_tier(tier: str) -> str:
+    if tier == "triangulated_strong":
+        return "candidate_direction"
+    if tier == "triangulated_limited":
+        return "candidate_direction_with_uncertainty"
+    if tier.startswith("exploratory"):
+        return "exploratory_hypothesis"
+    return "not_for_user_claim"
 
 
 def name_directions(
@@ -322,7 +431,19 @@ def name_directions(
         expected_period = "2026-2030"
         limitation_weight = float(cand.get("limitation_evidence_weight") or 0.0)
         limitation_factor = 0.85 + 0.15 * limitation_weight if cand.get("limitation_evidence") else 1.0
-        confidence = min(1.0, (0.45 + 0.15 * cand["evidence_paths"]) * limitation_factor)
+        prediction_confidence = float(cand.get("prediction_confidence") or cand.get("predicted_prob") or 0.0)
+        confidence = (
+            0.20
+            + 0.10 * int(cand["evidence_paths"])
+            + 0.35 * prediction_confidence
+            + 0.20 * limitation_weight
+        ) * limitation_factor
+        if cand.get("evidence_tier") == "exploratory_weak_limitation":
+            confidence = min(confidence, 0.62)
+        elif cand.get("evidence_tier") == "triangulated_limited":
+            confidence = min(confidence, 0.74)
+        else:
+            confidence = min(confidence, 0.88)
 
         if llm_client is not None:
             prompt = DIRECTION_NAMING_PROMPT.format(
@@ -348,6 +469,24 @@ def name_directions(
             "vgae_evidence": cand["vgae_evidence"],
             "limitation_evidence": cand["limitation_evidence"],
             "paper_ids_json": json.dumps(stable_unique(cand["src_ids"] + [cand["anchor_paper_id"]])),
+            "evidence_paths": int(cand.get("evidence_paths") or 0),
+            "evidence_tier": cand.get("evidence_tier") or "insufficient",
+            "claim_scope": cand.get("claim_scope") or "not_for_user_claim",
+            "calibration_label": cand.get("calibration_label"),
+            "evidence_json": json.dumps(
+                {
+                    "anchor_paper_id": cand["anchor_paper_id"],
+                    "src_ids": stable_unique(cand["src_ids"]),
+                    "predicted_prob": cand.get("predicted_prob"),
+                    "raw_predicted_prob": cand.get("raw_predicted_prob"),
+                    "calibrated_prob": cand.get("calibrated_prob"),
+                    "prediction_confidence": cand.get("prediction_confidence"),
+                    "limitation_evidence_quality": cand.get("limitation_evidence_quality"),
+                    "limitation_evidence_weight": cand.get("limitation_evidence_weight"),
+                    "claim_scope": cand.get("claim_scope"),
+                },
+                ensure_ascii=False,
+            ),
         })
 
     return named
@@ -362,14 +501,22 @@ def write_future_directions(
     directions: List[dict],
 ) -> int:
     """写入 future_directions 表"""
+    for direction in directions:
+        direction.setdefault("evidence_paths", None)
+        direction.setdefault("evidence_tier", None)
+        direction.setdefault("claim_scope", None)
+        direction.setdefault("calibration_label", None)
+        direction.setdefault("evidence_json", None)
     conn_v14.execute("DELETE FROM future_directions")
     conn_v14.executemany("""
         INSERT INTO future_directions
             (direction_name, confidence, expected_period,
-             main_path_evidence, vgae_evidence, limitation_evidence, paper_ids_json)
+             main_path_evidence, vgae_evidence, limitation_evidence, paper_ids_json,
+             evidence_paths, evidence_tier, claim_scope, calibration_label, evidence_json)
         VALUES
             (:direction_name, :confidence, :expected_period,
-             :main_path_evidence, :vgae_evidence, :limitation_evidence, :paper_ids_json)
+             :main_path_evidence, :vgae_evidence, :limitation_evidence, :paper_ids_json,
+             :evidence_paths, :evidence_tier, :claim_scope, :calibration_label, :evidence_json)
     """, directions)
     conn_v14.commit()
     return len(directions)
@@ -393,6 +540,12 @@ def write_fusion_evidence_audit(
         for atom in unresolved
     )
     path_counts = Counter(int(c.get("evidence_paths") or 0) for c in candidates)
+    tier_counts = Counter(c.get("evidence_tier") or "unknown" for c in candidates)
+    calibration_counts = Counter(c.get("calibration_label") or "legacy_raw" for c in candidates)
+    confidence_values = [
+        float(c.get("prediction_confidence") or 0.0)
+        for c in candidates
+    ]
     if n_directions == 0:
         adequacy = "no_user_facing_claim"
     elif n_directions < 5:
@@ -418,6 +571,18 @@ def write_fusion_evidence_audit(
         "n_directions": int(n_directions),
         "limitation_quality_json": json.dumps(dict(quality_counts), ensure_ascii=False),
         "evidence_path_json": json.dumps(dict(path_counts), ensure_ascii=False),
+        "candidate_tier_json": json.dumps(dict(tier_counts), ensure_ascii=False),
+        "calibration_json": json.dumps(
+            {
+                "labels": dict(calibration_counts),
+                "prediction_confidence_avg": (
+                    sum(confidence_values) / max(1, len(confidence_values))
+                ),
+                "min_vgae_confidence": FUSION_MIN_VGAE_CONFIDENCE,
+                "vgae_top_n": FUSION_VGAE_TOP_N,
+            },
+            ensure_ascii=False,
+        ),
         "adequacy_label": adequacy,
         "remaining_risk": remaining_risk,
     }
@@ -426,11 +591,13 @@ def write_fusion_evidence_audit(
         INSERT OR REPLACE INTO fusion_evidence_audit
             (run_id, n_terminals, n_vgae_preds_top, n_vgae_preds_total,
              n_cross_field_total, n_unresolved, n_candidates, n_directions,
-             limitation_quality_json, evidence_path_json, adequacy_label, remaining_risk)
+             limitation_quality_json, evidence_path_json, candidate_tier_json,
+             calibration_json, adequacy_label, remaining_risk)
         VALUES
             (:run_id, :n_terminals, :n_vgae_preds_top, :n_vgae_preds_total,
              :n_cross_field_total, :n_unresolved, :n_candidates, :n_directions,
-             :limitation_quality_json, :evidence_path_json, :adequacy_label, :remaining_risk)
+             :limitation_quality_json, :evidence_path_json, :candidate_tier_json,
+             :calibration_json, :adequacy_label, :remaining_risk)
     """, audit)
     conn_v14.commit()
     return audit

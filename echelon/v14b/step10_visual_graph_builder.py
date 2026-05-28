@@ -826,8 +826,10 @@ def build_branch_lineages(
             drivers[(c_src, c_dst)][src] += 1
 
     by_child: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    incoming_totals: Counter[str] = Counter()
     for (parent, child), w in influence.items():
         by_child[child].append((parent, w))
+        incoming_totals[child] += w
 
     child_future: dict[str, list[dict]] = defaultdict(list)
     for pred in predicted_future:
@@ -842,11 +844,16 @@ def build_branch_lineages(
         parent_id = None
         strength = 0.0
         top_parent = None
+        alternatives = []
         if by_child.get(cid):
             top_parent = max(by_child[cid], key=lambda x: x[1])
             parent_id = f"B{top_parent[0][1:]}"
             total = sum(w for _, w in by_child[cid])
             strength = top_parent[1] / max(total, 1)
+            alternatives = [
+                {"parent_cluster": p, "support": w, "support_ratio": w / max(total, 1)}
+                for p, w in sorted(by_child[cid], key=lambda x: x[1], reverse=True)[:5]
+            ]
         cluster_papers = [p for p in papers if assignment.get(p["id"]) == cid]
         years = sorted(p["year"] for p in cluster_papers)
         split_year = years[max(0, min(len(years) - 1, int(len(years) * 0.10)))] if years else None
@@ -863,14 +870,28 @@ def build_branch_lineages(
                     {
                         "parent_cluster": top_parent[0] if top_parent else None,
                         "parent_citation_support": top_parent[1] if top_parent else 0,
+                        "incoming_cross_cluster_support": incoming_totals.get(cid, 0),
+                        "parent_support_ratio": strength,
+                        "alternative_parents": alternatives,
                         "driver_papers": driver_ids,
-                        "interpretation": "Parent branch chosen by strongest time-forward cross-cluster citation flow.",
+                        "causality_status": (
+                            "data_driven_candidate"
+                            if top_parent and top_parent[1] >= 3
+                            else "weak_or_root_branch"
+                        ),
+                        "interpretation": (
+                            "Parent branch chosen by strongest time-forward cross-cluster citation flow. "
+                            "This is branch-lineage evidence, not standalone causal proof."
+                        ),
                     }
                 ),
                 "future_json": jdumps(
                     {
                         "predicted_edges": child_future.get(cid, [])[:20],
-                        "interpretation": "Future growth candidates from VGAE and fusion evidence.",
+                        "interpretation": (
+                            "Future growth candidates from calibrated VGAE and fusion evidence. "
+                            "Use prediction_confidence/evidence_tier before making claims."
+                        ),
                     }
                 ),
             }
@@ -880,11 +901,31 @@ def build_branch_lineages(
 
 def load_future_predictions(conn_v14: sqlite3.Connection) -> list[dict]:
     try:
+        cols = table_columns(conn_v14, "predicted_future_edges")
+        optional_cols = []
+        for col in (
+            "raw_predicted_prob",
+            "calibrated_prob",
+            "calibration_method",
+            "calibration_support",
+            "prediction_confidence",
+            "calibration_label",
+        ):
+            if col in cols:
+                optional_cols.append(col)
+        optional_sql = ", " + ", ".join(optional_cols) if optional_cols else ""
+        order_expr = (
+            "COALESCE(prediction_confidence, predicted_prob) DESC, "
+            "COALESCE(raw_predicted_prob, predicted_prob) DESC"
+            if "prediction_confidence" in cols
+            else "predicted_prob DESC"
+        )
         rows = conn_v14.execute(
-            """
+            f"""
             SELECT src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field
+                   {optional_sql}
             FROM predicted_future_edges
-            ORDER BY predicted_prob DESC
+            ORDER BY {order_expr}
             """
         ).fetchall()
         return [dict(r) for r in rows]
@@ -1127,6 +1168,8 @@ def write_visual_edges(
     for pred in future_predictions:
         src = pred["src_paper_id"]
         dst = pred["dst_paper_id"]
+        calibrated = float(pred.get("calibrated_prob") or pred.get("predicted_prob") or 0.0)
+        confidence = float(pred.get("prediction_confidence") or calibrated)
         add_row(
             (
                 edge_id("future", src, dst),
@@ -1134,13 +1177,20 @@ def write_visual_edges(
                 dst,
                 "future_growth",
                 "future",
-                float(pred.get("predicted_prob") or 0.0),
-                float(pred.get("predicted_prob") or 0.0),
+                calibrated,
+                confidence,
                 1,
                 0,
                 0,
                 jdumps({"stroke": "future", "dash": True, "glow": True}),
-                jdumps({**pred, "why": "VGAE/temporal prediction candidate"}),
+                jdumps({
+                    **pred,
+                    "why": "Calibrated VGAE/temporal prediction candidate",
+                    "confidence_semantics": (
+                        "visual confidence is calibrated empirical product confidence, "
+                        "not a guaranteed future citation probability"
+                    ),
+                }),
             )
         )
     rows = list(rows_by_id.values())

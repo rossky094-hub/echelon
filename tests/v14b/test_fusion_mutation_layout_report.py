@@ -195,14 +195,36 @@ class TestFusion:
             terminals=[{"paper_id": "4"}],
             vgae_preds=[{"src_paper_id": "4", "dst_paper_id": "5"}],
             unresolved=[{"evidence_quality": "weak_abstract"}],
-            candidates=[{"evidence_paths": 2}],
+            candidates=[{
+                "evidence_paths": 2,
+                "evidence_tier": "exploratory_weak_limitation",
+                "calibration_label": "calibrated_temporal_holdout",
+                "prediction_confidence": 0.58,
+            }],
             n_directions=1,
         )
-        row = conn_v14.execute("SELECT adequacy_label FROM fusion_evidence_audit").fetchone()
+        row = conn_v14.execute(
+            "SELECT adequacy_label, candidate_tier_json, calibration_json FROM fusion_evidence_audit"
+        ).fetchone()
         conn_v14.close()
 
         assert audit["adequacy_label"] == "sparse_evidence"
         assert row[0] == "sparse_evidence"
+        assert "exploratory_weak_limitation" in row[1]
+        assert "calibrated_temporal_holdout" in row[2]
+
+    def test_direction_tier_marks_weak_abstract_as_exploratory(self):
+        from echelon.v14b.step6_fusion import claim_scope_for_tier, direction_evidence_tier
+
+        tier = direction_evidence_tier(
+            evidence_paths=2,
+            limitation_quality=["weak_abstract"],
+            prediction_confidence=0.58,
+            has_main_path=False,
+        )
+
+        assert tier == "exploratory_weak_limitation"
+        assert claim_scope_for_tier(tier) == "exploratory_hypothesis"
 
 
 # ---------------------------------------------------------------------------

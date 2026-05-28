@@ -56,6 +56,14 @@ class EvolutionEdge:
     dst_year: int
 
 
+@dataclass(frozen=True)
+class CalibrationBin:
+    low: float
+    high: float
+    prob: float
+    support: int
+
+
 def _field_index(field_id) -> Optional[int]:
     if field_id is None:
         return None
@@ -362,6 +370,137 @@ def sample_temporal_negative_edges(
     return torch.tensor(arr, dtype=torch.long, device=device)
 
 
+def edge_scores_from_latent(z, edge_index) -> np.ndarray:
+    """Return raw sigmoid dot-product scores for a set of directed edges."""
+    import torch
+
+    if edge_index is None or edge_index.numel() == 0:
+        return np.array([], dtype=np.float32)
+    with torch.no_grad():
+        src = z[edge_index[0]]
+        dst = z[edge_index[1]]
+        scores = torch.sigmoid((src * dst).sum(dim=1))
+    return scores.detach().cpu().numpy().astype(np.float32)
+
+
+def fit_probability_calibrator(
+    positive_scores: np.ndarray,
+    negative_scores: np.ndarray,
+    *,
+    bins: int = 12,
+) -> dict:
+    """
+    Fit a light-weight monotonic histogram calibrator.
+
+    VGAE dot-product scores are useful for ranking but can be badly
+    overconfident.  The calibrator uses chronological validation positives and
+    temporal negative samples to turn raw scores into empirical product
+    confidence.  This is deliberately conservative: it should reduce user-facing
+    certainty before we have external/LLM edge audit.
+    """
+    positive_scores = np.asarray(positive_scores, dtype=np.float32)
+    negative_scores = np.asarray(negative_scores, dtype=np.float32)
+    if positive_scores.size == 0 or negative_scores.size == 0:
+        return {
+            "method": "uncalibrated_no_holdout",
+            "bins": [],
+            "support": 0,
+            "base_rate": 0.5,
+            "label": "uncalibrated",
+        }
+
+    scores = np.concatenate([positive_scores, negative_scores])
+    labels = np.concatenate([
+        np.ones_like(positive_scores, dtype=np.float32),
+        np.zeros_like(negative_scores, dtype=np.float32),
+    ])
+    order = np.argsort(scores)
+    scores = scores[order]
+    labels = labels[order]
+
+    n = len(scores)
+    n_bins = max(2, min(int(bins), n))
+    prior = float(labels.mean())
+    raw_bins: list[CalibrationBin] = []
+    for idxs in np.array_split(np.arange(n), n_bins):
+        if len(idxs) == 0:
+            continue
+        pos = float(labels[idxs].sum())
+        support = int(len(idxs))
+        # Beta prior smoothing keeps tiny or all-positive bins from becoming
+        # false 1.0 confidence.
+        prob = (pos + prior * 4.0) / (support + 4.0)
+        raw_bins.append(
+            CalibrationBin(
+                low=float(scores[idxs[0]]),
+                high=float(scores[idxs[-1]]),
+                prob=float(prob),
+                support=support,
+            )
+        )
+
+    # Enforce monotonicity with a simple cumulative max. This is less precise
+    # than full isotonic regression but has no extra dependency and is stable
+    # for repeated production runs.
+    calibrated_bins = []
+    running = 0.0
+    for b in raw_bins:
+        running = max(running, b.prob)
+        calibrated_bins.append(
+            {
+                "low": b.low,
+                "high": b.high,
+                "prob": min(0.995, float(running)),
+                "support": b.support,
+            }
+        )
+
+    return {
+        "method": "temporal_quantile_histogram_laplace",
+        "bins": calibrated_bins,
+        "support": int(n),
+        "base_rate": prior,
+        "label": "calibrated_temporal_holdout",
+    }
+
+
+def apply_probability_calibration(raw_score: float, calibrator: dict) -> tuple[float, int, str]:
+    """Map a raw VGAE score to calibrated product confidence."""
+    bins = calibrator.get("bins") or []
+    if not bins:
+        score = max(0.0, min(1.0, float(raw_score)))
+        # No holdout means the score remains ranking evidence only.
+        return min(0.65, score), 0, calibrator.get("label", "uncalibrated")
+
+    score = float(raw_score)
+    chosen = bins[-1]
+    for b in bins:
+        if score <= float(b["high"]):
+            chosen = b
+            break
+    calibrated = max(0.0, min(1.0, float(chosen["prob"])))
+    return calibrated, int(chosen.get("support") or 0), calibrator.get("label", "calibrated")
+
+
+def calibration_summary(
+    calibrator: dict,
+    positive_scores: np.ndarray,
+    negative_scores: np.ndarray,
+) -> dict:
+    """Summarise calibration quality for checkpoints and Step12."""
+    pos = [apply_probability_calibration(float(s), calibrator)[0] for s in positive_scores]
+    neg = [apply_probability_calibration(float(s), calibrator)[0] for s in negative_scores]
+    return {
+        "method": calibrator.get("method"),
+        "label": calibrator.get("label"),
+        "support": int(calibrator.get("support") or 0),
+        "base_rate": float(calibrator.get("base_rate") or 0.0),
+        "positive_calibrated_avg": float(np.mean(pos)) if pos else 0.0,
+        "negative_calibrated_avg": float(np.mean(neg)) if neg else 0.0,
+        "n_bins": len(calibrator.get("bins") or []),
+    }
+
+
 # ---------------------------------------------------------------------------
 # 训练
 # ---------------------------------------------------------------------------
@@ -493,6 +632,18 @@ def train_vgae(
 
     logger.info("测试集 AUC=%.4f AP=%.4f", test_auc, test_ap)
 
+    val_pos_scores = edge_scores_from_latent(z, val_pos_edge_index)
+    val_neg_scores = edge_scores_from_latent(z, val_neg_edge_index)
+    test_pos_scores = edge_scores_from_latent(z, test_pos_edge_index)
+    test_neg_scores = edge_scores_from_latent(z, test_neg_edge_index)
+    calibrator = fit_probability_calibrator(val_pos_scores, val_neg_scores)
+    cal_summary = calibration_summary(
+        calibrator,
+        test_pos_scores if test_pos_scores.size else val_pos_scores,
+        test_neg_scores if test_neg_scores.size else val_neg_scores,
+    )
+    logger.info("VGAE calibration: %s", cal_summary)
+
     # Link Prediction
     predicted_edges = predict_future_links(
         model=model,
@@ -501,6 +652,8 @@ def train_vgae(
         conn_main=conn_main,
         existing_edges=all_positive_pairs,
         device=device,
+        calibrator=calibrator,
+        auc=float(test_auc),
     )
 
     return {
@@ -513,6 +666,7 @@ def train_vgae(
         "train_edges": len(train_records),
         "val_edges": len(val_records),
         "test_edges": len(test_records),
+        "calibration": cal_summary,
     }
 
 
@@ -525,6 +679,8 @@ def predict_future_links(
     device,
     top_k: int = VGAE_PREDICT_TOP_K,
     threshold: float = VGAE_PREDICT_THRESHOLD,
+    calibrator: Optional[dict] = None,
+    auc: float = 0.0,
 ) -> list[dict]:
     """
     预测未来引用边。
@@ -557,8 +713,8 @@ def predict_future_links(
                     for dj, sj in enumerate(range(j, min(j + batch_size, n))):
                         if si == sj:
                             continue
-                        prob = float(scores_np[di, dj])
-                        if prob < threshold:
+                        raw_prob = float(scores_np[di, dj])
+                        if raw_prob < threshold:
                             continue
 
                         src_id = node_ids[si]
@@ -582,18 +738,36 @@ def predict_future_links(
                         dst_field = meta.get(dst_id, {}).get("field")
                         is_cross = (src_field != dst_field and
                                     src_field is not None and dst_field is not None)
+                        calibrated_prob, support, label = apply_probability_calibration(
+                            raw_prob,
+                            calibrator or {},
+                        )
+                        # Product confidence combines empirical calibration with
+                        # temporal holdout ranking quality.  This keeps high raw
+                        # VGAE scores useful without turning them into
+                        # unsupported scientific certainty.
+                        prediction_confidence = calibrated_prob * max(0.0, min(1.0, float(auc or 0.0)))
 
                         predictions.append({
                             "src_paper_id": src_id,
                             "dst_paper_id": dst_id,
-                            "predicted_prob": prob,
+                            "predicted_prob": calibrated_prob,
+                            "raw_predicted_prob": raw_prob,
+                            "calibrated_prob": calibrated_prob,
+                            "calibration_method": (calibrator or {}).get("method", "uncalibrated"),
+                            "calibration_support": support,
+                            "prediction_confidence": prediction_confidence,
+                            "calibration_label": label,
                             "src_year": src_year,
                             "dst_year": dst_year,
                             "is_cross_field": int(is_cross),
                         })
 
     # 排序取 top K
-    predictions.sort(key=lambda x: x["predicted_prob"], reverse=True)
+    predictions.sort(
+        key=lambda x: (x.get("prediction_confidence") or 0.0, x.get("raw_predicted_prob") or 0.0),
+        reverse=True,
+    )
     return predictions[:top_k]
 
 
@@ -636,9 +810,15 @@ def run_vgae(
         conn_v14.execute("DELETE FROM predicted_future_edges")
         conn_v14.executemany("""
             INSERT OR REPLACE INTO predicted_future_edges
-                (src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field)
+                (src_paper_id, dst_paper_id, predicted_prob,
+                 raw_predicted_prob, calibrated_prob, calibration_method,
+                 calibration_support, prediction_confidence, calibration_label,
+                 src_year, dst_year, is_cross_field)
             VALUES
-                (:src_paper_id, :dst_paper_id, :predicted_prob, :src_year, :dst_year, :is_cross_field)
+                (:src_paper_id, :dst_paper_id, :predicted_prob,
+                 :raw_predicted_prob, :calibrated_prob, :calibration_method,
+                 :calibration_support, :prediction_confidence, :calibration_label,
+                 :src_year, :dst_year, :is_cross_field)
         """, predicted)
         conn_v14.commit()
 
@@ -650,6 +830,10 @@ def run_vgae(
         "test_auc": train_result.get("test_auc", 0.0),
         "predicted_edges": n_predicted,
         "cross_field_edges": cross_field_n,
+        "calibration": train_result.get("calibration", {}),
+        "prediction_confidence_avg": (
+            sum(float(e.get("prediction_confidence") or 0.0) for e in predicted) / max(1, n_predicted)
+        ),
         "records_n": n_predicted,
     }
 

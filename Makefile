@@ -222,7 +222,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 交付目标产物链路: 不等待 OpenAlex backfill, 从现有 library 推进图谱产品
-product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae limitation fusion mutation layout report visual-graph
+product-chain: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae limitation fusion mutation layout report visual-graph goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Visual Graph 产品链路完成!"
@@ -256,7 +256,7 @@ pilot-full: enrich pilot-visual
 	@echo "======================================"
 
 ## 干净重跑图谱并构建 2.5D 可视化产品层
-pilot-visual: pilot-graph visual-graph
+pilot-visual: pilot-graph visual-graph goal-audit
 
 # 快速调试流程 (前 100 篇)
 pilot-debug:

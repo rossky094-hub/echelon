@@ -83,6 +83,26 @@ def test_step5b_temporal_split_uses_later_edges_for_holdout():
     assert max(e.dst_year for e in val) <= min(e.dst_year for e in test)
 
 
+def test_step5b_calibration_separates_raw_score_from_product_confidence():
+    import numpy as np
+    from echelon.v14b.step5b_vgae import (
+        apply_probability_calibration,
+        fit_probability_calibrator,
+    )
+
+    calibrator = fit_probability_calibrator(
+        positive_scores=np.array([0.65, 0.72, 0.82, 0.91]),
+        negative_scores=np.array([0.40, 0.55, 0.70, 0.88]),
+        bins=4,
+    )
+    calibrated, support, label = apply_probability_calibration(0.99, calibrator)
+
+    assert label == "calibrated_temporal_holdout"
+    assert support > 0
+    assert 0.0 <= calibrated <= 0.995
+    assert calibrated < 0.99
+
+
 def test_step6_empty_fusion_writes_no_placeholder(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step6_fusion import run_fusion
