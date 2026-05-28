@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,35 @@ from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args
 
 logger = logging.getLogger("echelon.v14b.step9_report")
+
+
+ARXIV_ID_RE = re.compile(r"^\d{4}\.\d{4,5}(?:v\d+)?$", re.IGNORECASE)
+
+
+def _normalise_arxiv_id(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    raw = str(value).strip()
+    raw = raw.removeprefix("arXiv:").removeprefix("arxiv:")
+    raw = raw.removeprefix("https://arxiv.org/abs/")
+    raw = raw.removeprefix("http://arxiv.org/abs/")
+    raw = raw.removeprefix("https://arxiv.org/pdf/")
+    raw = raw.removeprefix("http://arxiv.org/pdf/")
+    raw = raw.removesuffix(".pdf")
+    return raw if ARXIV_ID_RE.match(raw) else None
+
+
+def _paper_reference_markdown(paper: dict) -> str:
+    title = paper.get("title") or paper.get("id") or "TBD"
+    year = paper.get("publication_year") or "TBD"
+    label = f"{title} ({year})"
+    arxiv_id = _normalise_arxiv_id(paper.get("arxiv_id"))
+    doi = (paper.get("doi") or "").strip()
+    if arxiv_id:
+        return f"[{label}](https://arxiv.org/abs/{arxiv_id})"
+    if doi:
+        return f"[{label}](https://doi.org/{doi})"
+    return f"{label} — local_id: `{paper.get('id', 'TBD')}`"
 
 
 # ---------------------------------------------------------------------------
@@ -498,12 +528,12 @@ def generate_future_directions_report(
             lines.append("")
             placeholders = ",".join("?" * len(paper_ids))
             related = safe_query(conn_main, f"""
-                SELECT id, title, publication_year
+                SELECT id, title, publication_year, arxiv_id, doi
                 FROM papers WHERE id IN ({placeholders})
                 LIMIT 5
             """, paper_ids)
             for p in related:
-                lines.append(f"- [{p.get('title', 'TBD')} ({p.get('publication_year', 'TBD')})](https://arxiv.org/abs/{p['id']})")
+                lines.append(f"- {_paper_reference_markdown(dict(p))}")
 
         lines += [f"", f"---", f""]
 

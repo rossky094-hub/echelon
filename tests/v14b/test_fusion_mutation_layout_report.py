@@ -424,6 +424,28 @@ class TestReportGenerator:
 
         assert "TBD" in report or "尚无数据" in report
 
+    def test_future_report_links_use_external_ids(self):
+        from echelon.v14b.step9_report import _paper_reference_markdown
+
+        linked = _paper_reference_markdown({
+            "id": "01INTERNAL",
+            "title": "Real arXiv paper",
+            "publication_year": 2024,
+            "arxiv_id": "2401.12345",
+            "doi": None,
+        })
+        assert "https://arxiv.org/abs/2401.12345" in linked
+        assert "https://arxiv.org/abs/01INTERNAL" not in linked
+
+        fallback = _paper_reference_markdown({
+            "id": "01INTERNAL",
+            "title": "Local only paper",
+            "publication_year": 2024,
+            "arxiv_id": None,
+            "doi": None,
+        })
+        assert "local_id: `01INTERNAL`" in fallback
+
     def test_go_nogo_recommendation(self):
         from echelon.v14b.step9_report import _go_nogo_recommendation
         assert "GO" in _go_nogo_recommendation(15, 100, 50)
