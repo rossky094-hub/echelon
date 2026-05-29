@@ -5,6 +5,7 @@ from echelon.api.graph_visual_backend import (
     _build_topic_branch_splits,
     _build_topic_dossier,
     _lineage_status,
+    _split_topic_turning_papers,
     _topic_branch_facets,
 )
 
@@ -154,3 +155,27 @@ def test_topic_branch_splits_label_facet_matches_as_weak_not_layout():
     assert names["High-efficiency visible holography"]["lineage_status"] == "weak_split_candidate"
     assert names["High-efficiency visible holography"]["evidence_grade"] == "section_backed_topic_branch_candidate"
     assert names["High-efficiency visible holography"]["uncertainty_reasons"]
+
+
+def test_topic_turning_papers_demote_broader_field_context():
+    papers = [
+        {
+            "paper_id": "metalens-1",
+            "title": "Large-area achromatic metalens for imaging",
+            "abstract": "Metalens imaging with broad field of view.",
+            "score": 2.0,
+        },
+        {
+            "paper_id": "broad-1",
+            "title": "Microwave photonics with superconducting quantum circuits",
+            "abstract": "A broad photonics main-path paper about quantum circuits.",
+            "score": 10.0,
+        },
+    ]
+
+    topic_specific, broader = _split_topic_turning_papers("metalens", papers)
+
+    assert [p["paper_id"] for p in topic_specific] == ["metalens-1"]
+    assert [p["paper_id"] for p in broader] == ["broad-1"]
+    assert topic_specific[0]["reason"]["topic_relevance_scope"] == "topic_specific"
+    assert broader[0]["reason"]["topic_relevance_scope"] == "broader_field_context"

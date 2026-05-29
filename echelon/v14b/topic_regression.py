@@ -8,6 +8,7 @@ future candidates, access links, and Claim Card readiness.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -117,6 +118,149 @@ GOLD_TOPICS: dict[str, GoldTopic] = {
     )
 }
 
+BOTTLENECK_SYNONYMS: dict[str, tuple[str, ...]] = {
+    "brightness": (
+        "brightness",
+        "source brightness",
+        "emission rate",
+        "photon flux",
+        "pair rate",
+    ),
+    "chromatic aberration": (
+        "chromatic aberration",
+        "chromatic",
+        "dispersion",
+        "achromatic",
+        "broadband",
+    ),
+    "collection efficiency": (
+        "collection efficiency",
+        "extraction efficiency",
+        "collection",
+        "outcoupling",
+        "out-coupling",
+    ),
+    "cost": (
+        "cost",
+        "low-cost",
+        "cost-effective",
+        "commercial",
+        "mass production",
+    ),
+    "coupling loss": (
+        "coupling loss",
+        "coupling losses",
+        "interface loss",
+        "extraction loss",
+        "fiber-chip",
+    ),
+    "crosstalk": (
+        "crosstalk",
+        "cross-talk",
+        "channel leakage",
+        "polarization leakage",
+        "multiplex leakage",
+    ),
+    "efficiency": (
+        "efficiency",
+        "low efficiency",
+        "diffraction efficiency",
+        "throughput",
+        "loss",
+    ),
+    "fabrication disorder": (
+        "fabrication disorder",
+        "disorder",
+        "sidewall roughness",
+        "process variation",
+        "fabrication error",
+    ),
+    "fabrication tolerance": (
+        "fabrication tolerance",
+        "fabrication-tolerant",
+        "process tolerance",
+        "process repeatability",
+        "manufacturing consistency",
+        "fabrication consistency",
+        "process variation",
+    ),
+    "field of view": (
+        "field of view",
+        "field-of-view",
+        "fov",
+        "wide-angle",
+        "wide angle",
+        "off-axis",
+        "off axis",
+        "angular aberration",
+        "angular bandwidth",
+    ),
+    "indistinguishability": (
+        "indistinguishability",
+        "indistinguishable",
+        "hong-ou-mandel",
+        "hom visibility",
+        "two-photon interference",
+    ),
+    "integration": (
+        "integration",
+        "integrated",
+        "on-chip",
+        "packaging",
+        "heterogeneous integration",
+    ),
+    "manufacturing consistency": (
+        "manufacturing consistency",
+        "large-area uniformity",
+        "uniformity",
+        "yield",
+        "repeatability",
+        "wafer-scale",
+        "scalable fabrication",
+    ),
+    "mode volume": (
+        "mode volume",
+        "modal volume",
+        "small mode",
+        "v mode",
+    ),
+    "quality factor": (
+        "quality factor",
+        "q-factor",
+        "q factor",
+        "high-q",
+        "high q",
+    ),
+    "scalability": (
+        "scalability",
+        "scalable",
+        "scale-up",
+        "large-scale",
+        "wafer-scale",
+    ),
+    "speckle": (
+        "speckle",
+        "speckle noise",
+        "holographic noise",
+        "coherence noise",
+    ),
+    "system integration": (
+        "system integration",
+        "integration",
+        "integrated",
+        "packaging",
+        "alignment",
+        "on-chip",
+    ),
+    "thermal stability": (
+        "thermal stability",
+        "thermal drift",
+        "temperature stability",
+        "thermal tuning",
+        "heating",
+    ),
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -126,6 +270,16 @@ def _lower_text(value: Any) -> str:
     if isinstance(value, str):
         return value.lower()
     return json.dumps(value, ensure_ascii=False).lower()
+
+
+def _terms_for(label: str) -> tuple[str, ...]:
+    key = label.lower().strip()
+    return BOTTLENECK_SYNONYMS.get(key, (key,))
+
+
+def _matched_terms(label: str, text: str) -> list[str]:
+    lower = text.lower()
+    return [term for term in _terms_for(label) if term in lower]
 
 
 def _branch_by_name(lens: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -146,6 +300,23 @@ def _bottleneck_text(lens: dict[str, Any]) -> str:
         lens.get("bottleneck_lineage") or [],
     ]
     return " ".join(_lower_text(piece) for piece in pieces)
+
+
+def _branch_hypothesis_text(lens: dict[str, Any]) -> str:
+    dossier = lens.get("topic_dossier") or {}
+    pieces = []
+    for branch in dossier.get("branch_splits") or []:
+        if not isinstance(branch, dict):
+            continue
+        pieces.append(
+            {
+                "name": branch.get("name"),
+                "historical_bottleneck": branch.get("historical_bottleneck"),
+                "why_appeared": branch.get("why_appeared"),
+                "enabling_condition": branch.get("enabling_condition"),
+            }
+        )
+    return _lower_text(pieces)
 
 
 def _turning_papers(lens: dict[str, Any]) -> list[dict[str, Any]]:
@@ -185,10 +356,115 @@ def _status(passed: bool, warn: bool = False) -> str:
     return "warn" if warn else "fail"
 
 
+def _branch_driver_ids_for_bottleneck(lens: dict[str, Any], label: str, *, limit: int = 12) -> list[str]:
+    dossier = lens.get("topic_dossier") or {}
+    out: list[str] = []
+    seen: set[str] = set()
+    for branch in dossier.get("branch_splits") or []:
+        if not isinstance(branch, dict):
+            continue
+        branch_text = _lower_text(
+            {
+                "historical_bottleneck": branch.get("historical_bottleneck"),
+                "why_appeared": branch.get("why_appeared"),
+                "enabling_condition": branch.get("enabling_condition"),
+            }
+        )
+        if not _matched_terms(label, branch_text):
+            continue
+        for paper in branch.get("driver_papers") or []:
+            pid = str((paper or {}).get("paper_id") or "").strip()
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            out.append(pid)
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def _turning_primary_section_gaps(turning: list[dict[str, Any]], *, limit: int = 20) -> list[dict[str, Any]]:
+    rows = []
+    for paper in turning:
+        if _paper_has_primary_section(paper):
+            continue
+        rows.append(
+            {
+                "paper_id": paper.get("paper_id"),
+                "title": paper.get("title"),
+                "year": paper.get("year"),
+                "reason": "key turning paper lacks local primary section evidence",
+                "access_links": paper.get("access_links") or [],
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def build_evidence_gap_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert a regression result into an actionable evidence-frontfill queue.
+
+    These rows are deliberately not proof that a bottleneck exists. They are the
+    next audit targets needed before the Topic Dossier can make stronger claims.
+    """
+    topic = str(result.get("topic") or "")
+    rows: list[dict[str, Any]] = []
+    for row in result.get("bottleneck_results") or []:
+        if row.get("present_in_evidence"):
+            continue
+        candidate_ids = row.get("candidate_paper_ids") or []
+        priority = 100 if row.get("present_in_branch_hypothesis") else 80
+        rows.append(
+            {
+                "topic": topic,
+                "gap_type": "missing_bottleneck_section_evidence",
+                "bottleneck": row.get("name"),
+                "priority": priority,
+                "candidate_paper_ids": ";".join(str(x) for x in candidate_ids),
+                "frontfill_query": f"{topic} {row.get('name')}",
+                "required_sections": "limitation;discussion;conclusion;future work;results;error_analysis;ablation;method;experiments",
+                "why": (
+                    "Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence"
+                    if row.get("present_in_branch_hypothesis")
+                    else "Expected bottleneck is missing from evidence and needs targeted paper/section retrieval"
+                ),
+            }
+        )
+    for paper in result.get("turning_primary_section_gaps") or []:
+        rows.append(
+            {
+                "topic": topic,
+                "gap_type": "key_turning_paper_missing_primary_section",
+                "bottleneck": "",
+                "priority": 90,
+                "candidate_paper_ids": str(paper.get("paper_id") or ""),
+                "frontfill_query": f"{topic} {paper.get('title') or paper.get('paper_id')}",
+                "required_sections": "limitation;discussion;conclusion;future work;results;method;experiments",
+                "why": paper.get("reason") or "key turning paper needs local section evidence",
+            }
+        )
+    if (result.get("future_candidates") or {}).get("total") and not (result.get("future_candidates") or {}).get("complete_claim_cards"):
+        rows.append(
+            {
+                "topic": topic,
+                "gap_type": "future_candidates_missing_claim_card",
+                "bottleneck": "",
+                "priority": 85,
+                "candidate_paper_ids": "",
+                "frontfill_query": topic,
+                "required_sections": "limitation;discussion;conclusion;future work;results;error_analysis;ablation",
+                "why": "Future candidates exist but Step6/Step13 has not produced a complete Claim Card for this topic",
+            }
+        )
+    return rows
+
+
 def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) -> dict[str, Any]:
     baseline = evaluate_topic_lens(gold.topic, lens)
     branches = _branch_by_name(lens)
     bottleneck_text = _bottleneck_text(lens)
+    branch_hypothesis_text = _branch_hypothesis_text(lens)
     turning = _turning_papers(lens)
     future_edges = _future_edges(lens)
     claim_cards = _claim_cards(lens)
@@ -214,11 +490,17 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
 
     bottleneck_results = []
     for label in gold.expected_bottlenecks:
-        matched = label.lower() in bottleneck_text
+        evidence_terms = _matched_terms(label, bottleneck_text)
+        hypothesis_terms = _matched_terms(label, branch_hypothesis_text)
+        matched = bool(evidence_terms)
         bottleneck_results.append(
             {
                 "name": label,
                 "present_in_evidence": matched,
+                "present_in_branch_hypothesis": bool(hypothesis_terms),
+                "matched_evidence_terms": evidence_terms,
+                "matched_branch_terms": hypothesis_terms,
+                "candidate_paper_ids": _branch_driver_ids_for_bottleneck(lens, label),
                 "status": _status(matched),
             }
         )
@@ -232,6 +514,7 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
         or c.get("five_question_complete")
         or ((c.get("claim_card") or {}).get("five_question_complete"))
     )
+    turning_primary_gaps = _turning_primary_section_gaps(turning)
 
     gates = [
         {
@@ -281,7 +564,7 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
     warn = [gate for gate in gates if gate["status"] == "warn"]
     overall = "fail" if fail else "warn" if warn else "pass"
 
-    return {
+    result = {
         "audit_ts": utc_now(),
         "topic": gold.topic,
         "overall_status": overall,
@@ -299,8 +582,11 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
             "claim_cards": len(claim_cards),
             "complete_claim_cards": complete_claim_cards,
         },
+        "turning_primary_section_gaps": turning_primary_gaps,
         "baseline_quality": baseline,
     }
+    result["evidence_gap_rows"] = build_evidence_gap_rows(result)
+    return result
 
 
 def render_regression_md(result: dict[str, Any]) -> str:
@@ -327,9 +613,12 @@ def render_regression_md(result: dict[str, Any]) -> str:
         lines.append(
             f"| {row['name']} | {row['driver_papers']} | {row['has_bottleneck']} | {row['has_enabler']} | {row['status']} |"
         )
-    lines.extend(["", "## Expected Bottlenecks", "", "| Bottleneck | Present In Evidence | Status |", "| --- | --- | --- |"])
+    lines.extend(["", "## Expected Bottlenecks", "", "| Bottleneck | Evidence | Branch Hypothesis | Candidate Papers | Status |", "| --- | --- | --- | ---: | --- |"])
     for row in result["bottleneck_results"]:
-        lines.append(f"| {row['name']} | {row['present_in_evidence']} | {row['status']} |")
+        lines.append(
+            f"| {row['name']} | {row['present_in_evidence']} | {row.get('present_in_branch_hypothesis')} | "
+            f"{len(row.get('candidate_paper_ids') or [])} | {row['status']} |"
+        )
     k = result["key_turning_papers"]
     f = result["future_candidates"]
     lines.extend(
@@ -347,6 +636,23 @@ def render_regression_md(result: dict[str, Any]) -> str:
         lines.extend(["", "## Quality Gaps", ""])
         for gap in gaps:
             lines.append(f"- {gap}")
+    evidence_rows = result.get("evidence_gap_rows") or []
+    if evidence_rows:
+        lines.extend(
+            [
+                "",
+                "## Evidence Gap Queue",
+                "",
+                "| Gap | Bottleneck | Priority | Candidate Papers | Why |",
+                "| --- | --- | ---: | ---: | --- |",
+            ]
+        )
+        for row in evidence_rows[:30]:
+            candidate_count = len([x for x in str(row.get("candidate_paper_ids") or "").split(";") if x])
+            lines.append(
+                f"| {row.get('gap_type')} | {row.get('bottleneck') or ''} | "
+                f"{row.get('priority')} | {candidate_count} | {row.get('why')} |"
+            )
     return "\n".join(lines) + "\n"
 
 
@@ -381,7 +687,58 @@ def render_multi_regression_md(results: list[dict[str, Any]]) -> str:
             "A topic may fail because evidence is genuinely thin; the required behavior is explicit gaps, not confident generic prose.",
         ]
     )
+    gap_rows = [row for result in results for row in (result.get("evidence_gap_rows") or [])]
+    if gap_rows:
+        by_type: dict[str, int] = {}
+        for row in gap_rows:
+            by_type[str(row.get("gap_type") or "unknown")] = by_type.get(str(row.get("gap_type") or "unknown"), 0) + 1
+        lines.extend(["", "## Evidence Gap Summary", ""])
+        for key, count in sorted(by_type.items()):
+            lines.append(f"- {key}: {count}")
+        lines.append("")
+        lines.append("See `multi_topic_evidence_gap_queue.csv` for section/OpenAlex/frontfill targets.")
     return "\n".join(lines) + "\n"
+
+
+def write_evidence_gap_outputs(results: list[dict[str, Any]], out_dir: Path) -> None:
+    rows = [row for result in results for row in (result.get("evidence_gap_rows") or [])]
+    json_path = out_dir / "multi_topic_evidence_gap_queue.json"
+    csv_path = out_dir / "multi_topic_evidence_gap_queue.csv"
+    md_path = out_dir / "multi_topic_evidence_gap_queue.md"
+    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    fieldnames = [
+        "topic",
+        "gap_type",
+        "bottleneck",
+        "priority",
+        "candidate_paper_ids",
+        "frontfill_query",
+        "required_sections",
+        "why",
+    ]
+    with csv_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fieldnames})
+    lines = [
+        "# Multi-topic Evidence Gap Queue",
+        "",
+        f"- Audit: `{utc_now()}`",
+        f"- Rows: {len(rows)}",
+        "",
+        "These rows are not conclusions. They are targeted evidence-frontfill tasks generated by the multi-topic regression gate.",
+        "",
+        "| Topic | Gap | Bottleneck | Priority | Candidate Papers |",
+        "| --- | --- | --- | ---: | ---: |",
+    ]
+    for row in rows[:80]:
+        candidate_count = len([x for x in str(row.get("candidate_paper_ids") or "").split(";") if x])
+        lines.append(
+            f"| {row.get('topic')} | {row.get('gap_type')} | {row.get('bottleneck') or ''} | "
+            f"{row.get('priority')} | {candidate_count} |"
+        )
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def load_topic_lens(topic: str, top_k: int) -> dict[str, Any]:
@@ -428,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
         suite_json = out_dir / "multi_topic_regression.json"
         suite_md.write_text(render_multi_regression_md(results), encoding="utf-8")
         suite_json.write_text(json.dumps(results, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_evidence_gap_outputs(results, out_dir)
         outputs.append({"topic": "all", "report": str(suite_md), "json": str(suite_json)})
     print(json.dumps({"outputs": outputs}, ensure_ascii=False, sort_keys=True))
     return 0

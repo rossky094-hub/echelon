@@ -1,15 +1,15 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T18:13:12Z`
+- generated_at: `2026-05-29T18:24:29Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
-- linked refs: 443,443 / 3,202,464 (13.8%)
-- OpenAlex W IDs: 34,642 (62.5%)
-- section evidence: 1,339 rows / 740 papers
-- primary section evidence: 740 papers (1.3%)
-- section frontfill health: running_or_unknown [section_delta] (done=None/None, no_evidence_delta=0, no_evidence_hours=0.0)
+- linked refs: 443,651 / 3,202,848 (13.9%)
+- OpenAlex W IDs: 34,667 (62.6%)
+- section evidence: 1,355 rows / 749 papers
+- primary section evidence: 749 papers (1.4%)
+- section frontfill health: running_or_unknown [section_delta] (done=607/12227, no_evidence_delta=0, no_evidence_hours=0.0)
 - predicted future edges: 1,000
 - visual future edges: 1,000
 - future directions: 5
@@ -17,9 +17,9 @@
 
 ## Blockers
 
-- **citation_graph_bone** (high): linked refs are 13.8%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
-- **section_evidence** (high): primary section evidence covers only 740 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.5%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
+- **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
+- **section_evidence** (high): primary section evidence covers only 749 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
+- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.6%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit
 

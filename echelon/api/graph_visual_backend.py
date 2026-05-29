@@ -1429,6 +1429,29 @@ TOPIC_BOTTLENECK_TERMS = {
     ],
 }
 
+TOPIC_RELEVANCE_PROFILES = {
+    "metasurface_holography": {
+        "strong": ["metasurface holography", "meta-holography", "holographic metasurface", "metasurface hologram"],
+        "medium": ["holography", "holographic", "hologram", "metahologram", "meta hologram"],
+        "weak": ["metasurface", "multiplexed", "speckle", "field of view", "crosstalk"],
+    },
+    "photonic_crystal_cavity": {
+        "strong": ["photonic crystal cavity", "photonic-crystal cavity", "photonic crystal nanocavity"],
+        "medium": ["nanocavity", "nanocavities", "high-q", "q-factor", "quality factor", "mode volume"],
+        "weak": ["cavity", "purcell", "strong coupling", "waveguide-coupled"],
+    },
+    "quantum_light_source": {
+        "strong": ["quantum light source", "single-photon source", "single photon source", "photon-pair source"],
+        "medium": ["single photon", "single-photon", "photon pair", "entangled photon", "quantum emitter", "emitter"],
+        "weak": ["brightness", "indistinguishability", "collection efficiency", "heralded", "spdc"],
+    },
+    "metalens": {
+        "strong": ["metalens", "meta-lens", "metalenses"],
+        "medium": ["achromatic lens", "flat lens", "metasurface lens", "metaoptic lens", "meta-optic lens"],
+        "weak": ["high-na", "numerical aperture", "field of view", "large-area", "inverse design"],
+    },
+}
+
 
 def _topic_branch_facets(topic: str) -> list[dict[str, Any]]:
     text = topic.lower()
@@ -1462,6 +1485,19 @@ def _topic_bottleneck_terms(topic: str) -> list[str]:
     return list(dict.fromkeys(t.lower() for t in terms if t))
 
 
+def _topic_profile_key(topic: str) -> str | None:
+    text = topic.lower()
+    if "holograph" in text and ("metasurface" in text or "meta-optic" in text or "meta optic" in text):
+        return "metasurface_holography"
+    if "photonic crystal" in text and "cavit" in text:
+        return "photonic_crystal_cavity"
+    if "quantum" in text and ("light source" in text or "photon source" in text or "single photon" in text):
+        return "quantum_light_source"
+    if "metalens" in text or "meta-lens" in text:
+        return "metalens"
+    return None
+
+
 def _paper_text(paper: dict[str, Any]) -> str:
     return " ".join(
         str(paper.get(k) or "")
@@ -1472,6 +1508,117 @@ def _paper_text(paper: dict[str, Any]) -> str:
 def _facet_matches(text: str, keywords: list[str]) -> bool:
     lower = text.lower()
     return any(k in lower for k in keywords)
+
+
+def _topic_relevance_score(topic: str, paper: dict[str, Any]) -> tuple[int, list[str]]:
+    text = _paper_text(paper)
+    key = _topic_profile_key(topic)
+    matched: list[str] = []
+    score = 0
+    if key:
+        profile = TOPIC_RELEVANCE_PROFILES.get(key, {})
+        for term in profile.get("strong", []):
+            if term in text:
+                score += 4
+                matched.append(term)
+        for term in profile.get("medium", []):
+            if term in text:
+                score += 2
+                matched.append(term)
+        for term in profile.get("weak", []):
+            if term in text:
+                score += 1
+                matched.append(term)
+        return score, matched
+
+    tokens = _token_set(topic)
+    for token in tokens:
+        if token in text:
+            score += 1
+            matched.append(token)
+    return score, matched
+
+
+def _split_topic_turning_papers(
+    topic: str,
+    papers: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    topic_specific: list[dict[str, Any]] = []
+    broader_context: list[dict[str, Any]] = []
+    for paper in papers:
+        score, matched = _topic_relevance_score(topic, paper)
+        item = dict(paper)
+        reason = dict(item.get("reason") or {})
+        reason["topic_relevance_score"] = score
+        reason["topic_relevance_terms"] = matched[:8]
+        if score >= 2:
+            reason["topic_relevance_scope"] = "topic_specific"
+            item["reason"] = reason
+            topic_specific.append(item)
+        else:
+            reason["topic_relevance_scope"] = "broader_field_context"
+            reason["why"] = (
+                "This paper lies on a nearby field-level main path but lacks enough topic-specific "
+                "text evidence to be treated as a key turning paper for this query."
+            )
+            item["reason"] = reason
+            broader_context.append(item)
+    topic_specific.sort(
+        key=lambda p: (
+            int((p.get("reason") or {}).get("topic_relevance_score") or 0),
+            float(p.get("score") or 0.0),
+        ),
+        reverse=True,
+    )
+    return topic_specific, broader_context
+
+
+def _topic_driver_fallback_papers(
+    topic: str,
+    hits: list[dict[str, Any]],
+    *,
+    existing_ids: set[str],
+    per_facet: int = 2,
+    limit: int = 16,
+) -> list[dict[str, Any]]:
+    """Use topic-facet driver papers when the global main path is too broad.
+
+    This keeps the Topic Dossier honest: a field-level main-path paper is not
+    promoted as a topic turning paper, but strongly matching branch drivers can
+    still seed a useful, clickable history path.
+    """
+    out: list[dict[str, Any]] = []
+    seen = set(existing_ids)
+    for facet in _topic_branch_facets(topic):
+        matched = [
+            h for h in hits
+            if h.get("paper_id")
+            and h.get("paper_id") not in seen
+            and _facet_matches(_paper_text(h), facet.get("keywords") or [])
+        ]
+        matched.sort(key=lambda h: (int(h.get("year") or 9999), -(float(h.get("score") or 0.0))))
+        for paper in matched[:per_facet]:
+            item = dict(paper)
+            score, terms = _topic_relevance_score(topic, item)
+            if score <= 0:
+                continue
+            reason = dict(item.get("reason") or {})
+            reason.update(
+                {
+                    "why": "This paper is a topic-specific branch driver used because the global main path is too broad for this query.",
+                    "role": "topic branch driver / turning fallback",
+                    "topic_relevance_scope": "topic_branch_driver_fallback",
+                    "topic_relevance_score": score,
+                    "topic_relevance_terms": terms[:8],
+                    "facet": facet.get("name"),
+                }
+            )
+            item["reason"] = reason
+            out.append(item)
+            seen.add(str(item.get("paper_id")))
+            if len(out) >= limit:
+                return out
+    return out
 
 
 def _paper_ref(paper: dict[str, Any], why: str | None = None) -> dict[str, Any]:
@@ -2639,6 +2786,16 @@ def get_topic_lens(
             scores={pid: float(turning_scores.get(pid, 0.0)) for pid in turning_ids},
             reasons=turning_reasons,
         )
+        turning_hits, broader_turning_context = _split_topic_turning_papers(topic_text, turning_hits)
+        min_topic_turning = min(8, max(4, int(top_k) // 10))
+        if len(turning_hits) < min_topic_turning:
+            fallback_turning = _topic_driver_fallback_papers(
+                topic_text,
+                hits,
+                existing_ids={str(p.get("paper_id")) for p in turning_hits},
+                limit=max(8, min_topic_turning * 2),
+            )
+            turning_hits = [*turning_hits, *fallback_turning]
 
         future_rows = conn.execute(
             f"""
@@ -3045,15 +3202,23 @@ def get_topic_lens(
             "scope": context_scope,
             "top_cluster_ids": top_cluster_ids,
             "top_branch_ids": top_branch_ids,
+            "topic_specific_turning_papers": len(turning_hits),
+            "broader_turning_context_papers": len(broader_turning_context),
             "note": (
                 "Topic Lens expands from exact paper matches into dominant clusters/branches "
-                "so mainstream directions can recover main-path and future-growth context."
+                "so mainstream directions can recover main-path and future-growth context. "
+                "Broader-field main-path papers are separated from topic-specific turning papers."
             ),
         },
         "cluster_distribution": cluster_distribution,
         "history_main_path": {
             "edges": main_path_edges,
             "key_turning_papers": turning_hits[: max(10, min(int(top_k), 80))],
+            "broader_context_papers": broader_turning_context[: max(10, min(int(top_k), 40))],
+            "relevance_policy": (
+                "key_turning_papers require topic-specific text/facet evidence; broader_context_papers "
+                "are field-level anchors and should not be narrated as topic turning papers."
+            ),
         },
         "unresolved_limitations": unresolved_limitations,
         "future_growth": {
