@@ -1,16 +1,16 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-29T16:48:14Z`
+- generated_at: `2026-05-29T16:58:25Z`
 
 ## Reference Linkage
 
-- linked refs: 442,932 / 3,198,284 (13.8%)
-- unlinked refs: 2,755,352
+- linked refs: 442,988 / 3,198,611 (13.8%)
+- unlinked refs: 2,755,623
 
 | unlinked kind | count |
 | --- | ---: |
 | doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,279,442 |
+| openalex_unlinked | 1,279,713 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
@@ -41,7 +41,7 @@
 | download_failure | 22,614 |
 | pdf_graphics_warning | 3,044 |
 
-- section progress: 1017/12000
+- section progress: 1020/12000
 
 ## Recommended Next Actions
 

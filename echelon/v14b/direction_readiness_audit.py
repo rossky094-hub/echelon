@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
+
 
 PRIMARY_SECTION_NAMES = (
     "limitation",
@@ -247,6 +249,29 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         lines.append(f"- **{b['gate']}** ({b['severity']}): {b['why']} Next: {b['next_action']}")
     if metrics.get("latest_fusion"):
         lines.extend(["", "## Latest Fusion Audit", "", "```json", json.dumps(metrics["latest_fusion"], ensure_ascii=False, indent=2), "```"])
+    if metrics.get("candidate_lifecycle_summary"):
+        lifecycle = metrics["candidate_lifecycle_summary"]
+        lines.extend(
+            [
+                "",
+                "## Future Candidate Lifecycle",
+                "",
+                f"- total candidates: {int(lifecycle.get('total_candidates') or 0):,}",
+                f"- radar eligible: {int(lifecycle.get('radar_eligible') or 0):,}",
+                "",
+                "| state | count |",
+                "| --- | ---: |",
+            ]
+        )
+        for state, count in sorted((lifecycle.get("state_counts") or {}).items()):
+            lines.append(f"| {state} | {int(count):,} |")
+        if lifecycle.get("missing_gate_counts"):
+            lines.extend(["", "### Missing Claim Gates", "", "| gate | count |", "| --- | ---: |"])
+            for gate, count in sorted(
+                lifecycle["missing_gate_counts"].items(),
+                key=lambda kv: (-kv[1], kv[0]),
+            ):
+                lines.append(f"| {gate} | {int(count):,} |")
     lines.extend(
         [
             "",
@@ -261,7 +286,9 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
 
 
 def run_audit(db_main: Path, db_v14: Path, out_dir: Path) -> dict[str, Any]:
+    lifecycle = run_lifecycle_audit(db_main, db_v14, out_dir, write_table=True)
     metrics = collect_metrics(db_main, db_v14)
+    metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)

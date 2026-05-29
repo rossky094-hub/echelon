@@ -101,6 +101,23 @@ def jdumps(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def jloads(value, default):
+    if value in (None, ""):
+        return default
+    try:
+        return json.loads(value)
+    except Exception:
+        return default
+
+
+def table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table','virtual table') AND name=?",
+        (name,),
+    ).fetchone()
+    return bool(row)
+
+
 def clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 
@@ -968,6 +985,10 @@ def build_branch_lineages(
 def load_future_predictions(conn_v14: sqlite3.Connection) -> list[dict]:
     try:
         cols = table_columns(conn_v14, "predicted_future_edges")
+        has_lifecycle = table_exists(conn_v14, "future_candidate_lifecycle")
+        src_year_sql = "p.src_year" if "src_year" in cols else "NULL AS src_year"
+        dst_year_sql = "p.dst_year" if "dst_year" in cols else "NULL AS dst_year"
+        cross_field_sql = "p.is_cross_field" if "is_cross_field" in cols else "0 AS is_cross_field"
         optional_cols = []
         for col in (
             "raw_predicted_prob",
@@ -978,19 +999,39 @@ def load_future_predictions(conn_v14: sqlite3.Connection) -> list[dict]:
             "calibration_label",
         ):
             if col in cols:
-                optional_cols.append(col)
+                optional_cols.append(f"p.{col}")
+        lifecycle_sql = ""
+        lifecycle_join = ""
+        if has_lifecycle:
+            lifecycle_sql = """
+                , lc.lifecycle_state, lc.radar_eligible, lc.candidate_pool_reason,
+                  lc.calibration_status AS lifecycle_calibration_status,
+                  lc.missing_gates_json, lc.missing_high_confidence_gates_json,
+                  lc.uncertainty_reasons_json
+            """
+            lifecycle_join = """
+                LEFT JOIN future_candidate_lifecycle lc
+                  ON lc.src_paper_id = p.src_paper_id
+                 AND lc.dst_paper_id = p.dst_paper_id
+            """
         optional_sql = ", " + ", ".join(optional_cols) if optional_cols else ""
-        order_expr = (
-            "COALESCE(prediction_confidence, predicted_prob) DESC, "
-            "COALESCE(raw_predicted_prob, predicted_prob) DESC"
-            if "prediction_confidence" in cols
-            else "predicted_prob DESC"
-        )
+        if "prediction_confidence" in cols and "raw_predicted_prob" in cols:
+            order_expr = (
+                "COALESCE(p.prediction_confidence, p.predicted_prob) DESC, "
+                "COALESCE(p.raw_predicted_prob, p.predicted_prob) DESC"
+            )
+        elif "prediction_confidence" in cols:
+            order_expr = "COALESCE(p.prediction_confidence, p.predicted_prob) DESC, p.predicted_prob DESC"
+        else:
+            order_expr = "p.predicted_prob DESC"
         rows = conn_v14.execute(
             f"""
-            SELECT src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field
+            SELECT p.src_paper_id, p.dst_paper_id, p.predicted_prob,
+                   {src_year_sql}, {dst_year_sql}, {cross_field_sql}
                    {optional_sql}
-            FROM predicted_future_edges
+                   {lifecycle_sql}
+            FROM predicted_future_edges p
+            {lifecycle_join}
             ORDER BY {order_expr}
             """
         ).fetchall()
@@ -1380,6 +1421,11 @@ def write_visual_edges(
         dst = pred["dst_paper_id"]
         calibrated = float(pred.get("calibrated_prob") or pred.get("predicted_prob") or 0.0)
         confidence = float(pred.get("prediction_confidence") or calibrated)
+        lifecycle_state = pred.get("lifecycle_state") or "future_candidate_unassessed"
+        radar_eligible = int(pred.get("radar_eligible") or 0)
+        missing_gates = jloads(pred.get("missing_gates_json"), [])
+        missing_high_confidence = jloads(pred.get("missing_high_confidence_gates_json"), [])
+        uncertainty = jloads(pred.get("uncertainty_reasons_json"), [])
         add_row(
             (
                 edge_id("future", src, dst),
@@ -1395,7 +1441,18 @@ def write_visual_edges(
                 jdumps({"stroke": "future", "dash": True, "glow": True}),
                 jdumps({
                     **pred,
+                    "lifecycle_state": lifecycle_state,
+                    "radar_eligible": bool(radar_eligible),
+                    "candidate_pool_reason": pred.get("candidate_pool_reason"),
+                    "calibration_status": pred.get("lifecycle_calibration_status") or pred.get("calibration_status"),
+                    "missing_gates": missing_gates,
+                    "missing_high_confidence_gates": missing_high_confidence,
+                    "uncertainty_reasons": uncertainty,
                     "why": "Calibrated VGAE/temporal prediction candidate",
+                    "product_rule": (
+                        "Future edge is an inspection candidate until Step6 fusion and "
+                        "Step13 Claim Card gates promote it."
+                    ),
                     "confidence_semantics": (
                         "visual confidence is calibrated empirical product confidence, "
                         "not a guaranteed future citation probability"

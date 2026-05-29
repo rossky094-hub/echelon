@@ -1869,6 +1869,8 @@ def _build_rd_radar(
         dst = (e.get("target_paper") or {}).get("title") or e.get("target_paper_id")
         conf = float(e.get("confidence") or e.get("weight") or 0.0)
         evidence = e.get("evidence") or {}
+        lifecycle_missing = evidence.get("missing_gates") or []
+        lifecycle_reason = evidence.get("candidate_pool_reason")
         candidate_pool.append(
             {
                 "kind": "candidate_edge",
@@ -1882,8 +1884,12 @@ def _build_rd_radar(
                     "calibration_method": evidence.get("calibration_method"),
                     "calibration_support": evidence.get("calibration_support"),
                     "calibration_label": evidence.get("calibration_label"),
+                    "calibration_status": evidence.get("calibration_status"),
+                    "lifecycle_state": evidence.get("lifecycle_state"),
+                    "candidate_pool_reason": lifecycle_reason,
                     "relationship_scope": evidence.get("relationship_scope"),
                     "confidence_semantics": evidence.get("confidence_semantics"),
+                    "uncertainty_reasons": evidence.get("uncertainty_reasons") or [],
                 },
                 "commercial_relevance": None,
                 "validation_cost": None,
@@ -1895,7 +1901,7 @@ def _build_rd_radar(
                     _paper_ref(e.get("source_paper") or {"paper_id": e.get("source_paper_id")}, "GNN candidate source"),
                     _paper_ref(e.get("target_paper") or {"paper_id": e.get("target_paper_id")}, "GNN candidate target"),
                 ],
-                "missing_gates": [
+                "missing_gates": lifecycle_missing or [
                     "Step6 fusion evidence",
                     "Step13 five-question Claim Card",
                     "section-level bottleneck evidence",

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T16:48:27Z`
+- generated_at: `2026-05-29T16:58:27Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
 
@@ -26,8 +26,8 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13849047223746477,
-    "openalex_w_rate": 0.6195771876297593,
+    "linked_ref_rate": 0.13849386499327365,
+    "openalex_w_rate": 0.6202090592334495,
     "primary_section_papers": 690
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -84,9 +84,13 @@
 {
   "bad_high_confidence_cards": 0,
   "calibration_audits": 0,
+  "future_candidate_lifecycle": {
+    "future_candidate_unfused": 1000
+  },
   "issue": "Future Growth Calibration",
   "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
   "predicted_future_edges": 1000,
+  "radar_eligible_candidates": 0,
   "status": "warn"
 }
 ```

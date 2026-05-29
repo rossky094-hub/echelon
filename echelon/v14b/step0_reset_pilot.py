@@ -22,6 +22,7 @@ DERIVED_TABLES = [
     "limitation_resolutions",
     "predicted_future_edges",
     "vgae_calibration_audit",
+    "future_candidate_lifecycle",
     "future_directions",
     "fusion_evidence_audit",
     "first_principles_principles",

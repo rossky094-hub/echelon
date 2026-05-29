@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -151,6 +151,14 @@ access-audit:
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot \
 		--limit $${V14B_ACCESS_AUDIT_LIMIT:-12000}
+
+## Future candidate lifecycle audit: GNN edge -> Step6 -> Claim Card -> Radar
+future-lifecycle-audit:
+	@echo ">>> Future candidate lifecycle audit: candidate generator to Radar gates..."
+	$(PYTHON) -m echelon.v14b.future_candidate_lifecycle \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot
 
 ## Direction readiness audit: Step5b -> Step6 -> Step13 promotion gates
 direction-readiness-audit:

@@ -179,6 +179,19 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
 def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     predicted = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0) if table_exists(conn_v14, "predicted_future_edges") else 0
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
+    lifecycle_counts: dict[str, int] = {}
+    radar_eligible = 0
+    if table_exists(conn_v14, "future_candidate_lifecycle"):
+        lifecycle_counts = {
+            str(row[0]): int(row[1])
+            for row in conn_v14.execute(
+                "SELECT lifecycle_state, COUNT(*) FROM future_candidate_lifecycle GROUP BY lifecycle_state"
+            ).fetchall()
+        }
+        radar_eligible = int(
+            scalar(conn_v14, "SELECT COUNT(*) FROM future_candidate_lifecycle WHERE radar_eligible=1")
+            or 0
+        )
     high_conf_bad = 0
     if table_exists(conn_v14, "direction_claim_cards"):
         high_conf_bad = int(
@@ -196,6 +209,8 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
         "status": _gate_status(predicted >= 0 and high_conf_bad == 0 and calibration > 0, warn=predicted > 0),
         "predicted_future_edges": predicted,
         "calibration_audits": calibration,
+        "future_candidate_lifecycle": lifecycle_counts,
+        "radar_eligible_candidates": radar_eligible,
         "bad_high_confidence_cards": high_conf_bad,
         "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
     }

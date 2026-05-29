@@ -1,12 +1,12 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T16:48:13Z`
+- generated_at: `2026-05-29T16:58:26Z`
 - readiness_level: `candidate_generator_only`
 
 ## Metrics
 
-- linked refs: 442,932 / 3,198,284 (13.8%)
-- OpenAlex W IDs: 34,318 (62.0%)
+- linked refs: 442,988 / 3,198,611 (13.8%)
+- OpenAlex W IDs: 34,354 (62.0%)
 - section evidence: 1,241 rows / 690 papers
 - primary section evidence: 690 papers (1.2%)
 - predicted future edges: 1,000
@@ -42,6 +42,22 @@
   "calibration_json": "{\"labels\": {\"calibrated_temporal_holdout\": 20}, \"prediction_confidence_avg\": 0.8517545731272295, \"min_vgae_confidence\": 0.55, \"vgae_top_n\": 500}"
 }
 ```
+
+## Future Candidate Lifecycle
+
+- total candidates: 1,000
+- radar eligible: 0
+
+| state | count |
+| --- | ---: |
+| future_candidate_unfused | 1,000 |
+
+### Missing Claim Gates
+
+| gate | count |
+| --- | ---: |
+| Step13 Claim Card | 1,000 |
+| Step6 fusion direction | 1,000 |
 
 ## Product Interpretation
 
