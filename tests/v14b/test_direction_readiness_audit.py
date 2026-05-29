@@ -3,7 +3,13 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from echelon.v14b.direction_readiness_audit import classify_blockers, collect_metrics, readiness_level, run_audit
+from echelon.v14b.direction_readiness_audit import (
+    classify_blockers,
+    collect_metrics,
+    load_section_frontfill_state,
+    readiness_level,
+    run_audit,
+)
 
 
 def _make_main(path: Path) -> None:
@@ -60,6 +66,59 @@ def test_direction_readiness_blocks_raw_gnn_promotion(tmp_path):
     assert metrics["predicted_future_edges"] == 1
     assert readiness_level(metrics, blockers) == "candidate_generator_only"
     assert any(b["gate"] == "fusion_materialization" for b in blockers)
+
+
+def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
+    state = tmp_path / "watchdog_state.json"
+    state.write_text(
+        """
+        {
+          "done": 1200,
+          "total": 12000,
+          "rows": 1241,
+          "papers": 690,
+          "primary_section_papers": 690,
+          "no_evidence_done_delta": 240,
+          "no_evidence_elapsed_s": 7200,
+          "low_yield_intervals": 2
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    metrics = {
+        "linked_ref_rate": 0.31,
+        "primary_section_papers": 9000,
+        "predicted_future_edges": 0,
+        "future_directions": 0,
+        "direction_claim_cards": 0,
+        "complete_claim_cards": 0,
+        "openalex_w_rate": 0.72,
+        "section_frontfill_state": load_section_frontfill_state(state),
+    }
+    blockers = classify_blockers(metrics)
+
+    assert metrics["section_frontfill_state"]["status"] == "soft_stall"
+    assert any(b["gate"] == "section_frontfill_efficiency" for b in blockers)
+
+
+def test_direction_readiness_infers_soft_stall_from_watchdog_log(tmp_path):
+    state = tmp_path / "section_top12000_watchdog_state.json"
+    state.write_text(
+        '{"done": 1015, "total": 12000, "rows": 1241, "papers": 690, "low_yield_intervals": 0}',
+        encoding="utf-8",
+    )
+    state.with_name("section_top12000_watchdog.log").write_text(
+        "[2026-05-29T06:56:02Z] pid=1 status=running rows=1241 papers=690 progress=na\n"
+        "[2026-05-29T16:43:54Z] pid=1 status=running rows=1241 papers=690 "
+        "done=1015/12000 elapsed_s=33961\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_section_frontfill_state(state)
+
+    assert loaded["status"] == "soft_stall"
+    assert loaded["no_evidence_elapsed_s"] > 9 * 3600
 
 
 def test_direction_readiness_writes_report(tmp_path):

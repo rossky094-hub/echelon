@@ -1,6 +1,6 @@
 # Future Candidate Lifecycle Audit
 
-- generated_at: `2026-05-29T16:58:26Z`
+- generated_at: `2026-05-29T17:09:42Z`
 - total candidates: 1,000
 - radar eligible: 0
 

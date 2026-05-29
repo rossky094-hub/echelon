@@ -221,6 +221,7 @@ LOG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("download_failure", re.compile(r"download|http|connection|server disconnected|failed", re.I)),
     ("parser_exception", re.compile(r"traceback|exception|error", re.I)),
     ("low_yield_scan", re.compile(r"LOW_YIELD_SCAN", re.I)),
+    ("section_evidence_soft_stall", re.compile(r"SECTION_EVIDENCE_SOFT_STALL", re.I)),
     ("hard_stall", re.compile(r"HARD_STALL", re.I)),
 )
 
@@ -252,10 +253,159 @@ def section_log_taxonomy(log_paths: list[Path]) -> dict[str, Any]:
     }
 
 
+WATCHDOG_TS_RE = re.compile(r"\[(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]")
+WATCHDOG_COUNT_RE = re.compile(r"rows=(?P<rows>\d+)\s+papers=(?P<papers>\d+)")
+WATCHDOG_PRIMARY_RE = re.compile(r"primary_section_papers=(?P<primary>\d+)")
+WATCHDOG_DONE_RE = re.compile(r"done=(?P<done>\d+)/(?P<total>\d+)")
+
+
+def _parse_ts(value: str) -> float:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def watchdog_history(log_path: Path) -> dict[str, Any]:
+    if not log_path.exists():
+        return {"available": False}
+    latest: dict[str, Any] | None = None
+    last_evidence: dict[str, Any] | None = None
+    records = 0
+    for line in log_path.read_text(errors="ignore").splitlines():
+        ts_m = WATCHDOG_TS_RE.search(line)
+        count_m = WATCHDOG_COUNT_RE.search(line)
+        if not ts_m or not count_m:
+            continue
+        primary_m = WATCHDOG_PRIMARY_RE.search(line)
+        done_m = WATCHDOG_DONE_RE.search(line)
+        records += 1
+        rec = {
+            "ts": ts_m.group("ts"),
+            "ts_epoch": _parse_ts(ts_m.group("ts")),
+            "rows": int(count_m.group("rows")),
+            "papers": int(count_m.group("papers")),
+            "primary_section_papers": int(primary_m.group("primary")) if primary_m else 0,
+            "done": int(done_m.group("done")) if done_m else None,
+            "total": int(done_m.group("total")) if done_m else None,
+        }
+        if latest is None or rec["rows"] != latest["rows"] or rec["papers"] != latest["papers"]:
+            last_evidence = rec
+        latest = rec
+    if not latest:
+        return {"available": False, "records": records}
+    if last_evidence is None:
+        last_evidence = latest
+    no_evidence_elapsed_s = int(max(0, float(latest["ts_epoch"]) - float(last_evidence["ts_epoch"])))
+    no_evidence_done_delta = 0
+    if latest.get("done") is not None and last_evidence.get("done") is not None:
+        no_evidence_done_delta = int(latest["done"]) - int(last_evidence["done"])
+    return {
+        "available": True,
+        "records": records,
+        "latest": latest,
+        "last_evidence_growth": last_evidence,
+        "no_evidence_elapsed_s": no_evidence_elapsed_s,
+        "no_evidence_done_delta": max(0, no_evidence_done_delta),
+    }
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def frontfill_health(
+    sections: dict[str, Any],
+    logs: dict[str, Any],
+    state_file: Path,
+    watchdog_history_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Classify whether frontfill is strengthening evidence, not just running.
+
+    The value objective is decision-grade evidence.  A process that advances
+    through PDFs but does not add primary sections should be visible as a
+    product blocker even if the OS process is healthy.
+    """
+    state = _load_json(state_file)
+    progress = logs.get("progress") or {}
+    done = state.get("done", progress.get("done"))
+    total = state.get("total", progress.get("total"))
+    rows = int(state.get("rows") or sections.get("section_rows") or 0)
+    papers = int(state.get("papers") or sections.get("section_papers") or 0)
+    primary = int(state.get("primary_section_papers") or sections.get("primary_section_papers") or 0)
+    no_evidence_delta = int(state.get("no_evidence_done_delta") or 0)
+    no_evidence_elapsed_s = int(state.get("no_evidence_elapsed_s") or 0)
+    low_yield_intervals = int(state.get("low_yield_intervals") or 0)
+    history = watchdog_history_data or {}
+    if history.get("available"):
+        no_evidence_delta = max(no_evidence_delta, int(history.get("no_evidence_done_delta") or 0))
+        no_evidence_elapsed_s = max(no_evidence_elapsed_s, int(history.get("no_evidence_elapsed_s") or 0))
+        latest = history.get("latest") or {}
+        done = done if done is not None else latest.get("done")
+        total = total if total is not None else latest.get("total")
+    event_counts = logs.get("event_counts") or {}
+    soft_stall_events = int(event_counts.get("section_evidence_soft_stall") or 0)
+    low_yield_events = int(event_counts.get("low_yield_scan") or 0)
+
+    if soft_stall_events or low_yield_intervals >= 2 or no_evidence_elapsed_s >= 4 * 3600:
+        status = "soft_stall"
+    elif no_evidence_delta >= 200 or low_yield_events:
+        status = "low_yield"
+    elif primary < 8000:
+        status = "insufficient_but_running"
+    else:
+        status = "evidence_gate_ready"
+
+    recommendation = {
+        "soft_stall": (
+            "Do not wait for topN completion as if it were productive evidence growth. "
+            "Keep the single live process conservative, but prepare/advance the high-value "
+            "delta queue and classify no-PDF/no-target-section/timeouts before downstream claims."
+        ),
+        "low_yield": (
+            "Treat the current candidate segment as low-yield evidence acquisition; prioritize "
+            "main path, future endpoints, branch drivers, top keystone, and gold-topic papers."
+        ),
+        "insufficient_but_running": (
+            "Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped "
+            "until the high-value primary-section budget is met."
+        ),
+        "evidence_gate_ready": (
+            "Primary section evidence has crossed the configured gate; downstream Step5c/6/13 "
+            "can be rerun from a stronger evidence base."
+        ),
+    }[status]
+
+    return {
+        "status": status,
+        "done": done,
+        "total": total,
+        "rows": rows,
+        "papers": papers,
+        "primary_section_papers": primary,
+        "no_evidence_done_delta": no_evidence_delta,
+        "no_evidence_elapsed_s": no_evidence_elapsed_s,
+        "low_yield_intervals": low_yield_intervals,
+        "low_yield_events": low_yield_events,
+        "soft_stall_events": soft_stall_events,
+        "watchdog_history": history,
+        "state_file": str(state_file),
+        "recommendation": recommendation,
+    }
+
+
 def _log_next_actions(counts: Counter[str]) -> list[str]:
     actions: list[str] = []
     if counts.get("pdf_graphics_warning", 0) > 100:
         actions.append("Suppress or downgrade noisy PDF graphics warnings so true parser failures remain visible.")
+    if counts.get("section_evidence_soft_stall", 0):
+        actions.append("Section frontfill is in evidence soft-stall; prepare adaptive delta queue instead of passively waiting for topN.")
     if counts.get("low_yield_scan", 0):
         actions.append("Treat current low-yield section segment as evidence-budget issue; rely on delta queue handoff after topN.")
     if counts.get("timeout", 0) or counts.get("download_failure", 0):
@@ -269,17 +419,21 @@ def collect_audit(
     db_v14: Path,
     section_log: Path,
     watchdog_log: Path,
+    watchdog_state: Path,
     openalex_log: Path,
 ) -> dict[str, Any]:
     with connect(db_main) as conn_main, connect(db_v14) as conn_v14:
         refs = reference_taxonomy(conn_main)
         sections = section_coverage(conn_main, conn_v14)
     logs = section_log_taxonomy([section_log, watchdog_log, openalex_log])
+    history = watchdog_history(watchdog_log)
+    health = frontfill_health(sections, logs, watchdog_state, history)
     return {
         "generated_at": utc_now(),
         "reference_taxonomy": refs,
         "section_coverage": sections,
         "frontfill_log_taxonomy": logs,
+        "frontfill_health": health,
         "product_interpretation": (
             "Evidence Bone remains the limiting factor if linked refs are below 30% "
             "or primary section evidence is below the high-value claim budget. "
@@ -292,6 +446,7 @@ def render_markdown(result: dict[str, Any]) -> str:
     refs = result["reference_taxonomy"]
     sections = result["section_coverage"]
     logs = result["frontfill_log_taxonomy"]
+    health = result.get("frontfill_health") or {}
     lines = [
         "# V14B Evidence Bone Audit",
         "",
@@ -341,6 +496,19 @@ def render_markdown(result: dict[str, Any]) -> str:
     prog = logs.get("progress") or {}
     if prog.get("done"):
         lines.extend(["", f"- section progress: {prog.get('done')}/{prog.get('total')}"])
+    lines.extend(
+        [
+            "",
+            "## Frontfill Health",
+            "",
+            f"- status: `{health.get('status', 'unknown')}`",
+            f"- progress: `{health.get('done')}/{health.get('total')}`",
+            f"- rows / papers / primary papers: `{int(health.get('rows') or 0):,}` / `{int(health.get('papers') or 0):,}` / `{int(health.get('primary_section_papers') or 0):,}`",
+            f"- candidates since last evidence growth: `{int(health.get('no_evidence_done_delta') or 0):,}`",
+            f"- seconds since last evidence growth: `{int(health.get('no_evidence_elapsed_s') or 0):,}`",
+            f"- recommendation: {health.get('recommendation', 'n/a')}",
+        ]
+    )
     lines.extend(["", "## Recommended Next Actions", ""])
     actions = []
     actions.extend(refs.get("next_actions") or [])
@@ -361,6 +529,7 @@ def run_audit(
     out_dir: Path = Path("reports/v14b_pilot"),
     section_log: Path = Path("logs/v14b/step5s_section_top12000.log"),
     watchdog_log: Path = Path("logs/v14b/section_top12000_watchdog.log"),
+    watchdog_state: Path = Path("logs/v14b/section_top12000_watchdog_state.json"),
     openalex_log: Path = Path("logs/v14b/openalex_backfill_current.log"),
 ) -> dict[str, Any]:
     result = collect_audit(
@@ -368,6 +537,7 @@ def run_audit(
         db_v14=db_v14,
         section_log=section_log,
         watchdog_log=watchdog_log,
+        watchdog_state=watchdog_state,
         openalex_log=openalex_log,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -385,6 +555,7 @@ def main() -> None:
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
     parser.add_argument("--section-log", default="logs/v14b/step5s_section_top12000.log")
     parser.add_argument("--watchdog-log", default="logs/v14b/section_top12000_watchdog.log")
+    parser.add_argument("--watchdog-state", default="logs/v14b/section_top12000_watchdog_state.json")
     parser.add_argument("--openalex-log", default="logs/v14b/openalex_backfill_current.log")
     args = parser.parse_args()
     result = run_audit(
@@ -393,6 +564,7 @@ def main() -> None:
         out_dir=Path(args.out_dir),
         section_log=Path(args.section_log),
         watchdog_log=Path(args.watchdog_log),
+        watchdog_state=Path(args.watchdog_state),
         openalex_log=Path(args.openalex_log),
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from echelon.v14b.evidence_bone_audit import collect_audit, run_audit
+from echelon.v14b.evidence_bone_audit import collect_audit, run_audit, watchdog_history
 
 
 def _make_main(path: Path) -> None:
@@ -90,7 +90,27 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
         encoding="utf-8",
     )
     watchdog_log = tmp_path / "watchdog.log"
-    watchdog_log.write_text("LOW_YIELD_SCAN progress_delta=200 rows_delta=0\n", encoding="utf-8")
+    watchdog_log.write_text(
+        "LOW_YIELD_SCAN progress_delta=200 rows_delta=0\n"
+        "SECTION_EVIDENCE_SOFT_STALL progress_delta=220 low_yield_intervals=2\n",
+        encoding="utf-8",
+    )
+    watchdog_state = tmp_path / "watchdog_state.json"
+    watchdog_state.write_text(
+        """
+        {
+          "rows": 2,
+          "papers": 2,
+          "primary_section_papers": 1,
+          "done": 220,
+          "total": 12000,
+          "no_evidence_done_delta": 210,
+          "no_evidence_elapsed_s": 7200,
+          "low_yield_intervals": 2
+        }
+        """,
+        encoding="utf-8",
+    )
     openalex_log = tmp_path / "openalex.log"
     openalex_log.write_text("Server disconnected without sending a response.\n", encoding="utf-8")
 
@@ -99,6 +119,7 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
         db_v14=v14,
         section_log=section_log,
         watchdog_log=watchdog_log,
+        watchdog_state=watchdog_state,
         openalex_log=openalex_log,
     )
 
@@ -108,6 +129,24 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
     assert taxonomy["arxiv_unlinked"] == 1
     assert result["section_coverage"]["primary_section_papers"] == 1
     assert result["frontfill_log_taxonomy"]["event_counts"]["low_yield_scan"] == 1
+    assert result["frontfill_health"]["status"] == "soft_stall"
+    assert result["frontfill_health"]["no_evidence_done_delta"] == 210
+
+
+def test_watchdog_history_detects_elapsed_no_evidence_growth(tmp_path):
+    log = tmp_path / "watchdog.log"
+    log.write_text(
+        "[2026-05-29T06:56:02Z] pid=1 status=running rows=1241 papers=690 progress=na\n"
+        "[2026-05-29T13:43:54Z] pid=1 status=running rows=1241 papers=690 "
+        "primary_section_papers=690 delta_rows=0 delta_papers=0 done=944/12000 elapsed_s=23160\n",
+        encoding="utf-8",
+    )
+
+    history = watchdog_history(log)
+
+    assert history["available"] is True
+    assert history["latest"]["done"] == 944
+    assert history["no_evidence_elapsed_s"] > 6 * 3600
 
 
 def test_evidence_bone_audit_writes_report(tmp_path):

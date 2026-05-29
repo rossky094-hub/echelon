@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T16:58:27Z`
+- generated_at: `2026-05-29T17:09:43Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
 
@@ -26,9 +26,11 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13849386499327365,
-    "openalex_w_rate": 0.6202090592334495,
-    "primary_section_papers": 690
+    "linked_ref_rate": 0.13846806411713902,
+    "openalex_w_rate": 0.6209853586322688,
+    "primary_section_papers": 690,
+    "section_frontfill_no_evidence_delta": 0,
+    "section_frontfill_status": "soft_stall"
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
   "status": "warn",
@@ -36,7 +38,8 @@
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
-    "future-growth calibration audit missing"
+    "future-growth calibration audit missing",
+    "section frontfill soft_stall; process progress is not translating into new primary evidence"
   ]
 }
 ```

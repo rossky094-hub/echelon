@@ -64,6 +64,32 @@ def test_watchdog_done_and_primary_section_gate(tmp_path):
     assert mod.get_primary_section_papers(db_main) == 2
 
 
+def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
+    mod = _load_watchdog_module()
+    # A restart should preserve evidence counters separately from ordinary
+    # progress counters.  This is the difference between "process is alive" and
+    # "the evidence bone is getting stronger".
+    state = {
+        "rows": 1241,
+        "papers": 690,
+        "done": 1015,
+        "last_evidence_rows": 1241,
+        "last_evidence_papers": 690,
+        "last_evidence_done": 815,
+        "last_evidence_ts": 1000.0,
+        "low_yield_intervals": 1,
+    }
+    path = tmp_path / "state.json"
+    mod._write_state(path, state)
+
+    loaded = mod._load_state(path)
+
+    assert loaded["rows"] == 1241
+    assert loaded["last_evidence_done"] == 815
+    assert loaded["done"] - loaded["last_evidence_done"] == 200
+    assert loaded["low_yield_intervals"] == 1
+
+
 def _make_main_db(path: Path) -> None:
     conn = sqlite3.connect(str(path))
     conn.executescript(

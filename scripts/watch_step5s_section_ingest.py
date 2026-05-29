@@ -218,6 +218,15 @@ def main() -> None:
     parser.add_argument("--stale-intervals", type=int, default=3)
     parser.add_argument("--stall-min-sec", type=int, default=7200)
     parser.add_argument("--low-yield-progress-items", type=int, default=200)
+    parser.add_argument(
+        "--soft-stall-intervals",
+        type=int,
+        default=2,
+        help=(
+            "Number of consecutive low-yield evidence intervals before marking a "
+            "soft stall. This does not kill Step5s; it makes evidence debt visible."
+        ),
+    )
     parser.add_argument("--no-restart-on-stall", action="store_true")
     parser.add_argument(
         "--restart-cmd",
@@ -256,6 +265,11 @@ def main() -> None:
     last_done = state.get("done")
     last_change_ts = float(state.get("last_change_ts") or time.time())
     stale_intervals = int(state.get("stale_intervals") or 0)
+    last_evidence_rows = int(state.get("last_evidence_rows", last_rows) or 0)
+    last_evidence_papers = int(state.get("last_evidence_papers", last_papers) or 0)
+    last_evidence_done = state.get("last_evidence_done", last_done)
+    last_evidence_ts = float(state.get("last_evidence_ts") or last_change_ts)
+    low_yield_intervals = int(state.get("low_yield_intervals") or 0)
 
     append_log(log_file, f"[START] {utc_now()} step5s watchdog interval={args.interval_sec}s")
 
@@ -282,11 +296,29 @@ def main() -> None:
         rows_delta = rows - last_rows
         papers_delta = papers - last_papers
         done_delta = (int(done) - int(last_done)) if done is not None and last_done is not None else None
-        low_yield = (
-            rows_delta <= 0
-            and done_delta is not None
-            and done_delta >= int(args.low_yield_progress_items)
+        evidence_changed = rows != last_evidence_rows or papers != last_evidence_papers
+        if evidence_changed or last_evidence_done is None:
+            last_evidence_rows = rows
+            last_evidence_papers = papers
+            last_evidence_done = done
+            last_evidence_ts = now
+            low_yield_intervals = 0
+        no_evidence_done_delta = (
+            int(done) - int(last_evidence_done)
+            if done is not None and last_evidence_done is not None
+            else 0
         )
+        no_evidence_elapsed_s = int(max(0, now - last_evidence_ts))
+        low_yield = (
+            no_evidence_done_delta >= int(args.low_yield_progress_items)
+            and rows == last_evidence_rows
+            and papers == last_evidence_papers
+        )
+        if low_yield:
+            low_yield_intervals += 1
+        elif evidence_changed:
+            low_yield_intervals = 0
+        evidence_soft_stall = low_yield and low_yield_intervals >= int(args.soft_stall_intervals)
         hard_stall = (
             pid
             and stale_intervals >= int(args.stale_intervals)
@@ -299,6 +331,9 @@ def main() -> None:
                 f"[{ts}] pid={pid or 'none'} status={status} rows={rows} papers={papers} "
                 f"primary_section_papers={primary_section_papers} "
                 f"delta_rows={rows_delta} delta_papers={papers_delta} "
+                f"no_evidence_done_delta={no_evidence_done_delta} "
+                f"no_evidence_elapsed_s={no_evidence_elapsed_s} "
+                f"low_yield_intervals={low_yield_intervals} "
                 f"stale_intervals={stale_intervals} {progress}"
             ),
         )
@@ -306,8 +341,18 @@ def main() -> None:
             append_log(
                 log_file,
                 (
-                    f"[{ts}] LOW_YIELD_SCAN progress_delta={done_delta} rows_delta={rows_delta}; "
+                    f"[{ts}] LOW_YIELD_SCAN progress_delta={no_evidence_done_delta} "
+                    f"rows_delta=0 papers_delta=0 elapsed_s={no_evidence_elapsed_s}; "
                     "crawler is alive but current candidate segment is not producing usable sections"
+                ),
+            )
+        if evidence_soft_stall:
+            append_log(
+                log_file,
+                (
+                    f"[{ts}] SECTION_EVIDENCE_SOFT_STALL progress_delta={no_evidence_done_delta} "
+                    f"low_yield_intervals={low_yield_intervals}; "
+                    "keep process conservative, but treat topN as low-yield and prepare delta/frontier queue"
                 ),
             )
         if hard_stall:
@@ -368,6 +413,13 @@ def main() -> None:
                     "done": done,
                     "total": progress_data.get("total"),
                     "last_change_ts": last_change_ts,
+                    "last_evidence_rows": last_evidence_rows,
+                    "last_evidence_papers": last_evidence_papers,
+                    "last_evidence_done": last_evidence_done,
+                    "last_evidence_ts": last_evidence_ts,
+                    "no_evidence_done_delta": no_evidence_done_delta,
+                    "no_evidence_elapsed_s": no_evidence_elapsed_s,
+                    "low_yield_intervals": low_yield_intervals,
                     "stale_intervals": stale_intervals,
                     "status": status,
                 },
@@ -393,6 +445,13 @@ def main() -> None:
                 "done": done,
                 "total": progress_data.get("total"),
                 "last_change_ts": last_change_ts,
+                "last_evidence_rows": last_evidence_rows,
+                "last_evidence_papers": last_evidence_papers,
+                "last_evidence_done": last_evidence_done,
+                "last_evidence_ts": last_evidence_ts,
+                "no_evidence_done_delta": no_evidence_done_delta,
+                "no_evidence_elapsed_s": no_evidence_elapsed_s,
+                "low_yield_intervals": low_yield_intervals,
                 "stale_intervals": stale_intervals,
                 "status": status,
             },

@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from echelon.v14b.direction_readiness_audit import collect_metrics, scalar, table_exists
+from echelon.v14b.direction_readiness_audit import (
+    collect_metrics,
+    load_section_frontfill_state,
+    scalar,
+    table_exists,
+)
 from echelon.v14b.evidence_grade import (
     claim_scope_policy,
     coverage_grade,
@@ -94,6 +99,11 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
         openalex_rate=float(metrics["openalex_w_rate"]),
         has_calibration=bool(metrics.get("vgae_calibration_audit")),
     )
+    frontfill = metrics.get("section_frontfill_state") or {}
+    if frontfill.get("status") in {"low_yield", "soft_stall"}:
+        reasons.append(
+            f"section frontfill {frontfill.get('status')}; process progress is not translating into new primary evidence"
+        )
     return {
         "issue": "Evidence Bone",
         "status": _gate_status(
@@ -105,6 +115,8 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "linked_ref_rate": metrics["linked_ref_rate"],
             "primary_section_papers": metrics["primary_section_papers"],
             "openalex_w_rate": metrics["openalex_w_rate"],
+            "section_frontfill_status": frontfill.get("status"),
+            "section_frontfill_no_evidence_delta": frontfill.get("no_evidence_done_delta"),
         },
         "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
         "uncertainty_reasons": reasons,
@@ -339,6 +351,9 @@ def audit_quarterly_multi_corpus(db_main: Path, repo_root: Path) -> dict[str, An
 
 def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir: Path | None = None) -> dict[str, Any]:
     metrics = collect_metrics(db_main, db_v14)
+    metrics["section_frontfill_state"] = load_section_frontfill_state(
+        repo_root / "logs/v14b/section_top12000_watchdog_state.json"
+    )
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
     with sqlite3.connect(str(db_v14)) as conn_v14:

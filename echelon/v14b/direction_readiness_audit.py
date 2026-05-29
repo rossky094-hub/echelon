@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +52,89 @@ def scalar(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> 
 
 def pct(value: float) -> str:
     return f"{value * 100:.1f}%"
+
+
+_WATCHDOG_TS_RE = re.compile(r"\[(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]")
+_WATCHDOG_COUNT_RE = re.compile(r"rows=(?P<rows>\d+)\s+papers=(?P<papers>\d+)")
+_WATCHDOG_DONE_RE = re.compile(r"done=(?P<done>\d+)/(?P<total>\d+)")
+
+
+def _ts_epoch(value: str) -> float:
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _watchdog_no_evidence_elapsed(log_path: Path) -> dict[str, Any]:
+    if not log_path.exists():
+        return {}
+    latest: dict[str, Any] | None = None
+    last_growth: dict[str, Any] | None = None
+    for line in log_path.read_text(errors="ignore").splitlines():
+        ts = _WATCHDOG_TS_RE.search(line)
+        counts = _WATCHDOG_COUNT_RE.search(line)
+        if not ts or not counts:
+            continue
+        done = _WATCHDOG_DONE_RE.search(line)
+        rec = {
+            "ts": ts.group("ts"),
+            "epoch": _ts_epoch(ts.group("ts")),
+            "rows": int(counts.group("rows")),
+            "papers": int(counts.group("papers")),
+            "done": int(done.group("done")) if done else None,
+            "total": int(done.group("total")) if done else None,
+        }
+        if latest is None or rec["rows"] != latest["rows"] or rec["papers"] != latest["papers"]:
+            last_growth = rec
+        latest = rec
+    if not latest or not last_growth:
+        return {}
+    out = {
+        "log_no_evidence_elapsed_s": int(max(0, latest["epoch"] - last_growth["epoch"])),
+        "log_latest_done": latest.get("done"),
+        "log_latest_total": latest.get("total"),
+    }
+    if latest.get("done") is not None and last_growth.get("done") is not None:
+        out["log_no_evidence_done_delta"] = int(latest["done"]) - int(last_growth["done"])
+    return out
+
+
+def load_section_frontfill_state(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"available": False}
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"available": False, "reason": "unreadable"}
+    if not isinstance(state, dict):
+        return {"available": False, "reason": "not_object"}
+    no_evidence_delta = int(state.get("no_evidence_done_delta") or 0)
+    no_evidence_elapsed_s = int(state.get("no_evidence_elapsed_s") or 0)
+    low_yield_intervals = int(state.get("low_yield_intervals") or 0)
+    log_state = _watchdog_no_evidence_elapsed(path.with_name("section_top12000_watchdog.log"))
+    no_evidence_delta = max(no_evidence_delta, int(log_state.get("log_no_evidence_done_delta") or 0))
+    no_evidence_elapsed_s = max(no_evidence_elapsed_s, int(log_state.get("log_no_evidence_elapsed_s") or 0))
+    if low_yield_intervals >= 2 or no_evidence_elapsed_s >= 4 * 3600:
+        status = "soft_stall"
+    elif no_evidence_delta >= 200:
+        status = "low_yield"
+    else:
+        status = "running_or_unknown"
+    return {
+        "available": True,
+        "status": status,
+        "done": state.get("done"),
+        "total": state.get("total"),
+        "log_latest_done": log_state.get("log_latest_done"),
+        "log_latest_total": log_state.get("log_latest_total"),
+        "rows": state.get("rows"),
+        "papers": state.get("papers"),
+        "primary_section_papers": state.get("primary_section_papers"),
+        "no_evidence_done_delta": no_evidence_delta,
+        "no_evidence_elapsed_s": no_evidence_elapsed_s,
+        "low_yield_intervals": low_yield_intervals,
+    }
 
 
 def collect_metrics(db_main: Path, db_v14: Path) -> dict[str, Any]:
@@ -173,6 +257,25 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 "next_action": "Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.",
             }
         )
+    frontfill = m.get("section_frontfill_state") or {}
+    if frontfill.get("status") in {"low_yield", "soft_stall"}:
+        delta = int(frontfill.get("no_evidence_done_delta") or 0)
+        elapsed_h = float(frontfill.get("no_evidence_elapsed_s") or 0) / 3600.0
+        delta_text = f"{delta:,} candidates" if delta else "candidate delta unknown"
+        blockers.append(
+            {
+                "gate": "section_frontfill_efficiency",
+                "severity": "high" if frontfill.get("status") == "soft_stall" else "medium",
+                "why": (
+                    f"section frontfill is {frontfill.get('status')}: "
+                    f"{delta_text} and {elapsed_h:.1f}h since last evidence growth."
+                ),
+                "next_action": (
+                    "Do not wait passively for topN. Run queue audit/delta handoff for high-value papers "
+                    "and classify no-target-section/no-PDF/timeout failures before promoting bottleneck claims."
+                ),
+            }
+        )
     if m["predicted_future_edges"] and not m["future_directions"]:
         blockers.append(
             {
@@ -223,6 +326,15 @@ def readiness_level(m: dict[str, Any], blockers: list[dict[str, str]]) -> str:
 
 
 def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], level: str) -> str:
+    frontfill = metrics.get("section_frontfill_state") or {}
+    frontfill_line = []
+    if frontfill.get("available"):
+        frontfill_line = [
+            f"- section frontfill health: {frontfill.get('status')} "
+            f"(done={frontfill.get('done')}/{frontfill.get('total')}, "
+            f"no_evidence_delta={int(frontfill.get('no_evidence_done_delta') or 0):,}, "
+            f"no_evidence_hours={float(frontfill.get('no_evidence_elapsed_s') or 0) / 3600.0:.1f})"
+        ]
     lines = [
         "# Direction Readiness Audit",
         "",
@@ -235,6 +347,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
         f"- primary section evidence: {metrics['primary_section_papers']:,} papers ({pct(metrics['primary_section_rate'])})",
+        *frontfill_line,
         f"- predicted future edges: {metrics['predicted_future_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
         f"- future directions: {metrics['future_directions']:,}",
@@ -289,6 +402,9 @@ def run_audit(db_main: Path, db_v14: Path, out_dir: Path) -> dict[str, Any]:
     lifecycle = run_lifecycle_audit(db_main, db_v14, out_dir, write_table=True)
     metrics = collect_metrics(db_main, db_v14)
     metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
+    metrics["section_frontfill_state"] = load_section_frontfill_state(
+        Path("logs/v14b/section_top12000_watchdog_state.json")
+    )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)
