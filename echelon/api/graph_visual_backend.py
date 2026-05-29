@@ -1211,6 +1211,86 @@ def _paper_ref(paper: dict[str, Any], why: str | None = None) -> dict[str, Any]:
     }
 
 
+def _paper_evidence_object(
+    paper: dict[str, Any] | None,
+    *,
+    role: str,
+    source: str,
+    why: str | None = None,
+) -> dict[str, Any] | None:
+    if not paper or not paper.get("paper_id"):
+        return None
+    return {
+        "type": "paper",
+        "role": role,
+        "source": source,
+        "paper_id": paper.get("paper_id"),
+        "title": paper.get("title"),
+        "year": paper.get("year"),
+        "cluster_id": paper.get("cluster_id"),
+        "branch_id": paper.get("branch_id"),
+        "label": paper.get("title") or paper.get("paper_id"),
+        "why": why or paper.get("why") or (paper.get("reason") or {}).get("why"),
+        "access_links": paper.get("access_links") or [],
+        "content_availability": paper.get("content_availability") or {},
+        "click_target": {"kind": "paper", "id": paper.get("paper_id")},
+    }
+
+
+def _limitation_evidence_object(limitation: dict[str, Any] | None, *, source: str) -> dict[str, Any] | None:
+    if not limitation:
+        return None
+    paper_id = limitation.get("paper_id")
+    return {
+        "type": "limitation_atom",
+        "role": "bottleneck_evidence",
+        "source": source,
+        "paper_id": paper_id,
+        "label": limitation.get("keyword") or "limitation",
+        "description": limitation.get("description"),
+        "evidence_quality": limitation.get("evidence_quality"),
+        "click_target": {"kind": "paper", "id": paper_id} if paper_id else None,
+    }
+
+
+def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source: str) -> dict[str, Any] | None:
+    if not edge:
+        return None
+    source_id = edge.get("source_paper_id")
+    target_id = edge.get("target_paper_id")
+    if not source_id and not target_id:
+        return None
+    return {
+        "type": edge_type,
+        "role": edge_type,
+        "source": source,
+        "edge_id": edge.get("edge_id"),
+        "source_paper_id": source_id,
+        "target_paper_id": target_id,
+        "weight": edge.get("weight"),
+        "confidence": edge.get("confidence"),
+        "label": f"{source_id or '?'} -> {target_id or '?'}",
+        "relationship_scope": (edge.get("evidence") or {}).get("relationship_scope"),
+        "click_target": {"kind": "edge", "id": edge.get("edge_id") or f"{source_id}->{target_id}"},
+    }
+
+
+def _compact_evidence_objects(objects: list[dict[str, Any] | None], *, limit: int = 12) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[Any, Any, Any]] = set()
+    for obj in objects:
+        if not obj:
+            continue
+        key = (obj.get("type"), obj.get("paper_id") or obj.get("edge_id"), obj.get("label"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(obj)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _build_topic_branch_splits(
     topic: str,
     hits: list[dict[str, Any]],
@@ -1234,6 +1314,17 @@ def _build_topic_branch_splits(
             if p.get("paper_id") in turning_by_id
         ]
         evidence = turning[:3] or matched[:3]
+        evidence_objects = _compact_evidence_objects(
+            [
+                _paper_evidence_object(
+                    p,
+                    role="branch_driver",
+                    source="topic_branch_facet",
+                    why="turning/main-path evidence" if p.get("paper_id") in turning_by_id else "topic evidence",
+                )
+                for p in evidence
+            ]
+        )
         splits.append(
             {
                 "name": facet["name"],
@@ -1247,6 +1338,7 @@ def _build_topic_branch_splits(
                     _paper_ref(p, "turning/main-path evidence" if p.get("paper_id") in turning_by_id else "topic evidence")
                     for p in evidence
                 ],
+                "evidence_objects": evidence_objects,
             }
         )
     if splits:
@@ -1266,6 +1358,17 @@ def _build_topic_branch_splits(
                 "enabling_condition": "unknown until section-level evidence is available",
                 "first_seen_year": min((int(p.get("year")) for p in branch_hits if p.get("year")), default=None),
                 "driver_papers": [_paper_ref(p, "representative topic evidence") for p in branch_hits[:3]],
+                "evidence_objects": _compact_evidence_objects(
+                    [
+                        _paper_evidence_object(
+                            p,
+                            role="branch_representative",
+                            source="cluster_topic_concentration",
+                            why="representative topic evidence",
+                        )
+                        for p in branch_hits[:3]
+                    ]
+                ),
             }
         )
     return fallback
@@ -1317,11 +1420,26 @@ def _build_bottleneck_dossiers(
                         "description": r.get("description"),
                         "keyword": r.get("keyword"),
                         "evidence_quality": r.get("evidence_quality"),
-                    }
-                    for r in rows[:4]
+                }
+                for r in rows[:4]
+            ],
+            "evidence_objects": _compact_evidence_objects(
+                [
+                    *[
+                        _paper_evidence_object(
+                            by_id.get(lim.get("paper_id")) or {"paper_id": lim.get("paper_id"), "title": lim.get("title")},
+                            role="bottleneck_paper",
+                            source="limitation_atoms",
+                            why=f"limitation evidence: {lim.get('keyword') or label}",
+                        )
+                        for lim in rows[:5]
+                    ],
+                    *[_limitation_evidence_object(lim, source="limitation_atoms") for lim in rows[:5]],
                 ],
-            }
-        )
+                limit=10,
+            ),
+        }
+    )
     return dossiers
 
 
@@ -1342,6 +1460,7 @@ def _build_validation_directions(
                 "why_not_ready": None if item.get("eligible") else "Claim Card exists but high-confidence gates are not fully passed.",
                 "evidence_papers": [],
                 "source": "Step6/Step13 Claim Card",
+                "evidence_objects": [],
             }
             for item in rd_radar.get("claim_cards", [])[:5]
         ]
@@ -1367,6 +1486,30 @@ def _build_validation_directions(
                 ),
                 "evidence_papers": (branch.get("driver_papers") or [])[:3] + (bottleneck.get("evidence_papers") or [])[:2],
                 "source": "topic branch + limitation evidence",
+                "evidence_objects": _compact_evidence_objects(
+                    [
+                        *[
+                            _paper_evidence_object(
+                                p,
+                                role="validation_branch_driver",
+                                source="topic_branch",
+                                why=p.get("why") if isinstance(p, dict) else None,
+                            )
+                            for p in (branch.get("driver_papers") or [])[:3]
+                        ],
+                        *[
+                            _paper_evidence_object(
+                                p,
+                                role="validation_bottleneck_evidence",
+                                source="bottleneck_dossier",
+                                why=p.get("why") if isinstance(p, dict) else None,
+                            )
+                            for p in (bottleneck.get("evidence_papers") or [])[:2]
+                        ],
+                        *((bottleneck.get("evidence_objects") or [])[:4] if isinstance(bottleneck, dict) else []),
+                    ],
+                    limit=10,
+                ),
             }
         )
     if not directions and future_growth:
@@ -1384,6 +1527,24 @@ def _build_validation_directions(
                         _paper_ref(edge.get("target_paper") or {"paper_id": edge.get("target_paper_id")}, "future edge target"),
                     ],
                     "source": "Step5b GNN candidate",
+                    "evidence_objects": _compact_evidence_objects(
+                        [
+                            _edge_evidence_object(edge, edge_type="future_candidate", source="Step5b VGAE"),
+                            _paper_evidence_object(
+                                edge.get("source_paper") or {"paper_id": edge.get("source_paper_id")},
+                                role="future_source",
+                                source="Step5b VGAE",
+                                why="future edge source",
+                            ),
+                            _paper_evidence_object(
+                                edge.get("target_paper") or {"paper_id": edge.get("target_paper_id")},
+                                role="future_target",
+                                source="Step5b VGAE",
+                                why="future edge target",
+                            ),
+                        ],
+                        limit=8,
+                    ),
                 }
             )
     return directions[:5]
@@ -1725,6 +1886,72 @@ def _build_topic_dossier(
     else:
         branch_text = ", ".join(branch_labels[:3]) or "several evidence branches"
     bottleneck_text = ", ".join(x["name"] for x in bottleneck_dossiers[:5]) or ", ".join(bottlenecks[:5])
+    evidence_objects = _compact_evidence_objects(
+        [
+            *[
+                obj
+                for branch in branch_splits[:6]
+                for obj in (branch.get("evidence_objects") or [])
+            ],
+            *[
+                obj
+                for bottleneck in bottleneck_dossiers[:6]
+                for obj in (bottleneck.get("evidence_objects") or [])
+            ],
+            *[
+                obj
+                for direction in validation_directions[:5]
+                for obj in (direction.get("evidence_objects") or [])
+            ],
+            *[
+                _paper_evidence_object(
+                    paper,
+                    role="key_turning_paper",
+                    source="topic_main_path",
+                    why=(paper.get("reason") or {}).get("why") if isinstance(paper, dict) else None,
+                )
+                for paper in turning_hits[:8]
+            ],
+            *[
+                _edge_evidence_object(edge, edge_type="future_candidate", source="Step5b VGAE")
+                for edge in future_growth[:8]
+            ],
+        ],
+        limit=40,
+    )
+    insufficient_evidence = []
+    if not branch_splits:
+        insufficient_evidence.append(
+            {
+                "claim": "interpretable branch split",
+                "reason": "no branch split matched the topic with driver-paper evidence",
+                "needed": "branch lineage or representative cluster evidence",
+            }
+        )
+    if not bottleneck_dossiers:
+        insufficient_evidence.append(
+            {
+                "claim": "hard bottleneck dossier",
+                "reason": "no unresolved limitation atoms matched this topic context",
+                "needed": "section-level limitations/discussion/conclusion evidence",
+            }
+        )
+    if future_growth and not rd_radar.get("claim_cards_ready"):
+        insufficient_evidence.append(
+            {
+                "claim": "investable future direction",
+                "reason": "future candidates exist but Step6/Step13 Claim Cards are not complete",
+                "needed": "fusion evidence plus five-question Claim Cards",
+            }
+        )
+    if section_ready == 0:
+        insufficient_evidence.append(
+            {
+                "claim": "strong local evidence",
+                "reason": "no primary section evidence was present in this topic result set",
+                "needed": "paper_sections from limitations/discussion/conclusion/future_work/results/methods",
+            }
+        )
     return {
         "headline": (
             f"{topic} is best read as a {phase} topic organized around {branch_text}."
@@ -1741,6 +1968,8 @@ def _build_topic_dossier(
         "branch_splits": branch_splits,
         "hard_bottlenecks": bottleneck_dossiers,
         "validation_directions": validation_directions,
+        "evidence_objects": evidence_objects,
+        "insufficient_evidence": insufficient_evidence,
         "solved_vs_open": {
             "partially_addressed": [
                 b["name"]

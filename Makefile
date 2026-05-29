@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -106,6 +106,24 @@ quality-audit:
 		--out-dir reports/v14b_pilot \
 		$(CORPUS_ARG) \
 		--fail-on $${V14B_AUDIT_FAIL_ON:-none}
+
+## Product baseline: 50h task list + Topic Dossier value rubric
+product-baseline:
+	@echo ">>> Product baseline: task backlog + Topic Dossier quality snapshot..."
+	$(PYTHON) -m echelon.v14b.product_baseline \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--topic $${V14B_BASELINE_TOPIC:-metalens} \
+		--top-k $${V14B_BASELINE_TOP_K:-80}
+
+## Topic regression: Metalens value baseline
+topic-regression:
+	@echo ">>> Topic regression: Metalens decision-grade dossier audit..."
+	$(PYTHON) -m echelon.v14b.topic_regression \
+		--topic $${V14B_TOPIC_REGRESSION_TOPIC:-metalens} \
+		--top-k $${V14B_TOPIC_REGRESSION_TOP_K:-80} \
+		--out-dir reports/v14b_pilot
 
 ## Step 1: OpenAlex enrich 13606 篇 (~1.5h)
 enrich:

@@ -230,6 +230,35 @@ function evidencePaperButtons(papers = [], limit = 5) {
   `;
 }
 
+function renderEvidenceObjects(objects = [], limit = 8) {
+  const items = (objects || []).filter(Boolean).slice(0, limit);
+  if (!items.length) return "";
+  return `
+    <details class="evidence-objects">
+      <summary>查看证据对象 (${fmt(items.length)})</summary>
+      ${items.map((obj) => {
+        const label = obj.label || obj.title || obj.paper_id || obj.edge_id || obj.type || "evidence";
+        const meta = [obj.type, obj.role, obj.source, obj.evidence_quality].filter(Boolean).join(" / ");
+        if (obj.paper_id) {
+          return `
+            <button class="evidence-paper" data-paper="${esc(obj.paper_id)}">
+              <strong>${esc(truncate(label, 96))}</strong>
+              <small>${esc(obj.paper_id)}${meta ? ` / ${esc(meta)}` : ""}</small>
+            </button>
+          `;
+        }
+        return `
+          <div class="evidence-object">
+            <strong>${esc(truncate(label, 110))}</strong>
+            <small>${esc(meta || "graph evidence")}</small>
+            ${obj.description ? `<p class="mini">${esc(truncate(obj.description, 220))}</p>` : ""}
+          </div>
+        `;
+      }).join("")}
+    </details>
+  `;
+}
+
 function shader(type, source) {
   const s = gl.createShader(type);
   gl.shaderSource(s, source);
@@ -927,6 +956,7 @@ function renderTopicDossier(dossier = {}) {
   const bottlenecks = dossier.hard_bottlenecks || [];
   const directions = dossier.validation_directions || [];
   const solved = dossier.solved_vs_open || {};
+  const insufficient = dossier.insufficient_evidence || [];
   return `
     <div class="dossier-hero">
       <strong>${esc(dossier.headline || "Topic dossier is being assembled.")}</strong>
@@ -943,6 +973,16 @@ function renderTopicDossier(dossier = {}) {
         ${(dossier.core_bottlenecks || []).slice(0, 5).map((x) => `<span class="pill warn">${esc(x)}</span>`).join("")}
       </div>
       <p class="mini">${esc(dossier.warning || "")}</p>
+      ${renderEvidenceObjects(dossier.evidence_objects || [], 10)}
+      ${insufficient.length ? `
+        <details class="insufficient-evidence">
+          <summary>证据不足，不作为强结论 (${fmt(insufficient.length)})</summary>
+          ${insufficient.map((item) => `
+            <p><strong>${esc(item.claim || "claim")}</strong><br>
+            <small>${esc(item.reason || "")} / 需要：${esc(item.needed || "")}</small></p>
+          `).join("")}
+        </details>
+      ` : ""}
     </div>
     <div class="item important">
       <div class="paper-meta">当前真实分支</div>
@@ -954,6 +994,7 @@ function renderTopicDossier(dossier = {}) {
           <p><strong>历史卡点：</strong>${esc(split.historical_bottleneck || "")}</p>
           <p><strong>使能条件：</strong>${esc(split.enabling_condition || "")}</p>
           ${evidencePaperButtons(split.driver_papers || [], 3)}
+          ${renderEvidenceObjects(split.evidence_objects || [], 5)}
         </div>
       `).join("") || "<p>No interpretable branch split has enough evidence yet.</p>"}
     </div>
@@ -968,6 +1009,7 @@ function renderTopicDossier(dossier = {}) {
           <small>${fmt(b.evidence_count || 0)} evidence atoms / ${esc(b.evidence_quality || "unknown")}</small>
           <p>${esc(b.why_it_matters || "")}</p>
           ${evidencePaperButtons(b.evidence_papers || [], 4)}
+          ${renderEvidenceObjects(b.evidence_objects || [], 6)}
         </div>
       `).join("") || "<p>No bottleneck evidence matched.</p>"}
     </div>
@@ -981,6 +1023,7 @@ function renderTopicDossier(dossier = {}) {
           ${d.why_not_ready ? `<p><strong>为什么还不能下注：</strong>${esc(d.why_not_ready)}</p>` : ""}
           ${d.minimal_validation_experiment ? `<p><strong>最小验证实验：</strong>${esc(d.minimal_validation_experiment)}</p>` : ""}
           ${evidencePaperButtons(d.evidence_papers || [], 5)}
+          ${renderEvidenceObjects(d.evidence_objects || [], 6)}
         </div>
       `).join("") || "<p>No validation direction has enough evidence yet.</p>"}
     </div>
