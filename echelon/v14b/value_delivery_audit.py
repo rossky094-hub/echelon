@@ -18,8 +18,8 @@ from typing import Any
 
 from echelon.v14b.direction_readiness_audit import (
     collect_metrics,
-    load_section_frontfill_state,
     scalar,
+    select_section_frontfill_state,
     table_exists,
 )
 from echelon.v14b.evidence_grade import (
@@ -351,9 +351,7 @@ def audit_quarterly_multi_corpus(db_main: Path, repo_root: Path) -> dict[str, An
 
 def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir: Path | None = None) -> dict[str, Any]:
     metrics = collect_metrics(db_main, db_v14)
-    metrics["section_frontfill_state"] = load_section_frontfill_state(
-        repo_root / "logs/v14b/section_top12000_watchdog_state.json"
-    )
+    metrics["section_frontfill_state"] = select_section_frontfill_state(repo_root)
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
     with sqlite3.connect(str(db_v14)) as conn_v14:

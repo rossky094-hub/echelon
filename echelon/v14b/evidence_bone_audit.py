@@ -378,9 +378,12 @@ def frontfill_health(
     progress = logs.get("progress") or {}
     done = state.get("done", progress.get("done"))
     total = state.get("total", progress.get("total"))
-    rows = int(state.get("rows") or sections.get("section_rows") or 0)
-    papers = int(state.get("papers") or sections.get("section_papers") or 0)
-    primary = int(state.get("primary_section_papers") or sections.get("primary_section_papers") or 0)
+    rows = max(int(state.get("rows") or 0), int(sections.get("section_rows") or 0))
+    papers = max(int(state.get("papers") or 0), int(sections.get("section_papers") or 0))
+    primary = max(
+        int(state.get("primary_section_papers") or 0),
+        int(sections.get("primary_section_papers") or 0),
+    )
     no_evidence_delta = int(state.get("no_evidence_done_delta") or 0)
     no_evidence_elapsed_s = int(state.get("no_evidence_elapsed_s") or 0)
     low_yield_intervals = int(state.get("low_yield_intervals") or 0)
@@ -438,6 +441,7 @@ def frontfill_health(
         "soft_stall_events": soft_stall_events,
         "watchdog_history": history,
         "state_file": str(state_file),
+        "source": state_file.stem.replace("_watchdog_state", ""),
         "recommendation": recommendation,
     }
 
@@ -468,6 +472,11 @@ def collect_audit(
         refs = reference_taxonomy(conn_main)
         sections = section_coverage(conn_main, conn_v14)
     logs = section_log_taxonomy([section_log, watchdog_log, openalex_log])
+    logs["source"] = {
+        "section_log": str(section_log),
+        "watchdog_log": str(watchdog_log),
+        "watchdog_state": str(watchdog_state),
+    }
     history = watchdog_history(watchdog_log)
     health = frontfill_health(sections, logs, watchdog_state, history)
     return {
@@ -549,13 +558,15 @@ def render_markdown(result: dict[str, Any]) -> str:
         lines.append(f"| {key} | {value:,} |")
     prog = logs.get("progress") or {}
     if prog.get("done"):
-        lines.extend(["", f"- section progress: {prog.get('done')}/{prog.get('total')}"])
+        source = (logs.get("source") or {}).get("section_log") or "unknown"
+        lines.extend(["", f"- section progress: {prog.get('done')}/{prog.get('total')} ({source})"])
     lines.extend(
         [
             "",
             "## Frontfill Health",
             "",
             f"- status: `{health.get('status', 'unknown')}`",
+            f"- source: `{health.get('source', 'unknown')}`",
             f"- progress: `{health.get('done')}/{health.get('total')}`",
             f"- rows / papers / primary papers: `{int(health.get('rows') or 0):,}` / `{int(health.get('papers') or 0):,}` / `{int(health.get('primary_section_papers') or 0):,}`",
             f"- candidates since last evidence growth: `{int(health.get('no_evidence_done_delta') or 0):,}`",
@@ -576,16 +587,44 @@ def render_markdown(result: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _default_frontfill_paths() -> tuple[Path, Path, Path]:
+    candidates = [
+        (
+            Path("logs/v14b/step5s_section_delta.log"),
+            Path("logs/v14b/section_delta_watchdog.log"),
+            Path("logs/v14b/section_delta_watchdog_state.json"),
+        ),
+        (
+            Path("logs/v14b/step5s_section_top12000.log"),
+            Path("logs/v14b/section_top12000_watchdog.log"),
+            Path("logs/v14b/section_top12000_watchdog_state.json"),
+        ),
+    ]
+    existing = [paths for paths in candidates if any(path.exists() for path in paths)]
+    if not existing:
+        return candidates[1]
+
+    def newest(paths: tuple[Path, Path, Path]) -> float:
+        return max((path.stat().st_mtime for path in paths if path.exists()), default=0.0)
+
+    return max(existing, key=newest)
+
+
 def run_audit(
     *,
     db_main: Path = DB_MAIN,
     db_v14: Path = DB_V14,
     out_dir: Path = Path("reports/v14b_pilot"),
-    section_log: Path = Path("logs/v14b/step5s_section_top12000.log"),
-    watchdog_log: Path = Path("logs/v14b/section_top12000_watchdog.log"),
-    watchdog_state: Path = Path("logs/v14b/section_top12000_watchdog_state.json"),
+    section_log: Path | None = None,
+    watchdog_log: Path | None = None,
+    watchdog_state: Path | None = None,
     openalex_log: Path = Path("logs/v14b/openalex_backfill_current.log"),
 ) -> dict[str, Any]:
+    if section_log is None or watchdog_log is None or watchdog_state is None:
+        default_section, default_watchdog, default_state = _default_frontfill_paths()
+        section_log = section_log or default_section
+        watchdog_log = watchdog_log or default_watchdog
+        watchdog_state = watchdog_state or default_state
     result = collect_audit(
         db_main=db_main,
         db_v14=db_v14,
@@ -607,18 +646,18 @@ def main() -> None:
     parser.add_argument("--db", default=str(DB_MAIN))
     parser.add_argument("--db-v14", default=str(DB_V14))
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
-    parser.add_argument("--section-log", default="logs/v14b/step5s_section_top12000.log")
-    parser.add_argument("--watchdog-log", default="logs/v14b/section_top12000_watchdog.log")
-    parser.add_argument("--watchdog-state", default="logs/v14b/section_top12000_watchdog_state.json")
+    parser.add_argument("--section-log", default=None)
+    parser.add_argument("--watchdog-log", default=None)
+    parser.add_argument("--watchdog-state", default=None)
     parser.add_argument("--openalex-log", default="logs/v14b/openalex_backfill_current.log")
     args = parser.parse_args()
     result = run_audit(
         db_main=Path(args.db),
         db_v14=Path(args.db_v14),
         out_dir=Path(args.out_dir),
-        section_log=Path(args.section_log),
-        watchdog_log=Path(args.watchdog_log),
-        watchdog_state=Path(args.watchdog_state),
+        section_log=Path(args.section_log) if args.section_log else None,
+        watchdog_log=Path(args.watchdog_log) if args.watchdog_log else None,
+        watchdog_state=Path(args.watchdog_state) if args.watchdog_state else None,
         openalex_log=Path(args.openalex_log),
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))

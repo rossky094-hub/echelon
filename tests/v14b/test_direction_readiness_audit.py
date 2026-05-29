@@ -9,6 +9,7 @@ from echelon.v14b.direction_readiness_audit import (
     load_section_frontfill_state,
     readiness_level,
     run_audit,
+    select_section_frontfill_state,
 )
 
 
@@ -119,6 +120,24 @@ def test_direction_readiness_infers_soft_stall_from_watchdog_log(tmp_path):
 
     assert loaded["status"] == "soft_stall"
     assert loaded["no_evidence_elapsed_s"] > 9 * 3600
+
+
+def test_direction_readiness_prefers_active_delta_watchdog_state(tmp_path):
+    log_dir = tmp_path / "logs" / "v14b"
+    log_dir.mkdir(parents=True)
+    (log_dir / "section_top12000_watchdog_state.json").write_text(
+        '{"done": 1000, "total": 12000, "rows": 100, "papers": 90}',
+        encoding="utf-8",
+    )
+    (log_dir / "section_delta_watchdog_state.json").write_text(
+        '{"done": 20, "total": 12227, "rows": 200, "papers": 190}',
+        encoding="utf-8",
+    )
+
+    loaded = select_section_frontfill_state(tmp_path)
+
+    assert loaded["source"] == "section_delta"
+    assert loaded["done"] == 20
 
 
 def test_direction_readiness_writes_report(tmp_path):

@@ -3,7 +3,12 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from echelon.v14b.evidence_bone_audit import collect_audit, run_audit, watchdog_history
+from echelon.v14b.evidence_bone_audit import (
+    _default_frontfill_paths,
+    collect_audit,
+    run_audit,
+    watchdog_history,
+)
 
 
 def _make_main(path: Path) -> None:
@@ -147,6 +152,21 @@ def test_watchdog_history_detects_elapsed_no_evidence_growth(tmp_path):
     assert history["available"] is True
     assert history["latest"]["done"] == 944
     assert history["no_evidence_elapsed_s"] > 6 * 3600
+
+
+def test_evidence_bone_default_frontfill_paths_prefer_delta(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    log_dir = tmp_path / "logs" / "v14b"
+    log_dir.mkdir(parents=True)
+    (log_dir / "step5s_section_top12000.log").write_text("old", encoding="utf-8")
+    (log_dir / "section_top12000_watchdog_state.json").write_text("{}", encoding="utf-8")
+    (log_dir / "step5s_section_delta.log").write_text("new", encoding="utf-8")
+    (log_dir / "section_delta_watchdog_state.json").write_text("{}", encoding="utf-8")
+
+    section_log, _watchdog_log, state = _default_frontfill_paths()
+
+    assert section_log.name == "step5s_section_delta.log"
+    assert state.name == "section_delta_watchdog_state.json"
 
 
 def test_evidence_bone_audit_writes_report(tmp_path):

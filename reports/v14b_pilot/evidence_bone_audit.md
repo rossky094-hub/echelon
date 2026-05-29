@@ -1,24 +1,24 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-29T17:19:36Z`
+- generated_at: `2026-05-29T17:30:50Z`
 
 ## Reference Linkage
 
-- linked refs: 442,988 / 3,199,564 (13.8%)
-- unlinked refs: 2,756,576
+- linked refs: 443,077 / 3,200,038 (13.8%)
+- unlinked refs: 2,756,961
 
 | unlinked kind | count |
 | --- | ---: |
 | doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,280,666 |
+| openalex_unlinked | 1,281,051 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
 ## Section Evidence
 
-- section rows: 1,241
-- section papers: 690
-- primary section papers: 690
+- section rows: 1,284
+- section papers: 714
+- primary section papers: 714
 
 ### High-Value Priority Coverage
 
@@ -34,23 +34,32 @@
 | limitation_evidence | 268 | 268 | 268 | 160 | 268 |
 | topic:metalens | 253 | 82 | 15 | 9 | 253 |
 
+### Latest Section Ingest Outcomes
+
+| outcome | papers |
+| --- | ---: |
+| no_target_sections | 58 |
+| success_primary | 18 |
+| success_secondary_only | 9 |
+
 ## Frontfill Log Signals
 
 | event | count |
 | --- | ---: |
-| download_failure | 22,614 |
-| pdf_graphics_warning | 3,044 |
+| download_failure | 22,615 |
+| pdf_graphics_warning | 43 |
 
-- section progress: 1027/12000
+- section progress: 85/12227 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
-- status: `soft_stall`
-- progress: `1024/12000`
-- rows / papers / primary papers: `1,241` / `690` / `690`
-- candidates since last evidence growth: `9`
-- seconds since last evidence growth: `36,878`
-- recommendation: Do not wait for topN completion as if it were productive evidence growth. Keep the single live process conservative, but prepare/advance the high-value delta queue and classify no-PDF/no-target-section/timeouts before downstream claims.
+- status: `insufficient_but_running`
+- source: `section_delta`
+- progress: `None/None`
+- rows / papers / primary papers: `1,284` / `714` / `714`
+- candidates since last evidence growth: `0`
+- seconds since last evidence growth: `0`
+- recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.
 
 ## Recommended Next Actions
 
@@ -60,7 +69,7 @@
 - Keep S2 IDs separate from OpenAlex IDs and relink through s2_paper_id.
 - After top12000 completes, run delta queue for high-value papers missing primary sections.
 - Prioritize section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens
-- Suppress or downgrade noisy PDF graphics warnings so true parser failures remain visible.
+- Mark no_target_sections papers as weak evidence unless alternate parser/Sci-Bot sections are available.
 - Keep single-process section ingest and add retry classification before increasing concurrency.
 
 ## Product Interpretation

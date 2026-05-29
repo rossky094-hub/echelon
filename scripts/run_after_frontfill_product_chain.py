@@ -29,6 +29,25 @@ DEFAULT_STEPS = (
     "goal-audit",
 )
 
+STEP_MODULES = {
+    "limitation": ("echelon.v14b.step5c_limitation", ()),
+    "fusion": ("echelon.v14b.step6_fusion", ()),
+    "first-principles": ("echelon.v14b.step13_first_principles_history", ("--out-dir", "reports/v14b_pilot")),
+    "mutation": ("echelon.v14b.step7_mutation", ()),
+    "layout": ("echelon.v14b.step8_layout", ()),
+    "report": ("echelon.v14b.step9_report", ()),
+    "visual-graph": ("echelon.v14b.step10_visual_graph_builder", ()),
+    "goal-audit": ("echelon.v14b.step12_goal_alignment_audit", ("--out-dir", "reports/v14b_pilot")),
+}
+
+EVIDENCE_SENSITIVE_STEPS = {
+    "limitation",
+    "fusion",
+    "mutation",
+    "layout",
+    "report",
+}
+
 
 def utc_now() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -144,8 +163,56 @@ def frontfill_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool, list
     return not failures, failures
 
 
-def run_step(repo_root: pathlib.Path, step: str, env: dict, log_file: pathlib.Path) -> None:
-    cmd = ["make", step]
+def build_step_command(
+    *,
+    python_exe: str,
+    step: str,
+    db_main: pathlib.Path,
+    db_v14: pathlib.Path,
+    corpus_id: str | None = None,
+    force_rerun: bool = True,
+) -> list[str]:
+    if step not in STEP_MODULES:
+        return ["make", step]
+
+    module, extra = STEP_MODULES[step]
+    cmd = [
+        python_exe,
+        "-m",
+        module,
+        "--db",
+        str(db_main),
+        "--db-v14",
+        str(db_v14),
+    ]
+    if corpus_id:
+        cmd += ["--corpus-id", corpus_id]
+    if force_rerun and step in EVIDENCE_SENSITIVE_STEPS:
+        cmd.append("--no-resume")
+    cmd.extend(extra)
+    return cmd
+
+
+def run_step(
+    repo_root: pathlib.Path,
+    step: str,
+    env: dict,
+    log_file: pathlib.Path,
+    *,
+    python_exe: str,
+    db_main: pathlib.Path,
+    db_v14: pathlib.Path,
+    corpus_id: str | None,
+    force_rerun: bool,
+) -> None:
+    cmd = build_step_command(
+        python_exe=python_exe,
+        step=step,
+        db_main=db_main,
+        db_v14=db_v14,
+        corpus_id=corpus_id,
+        force_rerun=force_rerun,
+    )
     log(log_file, f"RUN {' '.join(cmd)}")
     with log_file.open("a", encoding="utf-8") as f:
         p = subprocess.run(
@@ -173,6 +240,16 @@ def main(argv=None) -> int:
     parser.add_argument("--min-primary-field-rate", type=float, default=float(os.getenv("V14B_MIN_PRIMARY_FIELD_RATE", "0.95")))
     parser.add_argument("--step", action="append", default=None)
     parser.add_argument("--force", action="store_true", help="Run even if evidence gates are not ready; use only for smoke tests.")
+    parser.add_argument("--corpus-id", default=os.getenv("V14B_CORPUS_ID") or None)
+    parser.add_argument(
+        "--resume-downstream",
+        action="store_true",
+        help=(
+            "Allow checkpoint resume for evidence-sensitive downstream steps. "
+            "Default is to rebuild Step5c/6/7/8/9 after frontfill so new "
+            "section/OpenAlex evidence actually reaches Claim Cards and reports."
+        ),
+    )
     args = parser.parse_args(argv)
 
     repo_root = pathlib.Path(args.repo_root).resolve()
@@ -194,8 +271,19 @@ def main(argv=None) -> int:
     env.setdefault("NUMEXPR_NUM_THREADS", "4")
     env.setdefault("V14B_EMBEDDING_BATCH_SIZE", "16")
     env.setdefault("V14B_AUDIT_FAIL_ON", "none")
+    force_rerun = not args.resume_downstream
     for step in (args.step or list(DEFAULT_STEPS)):
-        run_step(repo_root, step, env, log_file)
+        run_step(
+            repo_root,
+            step,
+            env,
+            log_file,
+            python_exe=sys.executable or "python3",
+            db_main=db_main,
+            db_v14=db_v14,
+            corpus_id=args.corpus_id,
+            force_rerun=force_rerun,
+        )
     metrics_after = collect_metrics(db_main, db_v14)
     log(log_file, "PRODUCT_CHAIN_DONE " + json.dumps(metrics_after, ensure_ascii=False, sort_keys=True))
     return 0

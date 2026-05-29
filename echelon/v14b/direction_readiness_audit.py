@@ -100,6 +100,13 @@ def _watchdog_no_evidence_elapsed(log_path: Path) -> dict[str, Any]:
     return out
 
 
+def _watchdog_log_for_state(path: Path) -> Path:
+    name = path.name
+    if name.endswith("_state.json"):
+        return path.with_name(name[: -len("_state.json")] + ".log")
+    return path.with_suffix(".log")
+
+
 def load_section_frontfill_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"available": False}
@@ -112,7 +119,8 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
     no_evidence_delta = int(state.get("no_evidence_done_delta") or 0)
     no_evidence_elapsed_s = int(state.get("no_evidence_elapsed_s") or 0)
     low_yield_intervals = int(state.get("low_yield_intervals") or 0)
-    log_state = _watchdog_no_evidence_elapsed(path.with_name("section_top12000_watchdog.log"))
+    log_path = _watchdog_log_for_state(path)
+    log_state = _watchdog_no_evidence_elapsed(log_path)
     no_evidence_delta = max(no_evidence_delta, int(log_state.get("log_no_evidence_done_delta") or 0))
     no_evidence_elapsed_s = max(no_evidence_elapsed_s, int(log_state.get("log_no_evidence_elapsed_s") or 0))
     if low_yield_intervals >= 2 or no_evidence_elapsed_s >= 4 * 3600:
@@ -123,6 +131,9 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
         status = "running_or_unknown"
     return {
         "available": True,
+        "source": path.stem.replace("_watchdog_state", ""),
+        "state_path": str(path),
+        "watchdog_log": str(log_path),
         "status": status,
         "done": state.get("done"),
         "total": state.get("total"),
@@ -135,6 +146,18 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
         "no_evidence_elapsed_s": no_evidence_elapsed_s,
         "low_yield_intervals": low_yield_intervals,
     }
+
+
+def select_section_frontfill_state(repo_root: Path = Path(".")) -> dict[str, Any]:
+    candidates = [
+        repo_root / "logs/v14b/section_delta_watchdog_state.json",
+        repo_root / "logs/v14b/section_top12000_watchdog_state.json",
+    ]
+    existing = [p for p in candidates if p.exists()]
+    if not existing:
+        return {"available": False}
+    latest = max(existing, key=lambda p: p.stat().st_mtime)
+    return load_section_frontfill_state(latest)
 
 
 def collect_metrics(db_main: Path, db_v14: Path) -> dict[str, Any]:
@@ -329,8 +352,9 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     frontfill = metrics.get("section_frontfill_state") or {}
     frontfill_line = []
     if frontfill.get("available"):
+        source = frontfill.get("source") or "unknown"
         frontfill_line = [
-            f"- section frontfill health: {frontfill.get('status')} "
+            f"- section frontfill health: {frontfill.get('status')} [{source}] "
             f"(done={frontfill.get('done')}/{frontfill.get('total')}, "
             f"no_evidence_delta={int(frontfill.get('no_evidence_done_delta') or 0):,}, "
             f"no_evidence_hours={float(frontfill.get('no_evidence_elapsed_s') or 0) / 3600.0:.1f})"
@@ -402,9 +426,7 @@ def run_audit(db_main: Path, db_v14: Path, out_dir: Path) -> dict[str, Any]:
     lifecycle = run_lifecycle_audit(db_main, db_v14, out_dir, write_table=True)
     metrics = collect_metrics(db_main, db_v14)
     metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
-    metrics["section_frontfill_state"] = load_section_frontfill_state(
-        Path("logs/v14b/section_top12000_watchdog_state.json")
-    )
+    metrics["section_frontfill_state"] = select_section_frontfill_state(Path("."))
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)
