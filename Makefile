@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -133,6 +133,14 @@ access-audit:
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot \
 		--limit $${V14B_ACCESS_AUDIT_LIMIT:-12000}
+
+## Direction readiness audit: Step5b -> Step6 -> Step13 promotion gates
+direction-readiness-audit:
+	@echo ">>> Direction readiness audit: future candidates -> Claim Cards..."
+	$(PYTHON) -m echelon.v14b.direction_readiness_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot
 
 ## Step 1: OpenAlex enrich 13606 篇 (~1.5h)
 enrich:
