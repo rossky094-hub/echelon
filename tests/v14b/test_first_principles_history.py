@@ -115,3 +115,54 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     assert future_gate[2] == "exploratory_incomplete_card"
     assert "unresolved bottleneck evidence" in gate["missing_gates"]
     assert "future-growth calibration available" in gate["missing_high_confidence_gates"]
+
+
+def test_step13_complete_exploratory_card_is_not_high_confidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    atoms = [
+        {
+            "paper_id": "p1",
+            "paper_title": "Wafer-scale metalens manufacturing",
+            "publication_year": 2024,
+            "description": "Fabrication tolerance still limits broadband imaging quality.",
+            "keyword": "fabrication",
+            "severity": "high",
+            "evidence_quality": "section_level",
+            "evidence_weight": 0.9,
+            "is_resolved": 0,
+        }
+    ]
+    future_directions = [
+        {
+            "direction_id": 1,
+            "direction_name": "Wafer-scale broadband metalens manufacturing",
+            "paper_ids_json": '["p1"]',
+            "confidence": 0.82,
+            "evidence_tier": "exploratory",
+            "calibration_label": "calibrated_temporal_holdout",
+        }
+    ]
+    principles = [
+        {
+            "principle_id": "FP_PHYSICAL_CONSTRAINT",
+            "principle_name": "物理实现与制造约束",
+            "root_cause": "fabrication tolerance and material loss",
+        }
+    ]
+    calibration = {"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84}
+
+    cards, updates = build_direction_claim_cards(
+        atoms=atoms,
+        future_directions=future_directions,
+        principle_rows=principles,
+        calibration_audit=calibration,
+    )
+
+    assert len(cards) == 1
+    gate = json.loads(cards[0]["quality_gate_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["high_confidence_eligible"] == 0
+    assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
+    assert "triangulated Step6 fusion evidence" in gate["missing_high_confidence_gates"]
+    assert updates[0]["high_confidence_eligible"] == 0

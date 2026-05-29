@@ -1,6 +1,6 @@
 # Metasurface Holography Topic Regression
 
-- Audit: `2026-05-29T17:40:31Z`
+- Audit: `2026-05-29T18:13:09Z`
 - Topic: `metasurface holography`
 - Overall status: **fail**
 
@@ -13,7 +13,7 @@
 | expected bottlenecks evidenced | 2 | 5 | fail |
 | key turning papers | 80 | 4 | pass |
 | turning papers with access links | 80 | 3 | pass |
-| turning papers with primary sections | 2 | 2 | pass |
+| turning papers with primary sections | 3 | 2 | pass |
 | Claim Cards for Radar | 0 | 1 | fail |
 
 ## Expected Branches
@@ -37,6 +37,6 @@
 
 ## Interpretation
 
-- Key turning papers: 80 total, 80 with access links, 2 with primary local sections.
+- Key turning papers: 80 total, 80 with access links, 3 with primary local sections.
 - Future candidates: 0 graph candidates, 0 Radar cards, 0 complete cards.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.

@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-29T17:40:30Z`
+- Audit: `2026-05-29T18:13:08Z`
 - Topic: `metalens`
 - Overall status: **fail**
 
@@ -13,7 +13,7 @@
 | expected bottlenecks evidenced | 5 | 6 | fail |
 | key turning papers | 80 | 5 | pass |
 | turning papers with access links | 80 | 5 | pass |
-| turning papers with primary sections | 1 | 3 | fail |
+| turning papers with primary sections | 3 | 3 | pass |
 | Claim Cards for Radar | 0 | 1 | warn |
 
 ## Expected Branches
@@ -40,8 +40,8 @@
 
 ## Interpretation
 
-- Key turning papers: 80 total, 80 with access links, 1 with primary local sections.
-- Future candidates: 10 graph candidates, 0 Radar cards, 0 complete cards.
+- Key turning papers: 80 total, 80 with access links, 3 with primary local sections.
+- Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.
 
 ## Quality Gaps

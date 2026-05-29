@@ -690,6 +690,7 @@ def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
         "calibration_ready": "future-growth calibration available",
         "rolling_auc_ready": "rolling held-out-year AUC >= 0.65",
         "direction_confidence_ready": "direction confidence >= 0.70",
+        "fusion_tier_ready": "triangulated Step6 fusion evidence",
     }
     return [labels.get(k, k) for k, ok in gates.items() if not ok]
 
@@ -1299,12 +1300,15 @@ def build_direction_claim_cards(
         }
         five_complete = int(all(five_question_gates.values()))
 
+        evidence_tier = str(d.get("evidence_tier") or "")
+        fusion_tier_ready = evidence_tier == "triangulated_strong"
         high_confidence_gates = {
             "five_question_complete": bool(five_complete),
             "section_evidence_strong": section_strength == "strong",
             "calibration_ready": calibration_ready,
             "rolling_auc_ready": rolling_avg_auc >= 0.65,
             "direction_confidence_ready": float(d.get("confidence") or 0.0) >= 0.70,
+            "fusion_tier_ready": fusion_tier_ready,
         }
         high_confidence_eligible = int(all(high_confidence_gates.values()))
         claim_scope = (

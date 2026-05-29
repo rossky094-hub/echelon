@@ -1,18 +1,18 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T17:49:21Z`
+- generated_at: `2026-05-29T18:13:12Z`
 - evidence_policy: `insufficient_evidence`
-- gate_summary: `{"fail": 1, "pass": 4, "warn": 3}`
+- gate_summary: `{"fail": 1, "pass": 6, "warn": 1}`
 
 ## Eight Product Gates
 
 | # | Gate | Status | What This Enforces |
 | ---: | --- | --- | --- |
 | 1 | Evidence Bone | warn | All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes. |
-| 2 | Bottleneck Lineage Graph | warn | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
+| 2 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
 | 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such. |
 | 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card. |
-| 5 | Claim Card Engine | warn | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. |
+| 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. |
 | 6 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
 | 7 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
 | 8 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
@@ -26,9 +26,9 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13852511609803153,
-    "openalex_w_rate": 0.6237294867397231,
-    "primary_section_papers": 725,
+    "linked_ref_rate": 0.13847022413825943,
+    "openalex_w_rate": 0.6254084598580997,
+    "primary_section_papers": 740,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown"
   },
@@ -56,9 +56,9 @@
     "failure_mechanism->attempt_path",
     "local_fix->new_constraint"
   ],
-  "status": "warn",
+  "status": "pass",
   "triples": 2920,
-  "triples_with_page": 0
+  "triples_with_page": 164
 }
 ```
 
@@ -66,15 +66,15 @@
 
 ```json
 {
-  "branches": 5426,
+  "branches": 5286,
   "issue": "Branch Lineage Validity",
   "missing_columns": [],
   "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such.",
   "status": "pass",
   "status_counts": {
-    "evidence_backed_split": 107,
-    "layout_cluster_only": 4185,
-    "weak_split_candidate": 1134
+    "evidence_backed_split": 52,
+    "layout_cluster_only": 4950,
+    "weak_split_candidate": 284
   }
 }
 ```
@@ -95,7 +95,9 @@
   },
   "edge_calibration_rate": 1.0,
   "future_candidate_lifecycle": {
-    "future_candidate_unfused": 1000
+    "candidate_pool_incomplete_claim_card": 21,
+    "exploratory_claim_card": 421,
+    "future_candidate_unfused": 558
   },
   "issue": "Future Growth Calibration",
   "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
@@ -110,13 +112,13 @@
 ```json
 {
   "bad_high_confidence_cards": 0,
-  "cards": 0,
-  "complete_cards": 0,
+  "cards": 5,
+  "complete_cards": 1,
   "high_confidence_cards": 0,
   "issue": "Claim Card Engine",
   "missing_columns": [],
   "policy": "A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar.",
-  "status": "warn"
+  "status": "pass"
 }
 ```
 
@@ -128,7 +130,7 @@
   "issue": "Topic Dossier Product Value",
   "policy": "Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration.",
   "status": "pass",
-  "visual_edges": 739318,
+  "visual_edges": 772947,
   "visual_nodes": 55391
 }
 ```

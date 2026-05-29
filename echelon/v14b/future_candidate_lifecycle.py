@@ -273,7 +273,20 @@ def load_directions(conn_v14: sqlite3.Connection) -> tuple[dict[int, dict[str, A
             pids = []
         item["_paper_ids"] = {str(pid) for pid in pids}
         by_id[did] = item
-        if len(pids) >= 2:
+        evidence = jloads(item.get("evidence_json"), {})
+        explicit_pairs = evidence.get("future_edge_pairs") if isinstance(evidence, dict) else None
+        if isinstance(explicit_pairs, list) and explicit_pairs:
+            for pair in explicit_pairs:
+                if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                    continue
+                src, dst = str(pair[0] or ""), str(pair[1] or "")
+                if src and dst:
+                    by_edge[(src, dst)] = item
+        elif len(pids) >= 2:
+            # Legacy fallback for old fixtures that predate explicit Step6
+            # future_edge_pairs.  Current production Step6 writes exact pairs
+            # so lifecycle does not promote every edge sharing one endpoint with
+            # a broad direction paper set.
             for i, src in enumerate(pids):
                 for dst in pids[i + 1 :]:
                     by_edge[(str(src), str(dst))] = item
@@ -314,14 +327,7 @@ def _direction_for_candidate(
     dst = str(candidate.get("dst_paper_id") or "")
     if (src, dst) in directions_by_edge:
         return directions_by_edge[(src, dst)]
-    matched = []
-    for direction in directions_by_id.values():
-        pids = direction.get("_paper_ids") or set()
-        if src in pids or dst in pids:
-            matched.append(direction)
-    if not matched:
-        return None
-    return sorted(matched, key=lambda d: float(d.get("confidence") or 0.0), reverse=True)[0]
+    return None
 
 
 def build_lifecycle_rows(
@@ -362,9 +368,9 @@ def build_lifecycle_rows(
             evidence_grade = str(card.get("evidence_strength_level") or "metadata_only")
             claim_scope = str(card.get("claim_scope") or direction.get("claim_scope") or "candidate_pool_only")
             if high:
-                state = "radar_high_confidence"
-                radar_eligible = 1
-                candidate_reason = "Step6 and Step13 gates passed"
+                state = "fused_to_radar_claim_card"
+                radar_eligible = 0
+                candidate_reason = "Covered by a high-confidence Claim Card; Radar should show the card, not this raw edge"
             elif complete:
                 state = "exploratory_claim_card"
                 candidate_reason = "Claim Card complete but high-confidence gates remain open"
@@ -452,6 +458,7 @@ def summarize(rows: list[dict[str, Any]], context: dict[str, Any]) -> dict[str, 
         "missing_gate_counts": dict(missing_gate_counts),
         "missing_high_confidence_gate_counts": dict(missing_high_counts),
         "radar_eligible": int(sum(int(row.get("radar_eligible") or 0) for row in rows)),
+        "radar_claim_cards": int(context.get("high_confidence_claim_cards") or 0),
         "context": context,
     }
 
@@ -463,7 +470,8 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "",
         f"- generated_at: `{summary['generated_at']}`",
         f"- total candidates: {int(summary['total_candidates']):,}",
-        f"- radar eligible: {int(summary['radar_eligible']):,}",
+        f"- radar eligible Claim Cards: {int(summary.get('radar_claim_cards') or 0):,}",
+        f"- raw edge rows eligible for Radar main view: {int(summary['radar_eligible']):,}",
         f"- run-level calibration audits: {int(context.get('calibration_audits') or 0):,}",
         f"- edge-level calibrated candidates: {int(context.get('edge_calibrated_candidates') or 0):,} / {int(context.get('future_edge_candidates') or 0):,}",
         "",
@@ -477,7 +485,7 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
         "fused_direction_missing_claim_card": "Step6 direction exists, but Step13 evidence card is missing.",
         "candidate_pool_incomplete_claim_card": "Claim Card exists, but at least one of the five hard questions is missing.",
         "exploratory_claim_card": "Five-question card is complete, but high-confidence gates are not all satisfied.",
-        "radar_high_confidence": "Complete card plus high-confidence gates; may enter Radar.",
+        "fused_to_radar_claim_card": "Edge is covered by a high-confidence Claim Card; Radar shows the card, not the raw edge.",
     }
     for state, count in sorted(summary["state_counts"].items()):
         lines.append(f"| {state} | {int(count):,} | {meanings.get(state, '')} |")
@@ -509,9 +517,9 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
             "",
             "## Product Rule",
             "",
-            "Future candidates are inspection targets until they pass Step6 fusion and Step13 Claim Card gates. "
-            "Rows in `future_candidate_unfused`, `fused_direction_missing_claim_card`, or "
-            "`candidate_pool_incomplete_claim_card` must not appear in the Radar main view.",
+            "Future candidates are inspection targets.  Even when an edge is covered by a complete "
+            "Step13 card, Radar must show the Claim Card/direction, not the raw edge row.  "
+            "The edge table feeds Future/Bottleneck evidence views and the candidate pool only.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -532,6 +540,17 @@ def run_audit(
     candidates = load_future_candidates(conn_v14)
     directions_by_id, directions_by_edge = load_directions(conn_v14)
     claim_cards = load_claim_cards(conn_v14)
+    context.update(
+        {
+            "claim_cards": len(claim_cards),
+            "complete_claim_cards": sum(
+                1 for card in claim_cards.values() if int(card.get("five_question_complete") or 0) == 1
+            ),
+            "high_confidence_claim_cards": sum(
+                1 for card in claim_cards.values() if int(card.get("high_confidence_eligible") or 0) == 1
+            ),
+        }
+    )
     rows = build_lifecycle_rows(
         candidates=candidates,
         directions_by_id=directions_by_id,

@@ -296,6 +296,7 @@ def compute_direction_clusters(
             direction_candidates.append({
                 "anchor_paper_id": dst_id,
                 "anchor_title": dst_title,
+                "future_edge_pairs": [[src_id, dst_id]],
                 "evidence_paths": evidence_paths,
                 "evidence_tier": evidence_tier,
                 "claim_scope": claim_scope_for_tier(evidence_tier),
@@ -341,6 +342,10 @@ def compute_direction_clusters(
             for src_id in cand["src_ids"]:
                 if src_id not in existing["src_ids"]:
                     existing["src_ids"].append(src_id)
+            existing_pairs = existing.setdefault("future_edge_pairs", [])
+            for pair in cand.get("future_edge_pairs") or []:
+                if pair not in existing_pairs:
+                    existing_pairs.append(pair)
             existing["prediction_confidence"] = max(
                 existing.get("prediction_confidence") or 0.0,
                 cand.get("prediction_confidence") or 0.0,
@@ -481,6 +486,7 @@ def name_directions(
                 {
                     "anchor_paper_id": cand["anchor_paper_id"],
                     "src_ids": stable_unique(cand["src_ids"]),
+                    "future_edge_pairs": cand.get("future_edge_pairs") or [],
                     "predicted_prob": cand.get("predicted_prob"),
                     "raw_predicted_prob": cand.get("raw_predicted_prob"),
                     "calibrated_prob": cand.get("calibrated_prob"),
