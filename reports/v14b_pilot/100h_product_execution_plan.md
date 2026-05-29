@@ -1,5 +1,8 @@
 # V14B 100-Hour Product Execution Plan
 
+> Superseded as the primary strategic plan by `reports/v14b_pilot/100h_value_delivery_plan.md`.
+> This file remains as the operational sequence record. The value-delivery plan is the authoritative answer to what problems must be solved for high-value project delivery.
+
 Start: `2026-05-29 22:06 CST`
 
 Mission: turn the optics graph from a visual paper map into a decision-grade research engine. The product is successful only when a topic query can produce evidence-backed branch lineage, bottleneck history, calibrated future candidates, and actionable Claim Cards.

@@ -1,12 +1,12 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T14:08:20Z`
+- generated_at: `2026-05-29T14:09:30Z`
 - readiness_level: `candidate_generator_only`
 
 ## Metrics
 
-- linked refs: 442,304 / 3,194,034 (13.8%)
-- OpenAlex W IDs: 33,829 (61.1%)
+- linked refs: 442,304 / 3,194,038 (13.8%)
+- OpenAlex W IDs: 33,832 (61.1%)
 - section evidence: 1,241 rows / 690 papers
 - primary section evidence: 690 papers (1.2%)
 - predicted future edges: 1,000
