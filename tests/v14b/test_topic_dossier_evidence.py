@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from echelon.api.graph_visual_backend import _build_rd_radar, _build_topic_dossier, _lineage_status
+from echelon.api.graph_visual_backend import (
+    _build_rd_radar,
+    _build_topic_branch_splits,
+    _build_topic_dossier,
+    _lineage_status,
+    _topic_branch_facets,
+)
 
 
 def test_topic_dossier_returns_clickable_evidence_objects():
@@ -112,3 +118,39 @@ def test_branch_lineage_status_distinguishes_layout_from_evidence():
     assert _lineage_status({"parent_citation_support": 2}, 0.2) == "layout_cluster_only"
     assert _lineage_status({"parent_citation_support": 5}, 0.2) == "weak_split_candidate"
     assert _lineage_status({"parent_citation_support": 12}, 0.35) == "evidence_backed_split"
+
+
+def test_gold_topic_facets_are_not_metalens_template_reuse():
+    holography = [f["name"] for f in _topic_branch_facets("metasurface holography")]
+    cavity = [f["name"] for f in _topic_branch_facets("photonic crystal cavity")]
+    quantum_source = [f["name"] for f in _topic_branch_facets("quantum light source")]
+
+    assert "High-efficiency visible holography" in holography
+    assert "Imaging systems" not in holography
+    assert "High-Q nanocavities" in cavity
+    assert "Single-photon emitters" in quantum_source
+
+
+def test_topic_branch_splits_label_facet_matches_as_weak_not_layout():
+    hit = {
+        "paper_id": "p1",
+        "title": "Dynamic high efficiency 3D meta-holography in visible range",
+        "abstract": "multiplexed visible holography with metasurface fabrication tolerance",
+        "year": 2024,
+        "cluster_id": "C13",
+        "branch_id": "B13",
+        "cluster_label": "design, metasurfaces, metasurface",
+        "content_availability": {"has_primary_evidence_sections": True},
+    }
+
+    splits = _build_topic_branch_splits(
+        "metasurface holography",
+        hits=[hit],
+        turning_hits=[hit],
+    )
+
+    names = {row["name"]: row for row in splits}
+    assert "High-efficiency visible holography" in names
+    assert names["High-efficiency visible holography"]["lineage_status"] == "weak_split_candidate"
+    assert names["High-efficiency visible holography"]["evidence_grade"] == "section_backed_topic_branch_candidate"
+    assert names["High-efficiency visible holography"]["uncertainty_reasons"]

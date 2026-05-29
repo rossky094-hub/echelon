@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T17:30:52Z`
+- generated_at: `2026-05-29T17:40:25Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
 
@@ -26,9 +26,9 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13845991828847032,
-    "openalex_w_rate": 0.6224476900579516,
-    "primary_section_papers": 714,
+    "linked_ref_rate": 0.1384382010535722,
+    "openalex_w_rate": 0.6231156686104241,
+    "primary_section_papers": 721,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown"
   },

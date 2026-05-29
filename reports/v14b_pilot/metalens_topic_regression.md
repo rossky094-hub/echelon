@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-29T14:28:34Z`
+- Audit: `2026-05-29T17:40:30Z`
 - Topic: `metalens`
 - Overall status: **fail**
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | expected branches found | 1.00 | 1.0 | pass |
 | branches with driver papers | 6 | 4 | pass |
-| expected bottlenecks evidenced | 4 | 6 | fail |
+| expected bottlenecks evidenced | 5 | 6 | fail |
 | key turning papers | 80 | 5 | pass |
 | turning papers with access links | 80 | 5 | pass |
 | turning papers with primary sections | 1 | 3 | fail |
@@ -36,7 +36,7 @@
 | field of view | False | fail |
 | manufacturing consistency | True | pass |
 | system integration | True | pass |
-| cost | False | fail |
+| cost | True | pass |
 
 ## Interpretation
 

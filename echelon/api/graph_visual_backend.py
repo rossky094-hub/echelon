@@ -401,6 +401,123 @@ def _load_live_limitations(
     return out
 
 
+def _load_context_limitations(
+    conn: sqlite3.Connection,
+    *,
+    topic: str,
+    paper_ids: list[str],
+    cluster_ids: list[str],
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Find section-level bottleneck evidence in the topic's graph context.
+
+    Direct result papers are preferred.  Cluster-context rows are useful but
+    intentionally labeled as contextual so the UI does not overclaim them.
+    """
+    if not _table_exists(conn, "limitation_atoms"):
+        return []
+    terms = _topic_bottleneck_terms(topic)[:36]
+    topic_tokens = [
+        t for t in _token_set(topic)
+        if t not in TOPIC_STOPWORDS and len(t) >= 4
+    ][:8]
+    if not terms and not topic_tokens:
+        return []
+
+    clauses: list[str] = []
+    params: list[Any] = []
+    direct_ids = list(dict.fromkeys(str(pid) for pid in paper_ids if pid))[:500]
+    context_clusters = list(dict.fromkeys(str(cid) for cid in cluster_ids if cid))[:12]
+    if direct_ids:
+        ph = ",".join("?" for _ in direct_ids)
+        clauses.append(f"a.paper_id IN ({ph})")
+        params.extend(direct_ids)
+    if context_clusters:
+        ph = ",".join("?" for _ in context_clusters)
+        clauses.append(f"n.cluster_id IN ({ph})")
+        params.extend(context_clusters)
+
+    text_expr = (
+        "lower(coalesce(a.keyword,'') || ' ' || coalesce(a.description,'') || ' ' || "
+        "coalesce(d.metadata_json,'') || ' ' || coalesce(d.abstract,''))"
+    )
+    topic_like_clauses = []
+    for token in topic_tokens:
+        topic_like_clauses.append(f"{text_expr} LIKE ?")
+        params.append(f"%{token}%")
+    if topic_like_clauses:
+        clauses.append("(" + " OR ".join(topic_like_clauses) + ")")
+    if not clauses:
+        return []
+
+    bottleneck_clauses = []
+    for term in terms[:36]:
+        bottleneck_clauses.append(f"{text_expr} LIKE ?")
+        params.append(f"%{term}%")
+    if not bottleneck_clauses:
+        return []
+
+    params.append(limit)
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT a.paper_id, a.description, a.keyword, a.severity,
+                   a.evidence_source, a.evidence_quality, a.evidence_weight,
+                   a.source_section_name, a.extractor_method,
+                   n.cluster_id, n.branch_id, d.metadata_json
+            FROM limitation_atoms a
+            LEFT JOIN visual_nodes n ON n.paper_id = a.paper_id
+            LEFT JOIN visual_paper_details d ON d.paper_id = a.paper_id
+            WHERE ({' OR '.join(clauses)})
+              AND ({' OR '.join(bottleneck_clauses)})
+            ORDER BY
+              CASE WHEN a.paper_id IN ({','.join('?' for _ in direct_ids) if direct_ids else "NULL"}) THEN 1 ELSE 0 END DESC,
+              COALESCE(a.evidence_weight, 0) DESC,
+              a.atom_id DESC
+            LIMIT ?
+            """,
+            [
+                *params[:-1],
+                *direct_ids,
+                params[-1],
+            ],
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    direct = set(direct_ids)
+    for row in rows:
+        pid = str(row["paper_id"])
+        key = (pid, str(row["keyword"] or ""), str(row["description"] or "")[:160])
+        if key in seen:
+            continue
+        seen.add(key)
+        metadata = _loads(row["metadata_json"], {})
+        relationship_scope = "direct_paper_match" if pid in direct else "cluster_branch_context"
+        out.append(
+            {
+                "paper_id": pid,
+                "title": metadata.get("title") or pid,
+                "branch_id": row["branch_id"],
+                "cluster_id": row["cluster_id"],
+                "keyword": row["keyword"],
+                "description": row["description"],
+                "severity": row["severity"],
+                "evidence_source": row["evidence_source"],
+                "evidence_quality": row["evidence_quality"],
+                "evidence_weight": row["evidence_weight"],
+                "source_section_name": row["source_section_name"],
+                "extractor_method": row["extractor_method"],
+                "relationship_scope": relationship_scope,
+            }
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _external_links_from_ids(
     ids: dict[str, Any],
     sections: list[dict[str, Any]] | None = None,
@@ -1173,21 +1290,176 @@ METALENS_BRANCH_FACETS = [
     },
 ]
 
+METASURFACE_HOLOGRAPHY_BRANCH_FACETS = [
+    {
+        "name": "High-efficiency visible holography",
+        "priority": 10,
+        "keywords": ["efficiency", "efficient", "visible", "highest efficiency", "dielectric", "amplitude", "phase"],
+        "why": "This branch asks whether holographic metasurfaces can move beyond image formation demos into high-throughput visible devices.",
+        "bottleneck": "diffraction efficiency, optical loss, and phase/amplitude control under visible-wavelength constraints",
+        "enabler": "dielectric meta-atoms, full amplitude-phase control, and printable or resin-embedded fabrication routes",
+    },
+    {
+        "name": "Large field-of-view holography",
+        "priority": 20,
+        "keywords": ["wide-angle", "field of view", "fov", "angular", "off-axis", "large field", "3d"],
+        "why": "Holography branches when narrow viewing windows and off-axis aberrations limit display or imaging utility.",
+        "bottleneck": "field-of-view, angular bandwidth, and speckle/noise trade-offs",
+        "enabler": "vectorial wavefront control, angular-momentum design, and multi-plane holographic encoding",
+    },
+    {
+        "name": "Multiplexed and dynamic holography",
+        "priority": 30,
+        "keywords": ["multiplex", "multiplexed", "dynamic", "reconfigurable", "polarization", "wavelength", "spin", "channel", "encrypted"],
+        "why": "Static single-channel holograms split into multiplexed/dynamic work when systems need several images, states, or security channels.",
+        "bottleneck": "channel crosstalk, refreshability, polarization leakage, and information capacity",
+        "enabler": "polarization/wavelength/OAM multiplexing, phase correlation design, and active or multi-layer metasurfaces",
+    },
+    {
+        "name": "Fabrication-tolerant metasurface design",
+        "priority": 40,
+        "keywords": ["fabrication", "tolerant", "tolerance", "printing", "print", "resin", "inverse design", "end-to-end", "deep-learning"],
+        "why": "The branch appears when ideal metasurface holograms fail to survive process error, scale-up, or fabrication-aware deployment.",
+        "bottleneck": "fabrication tolerance, process repeatability, and inverse-design-to-fabrication transfer",
+        "enabler": "end-to-end optimization, fabrication-aware inverse design, and one-step nanoparticle/resin printing",
+    },
+]
+
+PHOTONIC_CRYSTAL_CAVITY_BRANCH_FACETS = [
+    {
+        "name": "High-Q nanocavities",
+        "priority": 10,
+        "keywords": ["high-q", "high q", "quality factor", "q-factor", "nanocavity", "nanocavities", "mode volume", "bic"],
+        "why": "Photonic-crystal cavity work starts from pushing Q/V and confinement because those set the strength of light-matter interaction.",
+        "bottleneck": "quality factor, mode volume, radiation loss, and fabrication disorder",
+        "enabler": "band-gap engineering, nanobeam/L3 designs, topology/BIC concepts, and local tuning",
+    },
+    {
+        "name": "Cavity quantum electrodynamics",
+        "priority": 20,
+        "keywords": ["qed", "quantum dot", "single quantum", "purcell", "strongly coupled", "strong coupling", "rabi", "emitter"],
+        "why": "A distinct branch forms when cavities become platforms for quantum emitters, Purcell enhancement, and strong-coupling experiments.",
+        "bottleneck": "emitter-cavity detuning, linewidth, mode volume, and deterministic placement",
+        "enabler": "quantum dots/color centers, strain/photochromic tuning, and cavity-waveguide architectures",
+    },
+    {
+        "name": "On-chip coupling and integration",
+        "priority": 30,
+        "keywords": ["waveguide", "coupled", "coupling", "integrated", "on-chip", "readout", "interface", "fiber"],
+        "why": "The cavity branch becomes system-relevant when energy must be coupled into waveguides, fibers, or chip-scale readout paths.",
+        "bottleneck": "coupling loss, alignment, packaging, and interface stability",
+        "enabler": "waveguide-coupled cavities, fiber tapers, deterministic interfaces, and integrated tuning",
+    },
+    {
+        "name": "Tunable and nonlinear cavity devices",
+        "priority": 40,
+        "keywords": ["tuning", "tunable", "nonlinear", "slow-light", "electrical", "strain", "photochromic", "graphene"],
+        "why": "Tunable/nonlinear devices split from static cavities when applications require active control, switching, or enhanced nonlinear response.",
+        "bottleneck": "thermal stability, tuning range, nonlinear loss, and device repeatability",
+        "enabler": "strain/electrical/photochromic tuning, graphene control, and coupled-cavity arrays",
+    },
+]
+
+QUANTUM_LIGHT_SOURCE_BRANCH_FACETS = [
+    {
+        "name": "Single-photon emitters",
+        "priority": 10,
+        "keywords": ["single-photon", "single photon", "emitter", "quantum dot", "color center", "heralded", "deterministic"],
+        "why": "Quantum light-source work splits into emitter-based sources when deterministic single photons and local integration become central.",
+        "bottleneck": "brightness, purity, indistinguishability, collection efficiency, and deterministic placement",
+        "enabler": "quantum dots, color centers, 2D emitters, resonant cavities, and deterministic coupling",
+    },
+    {
+        "name": "Entangled photon-pair sources",
+        "priority": 20,
+        "keywords": ["entangled", "photon pair", "biphoton", "spdc", "sagnac", "parametric", "squeezed", "coincidence"],
+        "why": "Pair-source work forms a branch because networking and quantum information often need entanglement rate and pair quality, not just single photons.",
+        "bottleneck": "pair rate, noise, spectral purity, indistinguishability, and source stability",
+        "enabler": "SPDC/SFWM platforms, Sagnac loops, microresonators, and engineered nonlinear materials",
+    },
+    {
+        "name": "Integrated quantum photonics",
+        "priority": 30,
+        "keywords": ["integrated", "on-chip", "photonic", "waveguide", "micro-ring", "microring", "silicon", "lithium niobate", "platform"],
+        "why": "A system branch appears when quantum-light generation must be packaged into scalable photonic circuits.",
+        "bottleneck": "propagation/coupling loss, chip-scale scalability, thermal drift, and packaging",
+        "enabler": "silicon, SiN, lithium-niobate, van-der-Waals, and heterogeneous integrated photonic platforms",
+    },
+    {
+        "name": "Deterministic coupling and collection",
+        "priority": 40,
+        "keywords": ["collection", "coupling", "fiber", "interface", "brightness", "extraction", "deterministic", "antenna"],
+        "why": "This branch grows when a source exists but practical use is limited by collecting photons into the right spatial/spectral channel.",
+        "bottleneck": "collection efficiency, fiber/chip coupling, spectral matching, and alignment robustness",
+        "enabler": "nanocavities, antennas, waveguide interfaces, and packaged collection optics",
+    },
+]
+
 BOTTLENECK_FACETS = [
+    ("coupling loss", ["coupling loss", "coupling losses", "fiber-chip", "interface loss", "extraction", "escape efficiency"]),
+    ("fabrication tolerance", ["fabrication tolerance", "fabrication disorder", "process variation", "disorder", "tolerance", "repeatability"]),
+    ("quality factor and mode volume", ["quality factor", "q-factor", "high-q", "mode volume", "radiative loss"]),
+    ("brightness and indistinguishability", ["brightness", "indistinguishability", "purity", "pair rate", "single photon"]),
+    ("speckle and holographic noise", ["speckle", "holographic noise", "coherence noise", "ghost", "contrast"]),
+    ("channel crosstalk", ["crosstalk", "cross-talk", "channel leakage", "polarization leakage", "multiplex leakage"]),
     ("efficiency", ["efficiency", "throughput", "loss", "collection", "transmission"]),
     ("chromatic aberration", ["chromatic", "dispersion", "achromatic", "broadband", "wavelength"]),
-    ("field of view and angular aberration", ["field of view", "fov", "angular", "off-axis", "aberration"]),
+    ("field of view and angular aberration", ["field of view", "fov", "angular", "off-axis", "aberration", "wide-angle"]),
     ("manufacturing consistency", ["manufacturing", "fabrication", "scalable", "scalability", "large-area", "uniformity", "yield", "printing", "lithography"]),
     ("system integration", ["integration", "integrated", "on-chip", "packaging", "alignment", "coupling"]),
     ("cost and reliability", ["cost", "low-cost", "reliability", "robust", "mass", "commercial"]),
 ]
 
+TOPIC_BOTTLENECK_TERMS = {
+    "metasurface_holography": [
+        "efficiency", "speckle", "field of view", "fov", "crosstalk", "fabrication tolerance",
+        "holography", "multiplex", "wide-angle",
+    ],
+    "photonic_crystal_cavity": [
+        "quality factor", "q-factor", "mode volume", "coupling loss", "fabrication disorder",
+        "thermal", "photonic crystal", "cavity", "nanocavity",
+    ],
+    "quantum_light_source": [
+        "brightness", "indistinguishability", "collection", "collection efficiency", "scalability",
+        "integration", "single photon", "photon pair", "quantum source",
+    ],
+    "metalens": [
+        "efficiency", "chromatic", "field of view", "fov", "manufacturing", "integration", "cost",
+        "metalens", "metasurface",
+    ],
+}
+
 
 def _topic_branch_facets(topic: str) -> list[dict[str, Any]]:
     text = topic.lower()
-    if "metalens" in text or "metasurface" in text or "meta-lens" in text:
+    if "holograph" in text and ("metasurface" in text or "meta-optic" in text or "meta optic" in text):
+        return METASURFACE_HOLOGRAPHY_BRANCH_FACETS
+    if "photonic crystal" in text and "cavit" in text:
+        return PHOTONIC_CRYSTAL_CAVITY_BRANCH_FACETS
+    if "quantum" in text and ("light source" in text or "photon source" in text or "single photon" in text):
+        return QUANTUM_LIGHT_SOURCE_BRANCH_FACETS
+    if "metalens" in text or "meta-lens" in text:
         return METALENS_BRANCH_FACETS
     return []
+
+
+def _topic_bottleneck_terms(topic: str) -> list[str]:
+    text = topic.lower()
+    key = None
+    if "holograph" in text and ("metasurface" in text or "meta-optic" in text or "meta optic" in text):
+        key = "metasurface_holography"
+    elif "photonic crystal" in text and "cavit" in text:
+        key = "photonic_crystal_cavity"
+    elif "quantum" in text and ("light source" in text or "photon source" in text or "single photon" in text):
+        key = "quantum_light_source"
+    elif "metalens" in text or "meta-lens" in text:
+        key = "metalens"
+    terms = list(TOPIC_BOTTLENECK_TERMS.get(key or "", []))
+    for label, facet_terms in BOTTLENECK_FACETS:
+        terms.append(label)
+        terms.extend(facet_terms[:3])
+    # Keep this deterministic; the SQL caller will cap the list.
+    return list(dict.fromkeys(t.lower() for t in terms if t))
 
 
 def _paper_text(paper: dict[str, Any]) -> str:
@@ -1253,6 +1525,8 @@ def _limitation_evidence_object(limitation: dict[str, Any] | None, *, source: st
         "label": limitation.get("keyword") or "limitation",
         "description": limitation.get("description"),
         "evidence_quality": limitation.get("evidence_quality"),
+        "relationship_scope": limitation.get("relationship_scope"),
+        "source_section_name": limitation.get("source_section_name"),
         "click_target": {"kind": "paper", "id": paper_id} if paper_id else None,
     }
 
@@ -1318,6 +1592,19 @@ def _build_topic_branch_splits(
             if p.get("paper_id") in turning_by_id
         ]
         evidence = turning[:3] or matched[:3]
+        branch_ids = Counter(
+            str(p.get("branch_id")) for p in matched if p.get("branch_id")
+        )
+        cluster_ids = Counter(
+            str(p.get("cluster_id")) for p in matched if p.get("cluster_id")
+        )
+        dominant_branch_id = branch_ids.most_common(1)[0][0] if branch_ids else None
+        dominant_cluster_id = cluster_ids.most_common(1)[0][0] if cluster_ids else None
+        primary_section_evidence = sum(
+            1
+            for p in evidence
+            if (p.get("content_availability") or {}).get("has_primary_evidence_sections")
+        )
         evidence_objects = _compact_evidence_objects(
             [
                 _paper_evidence_object(
@@ -1338,6 +1625,24 @@ def _build_topic_branch_splits(
                 "historical_bottleneck": facet["bottleneck"],
                 "enabling_condition": facet["enabler"],
                 "first_seen_year": min((int(p.get("year")) for p in matched if p.get("year")), default=None),
+                "dominant_branch_id": dominant_branch_id,
+                "dominant_cluster_id": dominant_cluster_id,
+                "parent_branch_id": None,
+                "lineage_status": "weak_split_candidate",
+                "claim_scope": "topic_facet_with_driver_papers",
+                "evidence_grade": (
+                    "section_backed_topic_branch_candidate"
+                    if primary_section_evidence
+                    else "metadata_topic_branch_candidate"
+                ),
+                "uncertainty_reasons": [
+                    "branch matched by topic-specific facet and driver papers; branch_lineages parent evidence is not yet attached to this dossier item",
+                    *(
+                        []
+                        if primary_section_evidence
+                        else ["driver papers lack local primary section evidence in this card"]
+                    ),
+                ],
                 "driver_papers": [
                     _paper_ref(p, "turning/main-path evidence" if p.get("paper_id") in turning_by_id else "topic evidence")
                     for p in evidence
@@ -1361,6 +1666,16 @@ def _build_topic_branch_splits(
                 "historical_bottleneck": "unknown until limitation/section evidence is available",
                 "enabling_condition": "unknown until section-level evidence is available",
                 "first_seen_year": min((int(p.get("year")) for p in branch_hits if p.get("year")), default=None),
+                "dominant_branch_id": branch_hits[0].get("branch_id") if branch_hits else None,
+                "dominant_cluster_id": branch_hits[0].get("cluster_id") if branch_hits else None,
+                "parent_branch_id": None,
+                "lineage_status": "layout_cluster_only",
+                "claim_scope": "exploratory_layout_cluster",
+                "evidence_grade": "layout_cluster_only",
+                "uncertainty_reasons": [
+                    "no topic-specific branch facet or branch-lineage evidence matched this item",
+                    "this may be useful for navigation but must not be narrated as scientific branch evolution",
+                ],
                 "driver_papers": [_paper_ref(p, "representative topic evidence") for p in branch_hits[:3]],
                 "evidence_objects": _compact_evidence_objects(
                     [
@@ -2415,8 +2730,33 @@ def get_topic_lens(
                         "description": (lim or {}).get("description") if isinstance(lim, dict) else str(lim),
                         "severity": (lim or {}).get("severity") if isinstance(lim, dict) else None,
                         "evidence_quality": (lim or {}).get("evidence_quality") if isinstance(lim, dict) else None,
+                        "relationship_scope": "direct_paper_match",
                     }
                 )
+        context_limitations = _load_context_limitations(
+            conn,
+            topic=topic_text,
+            paper_ids=context_seed_ids,
+            cluster_ids=top_cluster_ids,
+            limit=max(20, int(top_k)),
+        )
+        seen_limitations = {
+            (
+                str(x.get("paper_id") or ""),
+                str(x.get("keyword") or ""),
+                str(x.get("description") or "")[:160],
+            )
+            for x in unresolved_limitations
+        }
+        for lim in context_limitations:
+            key = (
+                str(lim.get("paper_id") or ""),
+                str(lim.get("keyword") or ""),
+                str(lim.get("description") or "")[:160],
+            )
+            if key not in seen_limitations:
+                seen_limitations.add(key)
+                unresolved_limitations.append(lim)
         unresolved_limitations = unresolved_limitations[: max(20, int(top_k))]
 
         future_directions = []

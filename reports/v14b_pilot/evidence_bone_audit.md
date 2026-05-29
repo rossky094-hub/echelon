@@ -1,24 +1,24 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-29T17:30:50Z`
+- generated_at: `2026-05-29T17:40:28Z`
 
 ## Reference Linkage
 
-- linked refs: 443,077 / 3,200,038 (13.8%)
-- unlinked refs: 2,756,961
+- linked refs: 443,077 / 3,200,540 (13.8%)
+- unlinked refs: 2,757,463
 
 | unlinked kind | count |
 | --- | ---: |
 | doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,281,051 |
+| openalex_unlinked | 1,281,553 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
 ## Section Evidence
 
-- section rows: 1,284
-- section papers: 714
-- primary section papers: 714
+- section rows: 1,302
+- section papers: 721
+- primary section papers: 721
 
 ### High-Value Priority Coverage
 
@@ -38,25 +38,26 @@
 
 | outcome | papers |
 | --- | ---: |
-| no_target_sections | 58 |
-| success_primary | 18 |
-| success_secondary_only | 9 |
+| no_target_sections | 145 |
+| success_primary | 23 |
+| success_secondary_only | 18 |
+| pdf_download_failed | 1 |
 
 ## Frontfill Log Signals
 
 | event | count |
 | --- | ---: |
-| download_failure | 22,615 |
-| pdf_graphics_warning | 43 |
+| download_failure | 22,616 |
+| pdf_graphics_warning | 233 |
 
-- section progress: 85/12227 (logs/v14b/step5s_section_delta.log)
+- section progress: 187/12227 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
 - progress: `None/None`
-- rows / papers / primary papers: `1,284` / `714` / `714`
+- rows / papers / primary papers: `1,302` / `721` / `721`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.
@@ -69,7 +70,9 @@
 - Keep S2 IDs separate from OpenAlex IDs and relink through s2_paper_id.
 - After top12000 completes, run delta queue for high-value papers missing primary sections.
 - Prioritize section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens
+- Retry only high-value retryable PDF failures with conservative concurrency; do not broaden to all PDFs.
 - Mark no_target_sections papers as weak evidence unless alternate parser/Sci-Bot sections are available.
+- Suppress or downgrade noisy PDF graphics warnings so true parser failures remain visible.
 - Keep single-process section ingest and add retry classification before increasing concurrency.
 
 ## Product Interpretation
