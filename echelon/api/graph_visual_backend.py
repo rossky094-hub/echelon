@@ -918,6 +918,7 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
             "claim_cards": claim_cards,
             "fusion_adequacy": fusion_adequacy,
         },
+        "frontfill_status": _frontfill_status(conn),
         "model_components": {
             "gnn_future_growth": {
                 "name": "Step5b VGAE / GCN link-prediction model",
@@ -1001,6 +1002,104 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
             else "graph_edges_only_until_step6_step13_rerun"
         ),
     }
+
+
+def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, Any]:
+    """Expose evidence-readiness as product state, not hidden ops trivia."""
+    status: dict[str, Any] = {
+        "available": False,
+        "papers": 0,
+        "openalex_w": 0,
+        "openalex_w_rate": 0.0,
+        "primary_field": 0,
+        "primary_field_rate": 0.0,
+        "section_rows": 0,
+        "section_papers": 0,
+        "primary_section_papers": 0,
+        "primary_section_rate": 0.0,
+        "high_value_delta_queue": None,
+        "interpretation": "frontfill metrics unavailable",
+    }
+    conn_main = _connect_main()
+    if conn_main is None:
+        return status
+    try:
+        papers = int(conn_main.execute("SELECT COUNT(*) FROM papers").fetchone()[0] or 0)
+        openalex_w = int(
+            conn_main.execute(
+                """
+                SELECT COUNT(*) FROM papers
+                WHERE openalex_id LIKE 'W%'
+                   OR openalex_id LIKE 'https://openalex.org/W%'
+                """
+            ).fetchone()[0] or 0
+        )
+        primary_field = int(
+            conn_main.execute(
+                """
+                SELECT COUNT(*) FROM papers
+                WHERE primary_field_id IS NOT NULL AND primary_field_id <> ''
+                """
+            ).fetchone()[0] or 0
+        )
+        section_rows = section_papers = primary_section_papers = 0
+        if _table_exists(conn_main, "paper_sections"):
+            section_rows = int(conn_main.execute("SELECT COUNT(*) FROM paper_sections").fetchone()[0] or 0)
+            section_papers = int(
+                conn_main.execute("SELECT COUNT(DISTINCT paper_id) FROM paper_sections").fetchone()[0] or 0
+            )
+            primary_section_papers = int(
+                conn_main.execute(
+                    """
+                    SELECT COUNT(DISTINCT paper_id)
+                    FROM paper_sections
+                    WHERE section_name IN ('limitations','discussion','conclusion','future_work')
+                      AND length(trim(section_text)) >= 80
+                    """
+                ).fetchone()[0] or 0
+            )
+        status.update(
+            {
+                "available": True,
+                "papers": papers,
+                "openalex_w": openalex_w,
+                "openalex_w_rate": openalex_w / max(1, papers),
+                "primary_field": primary_field,
+                "primary_field_rate": primary_field / max(1, papers),
+                "section_rows": section_rows,
+                "section_papers": section_papers,
+                "primary_section_papers": primary_section_papers,
+                "primary_section_rate": primary_section_papers / max(1, papers),
+            }
+        )
+    finally:
+        conn_main.close()
+    if conn_v14 is not None and _table_exists(conn_v14, "section_priority_papers"):
+        try:
+            row = conn_v14.execute(
+                """
+                SELECT COUNT(*) AS n,
+                       SUM(CASE WHEN has_primary_section = 0 AND eligible_pdf = 1 THEN 1 ELSE 0 END) AS delta_n,
+                       SUM(CASE WHEN in_top_n = 1 THEN 1 ELSE 0 END) AS in_top_n
+                FROM section_priority_papers
+                """
+            ).fetchone()
+            if row:
+                status["high_value_delta_queue"] = {
+                    "high_value_papers": int(row["n"] or 0),
+                    "missing_primary_with_pdf": int(row["delta_n"] or 0),
+                    "in_current_top_n": int(row["in_top_n"] or 0),
+                }
+        except sqlite3.Error:
+            pass
+    if status["primary_section_papers"] < 5000:
+        label = "section evidence is still too thin for high-confidence Claim Cards"
+    elif status["openalex_w_rate"] < 0.7:
+        label = "OpenAlex coverage still limits cross-field interpretation"
+    else:
+        label = "frontfill is approaching product-chain readiness"
+    status["interpretation"] = label
+    return status
 
 
 TOPIC_STOPWORDS = {
@@ -2312,11 +2411,13 @@ def get_visual_graph_status() -> dict:
                     counts[table] = 0
             else:
                 counts[table] = 0
+        frontfill = _frontfill_status(conn)
     return {
         "schema_version": SCHEMA_VERSION,
         "ready": ready,
         "missing_tables": missing,
         "counts": counts,
+        "frontfill_status": frontfill,
         "db_path": str(_db_v14_path()),
     }
 

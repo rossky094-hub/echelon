@@ -627,6 +627,7 @@ function startPlayback(fromStart = false) {
 
 function renderMetrics(status = {}) {
   const counts = status.counts || {};
+  const frontfill = status.frontfill_status || {};
   const items = [
     ["Nodes", counts.visual_nodes || state.nodes.length],
     ["Edges", counts.visual_edges || state.edges.length],
@@ -635,13 +636,17 @@ function renderMetrics(status = {}) {
   ];
   els.metrics.innerHTML = items.map(([label, value]) => (
     `<div class="metric"><strong>${fmt(value)}</strong><span>${label}</span></div>`
-  )).join("");
+  )).join("") + (frontfill.available ? `
+    <div class="metric warning"><strong>${fmt(frontfill.primary_section_papers || 0)}</strong><span>Primary sections</span></div>
+    <div class="metric"><strong>${pct(frontfill.openalex_w_rate || 0)}</strong><span>OpenAlex W</span></div>
+  ` : "");
 }
 
 function renderExplainDock(model = null) {
   const valueModel = model || state.topicLens?.value_model || DEFAULT_VALUE_MODEL;
   const layers = valueModel.layers || DEFAULT_VALUE_MODEL.layers;
   const counts = valueModel.counts || {};
+  const frontfill = valueModel.frontfill_status || {};
   const edgeCounts = counts.edges_by_layer || {};
   const gnn = valueModel.model_components?.gnn_future_growth || DEFAULT_VALUE_MODEL.model_components.gnn_future_growth;
   const combos = valueModel.layer_combinations || [];
@@ -684,6 +689,9 @@ function renderExplainDock(model = null) {
         </div>
       </details>
       <p class="mini">Fusion status: ${esc(valueModel.fusion_status || "unknown")} / Step6 adequacy ${esc(counts.fusion_adequacy || "unknown")} / claim cards ${fmt(counts.claim_cards || 0)}</p>
+      ${frontfill.available ? `
+        <p class="mini">Evidence frontfill: primary sections ${fmt(frontfill.primary_section_papers || 0)} papers / OpenAlex W ${pct(frontfill.openalex_w_rate || 0)} / ${esc(frontfill.interpretation || "")}</p>
+      ` : ""}
     </details>
   `;
 }
@@ -1097,6 +1105,7 @@ function renderTopicLens(lens) {
   const futureEdges = lens.future_growth?.predicted_edges || [];
   const valueModel = lens.value_model || DEFAULT_VALUE_MODEL;
   const fusionCounts = valueModel.counts || {};
+  const frontfill = valueModel.frontfill_status || {};
   els.topicPane.innerHTML = `
     ${renderTopicDossier(lens.topic_dossier || {})}
     <div class="item">
@@ -1105,6 +1114,13 @@ function renderTopicLens(lens) {
       <div class="pill-row">${clusters}</div>
       <p class="mini">scope: ${esc(lens.context?.scope || "direct_papers")} / seed matches ${fmt(lens.context?.seed_matches || lens.total_related)} / context papers ${fmt(lens.context?.context_papers || 0)}</p>
       <p class="mini">fusion: ${esc(valueModel.fusion_status || "unknown")} / directions ${fmt(fusionCounts.future_directions || 0)} / claim cards ${fmt(fusionCounts.claim_cards || 0)} / adequacy ${esc(fusionCounts.fusion_adequacy || "unknown")}</p>
+      ${frontfill.available ? `
+        <div class="frontfill-card">
+          <strong>Evidence frontfill status</strong>
+          <p>Primary section evidence: ${fmt(frontfill.primary_section_papers || 0)} papers. OpenAlex W coverage: ${pct(frontfill.openalex_w_rate || 0)}. ${esc(frontfill.interpretation || "")}</p>
+          ${frontfill.high_value_delta_queue ? `<p class="mini">High-value delta queue missing primary section: ${fmt(frontfill.high_value_delta_queue.missing_primary_with_pdf || 0)} papers with accessible PDFs.</p>` : ""}
+        </div>
+      ` : ""}
     </div>
     ${renderBranchDossiers(lens.branch_dossiers || [])}
     ${renderBottleneckLineage(lens.bottleneck_lineage || {})}

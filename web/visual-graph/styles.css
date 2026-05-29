@@ -213,6 +213,10 @@ button.primary,
   background: #fff;
 }
 
+.metric.warning {
+  background: #fffaf1;
+}
+
 .metric strong {
   display: block;
   font-size: 16px;
@@ -266,7 +270,8 @@ button.primary,
 .dossier-hero,
 .branch-card,
 .combo-card,
-.candidate-card {
+.candidate-card,
+.frontfill-card {
   margin: 0 0 10px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -294,6 +299,12 @@ button.primary,
 .warning-card {
   border-left-color: var(--uncertainty);
   background: #fffaf1;
+}
+
+.frontfill-card {
+  border-left: 3px solid var(--uncertainty);
+  background: #fffaf1;
+  margin-top: 10px;
 }
 
 .candidate-card {

@@ -6,6 +6,7 @@ from echelon.v14b.step5s_section_ingest import (
     _select_candidate_ids,
     extract_sections_from_blocks,
     extract_sections_with_metadata,
+    read_candidate_file,
 )
 
 
@@ -169,3 +170,14 @@ def test_select_candidate_ids_prioritizes_prediction_and_branch_evidence():
     ]
     assert "cluster_rep_a" in ids
     assert "cluster_rep_b" in ids
+
+
+def test_read_candidate_file_accepts_delta_queue_csv(tmp_path):
+    queue = tmp_path / "section_delta_queue.csv"
+    queue.write_text(
+        "paper_id,priority_score,reasons\np1,10,main_path\np2,9,future\np1,8,duplicate\n",
+        encoding="utf-8",
+    )
+
+    assert read_candidate_file(queue) == ["p1", "p2"]
+    assert read_candidate_file(queue, limit=1) == ["p1"]

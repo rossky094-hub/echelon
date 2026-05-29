@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae section-evidence limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -169,6 +169,34 @@ section-evidence:
 		--top-n $${V14B_SECTION_INGEST_TOP_N:-1200} \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Step 5s-delta: 从高价值 delta queue 精准补 section
+section-evidence-delta:
+	@echo ">>> Step 5s: Section evidence delta queue ingestion..."
+	$(PYTHON) -m echelon.v14b.step5s_section_ingest \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--top-n $${V14B_SECTION_DELTA_TOP_N:-12000} \
+		--candidate-file $${V14B_SECTION_DELTA_QUEUE:-data/v14b/section_delta_queue.csv} \
+		$(CORPUS_ARG) \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Step 5s-audit: 高价值 section 队列覆盖审计 + delta queue
+section-queue-audit:
+	@echo ">>> Step 5s audit: high-value section queue coverage..."
+	$(PYTHON) -m echelon.v14b.step5s_section_queue_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--top-n $${V14B_SECTION_INGEST_TOP_N:-12000} \
+		--topic $${V14B_SECTION_AUDIT_TOPIC:-metalens}
+
+## 前置补齐完成后，从证据门槛断点推进产品链
+post-frontfill-chain:
+	@echo ">>> Post-frontfill product chain gate..."
+	$(PYTHON) scripts/run_after_frontfill_product_chain.py \
+		--repo-root . \
+		--db-main $(DB_MAIN) \
+		--db-v14 $(DB_V14)
 
 ## Step 5c: Limitation Tracking (~4h, ~$40 LLM 费用)
 limitation:

@@ -7,6 +7,7 @@ instead of falling back to abstract-only extraction.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 import os
@@ -295,8 +296,9 @@ def load_candidates(
     conn_v14: sqlite3.Connection,
     top_n: int,
     corpus_id: str | None = None,
+    candidate_ids: list[str] | None = None,
 ) -> list[dict]:
-    ids = _select_candidate_ids(conn_v14, top_n)
+    ids = candidate_ids or _select_candidate_ids(conn_v14, top_n)
     if not ids:
         return []
     placeholders = ",".join("?" * len(ids))
@@ -318,6 +320,31 @@ def load_candidates(
             if _arxiv_pdf_url(p.get("arxiv_id"), p.get("doi"))
         ]
     return papers
+
+
+def read_candidate_file(path: Path | None, limit: int | None = None) -> list[str] | None:
+    if not path:
+        return None
+    ids: list[str] = []
+    seen: set[str] = set()
+    with Path(path).open("r", encoding="utf-8", newline="") as f:
+        sample = f.read(4096)
+        f.seek(0)
+        first_line = sample.splitlines()[0] if sample.splitlines() else ""
+        if "paper_id" in first_line:
+            reader = csv.DictReader(f)
+            raw_values = (row.get("paper_id") for row in reader)
+        else:
+            raw_values = (line.split(",")[0] for line in f)
+        for raw in raw_values:
+            pid = str(raw or "").strip()
+            if not pid or pid in seen or pid == "paper_id":
+                continue
+            ids.append(pid)
+            seen.add(pid)
+            if limit and len(ids) >= int(limit):
+                break
+    return ids
 
 
 def _heading_to_section(line: str) -> Optional[str]:
@@ -558,6 +585,7 @@ def run_section_ingest(
     limit: Optional[int] = None,
     resume: bool = True,
     corpus_id: str | None = None,
+    candidate_file: Path | None = None,
 ) -> dict:
     step_name = "step5s_section_ingest"
     ck = Checkpoint(step_name)
@@ -577,11 +605,23 @@ def run_section_ingest(
     upsert_step_meta(conn_v14, step_name, "running")
 
     n_target = int(limit or top_n or LIMITATION_TOP_N)
-    papers = load_candidates(conn_main, conn_v14, n_target, corpus_id=corpus_id)
+    candidate_ids = read_candidate_file(candidate_file, limit=n_target if limit else None)
+    papers = load_candidates(
+        conn_main,
+        conn_v14,
+        n_target,
+        corpus_id=corpus_id,
+        candidate_ids=candidate_ids,
+    )
     if limit:
         papers = papers[: int(limit)]
 
-    logger.info("Step5s candidates=%d (top_n=%d)", len(papers), n_target)
+    logger.info(
+        "Step5s candidates=%d (top_n=%d candidate_file=%s)",
+        len(papers),
+        n_target,
+        candidate_file or "",
+    )
     if not papers:
         stats = {"records_n": 0, "papers_n": 0, "with_primary_sections": 0}
         ck.mark_done(records_n=0, meta=stats)
@@ -669,6 +709,7 @@ def run_section_ingest(
         "failed_parse": failed_parse,
         "section_counter": section_counter,
         "extra_sections_enabled": list(SECONDARY_SECTION_NAMES),
+        "candidate_file": str(candidate_file) if candidate_file else None,
     }
     logger.info("Step5s done: %s", stats)
     ck.mark_done(records_n=inserted_sections, meta=stats)
@@ -686,6 +727,12 @@ def main(argv=None) -> None:
     )
     add_common_args(parser)
     parser.add_argument("--top-n", type=int, default=SECTION_INGEST_TOP_N)
+    parser.add_argument(
+        "--candidate-file",
+        type=Path,
+        default=None,
+        help="Optional CSV/text file with paper_id column or one paper id per line; used for delta evidence queues.",
+    )
     args = parser.parse_args(argv)
 
     log_level = getattr(logging, args.log_level)
@@ -697,6 +744,7 @@ def main(argv=None) -> None:
         limit=args.limit or LIMIT,
         resume=args.resume,
         corpus_id=args.corpus_id,
+        candidate_file=args.candidate_file,
     )
 
 
