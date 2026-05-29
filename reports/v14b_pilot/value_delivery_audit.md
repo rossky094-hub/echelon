@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T17:40:25Z`
+- generated_at: `2026-05-29T17:44:06Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
 
@@ -26,9 +26,9 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.1384382010535722,
-    "openalex_w_rate": 0.6231156686104241,
-    "primary_section_papers": 721,
+    "linked_ref_rate": 0.13842522587820696,
+    "openalex_w_rate": 0.6233684172519002,
+    "primary_section_papers": 723,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown"
   },
@@ -86,6 +86,15 @@
 {
   "bad_high_confidence_cards": 0,
   "calibration_audits": 0,
+  "calibration_gap": "edge-level calibrated probabilities exist, but the run-level rolling held-out-year audit table is missing",
+  "edge_calibrated_candidates": 1000,
+  "edge_calibration_labels": {
+    "calibrated_temporal_holdout": 1000
+  },
+  "edge_calibration_methods": {
+    "temporal_platt_logistic": 1000
+  },
+  "edge_calibration_rate": 1.0,
   "future_candidate_lifecycle": {
     "future_candidate_unfused": 1000
   },

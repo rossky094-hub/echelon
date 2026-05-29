@@ -1,8 +1,10 @@
 # Future Candidate Lifecycle Audit
 
-- generated_at: `2026-05-29T17:40:23Z`
+- generated_at: `2026-05-29T17:44:10Z`
 - total candidates: 1,000
 - radar eligible: 0
+- run-level calibration audits: 0
+- edge-level calibrated candidates: 1,000 / 1,000
 
 ## Lifecycle States
 

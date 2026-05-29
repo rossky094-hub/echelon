@@ -4,7 +4,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from echelon.v14b.future_candidate_lifecycle import run_audit
+from echelon.v14b.future_candidate_lifecycle import future_edge_calibration_context, run_audit
 
 
 def _make_main(path: Path) -> None:
@@ -129,6 +129,9 @@ def test_future_candidate_lifecycle_marks_unfused_candidates_candidate_pool_only
 
     assert result["summary"]["state_counts"]["future_candidate_unfused"] == 1
     assert result["summary"]["radar_eligible"] == 0
+    assert result["summary"]["context"]["calibration_audits"] == 0
+    assert result["summary"]["context"]["edge_calibrated_candidates"] == 1
+    assert result["summary"]["context"]["edge_calibration_rate"] == 1.0
     conn = sqlite3.connect(str(v14))
     row = conn.execute("SELECT lifecycle_state, radar_eligible FROM future_candidate_lifecycle").fetchone()
     conn.close()
@@ -167,3 +170,16 @@ def test_visual_future_predictions_include_lifecycle_metadata(tmp_path):
     assert rows[0]["lifecycle_state"] == "future_candidate_unfused"
     assert rows[0]["radar_eligible"] == 0
     assert "Step13 Claim Card" in json.loads(rows[0]["missing_gates_json"])
+
+
+def test_future_edge_calibration_context_distinguishes_edge_and_run_audit(tmp_path):
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14_unfused(v14)
+
+    conn = sqlite3.connect(str(v14))
+    context = future_edge_calibration_context(conn)
+    conn.close()
+
+    assert context["future_edge_candidates"] == 1
+    assert context["edge_calibrated_candidates"] == 1
+    assert context["edge_calibration_labels"] == {"calibrated_temporal_holdout": 1}

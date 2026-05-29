@@ -90,6 +90,36 @@ def _make_v14(path: Path) -> None:
     conn.close()
 
 
+def _make_v14_edge_calibrated_without_run_audit(path: Path) -> None:
+    conn = sqlite3.connect(str(path))
+    conn.executescript(
+        """
+        CREATE TABLE predicted_future_edges (
+            src_paper_id TEXT,
+            dst_paper_id TEXT,
+            predicted_prob REAL,
+            calibrated_prob REAL,
+            calibration_method TEXT,
+            calibration_label TEXT
+        );
+        CREATE TABLE future_candidate_lifecycle (
+            lifecycle_state TEXT,
+            radar_eligible INTEGER
+        );
+        CREATE TABLE direction_claim_cards (
+            five_question_complete INTEGER,
+            high_confidence_eligible INTEGER
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO predicted_future_edges VALUES ('p1', 'p2', 0.9, 0.8, 'temporal_platt_logistic', 'calibrated_temporal_holdout')"
+    )
+    conn.execute("INSERT INTO future_candidate_lifecycle VALUES ('future_candidate_unfused', 0)")
+    conn.commit()
+    conn.close()
+
+
 def test_value_delivery_audit_maps_eight_gates(tmp_path):
     main = tmp_path / "main.sqlite3"
     v14 = tmp_path / "v14.sqlite3"
@@ -116,6 +146,21 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert len(result["gates"]) == 8
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
     assert any(g["issue"] == "Multi-topic Regression" and g["status"] == "pass" for g in result["gates"])
+
+
+def test_value_delivery_audit_reports_edge_calibration_without_run_audit(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    _make_main(main)
+    _make_v14_edge_calibrated_without_run_audit(v14)
+
+    result = collect_value_gates(main, v14, Path("."))
+    future_gate = next(g for g in result["gates"] if g["issue"] == "Future Growth Calibration")
+
+    assert future_gate["status"] == "warn"
+    assert future_gate["edge_calibrated_candidates"] == 1
+    assert future_gate["calibration_audits"] == 0
+    assert "run-level rolling held-out-year audit" in future_gate["calibration_gap"]
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):

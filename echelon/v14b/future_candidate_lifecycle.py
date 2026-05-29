@@ -134,6 +134,7 @@ def collect_global_evidence_context(conn_main: sqlite3.Connection, conn_v14: sql
         if table_exists(conn_v14, "vgae_calibration_audit")
         else 0
     )
+    edge_calibration = future_edge_calibration_context(conn_v14)
     linked_rate = linked_refs / max(1, refs)
     section_rate = primary_section_papers / max(1, papers)
     openalex_rate = openalex_w / max(1, papers)
@@ -147,12 +148,86 @@ def collect_global_evidence_context(conn_main: sqlite3.Connection, conn_v14: sql
         "primary_section_papers": primary_section_papers,
         "primary_section_rate": section_rate,
         "calibration_audits": calibration_audits,
+        **edge_calibration,
         "global_uncertainty_reasons": uncertainty_reasons(
             linked_ref_rate=linked_rate,
             primary_section_rate=section_rate,
             openalex_rate=openalex_rate,
             has_calibration=calibration_audits > 0,
         ),
+    }
+
+
+def future_edge_calibration_context(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+    """Measure edge-level calibration separately from run-level backtest audit.
+
+    The product contract requires a rolling held-out-year audit before future
+    links can be treated as more than candidates.  Still, Step5b may already
+    have per-edge calibrated probabilities.  Reporting both prevents a false
+    binary of "calibrated" vs "not calibrated".
+    """
+    if not table_exists(conn_v14, "predicted_future_edges"):
+        return {
+            "future_edge_candidates": 0,
+            "edge_calibrated_candidates": 0,
+            "edge_calibration_rate": 0.0,
+            "edge_calibration_labels": {},
+            "edge_calibration_methods": {},
+        }
+    cols = columns(conn_v14, "predicted_future_edges")
+    total = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0)
+    if total <= 0:
+        return {
+            "future_edge_candidates": 0,
+            "edge_calibrated_candidates": 0,
+            "edge_calibration_rate": 0.0,
+            "edge_calibration_labels": {},
+            "edge_calibration_methods": {},
+        }
+    markers = []
+    if "calibration_label" in cols:
+        markers.append("COALESCE(calibration_label, '') <> ''")
+    if "calibration_method" in cols:
+        markers.append("COALESCE(calibration_method, '') <> ''")
+    if "calibrated_prob" in cols:
+        markers.append("calibrated_prob IS NOT NULL")
+    calibrated = int(
+        scalar(
+            conn_v14,
+            "SELECT COUNT(*) FROM predicted_future_edges WHERE " + " OR ".join(markers),
+        )
+        or 0
+    ) if markers else 0
+    labels: dict[str, int] = {}
+    if "calibration_label" in cols:
+        labels = {
+            str(row[0] or "unlabeled"): int(row[1])
+            for row in conn_v14.execute(
+                """
+                SELECT COALESCE(NULLIF(calibration_label, ''), 'unlabeled'), COUNT(*)
+                FROM predicted_future_edges
+                GROUP BY COALESCE(NULLIF(calibration_label, ''), 'unlabeled')
+                """
+            ).fetchall()
+        }
+    methods: dict[str, int] = {}
+    if "calibration_method" in cols:
+        methods = {
+            str(row[0] or "unknown_method"): int(row[1])
+            for row in conn_v14.execute(
+                """
+                SELECT COALESCE(NULLIF(calibration_method, ''), 'unknown_method'), COUNT(*)
+                FROM predicted_future_edges
+                GROUP BY COALESCE(NULLIF(calibration_method, ''), 'unknown_method')
+                """
+            ).fetchall()
+        }
+    return {
+        "future_edge_candidates": total,
+        "edge_calibrated_candidates": calibrated,
+        "edge_calibration_rate": calibrated / max(1, total),
+        "edge_calibration_labels": labels,
+        "edge_calibration_methods": methods,
     }
 
 
@@ -382,12 +457,15 @@ def summarize(rows: list[dict[str, Any]], context: dict[str, Any]) -> dict[str, 
 
 
 def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
+    context = summary.get("context") or {}
     lines = [
         "# Future Candidate Lifecycle Audit",
         "",
         f"- generated_at: `{summary['generated_at']}`",
         f"- total candidates: {int(summary['total_candidates']):,}",
         f"- radar eligible: {int(summary['radar_eligible']):,}",
+        f"- run-level calibration audits: {int(context.get('calibration_audits') or 0):,}",
+        f"- edge-level calibrated candidates: {int(context.get('edge_calibrated_candidates') or 0):,} / {int(context.get('future_edge_candidates') or 0):,}",
         "",
         "## Lifecycle States",
         "",

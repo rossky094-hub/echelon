@@ -28,6 +28,7 @@ from echelon.v14b.evidence_grade import (
     grade_from_qualities,
     uncertainty_reasons,
 )
+from echelon.v14b.future_candidate_lifecycle import future_edge_calibration_context
 from echelon.v14b.topic_regression import GOLD_TOPICS
 
 
@@ -191,6 +192,7 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
 def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     predicted = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0) if table_exists(conn_v14, "predicted_future_edges") else 0
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
+    edge_calibration = future_edge_calibration_context(conn_v14)
     lifecycle_counts: dict[str, int] = {}
     radar_eligible = 0
     if table_exists(conn_v14, "future_candidate_lifecycle"):
@@ -216,11 +218,26 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
             )
             or 0
         )
+    if calibration > 0 and high_conf_bad == 0:
+        status = "pass"
+    elif predicted > 0 and edge_calibration.get("edge_calibrated_candidates", 0) > 0:
+        status = "warn"
+    else:
+        status = _gate_status(predicted >= 0 and high_conf_bad == 0 and calibration > 0, warn=predicted > 0)
     return {
         "issue": "Future Growth Calibration",
-        "status": _gate_status(predicted >= 0 and high_conf_bad == 0 and calibration > 0, warn=predicted > 0),
+        "status": status,
         "predicted_future_edges": predicted,
         "calibration_audits": calibration,
+        "edge_calibrated_candidates": edge_calibration.get("edge_calibrated_candidates", 0),
+        "edge_calibration_rate": edge_calibration.get("edge_calibration_rate", 0.0),
+        "edge_calibration_labels": edge_calibration.get("edge_calibration_labels", {}),
+        "edge_calibration_methods": edge_calibration.get("edge_calibration_methods", {}),
+        "calibration_gap": (
+            "edge-level calibrated probabilities exist, but the run-level rolling held-out-year audit table is missing"
+            if predicted > 0 and edge_calibration.get("edge_calibrated_candidates", 0) > 0 and calibration == 0
+            else None
+        ),
         "future_candidate_lifecycle": lifecycle_counts,
         "radar_eligible_candidates": radar_eligible,
         "bad_high_confidence_cards": high_conf_bad,
