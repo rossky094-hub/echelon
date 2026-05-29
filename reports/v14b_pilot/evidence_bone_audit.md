@@ -1,24 +1,24 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-29T17:40:28Z`
+- generated_at: `2026-05-29T17:51:03Z`
 
 ## Reference Linkage
 
-- linked refs: 443,077 / 3,200,540 (13.8%)
-- unlinked refs: 2,757,463
+- linked refs: 443,443 / 3,201,281 (13.9%)
+- unlinked refs: 2,757,838
 
 | unlinked kind | count |
 | --- | ---: |
 | doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,281,553 |
+| openalex_unlinked | 1,281,928 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
 ## Section Evidence
 
-- section rows: 1,302
-- section papers: 721
-- primary section papers: 721
+- section rows: 1,312
+- section papers: 726
+- primary section papers: 726
 
 ### High-Value Priority Coverage
 
@@ -38,26 +38,26 @@
 
 | outcome | papers |
 | --- | ---: |
-| no_target_sections | 145 |
-| success_primary | 23 |
-| success_secondary_only | 18 |
-| pdf_download_failed | 1 |
+| no_target_sections | 232 |
+| success_secondary_only | 31 |
+| success_primary | 26 |
+| pdf_download_failed | 2 |
 
 ## Frontfill Log Signals
 
 | event | count |
 | --- | ---: |
 | download_failure | 22,616 |
-| pdf_graphics_warning | 233 |
+| pdf_graphics_warning | 414 |
 
-- section progress: 187/12227 (logs/v14b/step5s_section_delta.log)
+- section progress: 291/12227 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
 - progress: `None/None`
-- rows / papers / primary papers: `1,302` / `721` / `721`
+- rows / papers / primary papers: `1,312` / `726` / `726`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.
