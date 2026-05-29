@@ -44,6 +44,79 @@ METALENS_GOLD = GoldTopic(
     ),
 )
 
+METASURFACE_HOLOGRAPHY_GOLD = GoldTopic(
+    topic="metasurface holography",
+    expected_branches=(
+        "High-efficiency visible holography",
+        "Large field-of-view holography",
+        "Multiplexed and dynamic holography",
+        "Fabrication-tolerant metasurface design",
+    ),
+    expected_bottlenecks=(
+        "efficiency",
+        "speckle",
+        "field of view",
+        "crosstalk",
+        "fabrication tolerance",
+    ),
+    minimum_key_turning_papers=4,
+    minimum_branches_with_driver_papers=3,
+    minimum_turning_papers_with_access=3,
+    minimum_turning_papers_with_primary_section=2,
+)
+
+PHOTONIC_CRYSTAL_CAVITY_GOLD = GoldTopic(
+    topic="photonic crystal cavity",
+    expected_branches=(
+        "High-Q nanocavities",
+        "Cavity quantum electrodynamics",
+        "On-chip coupling and integration",
+        "Tunable and nonlinear cavity devices",
+    ),
+    expected_bottlenecks=(
+        "quality factor",
+        "mode volume",
+        "coupling loss",
+        "fabrication disorder",
+        "thermal stability",
+    ),
+    minimum_key_turning_papers=4,
+    minimum_branches_with_driver_papers=3,
+    minimum_turning_papers_with_access=3,
+    minimum_turning_papers_with_primary_section=2,
+)
+
+QUANTUM_LIGHT_SOURCE_GOLD = GoldTopic(
+    topic="quantum light source",
+    expected_branches=(
+        "Single-photon emitters",
+        "Entangled photon-pair sources",
+        "Integrated quantum photonics",
+        "Deterministic coupling and collection",
+    ),
+    expected_bottlenecks=(
+        "brightness",
+        "indistinguishability",
+        "collection efficiency",
+        "scalability",
+        "integration",
+    ),
+    minimum_key_turning_papers=4,
+    minimum_branches_with_driver_papers=3,
+    minimum_turning_papers_with_access=3,
+    minimum_turning_papers_with_primary_section=2,
+)
+
+GOLD_TOPICS: dict[str, GoldTopic] = {
+    g.topic: g
+    for g in (
+        METALENS_GOLD,
+        METASURFACE_HOLOGRAPHY_GOLD,
+        PHOTONIC_CRYSTAL_CAVITY_GOLD,
+        QUANTUM_LIGHT_SOURCE_GOLD,
+    )
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -137,6 +210,7 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
                 "status": _status(bool(branch) and has_driver),
             }
         )
+    branch_coverage = sum(1 for row in branch_results if row["present"]) / max(1, len(gold.expected_branches))
 
     bottleneck_results = []
     for label in gold.expected_bottlenecks:
@@ -162,9 +236,9 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
     gates = [
         {
             "name": "expected branches found",
-            "actual": baseline.get("expected_branch_coverage"),
+            "actual": branch_coverage,
             "required": 1.0,
-            "status": _status(float(baseline.get("expected_branch_coverage") or 0.0) >= 1.0),
+            "status": _status(branch_coverage >= 1.0),
         },
         {
             "name": "branches with driver papers",
@@ -211,6 +285,7 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
         "audit_ts": utc_now(),
         "topic": gold.topic,
         "overall_status": overall,
+        "gold_branch_coverage": branch_coverage,
         "gates": gates,
         "branch_results": branch_results,
         "bottleneck_results": bottleneck_results,
@@ -229,8 +304,9 @@ def run_topic_regression(lens: dict[str, Any], gold: GoldTopic = METALENS_GOLD) 
 
 
 def render_regression_md(result: dict[str, Any]) -> str:
+    title = str(result.get("topic") or "topic").title()
     lines = [
-        "# Metalens Topic Regression",
+        f"# {title} Topic Regression",
         "",
         f"- Audit: `{result['audit_ts']}`",
         f"- Topic: `{result['topic']}`",
@@ -274,6 +350,40 @@ def render_regression_md(result: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_multi_regression_md(results: list[dict[str, Any]]) -> str:
+    lines = [
+        "# Multi-topic Topic Lens Regression",
+        "",
+        f"- Audit: `{utc_now()}`",
+        "",
+        "| Topic | Overall | Branch Coverage | Turning Papers | Complete Claim Cards |",
+        "| --- | --- | ---: | ---: | ---: |",
+    ]
+    for result in results:
+        baseline = result.get("baseline_quality") or {}
+        turning = result.get("key_turning_papers") or {}
+        future = result.get("future_candidates") or {}
+        lines.append(
+            "| {topic} | {status} | {coverage:.2f} | {turning} | {cards} |".format(
+                topic=result.get("topic"),
+                status=result.get("overall_status"),
+                coverage=float(result.get("gold_branch_coverage") or baseline.get("expected_branch_coverage") or 0.0),
+                turning=int(turning.get("total") or 0),
+                cards=int(future.get("complete_claim_cards") or 0),
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "## Product Gate",
+            "",
+            "This suite prevents the Topic Dossier from being tuned only for Metalens. "
+            "A topic may fail because evidence is genuinely thin; the required behavior is explicit gaps, not confident generic prose.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def load_topic_lens(topic: str, top_k: int) -> dict[str, Any]:
     from echelon.api.graph_visual_backend import get_topic_lens
 
@@ -282,22 +392,44 @@ def load_topic_lens(topic: str, top_k: int) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a Topic Lens product regression.")
-    parser.add_argument("--topic", default="metalens")
+    parser.add_argument("--topic", default="metalens", help="gold topic name, or 'all'")
     parser.add_argument("--top-k", type=int, default=80)
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
     args = parser.parse_args(argv)
-    if args.topic.lower() != "metalens":
-        raise SystemExit("Only the Metalens gold topic is currently defined.")
+    topic_arg = args.topic.lower().strip()
+    if topic_arg == "all":
+        gold_topics = list(GOLD_TOPICS.values())
+    else:
+        if topic_arg not in GOLD_TOPICS:
+            raise SystemExit(
+                "Unknown gold topic. Available: "
+                + ", ".join(sorted(GOLD_TOPICS))
+                + ", all"
+            )
+        gold_topics = [GOLD_TOPICS[topic_arg]]
 
-    lens = load_topic_lens(args.topic, args.top_k)
-    result = run_topic_regression(lens, METALENS_GOLD)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    md = out_dir / "metalens_topic_regression.md"
-    json_path = out_dir / "metalens_topic_regression.json"
-    md.write_text(render_regression_md(result), encoding="utf-8")
-    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(json.dumps({"report": str(md), "json": str(json_path), "overall_status": result["overall_status"]}, ensure_ascii=False, sort_keys=True))
+    results = []
+    outputs = []
+    for gold in gold_topics:
+        lens = load_topic_lens(gold.topic, args.top_k)
+        result = run_topic_regression(lens, gold)
+        results.append(result)
+        slug = gold.topic.replace(" ", "_")
+        md = out_dir / f"{slug}_topic_regression.md"
+        json_path = out_dir / f"{slug}_topic_regression.json"
+        md.write_text(render_regression_md(result), encoding="utf-8")
+        json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        outputs.append({"topic": gold.topic, "report": str(md), "json": str(json_path), "overall_status": result["overall_status"]})
+
+    if len(results) > 1:
+        suite_md = out_dir / "multi_topic_regression.md"
+        suite_json = out_dir / "multi_topic_regression.json"
+        suite_md.write_text(render_multi_regression_md(results), encoding="utf-8")
+        suite_json.write_text(json.dumps(results, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        outputs.append({"topic": "all", "report": str(suite_md), "json": str(suite_json)})
+    print(json.dumps({"outputs": outputs}, ensure_ascii=False, sort_keys=True))
     return 0
 
 

@@ -81,8 +81,17 @@ def memory_capped_concurrency(requested: int) -> int:
 
 
 def load_targets(conn: sqlite3.Connection, limit: Optional[int] = None) -> list[dict]:
-    q = """
-        SELECT id, title, doi, arxiv_id, publication_year
+    cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(papers)").fetchall()}
+    title_expr = "title" if "title" in cols else "'' AS title"
+    if "publication_year" in cols:
+        year_expr = "publication_year"
+    elif "publication_date" in cols:
+        year_expr = "CAST(substr(publication_date, 1, 4) AS INTEGER) AS publication_year"
+    else:
+        year_expr = "NULL AS publication_year"
+    order_date_expr = "publication_date" if "publication_date" in cols else "id"
+    q = f"""
+        SELECT id, {title_expr}, doi, arxiv_id, {year_expr}
         FROM papers
         WHERE (
               openalex_id IS NULL
@@ -102,12 +111,12 @@ def load_targets(conn: sqlite3.Connection, limit: Optional[int] = None) -> list[
             WHEN doi IS NOT NULL AND doi != '' THEN 0
             ELSE 1
           END,
-          CASE
-            WHEN openalex_id IS NULL OR openalex_id NOT LIKE 'W%' THEN 0
-            ELSE 1
-          END,
-          publication_date,
-          id
+              CASE
+                WHEN openalex_id IS NULL OR openalex_id NOT LIKE 'W%' THEN 0
+                ELSE 1
+              END,
+              {order_date_expr},
+              id
     """
     if limit:
         q += f" LIMIT {int(limit)}"

@@ -23,6 +23,7 @@ from typing import Any, Optional
 from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import DB_MAIN, DB_V14, REPORT_DIR
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
+from echelon.v14b.evidence_grade import grade_from_qualities
 from echelon.v14b.utils import add_common_args, setup_logging
 
 logger = logging.getLogger("echelon.v14b.step13_first_principles_history")
@@ -608,6 +609,11 @@ def infer_root_constraint_type(principle_id: str, text: str) -> str:
 def evidence_strength_level_from_atoms(atoms: list[dict]) -> str:
     if not atoms:
         return "weak"
+    grade = grade_from_qualities(a.get("evidence_quality") for a in atoms)
+    if grade == "strong_section":
+        return "strong"
+    if grade == "moderate_section":
+        return "moderate"
     qualities = Counter((a.get("evidence_quality") or "unknown") for a in atoms)
     section = int(qualities.get("section_level", 0) + qualities.get("structured_sections", 0))
     weak = int(qualities.get("weak_abstract", 0))
@@ -1074,6 +1080,15 @@ def build_bottleneck_lineage_triples(
                             "severity": atom.get("severity"),
                             "n_resolutions": len(rel_rows),
                             "page_candidates": pages,
+                            "lineage_schema": [
+                                "constraint",
+                                "failure_mechanism",
+                                "attempt_path",
+                                "local_fix",
+                                "new_constraint",
+                            ],
+                            "evidence_grade": grade_from_qualities([atom.get("evidence_quality")]),
+                            "claim_policy": "lineage evidence only; not a standalone prediction",
                         }
                     ),
                 }

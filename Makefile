@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit value-delivery-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -117,11 +117,11 @@ product-baseline:
 		--topic $${V14B_BASELINE_TOPIC:-metalens} \
 		--top-k $${V14B_BASELINE_TOP_K:-80}
 
-## Topic regression: Metalens value baseline
+## Topic regression: multi-topic value baseline
 topic-regression:
-	@echo ">>> Topic regression: Metalens decision-grade dossier audit..."
+	@echo ">>> Topic regression: multi-topic decision-grade dossier audit..."
 	$(PYTHON) -m echelon.v14b.topic_regression \
-		--topic $${V14B_TOPIC_REGRESSION_TOPIC:-metalens} \
+		--topic $${V14B_TOPIC_REGRESSION_TOPIC:-all} \
 		--top-k $${V14B_TOPIC_REGRESSION_TOP_K:-80} \
 		--out-dir reports/v14b_pilot
 
@@ -141,6 +141,15 @@ direction-readiness-audit:
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot
+
+## Value delivery audit: eight gates from graph demo to decision system
+value-delivery-audit:
+	@echo ">>> Value delivery audit: evidence, lineage, calibration, Topic Dossier, multi-corpus..."
+	$(PYTHON) -m echelon.v14b.value_delivery_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--repo-root .
 
 ## Step 1: OpenAlex enrich 13606 篇 (~1.5h)
 enrich:

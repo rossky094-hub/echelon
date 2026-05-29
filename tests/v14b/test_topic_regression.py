@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from echelon.v14b.topic_regression import (
+    GOLD_TOPICS,
     METALENS_GOLD,
+    render_multi_regression_md,
     render_regression_md,
     run_topic_regression,
 )
@@ -66,3 +68,28 @@ def test_metalens_regression_flags_missing_claim_cards_and_evidence():
     assert result["overall_status"] == "fail"
     assert any(gate["name"] == "Claim Cards for Radar" for gate in result["gates"])
     assert "Quality Gaps" in md
+
+
+def test_gold_topics_cover_required_regression_suite():
+    assert {
+        "metalens",
+        "metasurface holography",
+        "photonic crystal cavity",
+        "quantum light source",
+    }.issubset(GOLD_TOPICS)
+
+
+def test_multi_topic_rendering_uses_gold_branch_coverage():
+    results = [
+        {
+            "topic": "metasurface holography",
+            "overall_status": "warn",
+            "gold_branch_coverage": 0.75,
+            "key_turning_papers": {"total": 4},
+            "future_candidates": {"complete_claim_cards": 1},
+        }
+    ]
+    md = render_multi_regression_md(results)
+
+    assert "metasurface holography" in md
+    assert "0.75" in md

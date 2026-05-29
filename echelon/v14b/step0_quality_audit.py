@@ -523,6 +523,7 @@ def build_audit(
         "summary": {
             "total_papers": total_papers,
             "scoped_papers": scoped_total,
+            "optics_papers": scoped_total,
             "corpus_id": corpus_id,
             "expected_total": expected_total,
             "coverage_ratio": coverage_ratio,
