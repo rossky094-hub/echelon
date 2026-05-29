@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T16:28:59Z`
+- generated_at: `2026-05-29T16:48:27Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
 
@@ -26,8 +26,8 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13850039372467293,
-    "openalex_w_rate": 0.6183856583199436,
+    "linked_ref_rate": 0.13849047223746477,
+    "openalex_w_rate": 0.6195771876297593,
     "primary_section_papers": 690
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",

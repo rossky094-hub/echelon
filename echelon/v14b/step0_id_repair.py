@@ -268,11 +268,11 @@ def repair_ids(db_path: Path = DB_MAIN, corpus_id: str | None = None) -> dict:
     """)
 
     linked_before = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL"
+        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
     ).fetchone()[0]
     newly_linked = link_paper_reference_internals(conn)
     linked_after = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL"
+        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
     ).fetchone()[0]
 
     field_stats = backfill_field_topic_local(conn)

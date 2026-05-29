@@ -232,7 +232,7 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
         return normalize_arxiv_id(m.group(1))
 
     before = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL"
+        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
     ).fetchone()[0]
 
     paper_cols = _table_columns(conn, "papers")
@@ -253,7 +253,7 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
         pid = row[0]
         openalex_id = normalize_openalex_work_id(row[1])
         doi = normalize_doi(row[2])
-        arxiv_id = row[3]
+        arxiv_id = normalize_arxiv_id(row[3])
         s2_id = normalize_s2_paper_id(row[4]) if has_s2_col else None
         if openalex_id:
             id_maps["openalex"].setdefault(openalex_id, pid)
@@ -283,14 +283,14 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
             SELECT citing_paper_id, cited_paper_id_external,
                    cited_paper_id_provider, cited_paper_id_norm
             FROM paper_references
-            WHERE cited_paper_id_internal IS NULL
+            WHERE COALESCE(cited_paper_id_internal, '') = ''
               AND cited_paper_id_external IS NOT NULL
         """).fetchall()
     else:
         rows = conn.execute("""
             SELECT citing_paper_id, cited_paper_id_external
             FROM paper_references
-            WHERE cited_paper_id_internal IS NULL
+            WHERE COALESCE(cited_paper_id_internal, '') = ''
               AND cited_paper_id_external IS NOT NULL
         """).fetchall()
 
@@ -338,7 +338,7 @@ def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
         """, internal_updates)
     conn.commit()
     after = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL"
+        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
     ).fetchone()[0]
     linked = after - before
     logger.info("引用边内部 ID 链接: +%d (合计 %d)", linked, after)

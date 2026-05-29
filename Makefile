@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -56,6 +56,24 @@ id-repair:
 	$(PYTHON) -m echelon.v14b.step0_id_repair \
 		--db $(DB_MAIN) \
 		$(CORPUS_ARG)
+
+## Reference relink audit: deterministic DOI/OpenAlex/S2/arXiv exact joins
+reference-relink-audit:
+	@echo ">>> Reference relink audit: deterministic exact joins..."
+	$(PYTHON) -m echelon.v14b.reference_relink_audit \
+		--db $(DB_MAIN) \
+		--out-dir reports/v14b_pilot \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Reference relink apply: only exact unambiguous DOI/OpenAlex/S2/arXiv joins
+reference-relink-apply:
+	@echo ">>> Reference relink apply: deterministic exact joins only..."
+	$(PYTHON) -m echelon.v14b.reference_relink_audit \
+		--db $(DB_MAIN) \
+		--out-dir reports/v14b_pilot \
+		--apply \
+		--chunk-size $${V14B_REFERENCE_RELINK_CHUNK_SIZE:-5000} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
 ## Step 0.25: OpenAlex Field/Topic backfill
 openalex-backfill:

@@ -1,12 +1,12 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T16:28:59Z`
+- generated_at: `2026-05-29T16:48:13Z`
 - readiness_level: `candidate_generator_only`
 
 ## Metrics
 
-- linked refs: 442,878 / 3,197,666 (13.9%)
-- OpenAlex W IDs: 34,253 (61.8%)
+- linked refs: 442,932 / 3,198,284 (13.8%)
+- OpenAlex W IDs: 34,318 (62.0%)
 - section evidence: 1,241 rows / 690 papers
 - primary section evidence: 690 papers (1.2%)
 - predicted future edges: 1,000
@@ -16,10 +16,10 @@
 
 ## Blockers
 
-- **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
+- **citation_graph_bone** (high): linked refs are 13.8%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
 - **section_evidence** (high): primary section evidence covers only 690 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
 - **fusion_materialization** (high): Step5b produced future candidates but live future_directions is empty. Next: After section evidence improves, rerun Step5c -> Step6 -> Step13; do not promote raw GNN edges.
-- **openalex_topic_coverage** (medium): OpenAlex W coverage is 61.8%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
+- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.0%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit
 
