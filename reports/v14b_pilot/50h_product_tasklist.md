@@ -13,27 +13,27 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | P2-07 | 8-14h | Topic Lens 结论 evidence_objects 化 | API returns evidence_objects for every branch/bottleneck/turning/future statement | evidence types include paper, section, limitation_atom, main_path_edge, branch_lineage, future_candidate | completed |
 | P2-08 | 8-14h | 无证据结论降级 | insufficient_evidence blocks in Topic Dossier | no evidence-backed UI card is rendered from naked prose | completed |
 | P2-09 | 8-14h | 前端可点击证据闭环 | branch/bottleneck/turning/future cards open paper/section/evidence detail | each visible conclusion has an inspectable evidence drawer | completed |
-| P3-10 | 14-19h | Step13 五问 Claim Card 硬约束 | Claim Card quality gate | missing root/history/enabler/bottleneck/experiment prevents Radar promotion | next |
-| P3-11 | 14-19h | Radar 主视图只展示完整卡 | candidate pool separated from R&D Radar | GNN-only edges are never shown as investable directions | next |
-| P3-12 | 14-19h | Claim Card 缺口提示 | missing_gates, claim_scope, evidence_strength in API/UI | user can see exactly why a candidate is not actionable | next |
-| P4-13 | 19-24h | Access Link 完整性审计 | access gap table/report | key turning papers, branch drivers, future endpoints are audited | todo |
-| P4-14 | 19-24h | 自动合成外部访问链接 | arXiv/DOI/S2/OpenAlex links in paper detail | known IDs produce clickable links; missing IDs become explicit access gaps | todo |
-| P4-15 | 19-24h | 前端显示 local evidence / external access / access gap | paper detail access panel | researchers know whether they can inspect local evidence or must open an external source | todo |
-| P5-16 | 24-30h | Delta section 自动接力 | top12000 completion handoff to section-evidence-delta | if primary sections are below target, delta queue starts once and only once | todo |
-| P5-17 | 24-30h | Delta queue 优先级审查 | main/future/branch/keystone/Metalens coverage report | next crawl is evidence-budgeted, not blind sweeping | todo |
-| P5-18 | 24-30h | 资源保护 | single-process guard, disk floor, temp PDF cleanup | no duplicate crawler and no persistent full-PDF cache | todo |
-| P6-19 | 30-35h | 后段链路 smoke test | Step5c -> Step6 -> Step13 -> Step10 partial run log | schema, empty-table, quality-gate, frontend breaking issues are found before final run | todo |
-| P6-20 | 30-35h | 修复 smoke test 阻断点 | reviewable fixes with tests | fixes preserve algorithmic semantics and serve project goals | todo |
-| P7-21 | 35-40h | Branch Lineage 解释增强 | parent, split reason, driver papers, constraint shift in branch cards | layout-only clusters are labeled layout_cluster_only, not true branches | todo |
-| P7-22 | 35-40h | Topic Dossier 分支可信度门 | evidence-backed branch vs weak cluster distinction | only evidence-backed branches are narrated as real branch evolution | todo |
-| P8-23 | 40-44h | Future Growth 可解释化 | GNN/VGAE candidate generator explanation | each future candidate shows model probability, calibration, bottleneck, Step6/13 status | todo |
-| P8-24 | 40-44h | Future candidate 到 Claim Card 的转化路径 | candidate pool lifecycle state | no Claim Card means no Radar promotion | todo |
-| P9-25 | 44-47h | Topic Lens 第一屏改为 Dossier | topic-first workstation UI | search result answers branch/bottleneck/turning/future before showing raw paper list | todo |
-| P9-26 | 44-47h | 图层组合解释 | Main/Co-cite/Cite/Semantic/Future/Bottleneck/Uncertainty/Fusion value explanations | selected layer combinations explain what the user is seeing and why it matters | todo |
-| P9-27 | 44-47h | 交互打磨 | clickable branch, bottleneck, key paper, claim card | no important card is a dead end | todo |
-| P10-28 | 47-50h | 整理审计报告 | completed items, remaining risk, next required frontfill | remaining risk is explicit and tied to product-goal impact | todo |
-| P10-29 | 47-50h | 准备爬虫完成后的自动运行顺序 | post-frontfill-chain ready/restartable | section/OpenAlex threshold triggers downstream chain from a safe breakpoint | todo |
-| P10-30 | 47-50h | GitHub 同步与最终状态确认 | pushed branch, passing tests, live monitors | repo is reproducible while crawlers continue | todo |
+| P3-10 | 14-19h | Step13 五问 Claim Card 硬约束 | Claim Card quality gate | missing root/history/enabler/bottleneck/experiment prevents Radar promotion | completed |
+| P3-11 | 14-19h | Radar 主视图只展示完整卡 | candidate pool separated from R&D Radar | GNN-only edges are never shown as investable directions | completed |
+| P3-12 | 14-19h | Claim Card 缺口提示 | missing_gates, claim_scope, evidence_strength in API/UI | user can see exactly why a candidate is not actionable | completed |
+| P4-13 | 19-24h | Access Link 完整性审计 | access gap table/report | key turning papers, branch drivers, future endpoints are audited | completed |
+| P4-14 | 19-24h | 自动合成外部访问链接 | arXiv/DOI/S2/OpenAlex links in paper detail | known IDs produce clickable links; missing IDs become explicit access gaps | completed |
+| P4-15 | 19-24h | 前端显示 local evidence / external access / access gap | paper detail access panel | researchers know whether they can inspect local evidence or must open an external source | completed |
+| P5-16 | 24-30h | Delta section 自动接力 | top12000 completion handoff to section-evidence-delta | if primary sections are below target, delta queue starts once and only once | completed |
+| P5-17 | 24-30h | Delta queue 优先级审查 | main/future/branch/keystone/Metalens coverage report | next crawl is evidence-budgeted, not blind sweeping | completed |
+| P5-18 | 24-30h | 资源保护 | single-process guard, disk floor, temp PDF cleanup | no duplicate crawler and no persistent full-PDF cache | completed |
+| P6-19 | 30-35h | 后段链路 smoke test | Step5c -> Step6 -> Step13 -> Step10 partial run log | schema, empty-table, quality-gate, frontend breaking issues are found before final run | completed |
+| P6-20 | 30-35h | 修复 smoke test 阻断点 | reviewable fixes with tests | fixes preserve algorithmic semantics and serve project goals | completed |
+| P7-21 | 35-40h | Branch Lineage 解释增强 | parent, split reason, driver papers, constraint shift in branch cards | layout-only clusters are labeled layout_cluster_only, not true branches | completed |
+| P7-22 | 35-40h | Topic Dossier 分支可信度门 | evidence-backed branch vs weak cluster distinction | only evidence-backed branches are narrated as real branch evolution | completed |
+| P8-23 | 40-44h | Future Growth 可解释化 | GNN/VGAE candidate generator explanation | each future candidate shows model probability, calibration, bottleneck, Step6/13 status | completed |
+| P8-24 | 40-44h | Future candidate 到 Claim Card 的转化路径 | candidate pool lifecycle state | no Claim Card means no Radar promotion | completed |
+| P9-25 | 44-47h | Topic Lens 第一屏改为 Dossier | topic-first workstation UI | search result answers branch/bottleneck/turning/future before showing raw paper list | completed |
+| P9-26 | 44-47h | 图层组合解释 | Main/Co-cite/Cite/Semantic/Future/Bottleneck/Uncertainty/Fusion value explanations | selected layer combinations explain what the user is seeing and why it matters | completed |
+| P9-27 | 44-47h | 交互打磨 | clickable branch, bottleneck, key paper, claim card | no important card is a dead end | completed |
+| P10-28 | 47-50h | 整理审计报告 | completed items, remaining risk, next required frontfill | remaining risk is explicit and tied to product-goal impact | next |
+| P10-29 | 47-50h | 准备爬虫完成后的自动运行顺序 | post-frontfill-chain ready/restartable | section/OpenAlex threshold triggers downstream chain from a safe breakpoint | next |
+| P10-30 | 47-50h | GitHub 同步与最终状态确认 | pushed branch, passing tests, live monitors | repo is reproducible while crawlers continue | next |
 
 ## Execution Rule
 

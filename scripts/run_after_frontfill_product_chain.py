@@ -85,7 +85,11 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
                     """
                     SELECT COUNT(DISTINCT paper_id)
                     FROM paper_sections
-                    WHERE section_name IN ('limitations','discussion','conclusion','future_work')
+                    WHERE section_name IN (
+                        'limitation','limitations','discussion','conclusion','conclusions',
+                        'future_work','future directions','results','error_analysis',
+                        'ablation','method','methods','experiments'
+                    )
                       AND length(trim(section_text)) >= 80
                     """,
                 )

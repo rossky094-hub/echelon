@@ -385,6 +385,12 @@ button.primary,
   background: #fff3ef;
 }
 
+.pill.good {
+  border-color: rgba(37, 122, 82, .35);
+  color: #1f6b49;
+  background: #effaf4;
+}
+
 .score {
   display: grid;
   gap: 2px;

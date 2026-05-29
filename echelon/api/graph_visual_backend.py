@@ -1053,7 +1053,11 @@ def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, A
                     """
                     SELECT COUNT(DISTINCT paper_id)
                     FROM paper_sections
-                    WHERE section_name IN ('limitations','discussion','conclusion','future_work')
+                    WHERE section_name IN (
+                        'limitation','limitations','discussion','conclusion','conclusions',
+                        'future_work','future directions','results','error_analysis',
+                        'ablation','method','methods','experiments'
+                    )
                       AND length(trim(section_text)) >= 80
                     """
                 ).fetchone()[0] or 0
@@ -1578,6 +1582,40 @@ def _clean_branch_label(label: Any, fallback: str) -> str:
     return ", ".join(clean[:4]) or str(label or fallback)
 
 
+def _lineage_status(split_evidence: dict[str, Any], split_confidence: Any) -> str:
+    if not isinstance(split_evidence, dict):
+        split_evidence = {}
+    explicit = str(split_evidence.get("lineage_status") or "").strip()
+    if explicit:
+        return explicit
+    support = int(split_evidence.get("parent_citation_support") or 0)
+    try:
+        conf = float(split_confidence or split_evidence.get("parent_support_ratio") or 0.0)
+    except (TypeError, ValueError):
+        conf = 0.0
+    if support >= 8 and conf >= 0.30:
+        return "evidence_backed_split"
+    if support >= 3:
+        return "weak_split_candidate"
+    return "layout_cluster_only"
+
+
+def _split_reason(branch_id: str, parent_branch_id: Any, split_evidence: dict[str, Any]) -> str:
+    if not isinstance(split_evidence, dict):
+        split_evidence = {}
+    explicit = str(split_evidence.get("split_reason") or "").strip()
+    if explicit:
+        return explicit
+    support = int(split_evidence.get("parent_citation_support") or 0)
+    ratio = float(split_evidence.get("parent_support_ratio") or 0.0)
+    if parent_branch_id:
+        return (
+            f"Parent branch {parent_branch_id} is selected by {support} time-forward "
+            f"cross-cluster citation flows into {branch_id}; support ratio={ratio:.2f}."
+        )
+    return "No reliable parent branch was found; this is treated as a root or layout-only cluster."
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -1674,10 +1712,37 @@ def _build_branch_dossiers(
         why = _loads(row.get("why_json"), {})
         future = _loads(row.get("future_json"), {})
         count = int(c.get("n") or 0)
+        branch_id = row.get("branch_id") or c.get("branch_id")
+        split_confidence = row.get("split_confidence") if row.get("split_confidence") is not None else row.get("strength")
+        lineage_payload = split_evidence or why
+        lineage_status = _lineage_status(lineage_payload, split_confidence)
+        driver_ids = []
+        if isinstance(lineage_payload, dict):
+            driver_ids = [str(x) for x in (lineage_payload.get("driver_papers") or []) if x]
+        driver_papers = _hydrate_hits(conn, driver_ids[:5], scores={}) if driver_ids else []
+        split_reason = _split_reason(str(branch_id or cid), row.get("parent_branch_id"), lineage_payload)
+        constraint_shift = (
+            lineage_payload.get("constraint_shift")
+            if isinstance(lineage_payload, dict)
+            else None
+        ) or {
+            "status": "inferred_from_terms_pending_section_evidence",
+            "note": "Use top terms, driver papers, and section-level bottleneck evidence before treating this as a causal split.",
+        }
+        branch_evidence_objects = [
+            {
+                "type": "branch_lineage",
+                "id": f"branch_lineage:{branch_id or cid}",
+                "relationship": "split_evidence",
+                "lineage_status": lineage_status,
+                "confidence": split_confidence,
+                "description": split_reason,
+            }
+        ] + [_paper_ref(p, "branch split driver") for p in driver_papers[:3]]
         dossiers.append(
             {
                 "cluster_id": cid,
-                "branch_id": row.get("branch_id") or c.get("branch_id"),
+                "branch_id": branch_id,
                 "label": _clean_branch_label(row.get("label"), cid),
                 "topic_match_count": count,
                 "topic_share": count / total,
@@ -1685,14 +1750,24 @@ def _build_branch_dossiers(
                 "year_range": [row.get("year_start"), row.get("year_end")],
                 "parent_branch_id": row.get("parent_branch_id"),
                 "split_year": row.get("split_year"),
-                "split_confidence": row.get("split_confidence") if row.get("split_confidence") is not None else row.get("strength"),
-                "split_evidence": split_evidence or why,
+                "split_confidence": split_confidence,
+                "lineage_status": lineage_status,
+                "claim_scope": "evidence_backed_branch" if lineage_status == "evidence_backed_split" else "weak_branch_hypothesis",
+                "split_reason": split_reason,
+                "constraint_shift": constraint_shift,
+                "split_evidence": lineage_payload,
                 "future_hint": future,
                 "top_terms": [str(x) for x in (terms or [])[:8] if x],
                 "representative_papers": rep_papers,
+                "driver_papers": [_paper_ref(p, "branch split driver") for p in driver_papers],
+                "evidence_objects": branch_evidence_objects,
                 "interpretation": (
-                    f"This branch captures the topic's {row.get('label') or cid} neighborhood. "
-                    "Use representative papers to inspect the branch; use split evidence to decide whether it is a real lineage split or just a layout cluster."
+                    (
+                        f"This branch is an evidence-backed split for the topic's {row.get('label') or cid} neighborhood. "
+                        if lineage_status == "evidence_backed_split"
+                        else f"This branch is a weak/layout-derived hypothesis for the topic's {row.get('label') or cid} neighborhood. "
+                    )
+                    + "Use driver papers and section bottleneck evidence before treating it as a real lineage split."
                 ),
             }
         )
@@ -1756,32 +1831,60 @@ def _build_rd_radar(
     future_growth: list[dict[str, Any]],
 ) -> dict[str, Any]:
     claim_cards: list[dict[str, Any]] = []
+    incomplete_cards: list[dict[str, Any]] = []
     for d in future_directions[:12]:
         card = d.get("claim_card") or {}
-        claim_cards.append(
-            {
-                "kind": "claim_card",
-                "title": d.get("direction_name") or d.get("direction_id"),
-                "priority": d.get("confidence"),
-                "technical_probability": d.get("confidence"),
-                "claim_scope": d.get("claim_scope"),
-                "evidence_tier": d.get("evidence_tier"),
-                "eligible": bool(card.get("high_confidence_eligible")),
-                "claim_card": card,
-                "plain_language": "Evidence-fused direction with Step6/Step13 support.",
-            }
-        )
+        quality_gate = card.get("quality_gate") or {}
+        five_complete = bool(card.get("five_question_complete"))
+        eligible = bool(card.get("high_confidence_eligible"))
+        missing_gates = list(quality_gate.get("missing_gates") or [])
+        missing_high_conf = list(quality_gate.get("missing_high_confidence_gates") or [])
+        item = {
+            "kind": "claim_card" if five_complete else "incomplete_claim_card",
+            "title": d.get("direction_name") or d.get("direction_id"),
+            "priority": d.get("confidence"),
+            "technical_probability": d.get("confidence"),
+            "commercial_relevance": d.get("commercial_relevance"),
+            "validation_cost": d.get("validation_cost"),
+            "claim_scope": d.get("claim_scope"),
+            "evidence_tier": d.get("evidence_tier"),
+            "eligible": eligible,
+            "claim_card": card,
+            "missing_gates": missing_gates,
+            "missing_high_confidence_gates": missing_high_conf,
+            "plain_language": (
+                "Decision-grade Claim Card is complete; read eligibility gates before treating it as high confidence."
+                if five_complete
+                else "Incomplete Claim Card: this direction remains in the candidate pool until all five questions are answered."
+            ),
+        }
+        if five_complete:
+            claim_cards.append(item)
+        else:
+            incomplete_cards.append(item)
     candidate_pool: list[dict[str, Any]] = []
+    candidate_pool.extend(incomplete_cards)
     for e in future_growth[:20]:
         src = (e.get("source_paper") or {}).get("title") or e.get("source_paper_id")
         dst = (e.get("target_paper") or {}).get("title") or e.get("target_paper_id")
         conf = float(e.get("confidence") or e.get("weight") or 0.0)
+        evidence = e.get("evidence") or {}
         candidate_pool.append(
             {
                 "kind": "candidate_edge",
                 "title": f"{src} -> {dst}",
                 "priority": round(conf * 0.55, 4),
                 "technical_probability": conf,
+                "model_evidence": {
+                    "generator": "Step5b calibrated VGAE / temporal link prediction",
+                    "calibrated_prob": evidence.get("calibrated_prob"),
+                    "raw_predicted_prob": evidence.get("raw_predicted_prob"),
+                    "calibration_method": evidence.get("calibration_method"),
+                    "calibration_support": evidence.get("calibration_support"),
+                    "calibration_label": evidence.get("calibration_label"),
+                    "relationship_scope": evidence.get("relationship_scope"),
+                    "confidence_semantics": evidence.get("confidence_semantics"),
+                },
                 "commercial_relevance": None,
                 "validation_cost": None,
                 "claim_scope": "exploratory_candidate_pool",
@@ -1808,11 +1911,11 @@ def _build_rd_radar(
     items = claim_cards or [
         {
             "kind": "radar_empty_state",
-            "title": "No decision-grade Claim Cards yet",
+            "title": "No complete Claim Cards yet",
             "claim_scope": "candidate_only",
             "eligible": False,
             "plain_language": (
-                "Radar is intentionally empty because this topic currently has future candidates but no "
+                "Radar is intentionally empty because this topic currently has future candidates but no complete "
                 "Step6/Step13 five-question Claim Card. Review the candidate pool, then rerun fusion and "
                 "first-principles history after section evidence is complete."
             ),
@@ -1820,13 +1923,16 @@ def _build_rd_radar(
     ]
     return {
         "summary": (
-            "R&D Radar only promotes decision-grade Claim Cards. GNN future edges stay in the candidate pool "
-            "until Step6 fusion and Step13 evidence gates produce a complete five-question card."
+            "R&D Radar only promotes complete Step13 Claim Cards. High-confidence status additionally requires "
+            "strong section evidence, calibrated future-growth backtest, and sufficient direction confidence. "
+            "GNN future edges and incomplete cards stay in the candidate pool."
         ),
         "items": items,
         "claim_cards": claim_cards,
+        "incomplete_claim_cards": incomplete_cards,
         "candidate_pool": candidate_pool,
         "claim_cards_ready": bool(claim_cards),
+        "high_confidence_ready": any(item.get("eligible") for item in claim_cards),
     }
 
 
@@ -2847,6 +2953,9 @@ def get_visual_clusters(limit: int = 200) -> dict:
         item["split_evidence"] = _loads(item.pop("split_evidence_json", None), {})
         item["why"] = _loads(item.pop("why_json", None), {})
         item["future"] = _loads(item.pop("future_json", None), {})
+        lineage_payload = item.get("split_evidence") or item.get("why") or {}
+        item["lineage_status"] = _lineage_status(lineage_payload, item.get("split_confidence"))
+        item["split_reason"] = _split_reason(str(item.get("branch_id") or ""), item.get("parent_branch_id"), lineage_payload)
         lineages.append(item)
     return {
         "schema_version": SCHEMA_VERSION,

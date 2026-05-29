@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -124,6 +124,15 @@ topic-regression:
 		--topic $${V14B_TOPIC_REGRESSION_TOPIC:-metalens} \
 		--top-k $${V14B_TOPIC_REGRESSION_TOP_K:-80} \
 		--out-dir reports/v14b_pilot
+
+## Access audit: key turning / branch driver / future endpoint access gaps
+access-audit:
+	@echo ">>> Access audit: decision-critical paper links..."
+	$(PYTHON) -m echelon.v14b.access_link_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--limit $${V14B_ACCESS_AUDIT_LIMIT:-12000}
 
 ## Step 1: OpenAlex enrich 13606 篇 (~1.5h)
 enrich:

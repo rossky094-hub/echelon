@@ -666,6 +666,28 @@ def minimal_experiment_template(
     }
 
 
+def _claim_gate_labels(gates: dict[str, bool]) -> list[str]:
+    labels = {
+        "root_constraint": "root constraint",
+        "past_attempts_10y": "historical attempts and failure evidence",
+        "new_enablers": "new enabling condition",
+        "unresolved_bottleneck": "unresolved bottleneck evidence",
+        "minimal_validation_experiment": "minimal validation experiment",
+    }
+    return [labels.get(k, k) for k, ok in gates.items() if not ok]
+
+
+def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
+    labels = {
+        "five_question_complete": "complete five-question Claim Card",
+        "section_evidence_strong": "strong section-level evidence",
+        "calibration_ready": "future-growth calibration available",
+        "rolling_auc_ready": "rolling held-out-year AUC >= 0.65",
+        "direction_confidence_ready": "direction confidence >= 0.70",
+    }
+    return [labels.get(k, k) for k, ok in gates.items() if not ok]
+
+
 def score_atom(atom: dict) -> float:
     severity = str(atom.get("severity") or "medium").lower()
     severity_w = SEVERITY_WEIGHT.get(severity, 0.55)
@@ -1195,15 +1217,31 @@ def build_direction_claim_cards(
         calibration_ready = bool(calibration_audit.get("method"))
         rolling_avg_auc = float(calibration_audit.get("avg_calibrated_auc") or 0.0)
         section_strength = evidence_strength_level_from_atoms(direction_atoms)
+        new_enablers = []
+        missing_enablers = []
+        if calibration_ready and rolling_avg_auc >= 0.65:
+            new_enablers.append("rolling held-out-year calibration supports the future-growth candidate")
+        else:
+            missing_enablers.append("rolling held-out-year calibration is missing or below threshold")
+        if section_strength in {"moderate", "strong"}:
+            new_enablers.append(f"{section_strength} section-level bottleneck evidence is available")
+        else:
+            missing_enablers.append("section-level bottleneck evidence is weak")
+        if float(d.get("confidence") or 0.0) >= 0.70:
+            new_enablers.append("future-growth graph confidence is above the candidate threshold")
+        else:
+            missing_enablers.append("future-growth graph confidence is below candidate threshold")
+        if (d.get("evidence_tier") or "").strip() and "weak" not in str(d.get("evidence_tier") or "").lower():
+            new_enablers.append(f"Step6 fusion tier={d.get('evidence_tier')}")
+        else:
+            missing_enablers.append("Step6 fusion is weak or missing")
         enabling_conditions = {
-            "new_enablers": [
-                "temporal calibration curve available" if calibration_ready else "calibration missing",
-                "rolling held-out-year backtest available" if rolling_avg_auc > 0 else "rolling backtest missing",
-                f"evidence_strength={section_strength}",
-            ],
+            "new_enablers": new_enablers,
+            "missing_enablers": missing_enablers,
             "prediction_confidence": float(d.get("confidence") or 0.0),
             "calibration_label": d.get("calibration_label"),
             "rolling_avg_calibrated_auc": rolling_avg_auc,
+            "evidence_tier": d.get("evidence_tier"),
         }
 
         unresolved = [
@@ -1227,39 +1265,61 @@ def build_direction_claim_cards(
             keyword=top_kw,
         )
 
-        q1 = bool(root_constraint.get("constraint"))
+        q1 = bool(root_constraint.get("constraint")) and root_constraint.get("constraint") != "insufficient evidence"
         q2 = bool(attempts)
         q3 = bool(enabling_conditions.get("new_enablers"))
         q4 = bool(unresolved)
-        q5 = bool(minimal_experiment.get("experiment"))
-        five_complete = int(all([q1, q2, q3, q4, q5]))
-
-        high_confidence_eligible = int(
-            five_complete == 1
-            and section_strength == "strong"
-            and calibration_ready
-            and rolling_avg_auc >= 0.65
-            and float(d.get("confidence") or 0.0) >= 0.70
+        q5 = bool(
+            minimal_experiment.get("experiment")
+            and minimal_experiment.get("cost_level")
+            and minimal_experiment.get("cycle_weeks")
+            and minimal_experiment.get("success_criteria")
         )
+        five_question_gates = {
+            "root_constraint": q1,
+            "past_attempts_10y": q2,
+            "new_enablers": q3,
+            "unresolved_bottleneck": q4,
+            "minimal_validation_experiment": q5,
+        }
+        five_complete = int(all(five_question_gates.values()))
+
+        high_confidence_gates = {
+            "five_question_complete": bool(five_complete),
+            "section_evidence_strong": section_strength == "strong",
+            "calibration_ready": calibration_ready,
+            "rolling_auc_ready": rolling_avg_auc >= 0.65,
+            "direction_confidence_ready": float(d.get("confidence") or 0.0) >= 0.70,
+        }
+        high_confidence_eligible = int(all(high_confidence_gates.values()))
         claim_scope = (
             "validated_candidate"
             if high_confidence_eligible
             else ("exploratory_with_claim_card" if five_complete else "exploratory_incomplete_card")
         )
+        missing_gates = _claim_gate_labels(five_question_gates)
+        missing_high_confidence_gates = _high_confidence_gate_labels(high_confidence_gates)
 
         quality_gate = {
-            "five_questions": {
-                "root_constraint": q1,
-                "past_attempts_10y": q2,
-                "new_enablers": q3,
-                "unresolved_bottleneck": q4,
-                "minimal_validation_experiment": q5,
-            },
+            "five_questions": five_question_gates,
             "five_question_complete": bool(five_complete),
+            "missing_gates": missing_gates,
             "section_evidence_strength": section_strength,
             "calibration_ready": calibration_ready,
             "rolling_avg_calibrated_auc": rolling_avg_auc,
+            "direction_confidence": float(d.get("confidence") or 0.0),
+            "high_confidence_gates": high_confidence_gates,
+            "missing_high_confidence_gates": missing_high_confidence_gates,
             "high_confidence_eligible": bool(high_confidence_eligible),
+            "radar_policy": (
+                "promote_to_radar_high_confidence"
+                if high_confidence_eligible
+                else (
+                    "show_in_radar_as_exploratory_claim_card"
+                    if five_complete
+                    else "candidate_pool_only"
+                )
+            ),
         }
 
         card_id = f"claim:{direction_id}"

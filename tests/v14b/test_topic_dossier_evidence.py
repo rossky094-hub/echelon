@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from echelon.api.graph_visual_backend import _build_topic_dossier
+from echelon.api.graph_visual_backend import _build_rd_radar, _build_topic_dossier, _lineage_status
 
 
 def test_topic_dossier_returns_clickable_evidence_objects():
@@ -55,3 +55,60 @@ def test_topic_dossier_returns_clickable_evidence_objects():
     assert dossier["hard_bottlenecks"][0]["evidence_objects"]
     assert dossier["validation_directions"][0]["evidence_objects"]
     assert dossier["insufficient_evidence"][0]["claim"] == "investable future direction"
+
+
+def test_rd_radar_promotes_only_complete_claim_cards():
+    radar = _build_rd_radar(
+        future_directions=[
+            {
+                "direction_id": 1,
+                "direction_name": "Incomplete direction",
+                "confidence": 0.9,
+                "claim_scope": "exploratory_incomplete_card",
+                "claim_card": {
+                    "five_question_complete": False,
+                    "high_confidence_eligible": False,
+                    "quality_gate": {"missing_gates": ["root constraint"]},
+                },
+            },
+            {
+                "direction_id": 2,
+                "direction_name": "Complete but exploratory direction",
+                "confidence": 0.72,
+                "claim_scope": "exploratory_with_claim_card",
+                "claim_card": {
+                    "five_question_complete": True,
+                    "high_confidence_eligible": False,
+                    "quality_gate": {
+                        "missing_high_confidence_gates": ["strong section-level evidence"]
+                    },
+                },
+            },
+        ],
+        future_growth=[
+            {
+                "source_paper_id": "p1",
+                "target_paper_id": "p2",
+                "confidence": 0.8,
+                "evidence": {
+                    "calibrated_prob": 0.75,
+                    "raw_predicted_prob": 0.91,
+                    "calibration_label": "calibrated_temporal_holdout",
+                },
+            },
+        ],
+    )
+
+    assert len(radar["claim_cards"]) == 1
+    assert radar["claim_cards"][0]["title"] == "Complete but exploratory direction"
+    assert radar["claim_cards"][0]["eligible"] is False
+    assert len(radar["incomplete_claim_cards"]) == 1
+    assert any(item["kind"] == "incomplete_claim_card" for item in radar["candidate_pool"])
+    edge_items = [item for item in radar["candidate_pool"] if item["kind"] == "candidate_edge"]
+    assert edge_items[0]["model_evidence"]["calibrated_prob"] == 0.75
+
+
+def test_branch_lineage_status_distinguishes_layout_from_evidence():
+    assert _lineage_status({"parent_citation_support": 2}, 0.2) == "layout_cluster_only"
+    assert _lineage_status({"parent_citation_support": 5}, 0.2) == "weak_split_candidate"
+    assert _lineage_status({"parent_citation_support": 12}, 0.35) == "evidence_backed_split"

@@ -828,7 +828,11 @@ function renderClusters() {
           <small>${esc(cluster.cluster_id)} / ${fmt(cluster.n_nodes)} papers / ${esc(cluster.year_start || "?")}-${esc(cluster.year_end || "?")}</small>
         </button>
         <div class="pill-row">${terms}</div>
+        <div class="pill-row">
+          <span class="pill ${lineage.lineage_status === "evidence_backed_split" ? "good" : "warn"}">${esc(lineage.lineage_status || "layout_cluster_only")}</span>
+        </div>
         <p class="mini">parent ${esc(lineage.parent_branch_id || "-")} / split ${esc(lineage.split_year || "-")} / confidence ${confidence}</p>
+        ${lineage.split_reason ? `<p class="mini">${esc(lineage.split_reason)}</p>` : ""}
       </div>
     `;
   }).join("");
@@ -1039,11 +1043,20 @@ function renderBranchDossiers(branches = []) {
         <div class="branch-card">
           <strong>${esc(branch.label || branch.cluster_id)}</strong>
           <small>${esc(branch.cluster_id || "")} / ${esc(branch.branch_id || "")} / topic share ${pct(branch.topic_share || 0)} / ${esc((branch.year_range || []).join("-"))}</small>
+          <div class="pill-row">
+            <span class="pill ${branch.lineage_status === "evidence_backed_split" ? "good" : "warn"}">${esc(branch.lineage_status || "weak_branch_hypothesis")}</span>
+            <span class="pill">${esc(branch.claim_scope || "weak_branch_hypothesis")}</span>
+          </div>
           <p>${esc(branch.interpretation || "")}</p>
+          ${branch.split_reason ? `<p><strong>分叉证据：</strong>${esc(branch.split_reason)}</p>` : ""}
+          ${branch.constraint_shift ? `<p class="mini"><strong>约束变化：</strong>${esc(branch.constraint_shift.status || "")} ${esc(branch.constraint_shift.note || "")}</p>` : ""}
           <div class="pill-row">
             ${(branch.top_terms || []).slice(0, 6).map((term) => `<span class="pill">${esc(term)}</span>`).join("")}
           </div>
           <p class="mini">parent ${esc(branch.parent_branch_id || "-")} / split ${esc(branch.split_year || "-")} / confidence ${pct(branch.split_confidence || 0)}</p>
+          ${(branch.driver_papers || []).length ? `<p><strong>Driver papers</strong></p>${renderPaperList(branch.driver_papers || [], 3)}` : ""}
+          ${renderEvidenceObjects(branch.evidence_objects || [], 5)}
+          <p><strong>Representative papers</strong></p>
           ${renderPaperList(branch.representative_papers || [], 3)}
         </div>
       `).join("") || "<p>No branch dossiers matched.</p>"}
@@ -1085,15 +1098,17 @@ function renderDossierRadar(radar = {}) {
           <div class="score-row">
             <span class="score"><small>优先级</small><strong>${pct(item.priority || 0)}</strong></span>
             <span class="score"><small>技术概率</small><strong>${pct(item.technical_probability || 0)}</strong></span>
-            <span class="score"><small>状态</small><strong>${esc(item.claim_scope || "exploratory")}</strong></span>
+            <span class="score"><small>Claim scope</small><strong>${esc(item.claim_scope || "exploratory")}</strong></span>
+            <span class="score"><small>High confidence</small><strong>${item.eligible ? "yes" : "no"}</strong></span>
           </div>
           <p>${esc(item.plain_language || "")}</p>
-          ${(item.missing_gates || []).length ? `<p class="mini">缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
+          ${(item.missing_gates || []).length ? `<p class="mini">五问缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
+          ${(item.missing_high_confidence_gates || []).length ? `<p class="mini">高置信缺口：${item.missing_high_confidence_gates.map(esc).join(" / ")}</p>` : ""}
         </div>
       `).join("") : `
         <div class="branch-card warning-card">
-          <strong>No decision-grade Claim Cards yet</strong>
-          <p>Radar 主视图不会展示裸 GNN 边。下面只放候选池，必须等 Step6/Step13 生成五问卡片后才能进入 Radar。</p>
+          <strong>No complete Claim Cards yet</strong>
+          <p>Radar 主视图不会展示裸 GNN 边，也不会展示五问不完整的卡。下面只放候选池，必须等 Step6/Step13 生成完整五问卡后才能进入 Radar。</p>
         </div>
       `}
       <details>
@@ -1102,6 +1117,12 @@ function renderDossierRadar(radar = {}) {
           <div class="candidate-card">
             <strong>${esc(item.title || "candidate edge")}</strong>
             <small>technical ${pct(item.technical_probability || 0)} / scope ${esc(item.claim_scope || "candidate")}</small>
+            ${item.model_evidence ? `
+              <p class="mini">模型证据：${esc(item.model_evidence.generator || "future candidate generator")}
+              / calibrated ${pct(item.model_evidence.calibrated_prob || item.technical_probability || 0)}
+              / raw ${pct(item.model_evidence.raw_predicted_prob || 0)}
+              / ${esc(item.model_evidence.calibration_label || item.model_evidence.calibration_method || "uncalibrated")}</p>
+            ` : ""}
             <p>${esc(item.plain_language || "")}</p>
             <p class="mini">缺口：${(item.missing_gates || []).map(esc).join(" / ")}</p>
             ${evidencePaperButtons(item.evidence_papers || [], 2)}
@@ -1193,6 +1214,7 @@ function renderTopicLens(lens) {
         <span class="mini">可能连接到</span><br>
         <strong>${esc(paperLabel(edge.target_paper, edge.target_paper_id))}</strong><br>
         <small>GNN/VGAE confidence ${pct(edge.confidence || edge.weight)} / ${esc(edge.evidence?.relationship_scope || "graph")}</small><br>
+        <small>calibrated ${pct(edge.evidence?.calibrated_prob || edge.confidence || 0)} / raw ${pct(edge.evidence?.raw_predicted_prob || 0)} / ${esc(edge.evidence?.calibration_label || edge.evidence?.calibration_method || "calibration unknown")}</small><br>
         <small>${esc(edge.plain_language || "")}</small></p>
         ${evidencePaperButtons([edge.source_paper, edge.target_paper].filter(Boolean), 2)}
       `).join("") || "<p>No future edge matched this topic context yet.</p>"}
@@ -1266,6 +1288,7 @@ function renderFutureEdgeRadar(edge, score) {
         <span class="pill">GNN/VGAE</span>
         <span class="pill">${esc(edge.evidence?.relationship_scope || "graph")}</span>
       </div>
+      <p class="mini">模型证据：calibrated ${pct(edge.evidence?.calibrated_prob || edge.confidence || 0)} / raw ${pct(edge.evidence?.raw_predicted_prob || 0)} / ${esc(edge.evidence?.calibration_label || edge.evidence?.calibration_method || "calibration unknown")}</p>
       <p class="mini">${esc(edge.plain_language || "这是未来生长候选边，不是高置信方向。")}</p>
       <p class="mini">还不能下注：缺 Step6 融合证据、Step13 五问 Claim Card、商业相关和最小验证实验。</p>
     </div>

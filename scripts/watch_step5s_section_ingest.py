@@ -74,6 +74,59 @@ def get_section_counts(db_main: pathlib.Path) -> tuple[int, int]:
         conn.close()
 
 
+PRIMARY_SECTION_NAMES = {
+    "limitation",
+    "limitations",
+    "discussion",
+    "conclusion",
+    "conclusions",
+    "future_work",
+    "future works",
+    "future directions",
+    "results",
+    "error_analysis",
+    "error analysis",
+    "ablation",
+    "method",
+    "methods",
+    "experiments",
+    "experiment",
+}
+
+
+def get_primary_section_papers(db_main: pathlib.Path) -> int:
+    """Count papers with section evidence strong enough to support claims."""
+    conn = sqlite3.connect(str(db_main))
+    try:
+        paper_ids = conn.execute(
+            """
+            SELECT DISTINCT paper_id, section_name, section_text
+            FROM paper_sections
+            WHERE paper_id IS NOT NULL
+            """
+        ).fetchall()
+        # Keep this small and explicit: the watchdog uses the count as a value gate,
+        # not as a scientific metric, so we require a minimum text length.
+        return len(
+            {
+                str(pid)
+                for pid, name, text in paper_ids
+                if str(name or "").strip().lower() in PRIMARY_SECTION_NAMES
+                and len(str(text or "").strip()) >= 80
+            }
+        )
+    finally:
+        conn.close()
+
+
+def is_step5s_done(status: str, progress_data: dict) -> bool:
+    if str(status or "").strip().lower() in {"done", "completed", "success", "succeeded"}:
+        return True
+    done = progress_data.get("done")
+    total = progress_data.get("total")
+    return done is not None and total is not None and int(done) >= int(total) > 0
+
+
 def _elapsed_to_seconds(raw: str) -> int:
     parts = [int(x) for x in raw.split(":")]
     if len(parts) == 2:
@@ -174,6 +227,20 @@ def main() -> None:
         "--pid-pattern",
         default="python -m echelon.v14b.step5s_section_ingest --db db/echelon_library.sqlite3 --db-v14 db/v14_pilot.sqlite3 --top-n 1200",
     )
+    parser.add_argument(
+        "--handoff-cmd",
+        default="",
+        help=(
+            "Optional command to start once top-N frontfill is complete but primary "
+            "section evidence remains below threshold."
+        ),
+    )
+    parser.add_argument(
+        "--handoff-min-primary-section-papers",
+        type=int,
+        default=8000,
+        help="Primary-section paper count required before skipping delta evidence handoff.",
+    )
     args = parser.parse_args()
 
     repo_root = pathlib.Path(args.repo_root).resolve()
@@ -200,6 +267,7 @@ def main() -> None:
         progress_data = parse_progress(progress_log)
         progress = get_progress(progress_log)
         done = progress_data.get("done")
+        primary_section_papers = get_primary_section_papers(db_main)
         log_mtime = progress_log.stat().st_mtime if progress_log.exists() else 0.0
         now = time.time()
 
@@ -229,6 +297,7 @@ def main() -> None:
             log_file,
             (
                 f"[{ts}] pid={pid or 'none'} status={status} rows={rows} papers={papers} "
+                f"primary_section_papers={primary_section_papers} "
                 f"delta_rows={rows_delta} delta_papers={papers_delta} "
                 f"stale_intervals={stale_intervals} {progress}"
             ),
@@ -258,8 +327,56 @@ def main() -> None:
                 stale_intervals = 0
                 last_change_ts = time.time()
 
+        step_done = is_step5s_done(status, progress_data)
+        if step_done:
+            if args.handoff_cmd and primary_section_papers < int(args.handoff_min_primary_section_papers):
+                if not state.get("handoff_started_at"):
+                    append_log(
+                        log_file,
+                        (
+                            f"[{ts}] HANDOFF_START primary_section_papers={primary_section_papers} "
+                            f"threshold={args.handoff_min_primary_section_papers}: {args.handoff_cmd}"
+                        ),
+                    )
+                    subprocess.Popen(shlex.split(args.handoff_cmd), cwd=str(repo_root))
+                    state["handoff_started_at"] = ts
+                    state["handoff_cmd"] = args.handoff_cmd
+                else:
+                    append_log(
+                        log_file,
+                        (
+                            f"[{ts}] HANDOFF_ALREADY_STARTED at={state.get('handoff_started_at')} "
+                            f"primary_section_papers={primary_section_papers}"
+                        ),
+                    )
+            elif args.handoff_cmd:
+                append_log(
+                    log_file,
+                    (
+                        f"[{ts}] HANDOFF_SKIP primary_section_papers={primary_section_papers} "
+                        f"threshold={args.handoff_min_primary_section_papers}"
+                    ),
+                )
+            _write_state(
+                state_file,
+                {
+                    **state,
+                    "updated_at": ts,
+                    "rows": rows,
+                    "papers": papers,
+                    "primary_section_papers": primary_section_papers,
+                    "done": done,
+                    "total": progress_data.get("total"),
+                    "last_change_ts": last_change_ts,
+                    "stale_intervals": stale_intervals,
+                    "status": status,
+                },
+            )
+            append_log(log_file, f"[{ts}] step5s done; watchdog exit")
+            break
+
         if not pid:
-            if status == "done":
+            if step_done:
                 append_log(log_file, f"[{ts}] step5s done; watchdog exit")
                 break
             append_log(log_file, f"[{ts}] step5s missing and not done; restart: {' '.join(restart_argv)}")
@@ -272,6 +389,7 @@ def main() -> None:
                 "updated_at": ts,
                 "rows": rows,
                 "papers": papers,
+                "primary_section_papers": primary_section_papers,
                 "done": done,
                 "total": progress_data.get("total"),
                 "last_change_ts": last_change_ts,

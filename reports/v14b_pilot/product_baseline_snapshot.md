@@ -1,21 +1,22 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-29T13:28:42Z`
+- Snapshot: `2026-05-29T14:03:43Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
 ## Coverage
 
 - Papers: 55,391
-- OpenAlex W IDs: 33,631 / 55,391 (60.7%); missing 21,760
+- OpenAlex W IDs: 33,815 / 55,391 (61.0%); missing 21,576
 - Invalid OpenAlex IDs: 0
 - Pending enrich: 543
 - Primary Field coverage: 55,342 / 55,391 (99.9%)
-- References: 3,188,017; linked refs: 440,978 (13.8%)
+- References: 3,193,968; linked refs: 442,304 (13.8%)
 - Section rows: 1,241; section papers: 690; primary evidence papers: 690 (1.2%)
 
 ## Derived Product Tables
 
+- access_link_audit_items: 6,903
 - bottleneck_lineage_triples: 2,920
 - branch_lineages: 5,426
 - direction_claim_cards: 0
@@ -36,6 +37,7 @@
 - visual_tiles: 21,704
 - complete Claim Cards: 0
 - high-confidence Claim Cards: 0
+- access audit: 6,903 papers, 0 gaps
 
 ## Metalens Baseline
 
@@ -61,4 +63,4 @@
 
 ## Next Gate
 
-P0-P2 are complete in the first engineering pass: the baseline, Metalens regression, and evidence-object UI loop now exist.  The next gate is P3: make Step13 Claim Cards a hard eligibility layer for Radar.
+P0-P8 are complete in the first engineering pass: baseline, Metalens regression, evidence-object UI loop, Step13/Radar hard gates, access-link audit, and delta-section handoff controls now exist. A temporary-DB smoke test also verified Step5c -> Step6 -> Step13 -> Step10 runs without schema breakage on partial section data. Branch dossiers now separate evidence-backed splits from weak layout clusters, future-growth candidates are explicitly shown as calibrated candidate-generator output unless converted into complete Claim Cards, and the Topic Lens/layer interaction now explains what the selected evidence combination means. The next gate is P10: final delivery audit, GitHub sync, and post-frontfill automatic run readiness.

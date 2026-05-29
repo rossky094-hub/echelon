@@ -410,6 +410,7 @@ def collect_v14_metrics(db_v14: Path) -> dict[str, Any]:
         "visual_search_fts",
         "section_priority_papers",
         "section_priority_summary",
+        "access_link_audit_items",
     )
     metrics: dict[str, Any] = {"tables": {}}
     with connect(db_v14) as conn:
@@ -453,6 +454,13 @@ def collect_v14_metrics(db_v14: Path) -> dict[str, Any]:
                     rows.append(dict(row))
             metrics["section_priority_latest_audit_ts"] = latest
             metrics["section_priority_summary"] = rows
+        if table_exists(conn, "access_link_audit_items"):
+            metrics["access_gaps"] = int(
+                scalar(conn, "SELECT COUNT(*) FROM access_link_audit_items WHERE access_gap = 1") or 0
+            )
+            metrics["access_audited_papers"] = int(
+                scalar(conn, "SELECT COUNT(*) FROM access_link_audit_items") or 0
+            )
     return metrics
 
 
@@ -617,9 +625,9 @@ def render_tasklist_md(tasks: list[dict[str, Any]]) -> str:
     for task in tasks:
         task_id = str(task["id"])
         status = "todo"
-        if task_id.startswith(("P0-", "P1-", "P2-")):
+        if task_id.startswith(("P0-", "P1-", "P2-", "P3-", "P4-", "P5-", "P6-", "P7-", "P8-", "P9-")):
             status = "completed"
-        elif task_id.startswith("P3-"):
+        elif task_id.startswith("P10-"):
             status = "next"
         lines.append(
             "| {id} | {window} | {title} | {output} | {gate} | {status} |".format(
@@ -674,6 +682,8 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
     if "claim_cards_complete" in v14:
         lines.append(f"- complete Claim Cards: {v14['claim_cards_complete']:,}")
         lines.append(f"- high-confidence Claim Cards: {v14['claim_cards_high_confidence']:,}")
+    if "access_audited_papers" in v14:
+        lines.append(f"- access audit: {v14['access_audited_papers']:,} papers, {v14.get('access_gaps', 0):,} gaps")
     if v14.get("future_directions_by_scope"):
         lines.append("- future_directions by claim_scope: " + json.dumps(v14["future_directions_by_scope"], ensure_ascii=False, sort_keys=True))
     lines.extend(["", "## Metalens Baseline", ""])
@@ -701,9 +711,14 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
             "",
             "## Next Gate",
             "",
-            "P0-P2 are complete in the first engineering pass: the baseline, Metalens regression, "
-            "and evidence-object UI loop now exist.  The next gate is P3: make Step13 Claim Cards "
-            "a hard eligibility layer for Radar.",
+            "P0-P8 are complete in the first engineering pass: baseline, Metalens regression, "
+            "evidence-object UI loop, Step13/Radar hard gates, access-link audit, and delta-section "
+            "handoff controls now exist. A temporary-DB smoke test also verified Step5c -> Step6 -> Step13 -> Step10 "
+            "runs without schema breakage on partial section data. Branch dossiers now separate evidence-backed "
+            "splits from weak layout clusters, future-growth candidates are explicitly shown as calibrated "
+            "candidate-generator output unless converted into complete Claim Cards, and the Topic Lens/layer "
+            "interaction now explains what the selected evidence combination means. The next gate is P10: final "
+            "delivery audit, GitHub sync, and post-frontfill automatic run readiness.",
         ]
     )
     return "\n".join(lines) + "\n"

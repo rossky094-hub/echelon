@@ -34,6 +34,36 @@ def test_watchdog_parses_top12000_progress(tmp_path):
     assert "done=920/12000" in mod.get_progress(log)
 
 
+def test_watchdog_done_and_primary_section_gate(tmp_path):
+    mod = _load_watchdog_module()
+    db_main = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db_main))
+    conn.executescript(
+        """
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT
+        );
+        """
+    )
+    conn.executemany(
+        "INSERT INTO paper_sections VALUES (?, ?, ?)",
+        [
+            ("p1", "discussion", "rich section evidence " * 8),
+            ("p1", "abstract", "not a primary evidence section " * 8),
+            ("p2", "limitations", "short"),
+            ("p3", "future_work", "future experiment evidence " * 8),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    assert mod.is_step5s_done("running", {"done": 12000, "total": 12000})
+    assert mod.is_step5s_done("done", {"done": None, "total": None})
+    assert mod.get_primary_section_papers(db_main) == 2
+
+
 def _make_main_db(path: Path) -> None:
     conn = sqlite3.connect(str(path))
     conn.executescript(

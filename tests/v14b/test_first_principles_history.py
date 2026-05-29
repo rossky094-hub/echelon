@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 
@@ -100,7 +101,7 @@ def test_step13_builds_first_principles_outputs(tmp_path):
         "SELECT COUNT(*), SUM(five_question_complete), SUM(high_confidence_eligible) FROM direction_claim_cards"
     ).fetchone()
     future_gate = conn_v14.execute(
-        "SELECT claim_card_complete, high_confidence_eligible, claim_scope FROM future_directions LIMIT 1"
+        "SELECT claim_card_complete, high_confidence_eligible, claim_scope, quality_gate_json FROM future_directions LIMIT 1"
     ).fetchone()
     conn_v14.close()
     assert rows
@@ -108,3 +109,9 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     assert lineage_n > 0
     assert claim_rows[0] >= 1
     assert future_gate is not None
+    gate = json.loads(future_gate[3])
+    assert future_gate[0] == 0
+    assert future_gate[1] == 0
+    assert future_gate[2] == "exploratory_incomplete_card"
+    assert "unresolved bottleneck evidence" in gate["missing_gates"]
+    assert "future-growth calibration available" in gate["missing_high_confidence_gates"]

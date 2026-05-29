@@ -892,17 +892,40 @@ def build_branch_lineages(
         driver_ids = []
         if top_parent:
             driver_ids = [pid for pid, _ in drivers[(top_parent[0], cid)].most_common(8)]
+        parent_support = top_parent[1] if top_parent else 0
         split_confidence = min(
             1.0,
-            float(strength) * (1.0 if (top_parent and top_parent[1] >= 8) else 0.75),
+            float(strength) * (1.0 if (top_parent and parent_support >= 8) else 0.75),
         )
+        if top_parent and parent_support >= 8 and split_confidence >= 0.30:
+            lineage_status = "evidence_backed_split"
+        elif top_parent and parent_support >= 3:
+            lineage_status = "weak_split_candidate"
+        else:
+            lineage_status = "layout_cluster_only"
+        split_reason = (
+            f"Parent branch {parent_id} was selected by {parent_support} time-forward "
+            f"cross-cluster citation flows into {branch_id}; support ratio={strength:.2f}."
+            if parent_id
+            else "No reliable parent branch was found; treat this as a root/isolated layout cluster until stronger evidence exists."
+        )
+        constraint_shift = {
+            "status": "inferred_from_branch_terms_and_driver_papers",
+            "note": (
+                "Use top terms, driver papers, and section-level bottleneck evidence to interpret the constraint shift; "
+                "this field is a lineage hypothesis, not a causal proof."
+            ),
+        }
         split_evidence = {
             "parent_cluster": top_parent[0] if top_parent else None,
-            "parent_citation_support": top_parent[1] if top_parent else 0,
+            "parent_citation_support": parent_support,
             "incoming_cross_cluster_support": incoming_totals.get(cid, 0),
             "parent_support_ratio": strength,
             "alternative_parents": alternatives,
             "driver_papers": driver_ids,
+            "lineage_status": lineage_status,
+            "split_reason": split_reason,
+            "constraint_shift": constraint_shift,
             "decision_rule": "max time-forward cross-cluster citation support ratio",
             "confidence_formula": "split_confidence = parent_support_ratio × support_factor",
         }
