@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import logging
 import os
@@ -193,6 +194,27 @@ def record_ingest_attempt(
             "v14b_section_ingest_v2",
         ),
     )
+
+
+def _candidate_file_digest(path: Path | None) -> str:
+    if not path:
+        return ""
+    p = Path(path)
+    if not p.exists():
+        return "missing"
+    h = hashlib.sha256()
+    with p.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()[:12]
+
+
+def _checkpoint_step_name(candidate_file: Path | None) -> tuple[str, str]:
+    """Use separate checkpoints for topN scans and content-addressed delta queues."""
+    digest = _candidate_file_digest(candidate_file)
+    if candidate_file:
+        return f"step5s_section_ingest_delta_{digest}", digest
+    return "step5s_section_ingest", digest
 
 
 def _arxiv_pdf_url(arxiv_id: Optional[str], doi: Optional[str]) -> Optional[str]:
@@ -670,11 +692,11 @@ def run_section_ingest(
     corpus_id: str | None = None,
     candidate_file: Path | None = None,
 ) -> dict:
-    step_name = "step5s_section_ingest"
+    step_name, candidate_digest = _checkpoint_step_name(candidate_file)
     ck = Checkpoint(step_name)
     if resume and ck.done():
         data = ck.load()
-        logger.info("Step5s 已完成 (%d sections), 跳过", data.get("records_n", 0))
+        logger.info("Step5s 已完成 (%d sections), checkpoint=%s, 跳过", data.get("records_n", 0), step_name)
         return data
 
     conn_main = sqlite3.connect(str(db_main))
@@ -700,10 +722,11 @@ def run_section_ingest(
         papers = papers[: int(limit)]
 
     logger.info(
-        "Step5s candidates=%d (top_n=%d candidate_file=%s)",
+        "Step5s candidates=%d (top_n=%d candidate_file=%s checkpoint=%s)",
         len(papers),
         n_target,
         candidate_file or "",
+        step_name,
     )
     if not papers:
         stats = {"records_n": 0, "papers_n": 0, "with_primary_sections": 0}
@@ -877,6 +900,8 @@ def run_section_ingest(
         "section_counter": section_counter,
         "extra_sections_enabled": list(SECONDARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,
+        "candidate_digest": candidate_digest,
+        "run_kind": "delta_queue" if candidate_file else "topn_scan",
     }
     logger.info("Step5s done: %s", stats)
     ck.mark_done(records_n=inserted_sections, meta=stats)

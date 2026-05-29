@@ -3,6 +3,7 @@ import sqlite3
 
 from echelon.v14b.step5s_section_ingest import (
     _arxiv_pdf_url,
+    _checkpoint_step_name,
     _select_candidate_ids,
     ensure_sections_table,
     extract_sections_from_blocks,
@@ -183,6 +184,20 @@ def test_read_candidate_file_accepts_delta_queue_csv(tmp_path):
 
     assert read_candidate_file(queue) == ["p1", "p2"]
     assert read_candidate_file(queue, limit=1) == ["p1"]
+
+
+def test_delta_queue_uses_content_addressed_checkpoint(tmp_path):
+    queue = tmp_path / "section_delta_queue.csv"
+    queue.write_text("paper_id\np1\np2\n", encoding="utf-8")
+
+    normal_name, normal_digest = _checkpoint_step_name(None)
+    delta_name, delta_digest = _checkpoint_step_name(queue)
+
+    assert normal_name == "step5s_section_ingest"
+    assert normal_digest == ""
+    assert delta_name.startswith("step5s_section_ingest_delta_")
+    assert delta_digest
+    assert delta_digest in delta_name
 
 
 def test_section_ingest_records_attempt_outcomes(tmp_path):
