@@ -1,14 +1,14 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T17:44:10Z`
+- generated_at: `2026-05-29T17:49:22Z`
 - readiness_level: `candidate_generator_only`
 
 ## Metrics
 
-- linked refs: 443,077 / 3,200,896 (13.8%)
-- OpenAlex W IDs: 34,530 (62.3%)
-- section evidence: 1,307 rows / 723 papers
-- primary section evidence: 723 papers (1.3%)
+- linked refs: 443,443 / 3,201,174 (13.9%)
+- OpenAlex W IDs: 34,549 (62.4%)
+- section evidence: 1,310 rows / 725 papers
+- primary section evidence: 725 papers (1.3%)
 - section frontfill health: running_or_unknown [section_delta] (done=None/None, no_evidence_delta=0, no_evidence_hours=0.0)
 - predicted future edges: 1,000
 - visual future edges: 1,000
@@ -17,10 +17,10 @@
 
 ## Blockers
 
-- **citation_graph_bone** (high): linked refs are 13.8%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
-- **section_evidence** (high): primary section evidence covers only 723 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
+- **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
+- **section_evidence** (high): primary section evidence covers only 725 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
 - **fusion_materialization** (high): Step5b produced future candidates but live future_directions is empty. Next: After section evidence improves, rerun Step5c -> Step6 -> Step13; do not promote raw GNN edges.
-- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.3%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
+- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit
 

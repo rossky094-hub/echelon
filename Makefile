@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -151,6 +151,14 @@ access-audit:
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot \
 		--limit $${V14B_ACCESS_AUDIT_LIMIT:-12000}
+
+## Step 5b recovery: restore run-level rolling backtest audit from trusted checkpoint
+recover-vgae-calibration-audit:
+	@echo ">>> Recover Step5b run-level calibration audit from trusted checkpoint..."
+	$(PYTHON) -m echelon.v14b.recover_vgae_calibration_audit \
+		--db-v14 $(DB_V14) \
+		--checkpoint reports/v14b_pilot/checkpoints/step5b_vgae.done.json \
+		$${V14B_RECOVER_VGAE_CALIBRATION_FORCE:+--force}
 
 ## Future candidate lifecycle audit: GNN edge -> Step6 -> Claim Card -> Radar
 future-lifecycle-audit:

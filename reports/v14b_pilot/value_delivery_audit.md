@@ -1,8 +1,8 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T17:44:06Z`
+- generated_at: `2026-05-29T17:49:21Z`
 - evidence_policy: `insufficient_evidence`
-- gate_summary: `{"fail": 1, "pass": 3, "warn": 4}`
+- gate_summary: `{"fail": 1, "pass": 4, "warn": 3}`
 
 ## Eight Product Gates
 
@@ -11,7 +11,7 @@
 | 1 | Evidence Bone | warn | All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes. |
 | 2 | Bottleneck Lineage Graph | warn | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
 | 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such. |
-| 4 | Future Growth Calibration | warn | VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card. |
+| 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card. |
 | 5 | Claim Card Engine | warn | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. |
 | 6 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
 | 7 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
@@ -26,9 +26,9 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13842522587820696,
-    "openalex_w_rate": 0.6233684172519002,
-    "primary_section_papers": 723,
+    "linked_ref_rate": 0.13852511609803153,
+    "openalex_w_rate": 0.6237294867397231,
+    "primary_section_papers": 725,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown"
   },
@@ -37,8 +37,7 @@
   "uncertainty_reasons": [
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
-    "OpenAlex topic/field coverage below cross-field target",
-    "future-growth calibration audit missing"
+    "OpenAlex topic/field coverage below cross-field target"
   ]
 }
 ```
@@ -85,8 +84,8 @@
 ```json
 {
   "bad_high_confidence_cards": 0,
-  "calibration_audits": 0,
-  "calibration_gap": "edge-level calibrated probabilities exist, but the run-level rolling held-out-year audit table is missing",
+  "calibration_audits": 1,
+  "calibration_gap": null,
   "edge_calibrated_candidates": 1000,
   "edge_calibration_labels": {
     "calibrated_temporal_holdout": 1000
@@ -102,7 +101,7 @@
   "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
   "predicted_future_edges": 1000,
   "radar_eligible_candidates": 0,
-  "status": "warn"
+  "status": "pass"
 }
 ```
 

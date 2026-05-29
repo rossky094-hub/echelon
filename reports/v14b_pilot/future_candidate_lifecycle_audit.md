@@ -1,9 +1,9 @@
 # Future Candidate Lifecycle Audit
 
-- generated_at: `2026-05-29T17:44:10Z`
+- generated_at: `2026-05-29T17:49:21Z`
 - total candidates: 1,000
 - radar eligible: 0
-- run-level calibration audits: 0
+- run-level calibration audits: 1
 - edge-level calibrated candidates: 1,000 / 1,000
 
 ## Lifecycle States
@@ -16,7 +16,7 @@
 
 | status | count |
 | --- | ---: |
-| edge_has_calibration_label_but_run_audit_missing | 1,000 |
+| calibrated_with_run_audit | 1,000 |
 
 ## Missing Five-Question Gates
 
