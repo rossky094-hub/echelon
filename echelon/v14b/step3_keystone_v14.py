@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Dict
 
 from echelon.v14b.config import DB_MAIN, DB_V14, LIFECYCLE_WEIGHTS_V14, LIMIT
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, make_progress
 from echelon.seeds.lifecycle_weights import (
@@ -151,6 +152,7 @@ def ensure_v14_columns(conn: sqlite3.Connection) -> None:
 def load_papers_with_signals(
     conn: sqlite3.Connection,
     limit: Optional[int] = None,
+    corpus_id: str | None = None,
 ) -> list[dict]:
     """
     加载论文及其已计算的信号值。
@@ -174,10 +176,16 @@ def load_papers_with_signals(
         else:
             signal_select.append(f"NULL AS {col}")
 
+    corpus_join = (
+        "JOIN temp.v14b_corpus_papers cp ON cp.paper_id = p.id"
+        if corpus_id
+        else ""
+    )
     q = f"""
         SELECT
             {', '.join(base_cols + signal_select)}
         FROM papers p
+        {corpus_join}
         ORDER BY p.id
     """
     if limit:
@@ -334,6 +342,7 @@ def run_keystone_v14(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 3: V14 调权 KeystoneScore"""
     step_name = "step3_keystone_v14"
@@ -350,10 +359,12 @@ def run_keystone_v14(
     conn = sqlite3.connect(str(db_main))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    ensure_corpus_schema(conn)
+    scoped_count = create_temp_corpus_table(conn, corpus_id)
 
     ensure_v14_columns(conn)
 
-    papers = load_papers_with_signals(conn, limit=limit)
+    papers = load_papers_with_signals(conn, limit=limit, corpus_id=corpus_id)
     logger.info("加载论文: %d 篇", len(papers))
 
     n_written, lifecycle_dist, quality_summary = compute_and_write_v14_scores(conn, papers)
@@ -363,6 +374,8 @@ def run_keystone_v14(
         "records_n": n_written,
         "lifecycle_distribution": lifecycle_dist,
         "signal_quality": quality_summary,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else n_written,
     }
     upsert_step_meta(
         conn_v14,
@@ -395,7 +408,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_keystone_v14(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_keystone_v14(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from echelon.v14b.id_normalization import (
 )
 from echelon.v14b.step1_enrich import ensure_enrich_tables, link_paper_reference_internals
 from echelon.v14b.utils import setup_logging
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 
 logger = logging.getLogger("echelon.v14b.step0_id_repair")
 
@@ -127,10 +128,12 @@ def backfill_field_topic_local(conn: sqlite3.Connection) -> dict:
     }
 
 
-def repair_ids(db_path: Path = DB_MAIN) -> dict:
+def repair_ids(db_path: Path = DB_MAIN, corpus_id: str | None = None) -> dict:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    ensure_corpus_schema(conn)
+    scoped_count = create_temp_corpus_table(conn, corpus_id)
 
     ensure_enrich_tables(conn)
 
@@ -149,11 +152,17 @@ def repair_ids(db_path: Path = DB_MAIN) -> dict:
     normalized_openalex = 0
     unresolved_provider_ids = 0
 
-    rows = conn.execute("""
+    scope_filter = (
+        "AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    rows = conn.execute(f"""
         SELECT id, openalex_id, doi, arxiv_id, s2_paper_id, source_provider
         FROM papers
         WHERE openalex_id IS NOT NULL
           AND length(trim(openalex_id)) > 0
+          {scope_filter}
     """).fetchall()
     for row in rows:
         paper_id = row["id"]
@@ -223,14 +232,20 @@ def repair_ids(db_path: Path = DB_MAIN) -> dict:
             unresolved_provider_ids += 1
 
     invalid_openalex = 0
-    for row in conn.execute("SELECT id, openalex_id FROM papers WHERE openalex_id IS NOT NULL"):
+    for row in conn.execute(f"SELECT id, openalex_id FROM papers WHERE openalex_id IS NOT NULL {scope_filter}"):
         if normalize_openalex_work_id(row["openalex_id"]) is None:
             invalid_openalex += 1
 
-    ref_rows = conn.execute("""
+    ref_scope = (
+        "AND citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    ref_rows = conn.execute(f"""
         SELECT citing_paper_id, cited_paper_id_external
         FROM paper_references
         WHERE cited_paper_id_external IS NOT NULL
+        {ref_scope}
     """).fetchall()
     ref_updates = []
     for row in ref_rows:
@@ -262,12 +277,13 @@ def repair_ids(db_path: Path = DB_MAIN) -> dict:
 
     field_stats = backfill_field_topic_local(conn)
     field_cov = conn.execute(
-        """
+        f"""
         SELECT COUNT(*) FROM papers
         WHERE primary_field_id IS NOT NULL AND trim(primary_field_id) <> ''
+        {scope_filter}
         """
     ).fetchone()[0]
-    total_papers = conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
+    total_papers = conn.execute(f"SELECT COUNT(*) FROM papers WHERE 1=1 {scope_filter}").fetchone()[0]
 
     stats = {
         "moved_s2_from_openalex_id": moved_s2,
@@ -282,6 +298,8 @@ def repair_ids(db_path: Path = DB_MAIN) -> dict:
         "linked_before": linked_before,
         "newly_linked": newly_linked,
         "linked_after": linked_after,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else total_papers,
         "primary_field_coverage_after": {
             "with_field": field_cov,
             "total": total_papers,
@@ -298,9 +316,10 @@ def repair_ids(db_path: Path = DB_MAIN) -> dict:
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Repair V14B provider IDs and relink references")
     parser.add_argument("--db", type=Path, default=DB_MAIN)
+    parser.add_argument("--corpus-id", type=str, default=None)
     args = parser.parse_args(argv)
     setup_logging("step0_id_repair")
-    repair_ids(args.db)
+    repair_ids(args.db, corpus_id=args.corpus_id)
 
 
 if __name__ == "__main__":

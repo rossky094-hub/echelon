@@ -17,16 +17,19 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import math
 import re
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     VGAE_INPUT_DIM, VGAE_HIDDEN_DIM, VGAE_LATENT_DIM,
@@ -541,6 +544,114 @@ def calibration_summary(
     }
 
 
+def calibration_curve_points(
+    calibrator: dict,
+    *,
+    n_points: int = 21,
+) -> list[dict]:
+    """
+    Materialize a score->probability calibration curve for audit/reporting.
+    """
+    points: list[dict] = []
+    for i in range(max(3, int(n_points))):
+        raw = i / max(1, n_points - 1)
+        calibrated, support, label = apply_probability_calibration(raw, calibrator)
+        points.append(
+            {
+                "raw_score": float(raw),
+                "calibrated_prob": float(calibrated),
+                "support": int(support),
+                "label": label,
+            }
+        )
+    return points
+
+
+def ensure_calibration_audit_schema(conn_v14: sqlite3.Connection) -> None:
+    conn_v14.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS vgae_calibration_audit (
+            run_id TEXT PRIMARY KEY,
+            method TEXT,
+            label TEXT,
+            support INTEGER,
+            base_rate REAL,
+            avg_raw_auc REAL,
+            avg_calibrated_auc REAL,
+            summary_json TEXT,
+            rolling_backtest_json TEXT,
+            curve_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+    conn_v14.commit()
+
+
+def write_calibration_audit(
+    conn_v14: sqlite3.Connection,
+    *,
+    calibrator: dict,
+    cal_summary: dict,
+    rolling_backtest: dict,
+) -> dict:
+    ensure_calibration_audit_schema(conn_v14)
+    curve = calibration_curve_points(calibrator or {})
+    run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    payload = {
+        "run_id": run_id,
+        "method": (calibrator or {}).get("method"),
+        "label": (calibrator or {}).get("label"),
+        "support": int((calibrator or {}).get("support") or 0),
+        "base_rate": float((calibrator or {}).get("base_rate") or 0.0),
+        "avg_raw_auc": float((rolling_backtest or {}).get("avg_raw_auc") or 0.0),
+        "avg_calibrated_auc": float((rolling_backtest or {}).get("avg_calibrated_auc") or 0.0),
+        "summary_json": json.dumps(cal_summary or {}, ensure_ascii=False),
+        "rolling_backtest_json": json.dumps(rolling_backtest or {}, ensure_ascii=False),
+        "curve_json": json.dumps(curve, ensure_ascii=False),
+    }
+    conn_v14.execute("DELETE FROM vgae_calibration_audit")
+    conn_v14.execute(
+        """
+        INSERT INTO vgae_calibration_audit
+            (run_id, method, label, support, base_rate, avg_raw_auc, avg_calibrated_auc,
+             summary_json, rolling_backtest_json, curve_json)
+        VALUES
+            (:run_id, :method, :label, :support, :base_rate, :avg_raw_auc, :avg_calibrated_auc,
+             :summary_json, :rolling_backtest_json, :curve_json)
+        """,
+        payload,
+    )
+    conn_v14.commit()
+    return payload
+
+
+def _table_row_count(conn: sqlite3.Connection, table: str) -> int | None:
+    try:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+    except sqlite3.Error:
+        return None
+
+
+def _vgae_resume_state_valid(conn_v14: sqlite3.Connection, checkpoint_data: dict) -> tuple[bool, str]:
+    """A completed Step5b must include predictions and a calibration audit."""
+    if checkpoint_data.get("error"):
+        return False, "checkpoint records a previous VGAE error"
+
+    expected = int(checkpoint_data.get("records_n") or checkpoint_data.get("predicted_edges") or 0)
+    actual = _table_row_count(conn_v14, "predicted_future_edges")
+    if actual is None:
+        return False, "predicted_future_edges table is missing"
+    if actual != expected:
+        return False, f"predicted_future_edges rows={actual} != checkpoint records_n={expected}"
+
+    audit_rows = _table_row_count(conn_v14, "vgae_calibration_audit")
+    if not audit_rows:
+        return False, "vgae_calibration_audit is missing"
+
+    return True, "ok"
+
+
 def sample_temporal_negative_edges_for_year(
     node_years: list[int],
     positive_pairs: set[tuple[int, int]],
@@ -839,7 +950,9 @@ def train_vgae(
         "train_edges": len(train_records),
         "val_edges": len(val_records),
         "test_edges": len(test_records),
+        "calibrator": calibrator,
         "calibration": cal_summary,
+        "calibration_curve": calibration_curve_points(calibrator),
         "rolling_backtest": rolling_backtest,
     }
 
@@ -955,6 +1068,7 @@ def run_vgae(
     epochs: int = VGAE_EPOCHS,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 5b: VGAE 训练 + Link Prediction"""
     step_name = "step5b_vgae"
@@ -962,11 +1076,19 @@ def run_vgae(
 
     if resume and ck.done():
         data = ck.load()
-        logger.info("Step5b 已完成 (%d predicted),跳过", data.get("records_n", 0))
-        return data
+        conn_v14_resume = get_v14b_conn(db_v14)
+        valid, reason = _vgae_resume_state_valid(conn_v14_resume, data)
+        conn_v14_resume.close()
+        if valid:
+            logger.info("Step5b 已完成 (%d predicted),跳过", data.get("records_n", 0))
+            return data
+        logger.warning("Step5b checkpoint stale; rerunning VGAE: %s", reason)
+        ck.clear()
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
@@ -998,13 +1120,23 @@ def run_vgae(
 
     n_predicted = len(predicted)
     cross_field_n = sum(1 for e in predicted if e.get("is_cross_field"))
+    calibration_audit = write_calibration_audit(
+        conn_v14,
+        calibrator=train_result.get("calibrator") or {},
+        cal_summary=train_result.get("calibration") or {},
+        rolling_backtest=train_result.get("rolling_backtest") or {},
+    )
 
     stats = {
         "val_auc": train_result.get("val_auc", 0.0),
         "test_auc": train_result.get("test_auc", 0.0),
         "predicted_edges": n_predicted,
         "cross_field_edges": cross_field_n,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else None,
         "calibration": train_result.get("calibration", {}),
+        "calibration_curve": train_result.get("calibration_curve", []),
+        "calibration_audit": calibration_audit,
         "rolling_backtest": train_result.get("rolling_backtest", {}),
         "prediction_confidence_avg": (
             sum(float(e.get("prediction_confidence") or 0.0) for e in predicted) / max(1, n_predicted)
@@ -1042,7 +1174,7 @@ def main(argv=None):
 
     run_vgae(
         db_main=db_main, db_v14=db_v14,
-        epochs=args.epochs, limit=limit, resume=args.resume,
+        epochs=args.epochs, limit=limit, resume=args.resume, corpus_id=args.corpus_id,
     )
 
 

@@ -1,7 +1,7 @@
-"""Step 12: goal-alignment audit for the V14B optics product chain.
+"""Step 12: goal-alignment audit for the V14B product chain.
 
 This report compares Step1-Step6 evidence against the product goal:
-an explainable optics evolution graph that can show why branches formed and
+an explainable evolution graph that can show why branches formed and
 where they may grow next.  It is intentionally conservative: weak evidence is
 reported as weak instead of being promoted into user-facing claims.
 """
@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import DB_MAIN, DB_V14, REPORT_DIR
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import add_common_args, setup_logging, table_columns
@@ -57,18 +58,60 @@ def quality_label(value: float, *, good: float, warn: float) -> str:
     return "risk"
 
 
-def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
+def build_audit(
+    db_main: Path,
+    db_v14: Path,
+    *,
+    corpus_id: str | None = None,
+) -> tuple[str, dict]:
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
     conn_v14 = get_v14b_conn(db_v14)
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
+    scope = "id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else "1=1"
+    corpus_label = corpus_id or "all"
 
     paper_cols = table_columns(conn_main, "papers")
-    total_papers = int(scalar(conn_main, "SELECT COUNT(*) FROM papers") or 0)
-    abstracts = int(scalar(conn_main, "SELECT COUNT(*) FROM papers WHERE abstract IS NOT NULL AND LENGTH(abstract)>100") or 0)
-    total_refs = int(scalar(conn_main, "SELECT COUNT(*) FROM paper_references") or 0)
-    linked_refs = int(scalar(conn_main, "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL") or 0)
-    field_cov = int(scalar(conn_main, "SELECT COUNT(*) FROM papers WHERE primary_field_id IS NOT NULL") or 0) if "primary_field_id" in paper_cols else 0
-    embeddings = int(scalar(conn_main, "SELECT COUNT(*) FROM paper_embeddings") or 0)
+    total_papers = int(scalar(conn_main, f"SELECT COUNT(*) FROM papers WHERE {scope}") or 0)
+    abstracts = int(
+        scalar(
+            conn_main,
+            f"SELECT COUNT(*) FROM papers WHERE {scope} AND abstract IS NOT NULL AND LENGTH(abstract)>100",
+        ) or 0
+    )
+    total_refs = int(
+        scalar(
+            conn_main,
+            f"""
+            SELECT COUNT(*) FROM paper_references
+            WHERE citing_paper_id IN (SELECT id FROM papers WHERE {scope})
+            """,
+        ) or 0
+    )
+    linked_refs = int(
+        scalar(
+            conn_main,
+            f"""
+            SELECT COUNT(*) FROM paper_references
+            WHERE citing_paper_id IN (SELECT id FROM papers WHERE {scope})
+              AND cited_paper_id_internal IS NOT NULL
+            """,
+        ) or 0
+    )
+    field_cov = int(
+        scalar(conn_main, f"SELECT COUNT(*) FROM papers WHERE {scope} AND primary_field_id IS NOT NULL") or 0
+    ) if "primary_field_id" in paper_cols else 0
+    embeddings = int(
+        scalar(
+            conn_main,
+            f"""
+            SELECT COUNT(*) FROM paper_embeddings e
+            JOIN papers p ON p.id = e.paper_id
+            WHERE {scope}
+            """,
+        ) or 0
+    )
 
     main_edges = int(scalar(conn_v14, "SELECT COUNT(*) FROM main_path_edges") or 0)
     main_core = int(scalar(conn_v14, "SELECT COUNT(*) FROM main_path_edges WHERE is_main_path=1") or 0)
@@ -127,6 +170,9 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
     """)
     limitation_atoms = int(scalar(conn_v14, "SELECT COUNT(*) FROM limitation_atoms") or 0)
     limitation_resolutions = int(scalar(conn_v14, "SELECT COUNT(*) FROM limitation_resolutions") or 0)
+    subgraph_keystone_total = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM subgraph_nodes WHERE is_keystone = 1") or 0
+    )
     section_table_exists = int(
         scalar(
             conn_main,
@@ -149,14 +195,39 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
                 conn_main,
                 f"""
                 SELECT COUNT(DISTINCT paper_id) FROM {sec_table}
-                WHERE lower(section_name) IN ('limitations','limitation','discussion','conclusion','conclusions','future work')
+                WHERE lower(section_name) IN (
+                    'limitations','limitation','discussion','conclusion','conclusions',
+                    'future work','future_work','results','result','error analysis',
+                    'error_analysis','ablation','method','methods','experiment',
+                    'experiments'
+                )
+                  AND paper_id IN (SELECT id FROM papers WHERE {scope})
                 """,
             ) or 0
         )
+    section_keystone_coverage = section_primary_papers / max(1, subgraph_keystone_total)
 
     fusion_audit_rows = rows(conn_v14, "SELECT * FROM fusion_evidence_audit ORDER BY created_at DESC LIMIT 1")
     fusion_audit = fusion_audit_rows[0] if fusion_audit_rows else {}
     future_dirs = int(scalar(conn_v14, "SELECT COUNT(*) FROM future_directions") or 0)
+    fusion_audit_n_directions = (
+        int(fusion_audit.get("n_directions") or 0) if fusion_audit else None
+    )
+    fusion_consistent = (
+        fusion_audit_n_directions is None
+        or fusion_audit_n_directions == future_dirs
+    )
+    fusion_adequacy_label = (
+        fusion_audit.get("adequacy_label", "unknown")
+        if fusion_consistent
+        else "stale_or_inconsistent"
+    )
+    future_scope = rows(conn_v14, """
+        SELECT COALESCE(claim_scope, 'unknown') AS claim_scope, COUNT(*) AS n
+        FROM future_directions
+        GROUP BY COALESCE(claim_scope, 'unknown')
+        ORDER BY n DESC
+    """)
     direction_tiers = rows(conn_v14, """
         SELECT COALESCE(evidence_tier, 'unknown') AS tier,
                COUNT(*) AS n,
@@ -191,6 +262,26 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         )
         or 0
     )
+    lineage_triples = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM bottleneck_lineage_triples")
+        or 0
+    )
+    claim_cards_total = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM direction_claim_cards")
+        or 0
+    )
+    claim_cards_complete = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM direction_claim_cards WHERE five_question_complete = 1")
+        or 0
+    )
+    high_conf_eligible = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM direction_claim_cards WHERE high_confidence_eligible = 1")
+        or 0
+    )
+    calibration_report_present = int(
+        scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit")
+        or 0
+    ) > 0
 
     linked_ratio = linked_refs / max(total_refs, 1)
     field_ratio = field_cov / max(total_papers, 1)
@@ -199,26 +290,33 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
 
     summary = {
         "total_papers": total_papers,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else total_papers,
         "linked_ref_ratio": linked_ratio,
         "field_coverage": field_ratio,
         "embedding_coverage": embed_ratio,
         "step5b_test_auc": step5b.get("test_auc"),
         "future_directions": future_dirs,
-        "fusion_adequacy": fusion_audit.get("adequacy_label"),
+        "fusion_adequacy": fusion_adequacy_label,
+        "fusion_audit_n_directions": fusion_audit_n_directions,
+        "fusion_consistent": fusion_consistent,
         "visual_nodes": visual_nodes,
         "visual_edges": visual_edges,
         "first_principles": fp_principles,
+        "claim_cards_total": claim_cards_total,
+        "claim_cards_complete": claim_cards_complete,
+        "high_confidence_eligible": high_conf_eligible,
     }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = [
-        "# V14B Optics Goal Alignment Audit",
+        "# V14B Goal Alignment Audit",
         "",
         f"Generated: {now}",
         "",
         "## Project Goal",
         "",
-        "Build an explainable optics evolution graph that can show why the field grew into its current branch structure and where it may grow next, while exposing evidence quality for user-facing claims.",
+        f"Build an explainable **{corpus_label}** evolution graph that can show why the field grew into its current branch structure and where it may grow next, while exposing evidence quality for user-facing claims.",
         "",
         "## Executive Verdict",
         "",
@@ -226,8 +324,9 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"- Step5b future-growth signal is numerically strong as a ranker: test AUC={float(step5b.get('test_auc') or 0):.4f}, predicted_edges={predicted_total:,}, cross_field={predicted_cross:,}; product confidence is calibrated separately from raw model score.",
         f"- Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,}.",
         f"- Section evidence inventory: table_present={section_table_exists}, rows={section_rows_total:,}, primary-section papers={section_primary_papers:,}.",
-        f"- Step6 fusion output is limited: directions={future_dirs:,}, adequacy={fusion_audit.get('adequacy_label', 'unknown')}. This is acceptable as an honest signal, but not yet enough for strong user-facing future claims.",
+        f"- Step6 fusion output is limited: directions={future_dirs:,}, audit_n_directions={fusion_audit_n_directions}, adequacy={fusion_adequacy_label}, consistent={fusion_consistent}. This is acceptable as an honest signal only when audit/product tables agree.",
         f"- Step13 first-principles bottleneck lineage: principles={fp_principles:,}, atoms_covered={fp_atoms:,}, high_risk_principles={fp_high_risk:,}.",
+        f"- Step13 claim cards: total={claim_cards_total:,}, five-question-complete={claim_cards_complete:,}, high-confidence-eligible={high_conf_eligible:,}, lineage_triples={lineage_triples:,}.",
         "",
         "## Step1-Step6 Evidence Chain",
         "",
@@ -238,11 +337,12 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
         f"| Step0 embeddings | embeddings={embeddings:,}/{total_papers:,} ({pct(embeddings,total_papers)}) | {quality_label(embed_ratio, good=0.95, warn=0.80)} | semantic layer/search/layout is well supported |",
         f"| Step2 main path | edges={main_edges:,}, main={main_core:,}, cycles={cycle_components}, cyclic_nodes={cyclic_nodes}, intra_cycle_edges={intra_cycle_edges} | pass | SCC condensation preserves ambiguous cycles instead of arbitrary deletion |",
         f"| Step3 keystone | avg_signal_reliability={float(step3_notes.get('avg_signal_reliability') or 0):.3f}, critical_default_papers={step3_notes.get('critical_default_papers', 'n/a')} | pass | score is discriminative only while graph feature columns remain populated |",
-        f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | pilot/evidence subgraph, not complete optics graph |",
+        f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | pilot/evidence subgraph, not complete {corpus_label} graph |",
         f"| Step5a citation function | classified={sum(int(r.get('n') or 0) for r in citation_evidence):,} | weak evidence | no full citation context, therefore use only as fusion/visual weighting |",
         f"| Step5b future growth | predicted={predicted_total:,}, cross_field={predicted_cross:,}, calibrated_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |",
         f"| Step5c limitations | atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,} | weak-to-moderate | limitation quality must be visible in graph |",
         f"| Step6 fusion | directions={future_dirs:,}, candidates={fusion_audit.get('n_candidates', 'n/a')} | {fusion_audit.get('adequacy_label', 'unknown')} | few directions means evidence intersection is sparse, not a reason to lower thresholds |",
+        f"| Step13 claim cards | cards={claim_cards_total:,}, complete={claim_cards_complete:,}, high_conf={high_conf_eligible:,}, lineage_triples={lineage_triples:,} | {quality_label(claim_cards_complete / max(1, future_dirs), good=0.95, warn=0.70)} | missing 5-question cards cannot be promoted into high-confidence directions |",
         "",
         "## Limitation Evidence Quality",
         "",
@@ -285,6 +385,15 @@ def build_audit(db_main: Path, db_v14: Path) -> tuple[str, dict]:
 
     lines += [
         "",
+        "## Hard Acceptance Gates",
+        "",
+        f"- linked_refs_ratio >= 30%: current={linked_ratio:.3f} -> {'pass' if linked_ratio >= 0.30 else 'risk'}",
+        f"- top-keystone section evidence coverage >= 70%: current={section_keystone_coverage:.3f} ({section_primary_papers}/{max(1, subgraph_keystone_total)}) -> {'pass' if section_keystone_coverage >= 0.70 else 'risk'}",
+        f"- every direction has 5-question claim card: current={claim_cards_complete}/{max(1, future_dirs)} -> {'pass' if claim_cards_complete >= future_dirs and future_dirs > 0 else 'risk'}",
+        f"- future calibration report present: current={calibration_report_present} -> {'pass' if calibration_report_present else 'risk'}",
+        f"- fusion audit matches future_directions table: current={fusion_consistent} -> {'pass' if fusion_consistent else 'risk'}",
+        f"- claim_scope present for all directions: distribution=`{json.dumps(future_scope, ensure_ascii=False)}`",
+        "",
         "## What Was Improved",
         "",
         "- Step2 now exposes canonical `source_paper_id` / `target_paper_id` for time-forward main-path semantics while retaining legacy columns for compatibility.",
@@ -322,10 +431,12 @@ def run_goal_alignment_audit(
     db_main: Path = DB_MAIN,
     db_v14: Path = DB_V14,
     out_dir: Path = REPORT_DIR,
+    corpus_id: str | None = None,
 ) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
-    report, summary = build_audit(db_main, db_v14)
-    path = out_dir / "goal_alignment_audit_step1_step6.md"
+    report, summary = build_audit(db_main, db_v14, corpus_id=corpus_id)
+    suffix = f"_{corpus_id}" if corpus_id else ""
+    path = out_dir / f"goal_alignment_audit_step1_step6{suffix}.md"
     path.write_text(report, encoding="utf-8")
 
     conn_v14 = get_v14b_conn(db_v14)
@@ -353,7 +464,12 @@ def main(argv=None) -> None:
     setup_logging("step12_goal_alignment_audit", level=log_level)
     db_main = Path(args.db) if args.db else DB_MAIN
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
-    result = run_goal_alignment_audit(db_main=db_main, db_v14=db_v14, out_dir=Path(args.out_dir))
+    result = run_goal_alignment_audit(
+        db_main=db_main,
+        db_v14=db_v14,
+        out_dir=Path(args.out_dir),
+        corpus_id=args.corpus_id,
+    )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

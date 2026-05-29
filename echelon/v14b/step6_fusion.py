@@ -29,6 +29,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Set
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     FUSION_TOP_DIRECTIONS, FUSION_MIN_EVIDENCE_PATHS, VGAE_PREDICT_THRESHOLD,
@@ -76,6 +77,7 @@ def load_main_path_terminals(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
     year_threshold: int = 2022,
+    corpus_id: str | None = None,
 ) -> List[dict]:
     """
     加载主干道末端节点(在 main_path 上且是新论文)。
@@ -106,10 +108,12 @@ def load_main_path_terminals(
         return []
 
     placeholders = ",".join("?" * len(terminal_ids))
+    scope_sql = "AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""
     rows = conn_main.execute(f"""
         SELECT id AS paper_id, title, publication_year, primary_field_id
         FROM papers
         WHERE id IN ({placeholders})
+          {scope_sql}
           AND (publication_year IS NULL OR publication_year >= ?)
         ORDER BY publication_year DESC
         LIMIT 50
@@ -603,6 +607,37 @@ def write_fusion_evidence_audit(
     return audit
 
 
+def _table_row_count(conn: sqlite3.Connection, table: str) -> int | None:
+    try:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+    except sqlite3.Error:
+        return None
+
+
+def _fusion_resume_state_valid(conn_v14: sqlite3.Connection, checkpoint_data: dict) -> tuple[bool, str]:
+    """Protect Step6 from stale checkpoints and stale fusion audit rows."""
+    expected = int(checkpoint_data.get("records_n") or 0)
+    actual = _table_row_count(conn_v14, "future_directions")
+    if actual is None:
+        return False, "future_directions table is missing"
+    if actual != expected:
+        return False, f"future_directions rows={actual} != checkpoint records_n={expected}"
+
+    try:
+        row = conn_v14.execute(
+            "SELECT n_directions FROM fusion_evidence_audit LIMIT 1"
+        ).fetchone()
+    except sqlite3.Error:
+        row = None
+    if row is None:
+        return False, "fusion_evidence_audit is missing"
+    audit_n = int(row[0] or 0)
+    if audit_n != actual:
+        return False, f"fusion_evidence_audit n_directions={audit_n} != future_directions rows={actual}"
+
+    return True, "ok"
+
+
 # ---------------------------------------------------------------------------
 # 主函数
 # ---------------------------------------------------------------------------
@@ -612,6 +647,7 @@ def run_fusion(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 6: 三路融合"""
     step_name = "step6_fusion"
@@ -619,17 +655,25 @@ def run_fusion(
 
     if resume and ck.done():
         data = ck.load()
-        logger.info("Step6 已完成 (%d directions),跳过", data.get("records_n", 0))
-        return data
+        conn_v14_resume = get_v14b_conn(db_v14)
+        valid, reason = _fusion_resume_state_valid(conn_v14_resume, data)
+        conn_v14_resume.close()
+        if valid:
+            logger.info("Step6 已完成 (%d directions),跳过", data.get("records_n", 0))
+            return data
+        logger.warning("Step6 checkpoint stale; rerunning fusion: %s", reason)
+        ck.clear()
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
 
     # 加载三路输入
-    terminals = load_main_path_terminals(conn_main, conn_v14)
+    terminals = load_main_path_terminals(conn_main, conn_v14, corpus_id=corpus_id)
     logger.info("主干道末端节点: %d", len(terminals))
 
     vgae_preds = load_vgae_predictions(conn_v14)
@@ -677,6 +721,8 @@ def run_fusion(
         "n_terminals": len(terminals),
         "n_vgae_preds": len(vgae_preds),
         "n_unresolved": len(unresolved),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else None,
         "fusion_audit": audit,
         "records_n": n_written,
     }
@@ -700,7 +746,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_fusion(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_fusion(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

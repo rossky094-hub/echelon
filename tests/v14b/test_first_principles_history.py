@@ -25,11 +25,28 @@ def test_step13_builds_first_principles_outputs(tmp_path):
             publication_year INTEGER,
             primary_field_id TEXT
         );
+        CREATE TABLE paper_sections (
+            paper_id TEXT NOT NULL,
+            section_name TEXT NOT NULL,
+            section_text TEXT NOT NULL,
+            source_type TEXT,
+            parser_name TEXT,
+            source_url TEXT,
+            section_pages_json TEXT,
+            section_meta_json TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (paper_id, section_name)
+        );
         INSERT INTO papers VALUES
             ('p1', 'Fabrication-limited metasurface', 'thermal loss and fabrication tolerance remain key bottlenecks', 2020, 'F1'),
             ('p2', 'Sim2real policy transfer', 'domain shift remains a major generalization challenge', 2021, 'F2'),
             ('p3', 'Non-convex inverse design', 'gradient instability under non-convex optimization', 2022, 'F1'),
             ('p4', 'Scalable photonic integration', 'integration and latency constraints in deployment', 2024, 'F1');
+        INSERT INTO paper_sections
+            (paper_id, section_name, section_text, section_pages_json, section_meta_json)
+        VALUES
+            ('p1', 'limitations', 'fabrication tolerance and thermal loss remain unresolved', '[4,5]', '{"n_pages":2}'),
+            ('p2', 'discussion', 'domain shift failures remain under distribution shift', '[6]', '{"n_pages":1}');
         """
     )
     conn_main.close()
@@ -76,7 +93,18 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     rows = conn_v14.execute(
         "SELECT principle_id, unresolved_atoms, resolved_atoms FROM first_principles_principles"
     ).fetchall()
+    lineage_n = conn_v14.execute(
+        "SELECT COUNT(*) FROM bottleneck_lineage_triples"
+    ).fetchone()[0]
+    claim_rows = conn_v14.execute(
+        "SELECT COUNT(*), SUM(five_question_complete), SUM(high_confidence_eligible) FROM direction_claim_cards"
+    ).fetchone()
+    future_gate = conn_v14.execute(
+        "SELECT claim_card_complete, high_confidence_eligible, claim_scope FROM future_directions LIMIT 1"
+    ).fetchone()
     conn_v14.close()
     assert rows
     assert any((r[1] or 0) > 0 for r in rows)
-
+    assert lineage_n > 0
+    assert claim_rows[0] >= 1
+    assert future_gate is not None

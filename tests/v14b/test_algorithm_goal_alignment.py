@@ -103,6 +103,41 @@ def test_step5b_calibration_separates_raw_score_from_product_confidence():
     assert calibrated < 0.99
 
 
+def test_step5b_resume_requires_calibration_audit(tmp_path):
+    from echelon.v14b.db_schema import init_v14b_db
+    from echelon.v14b.step5b_vgae import (
+        _vgae_resume_state_valid,
+        ensure_calibration_audit_schema,
+        write_calibration_audit,
+    )
+
+    db_v14 = tmp_path / "v14.sqlite3"
+    conn = init_v14b_db(db_v14)
+    conn.execute(
+        """
+        INSERT INTO predicted_future_edges
+            (src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field)
+        VALUES ('old', 'new', 0.8, 2020, 2024, 0)
+        """
+    )
+    conn.commit()
+
+    valid, reason = _vgae_resume_state_valid(conn, {"records_n": 1})
+    assert not valid
+    assert "vgae_calibration_audit" in reason
+
+    ensure_calibration_audit_schema(conn)
+    write_calibration_audit(
+        conn,
+        calibrator={"method": "uncalibrated_no_holdout", "label": "uncalibrated"},
+        cal_summary={},
+        rolling_backtest={},
+    )
+    valid, reason = _vgae_resume_state_valid(conn, {"records_n": 1})
+    conn.close()
+    assert valid, reason
+
+
 def test_step6_empty_fusion_writes_no_placeholder(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step6_fusion import run_fusion
@@ -134,3 +169,27 @@ def test_step6_empty_fusion_writes_no_placeholder(tmp_path):
     conn_v14.close()
     assert stats["records_n"] == 0
     assert count == 0
+
+
+def test_step6_resume_rejects_stale_fusion_audit(tmp_path):
+    from echelon.v14b.db_schema import init_v14b_db
+    from echelon.v14b.step6_fusion import _fusion_resume_state_valid
+
+    db_v14 = tmp_path / "v14.sqlite3"
+    conn = init_v14b_db(db_v14)
+    conn.execute("DELETE FROM future_directions")
+    conn.execute(
+        """
+        INSERT INTO fusion_evidence_audit
+            (run_id, n_terminals, n_vgae_preds_top, n_vgae_preds_total,
+             n_cross_field_total, n_unresolved, n_candidates, n_directions,
+             limitation_quality_json, evidence_path_json, adequacy_label, remaining_risk)
+        VALUES ('r1', 1, 1, 1, 0, 1, 20, 20, '{}', '{}', 'adequate_candidate_set', '')
+        """
+    )
+    conn.commit()
+
+    valid, reason = _fusion_resume_state_valid(conn, {"records_n": 0})
+    conn.close()
+    assert not valid
+    assert "fusion_evidence_audit" in reason

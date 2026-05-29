@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     LIMITATION_TOP_N, LIMITATION_MAX_ATOMS_PER_PAPER,
@@ -134,6 +135,7 @@ def get_top_papers_for_limitation(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
     n: int = LIMITATION_TOP_N,
+    corpus_id: str | None = None,
 ) -> List[dict]:
     """
     获取 top N 关键石论文(按 keystone_score_v14),
@@ -158,6 +160,7 @@ def get_top_papers_for_limitation(
         SELECT id, title, abstract
         FROM papers
         WHERE id IN ({placeholders})
+          {"AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
           AND abstract IS NOT NULL
           AND LENGTH(abstract) > 100
     """, keystone_ids).fetchall()]
@@ -364,11 +367,12 @@ def get_later_citations(
     paper_id: int,
     paper_year: int,
     max_resolvers: int = LIMITATION_MAX_RESOLVERS,
+    corpus_id: str | None = None,
 ) -> List[dict]:
     """
     找出发表于 paper_year 之后、引用了 paper_id 的论文。
     """
-    rows = conn_main.execute("""
+    rows = conn_main.execute(f"""
         SELECT p.id, p.title, p.abstract, p.publication_year
         FROM papers p
         JOIN paper_references pr ON p.id = pr.citing_paper_id
@@ -376,6 +380,7 @@ def get_later_citations(
           AND p.publication_year > ?
           AND p.abstract IS NOT NULL
           AND LENGTH(p.abstract) > 100
+          {"AND p.id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
         ORDER BY p.publication_year ASC
         LIMIT ?
     """, (paper_id, paper_year, max_resolvers)).fetchall()
@@ -483,6 +488,7 @@ def run_limitation(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 5c: Limitation Tracking"""
     step_name = "step5c_limitation"
@@ -504,6 +510,8 @@ def run_limitation(
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
@@ -516,7 +524,7 @@ def run_limitation(
 
     # Phase 1: 选取目标论文
     top_n = limit or LIMITATION_TOP_N
-    papers = get_top_papers_for_limitation(conn_main, conn_v14, n=top_n)
+    papers = get_top_papers_for_limitation(conn_main, conn_v14, n=top_n, corpus_id=corpus_id)
     logger.info("Phase 1: 目标论文 %d 篇", len(papers))
 
     # Phase 2: 原子化 limitation
@@ -592,7 +600,7 @@ def run_limitation(
     else:
         _run_resolution_phase(
             conn_main, conn_v14, atoms_with_ids, paper_titles, paper_years,
-            llm_client, resume,
+            llm_client, resume, corpus_id=corpus_id,
         )
         total_resolutions = conn_v14.execute(
             "SELECT COUNT(*) FROM limitation_resolutions"
@@ -629,6 +637,8 @@ def run_limitation(
         "total_resolutions": total_resolutions,
         "unresolved_top": len(unresolved),
         "records_n": total_atoms,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(papers),
         "skipped_resolution": SKIP_LIMITATION_RESOLUTION,
         "evidence_quality": evidence_quality,
         "remaining_risk": remaining_risk,
@@ -649,6 +659,8 @@ def run_limitation(
         "total_resolutions": total_resolutions,
         "unresolved_top": len(unresolved),
         "evidence_quality": evidence_quality,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(papers),
         "records_n": total_atoms,
     }
     logger.info(
@@ -666,6 +678,7 @@ def _run_resolution_phase(
     paper_years: dict,
     llm_client,
     resume: bool,
+    corpus_id: str | None = None,
 ) -> None:
     """Phase 3: 逐 atom 检查后续引用是否解决 limitation。"""
     total_resolutions = 0
@@ -687,7 +700,12 @@ def _run_resolution_phase(
             # 找后续引用论文
             paper_id = atom["paper_id"]
             paper_year = paper_years.get(paper_id, 2000)
-            resolvers = get_later_citations(conn_main, paper_id, paper_year)
+            resolvers = get_later_citations(
+                conn_main,
+                paper_id,
+                paper_year,
+                corpus_id=corpus_id,
+            )
             older_title = paper_titles.get(paper_id, "Unknown")
 
             for resolver in resolvers:
@@ -728,7 +746,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_limitation(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_limitation(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

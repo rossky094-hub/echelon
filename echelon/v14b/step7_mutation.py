@@ -23,6 +23,7 @@ from typing import Optional
 
 import numpy as np
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     MUTATION_RED_CD_THRESHOLD,
@@ -291,6 +292,7 @@ def run_mutation(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 7: 三色突变标记"""
     step_name = "step7_mutation"
@@ -303,6 +305,8 @@ def run_mutation(
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
@@ -310,6 +314,15 @@ def run_mutation(
     # 获取子图节点列表
     rows = conn_v14.execute("SELECT paper_id FROM subgraph_nodes").fetchall()
     node_ids = [row[0] for row in rows]
+    if corpus_id:
+        node_ids = [
+            pid
+            for pid in node_ids
+            if conn_main.execute(
+                "SELECT 1 FROM temp.v14b_corpus_papers WHERE paper_id = ? LIMIT 1",
+                (pid,),
+            ).fetchone()
+        ]
     if limit:
         node_ids = node_ids[:limit]
     logger.info("子图节点数: %d", len(node_ids))
@@ -331,6 +344,8 @@ def run_mutation(
         "orange": len(orange_ids),
         "purple": len(purple_ids),
         "total_marked": n_written,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(node_ids),
         "records_n": n_written,
     }
     ck.mark_done(records_n=n_written, meta=stats)
@@ -356,7 +371,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_mutation(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_mutation(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

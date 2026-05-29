@@ -20,6 +20,7 @@ from echelon.api.graph_visual_backend import (
     get_visual_graph_status,
     get_visual_nodes,
     get_visual_paper_detail,
+    get_topic_lens,
     get_visual_story_steps,
     get_visual_tiles,
     search_visual_graph,
@@ -186,6 +187,22 @@ async def visual_clusters(
 async def visual_story(_role: str = Depends(_require_viewer)) -> dict:
     """Return precomputed story-mode steps for temporal playback."""
     return get_visual_story_steps()
+
+
+@router.get(
+    "/topic-lens",
+    response_model=dict,
+    summary="[V14B] Topic Lens: 论文+脉络+卡点+未来方向",
+    responses={401: {"description": "Unauthorized"}, 403: {"description": "Forbidden"}},
+)
+async def visual_topic_lens(
+    topic: str,
+    top_k: int = 50,
+    corpus_id: str | None = None,
+    _role: str = Depends(_require_viewer),
+) -> dict:
+    """Return Sci-Bot style topic lens over the visual graph product layer."""
+    return get_topic_lens(topic=topic, top_k=top_k, corpus_id=corpus_id)
 
 
 # ---------------------------------------------------------------------------

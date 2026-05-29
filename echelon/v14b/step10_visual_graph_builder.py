@@ -36,9 +36,12 @@ from typing import Iterable, Optional
 import networkx as nx
 import numpy as np
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import DB_MAIN, DB_V14, YEAR_MIN, YEAR_MAX
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.id_normalization import (
+    normalize_arxiv_id,
+    normalize_doi,
     normalize_openalex_work_id,
     normalize_s2_paper_id,
 )
@@ -204,6 +207,8 @@ def ensure_visual_schema(conn: sqlite3.Connection) -> None:
             parent_branch_id TEXT,
             split_year INTEGER,
             strength REAL,
+            split_confidence REAL,
+            split_evidence_json TEXT,
             why_json TEXT,
             future_json TEXT
         );
@@ -242,7 +247,9 @@ def ensure_visual_schema(conn: sqlite3.Connection) -> None:
             abstract TEXT,
             sections_json TEXT,
             limitations_json TEXT,
-            recommendation_json TEXT
+            recommendation_json TEXT,
+            claim_cards_json TEXT,
+            access_json TEXT
         );
 
         CREATE TABLE IF NOT EXISTS visual_recommendations (
@@ -272,6 +279,20 @@ def ensure_visual_schema(conn: sqlite3.Connection) -> None:
         )
     except sqlite3.OperationalError as exc:
         logger.warning("FTS5 unavailable, visual_search_fts skipped: %s", exc)
+    bl_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(branch_lineages)").fetchall()
+    }
+    if "split_confidence" not in bl_cols:
+        conn.execute("ALTER TABLE branch_lineages ADD COLUMN split_confidence REAL")
+    if "split_evidence_json" not in bl_cols:
+        conn.execute("ALTER TABLE branch_lineages ADD COLUMN split_evidence_json TEXT")
+    pd_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(visual_paper_details)").fetchall()
+    }
+    if "claim_cards_json" not in pd_cols:
+        conn.execute("ALTER TABLE visual_paper_details ADD COLUMN claim_cards_json TEXT")
+    if "access_json" not in pd_cols:
+        conn.execute("ALTER TABLE visual_paper_details ADD COLUMN access_json TEXT")
     conn.commit()
 
 
@@ -381,7 +402,12 @@ def validate_graph_ready_schema(
     return stats
 
 
-def load_papers(conn: sqlite3.Connection, limit: Optional[int]) -> list[dict]:
+def load_papers(
+    conn: sqlite3.Connection,
+    limit: Optional[int],
+    *,
+    corpus_id: str | None = None,
+) -> list[dict]:
     cols = table_columns(conn, "papers")
     provider_id_cols = [
         "s2_paper_id",
@@ -402,15 +428,21 @@ def load_papers(conn: sqlite3.Connection, limit: Optional[int]) -> list[dict]:
     provider_id_select = [
         f"p.{c}" if c in cols else f"NULL AS {c}" for c in provider_id_cols
     ]
+    scope_join = (
+        "JOIN temp.v14b_corpus_papers cp ON cp.paper_id = p.id"
+        if corpus_id
+        else ""
+    )
     q = f"""
         SELECT
             p.id, p.openalex_id, p.doi, p.arxiv_id, p.title, p.abstract,
             p.publication_date, p.publication_year, p.cited_by_count,
             p.primary_domain_id, p.primary_field_id, p.primary_subfield_id,
-            p.primary_topic_id, p.venue_id, p.source_provider,
+            p.primary_topic_id, p.venue_id, p.source_provider, p.corpus_id,
             p.openalex_enriched, p.keystone_score_v14, p.lifecycle_v14,
             {", ".join(provider_id_select + optional_select)}
         FROM papers p
+        {scope_join}
         ORDER BY COALESCE(p.publication_year, CAST(substr(p.publication_date, 1, 4) AS INTEGER), 2000), p.id
     """
     if limit:
@@ -860,20 +892,31 @@ def build_branch_lineages(
         driver_ids = []
         if top_parent:
             driver_ids = [pid for pid, _ in drivers[(top_parent[0], cid)].most_common(8)]
+        split_confidence = min(
+            1.0,
+            float(strength) * (1.0 if (top_parent and top_parent[1] >= 8) else 0.75),
+        )
+        split_evidence = {
+            "parent_cluster": top_parent[0] if top_parent else None,
+            "parent_citation_support": top_parent[1] if top_parent else 0,
+            "incoming_cross_cluster_support": incoming_totals.get(cid, 0),
+            "parent_support_ratio": strength,
+            "alternative_parents": alternatives,
+            "driver_papers": driver_ids,
+            "decision_rule": "max time-forward cross-cluster citation support ratio",
+            "confidence_formula": "split_confidence = parent_support_ratio × support_factor",
+        }
         records.append(
             {
                 "branch_id": branch_id,
                 "parent_branch_id": parent_id,
                 "split_year": split_year,
                 "strength": strength,
+                "split_confidence": split_confidence,
+                "split_evidence_json": jdumps(split_evidence),
                 "why_json": jdumps(
                     {
-                        "parent_cluster": top_parent[0] if top_parent else None,
-                        "parent_citation_support": top_parent[1] if top_parent else 0,
-                        "incoming_cross_cluster_support": incoming_totals.get(cid, 0),
-                        "parent_support_ratio": strength,
-                        "alternative_parents": alternatives,
-                        "driver_papers": driver_ids,
+                        **split_evidence,
                         "causality_status": (
                             "data_driven_candidate"
                             if top_parent and top_parent[1] >= 3
@@ -959,6 +1002,55 @@ def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> dict[str, list[
     return out
 
 
+def load_direction_claim_cards(conn_v14: sqlite3.Connection) -> dict[str, list[dict]]:
+    if "direction_claim_cards" not in {
+        row[0] for row in conn_v14.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }:
+        return {}
+    rows = conn_v14.execute(
+        """
+        SELECT
+            c.claim_card_id,
+            c.direction_id,
+            c.direction_name,
+            c.evidence_strength_level,
+            c.claim_scope,
+            c.five_question_complete,
+            c.high_confidence_eligible,
+            c.quality_gate_json,
+            c.root_constraint_json,
+            c.unresolved_bottleneck_json,
+            c.minimal_validation_experiment_json,
+            f.paper_ids_json
+        FROM direction_claim_cards c
+        LEFT JOIN future_directions f ON f.direction_id = c.direction_id
+        """
+    ).fetchall()
+    by_paper: dict[str, list[dict]] = defaultdict(list)
+    for row in rows:
+        item = dict(row)
+        paper_ids = json.loads(item.get("paper_ids_json") or "[]")
+        if not isinstance(paper_ids, list):
+            continue
+        card_payload = {
+            "claim_card_id": item.get("claim_card_id"),
+            "direction_id": item.get("direction_id"),
+            "direction_name": item.get("direction_name"),
+            "evidence_strength_level": item.get("evidence_strength_level"),
+            "claim_scope": item.get("claim_scope"),
+            "five_question_complete": int(item.get("five_question_complete") or 0),
+            "high_confidence_eligible": int(item.get("high_confidence_eligible") or 0),
+            "quality_gate": json.loads(item.get("quality_gate_json") or "{}"),
+            "root_constraint": json.loads(item.get("root_constraint_json") or "{}"),
+            "unresolved_bottleneck": json.loads(item.get("unresolved_bottleneck_json") or "{}"),
+            "minimal_validation_experiment": json.loads(item.get("minimal_validation_experiment_json") or "{}"),
+        }
+        for pid in paper_ids:
+            if pid:
+                by_paper[str(pid)].append(card_payload)
+    return by_paper
+
+
 def load_sections(conn: sqlite3.Connection, paper_ids: list[str]) -> dict[str, list[dict]]:
     table_names = {
         row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
@@ -971,10 +1063,17 @@ def load_sections(conn: sqlite3.Connection, paper_ids: list[str]) -> dict[str, l
     if not section_table or not paper_ids:
         return {}
     ph = ",".join("?" * len(paper_ids))
+    cols = table_columns(conn, section_table)
+    source_url_sql = "source_url" if "source_url" in cols else "NULL AS source_url"
+    pages_sql = "section_pages_json" if "section_pages_json" in cols else "NULL AS section_pages_json"
+    meta_sql = "section_meta_json" if "section_meta_json" in cols else "NULL AS section_meta_json"
     try:
         rows = conn.execute(
             f"""
-            SELECT paper_id, section_name, section_text
+            SELECT paper_id, section_name, section_text,
+                   {source_url_sql},
+                   {pages_sql},
+                   {meta_sql}
             FROM {section_table}
             WHERE paper_id IN ({ph})
             """,
@@ -986,9 +1085,97 @@ def load_sections(conn: sqlite3.Connection, paper_ids: list[str]) -> dict[str, l
     out: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         out[r["paper_id"]].append(
-            {"section_name": r["section_name"], "section_text": r["section_text"]}
+            {
+                "section_name": r["section_name"],
+                "section_text": r["section_text"],
+                "source_url": r["source_url"],
+                "pages": json.loads(r["section_pages_json"] or "[]"),
+                "meta": json.loads(r["section_meta_json"] or "{}"),
+            }
         )
     return out
+
+
+def build_access_payload(
+    p: dict,
+    paper_sections: list[dict],
+    limitations: list[dict],
+    claim_cards: list[dict],
+) -> dict:
+    doi = normalize_doi(p.get("doi"))
+    arxiv_id = normalize_arxiv_id(p.get("arxiv_id"))
+    openalex_work_id = normalize_openalex_work_id(p.get("openalex_id"))
+    s2_paper_id = p.get("s2_paper_id_norm")
+
+    external_links = []
+    seen_urls = set()
+
+    def add_link(kind: str, label: str, url: str | None, access_level: str = "external") -> None:
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        external_links.append(
+            {
+                "kind": kind,
+                "label": label,
+                "url": url,
+                "access_level": access_level,
+            }
+        )
+
+    if arxiv_id:
+        add_link("arxiv_abs", "arXiv abstract", f"https://arxiv.org/abs/{arxiv_id}", "open")
+        add_link("arxiv_pdf", "arXiv PDF", f"https://arxiv.org/pdf/{arxiv_id}.pdf", "open")
+    if doi:
+        add_link("doi", "Publisher DOI", f"https://doi.org/{doi}", "external")
+    if openalex_work_id:
+        add_link("openalex", "OpenAlex work", f"https://openalex.org/{openalex_work_id}", "metadata")
+    if s2_paper_id:
+        add_link("semantic_scholar", "Semantic Scholar", f"https://www.semanticscholar.org/paper/{s2_paper_id}", "metadata")
+
+    for section in paper_sections:
+        add_link(
+            "section_source",
+            f"Source for {section.get('section_name') or 'section'}",
+            section.get("source_url"),
+            "open" if "arxiv.org" in str(section.get("source_url") or "") else "external",
+        )
+
+    local_sections = sorted(
+        {
+            str(s.get("section_name") or "").strip()
+            for s in paper_sections
+            if str(s.get("section_name") or "").strip()
+        }
+    )
+    primary_sections = {"limitations", "discussion", "conclusion", "future_work"}
+    decision_sections = primary_sections | {"results", "error_analysis", "ablation", "method", "experiments"}
+    evidence_sections = [s for s in local_sections if s in decision_sections]
+    local_content = {
+        "abstract": bool(str(p.get("abstract") or "").strip()),
+        "sections": local_sections,
+        "decision_evidence_sections": evidence_sections,
+        "limitation_atoms": len(limitations or []),
+        "claim_cards": len(claim_cards or []),
+    }
+    return {
+        "storage_policy": "pdf_not_cached",
+        "local_content": local_content,
+        "content_availability": {
+            "has_local_abstract": local_content["abstract"],
+            "has_local_sections": bool(local_sections),
+            "has_primary_evidence_sections": bool(primary_sections.intersection(local_sections)),
+            "has_limitation_atoms": bool(limitations),
+            "has_claim_cards": bool(claim_cards),
+            "full_text_cached": False,
+        },
+        "external_links": external_links,
+        "reader_guidance": (
+            "Local view shows metadata, abstract, extracted evidence sections, limitations, "
+            "claim cards, graph neighborhood, and recommendations. Full article/PDF access "
+            "is provided through legal external links when available."
+        ),
+    }
 
 
 def uncertainty_score(p: dict, has_embedding: bool, ref_count: int, linked_count: int) -> float:
@@ -1235,9 +1422,11 @@ def write_clusters_and_lineage(
     conn_v14.executemany(
         """
         INSERT OR REPLACE INTO branch_lineages
-            (branch_id, parent_branch_id, split_year, strength, why_json, future_json)
+            (branch_id, parent_branch_id, split_year, strength,
+             split_confidence, split_evidence_json, why_json, future_json)
         VALUES
-            (:branch_id, :parent_branch_id, :split_year, :strength, :why_json, :future_json)
+            (:branch_id, :parent_branch_id, :split_year, :strength,
+             :split_confidence, :split_evidence_json, :why_json, :future_json)
         """,
         lineages,
     )
@@ -1292,7 +1481,12 @@ def write_tiles(conn_v14: sqlite3.Connection, clusters: list[dict], cfg: VisualC
     logger.info("visual_tiles written: %d", len(rows))
 
 
-def write_story_steps(conn_v14: sqlite3.Connection, clusters: list[dict]) -> None:
+def write_story_steps(
+    conn_v14: sqlite3.Connection,
+    clusters: list[dict],
+    *,
+    claim_cards_count: int = 0,
+) -> None:
     if not clusters:
         return
     year_min = min(c["year_start"] for c in clusters if c["year_start"])
@@ -1334,7 +1528,10 @@ def write_story_steps(conn_v14: sqlite3.Connection, clusters: list[dict]) -> Non
             "Predicted growth arcs and unresolved limitation bottlenecks that may shape next branches.",
             None,
             "[]",
-            jdumps({"source": "predicted_future_edges + limitation_atoms + future_directions"}),
+            jdumps({
+                "source": "predicted_future_edges + limitation_atoms + future_directions + direction_claim_cards",
+                "claim_cards_count": int(claim_cards_count),
+            }),
         )
     )
     conn_v14.executemany(
@@ -1357,6 +1554,7 @@ def write_details_and_search(
     clusters_by_id: dict[str, dict],
     assignment: dict[str, str],
     limitations: dict[str, list[dict]],
+    claim_cards_by_paper: dict[str, list[dict]],
 ) -> None:
     paper_ids = [p["id"] for p in papers]
     sections = load_sections(conn_main, paper_ids)
@@ -1367,6 +1565,7 @@ def write_details_and_search(
         cid = assignment.get(pid)
         cluster = clusters_by_id.get(cid or "", {})
         lims = limitations.get(pid, [])
+        claim_cards = claim_cards_by_paper.get(pid, [])
         paper_sections = sections.get(pid, [])
         ids_json = {
             "paper_id": pid,
@@ -1383,6 +1582,7 @@ def write_details_and_search(
             "year": p.get("year"),
             "publication_date": p.get("publication_date"),
             "cited_by_count": p.get("cited_by_count"),
+            "corpus_id": p.get("corpus_id"),
             "field": p.get("primary_field_id"),
             "subfield": p.get("primary_subfield_id"),
             "topic": p.get("primary_topic_id"),
@@ -1395,7 +1595,9 @@ def write_details_and_search(
             "frontier": bool((p.get("year") or 0) >= date.today().year - 2),
             "bridge": bool((p.get("c_bridging_centrality") or 0) > 0.2),
             "bottleneck": bool(lims),
+            "has_claim_card": bool(claim_cards),
         }
+        access_json = build_access_payload(p, paper_sections, lims, claim_cards)
         details_rows.append(
             (
                 pid,
@@ -1405,6 +1607,8 @@ def write_details_and_search(
                 jdumps(paper_sections),
                 jdumps(lims),
                 jdumps(rec_json),
+                jdumps(claim_cards),
+                jdumps(access_json),
             )
         )
         section_text = "\n".join(s.get("section_text") or "" for s in paper_sections)
@@ -1432,8 +1636,8 @@ def write_details_and_search(
         """
         INSERT OR REPLACE INTO visual_paper_details
             (paper_id, ids_json, metadata_json, abstract, sections_json,
-             limitations_json, recommendation_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+             limitations_json, recommendation_json, claim_cards_json, access_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         details_rows,
     )
@@ -1511,6 +1715,7 @@ def run_visual_graph_builder(
     limit: Optional[int] = None,
     cfg: Optional[VisualConfig] = None,
     allow_legacy_ids: Optional[bool] = None,
+    corpus_id: str | None = None,
 ) -> dict:
     cfg = cfg or VisualConfig.from_env()
     if allow_legacy_ids is not None:
@@ -1520,13 +1725,15 @@ def run_visual_graph_builder(
     conn_v14 = get_v14b_conn(db_v14)
     conn_v14.row_factory = sqlite3.Row
 
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
     validate_graph_ready_schema(conn_main, allow_legacy_ids=cfg.allow_legacy_ids)
 
     ensure_visual_schema(conn_v14)
     reset_visual_tables(conn_v14)
     upsert_step_meta(conn_v14, "step10_visual_graph_builder", "running")
 
-    papers = load_papers(conn_main, limit)
+    papers = load_papers(conn_main, limit, corpus_id=corpus_id)
     paper_ids = [p["id"] for p in papers]
     allowed = set(paper_ids)
 
@@ -1554,8 +1761,21 @@ def run_visual_graph_builder(
     cocitation_edges = build_cocitation_edges(conn_main, allowed, cfg)
     semantic_edges = build_semantic_edges(paper_ids, semantic_matrix, cfg)
     main_edges = load_main_path_edges(conn_v14)
-    future_predictions = load_future_predictions(conn_v14)
-    limitations = load_unresolved_limitations(conn_v14)
+    future_predictions = [
+        x for x in load_future_predictions(conn_v14)
+        if (x.get("src_paper_id") in allowed and x.get("dst_paper_id") in allowed)
+    ]
+    limitations = {
+        pid: vals
+        for pid, vals in load_unresolved_limitations(conn_v14).items()
+        if pid in allowed
+    }
+    claim_cards_by_paper = {
+        pid: vals
+        for pid, vals in load_direction_claim_cards(conn_v14).items()
+        if pid in allowed
+    }
+    claim_cards_count = sum(len(v) for v in claim_cards_by_paper.values())
 
     assignment = detect_clusters(paper_ids, citation_edges, cocitation_edges, semantic_edges, cfg)
     clusters, _by_cluster = build_cluster_records(papers, coords, assignment)
@@ -1578,9 +1798,17 @@ def run_visual_graph_builder(
         conn_v14, citation_edges, main_edges, cocitation_edges, semantic_edges, future_predictions
     )
     write_tiles(conn_v14, clusters, cfg)
-    write_story_steps(conn_v14, clusters)
+    write_story_steps(conn_v14, clusters, claim_cards_count=claim_cards_count)
     clusters_by_id = {c["cluster_id"]: c for c in clusters}
-    write_details_and_search(conn_main, conn_v14, papers, clusters_by_id, assignment, limitations)
+    write_details_and_search(
+        conn_main,
+        conn_v14,
+        papers,
+        clusters_by_id,
+        assignment,
+        limitations,
+        claim_cards_by_paper,
+    )
     write_recommendations(
         conn_v14, papers, assignment, limitations, future_predictions, cfg.recommendation_top_k
     )
@@ -1588,10 +1816,13 @@ def run_visual_graph_builder(
     stats = {
         "records_n": len(papers),
         "visual_nodes": len(papers),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(papers),
         "citation_edges": len(citation_edges),
         "cocitation_edges": len(cocitation_edges),
         "semantic_edges": len(semantic_edges),
         "future_edges": len(future_predictions),
+        "claim_cards_attached": claim_cards_count,
         "clusters": len(clusters),
         "branch_lineages": len(lineages),
     }
@@ -1620,6 +1851,7 @@ def main(argv=None) -> None:
         db_v14=Path(args.db_v14) if args.db_v14 else DB_V14,
         limit=args.limit,
         allow_legacy_ids=args.allow_legacy_ids,
+        corpus_id=args.corpus_id,
     )
 
 

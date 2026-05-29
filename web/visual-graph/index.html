@@ -11,16 +11,18 @@
       <header class="topbar">
         <div class="brand">
           <strong>Echelon V14B</strong>
-          <span>Optics Evolution Graph</span>
+          <span>Optics Research Decision Engine</span>
         </div>
+        <nav class="mode-switch" aria-label="Workspace">
+          <button class="mode" data-mode="map">Map</button>
+          <button class="mode active" data-mode="topic">Topic Lens</button>
+          <button class="mode" data-mode="radar">Radar</button>
+        </nav>
         <label class="api-field">
           <span>API</span>
           <input id="apiBase" value="http://127.0.0.1:8000" />
         </label>
-        <button id="loadBtn" class="primary">Load Graph</button>
-        <button id="storyBtn">Story</button>
-        <button id="mainPathBtn">Main Path</button>
-        <button id="futureBtn">Future</button>
+        <button id="loadBtn" class="primary">Refresh</button>
         <div id="statusText" class="status">Waiting for API</div>
       </header>
 
@@ -28,15 +30,29 @@
         <aside class="panel">
           <form id="searchForm" class="search">
             <input id="searchInput" placeholder="Search topic, paper, limitation..." />
-            <button type="submit">Search</button>
+            <button type="submit">Lens</button>
           </form>
+
+          <div class="context-strip">
+            <strong id="contextTitle">Field Evolution Map</strong>
+            <span id="contextMeta">Optics corpus</span>
+          </div>
+
+          <div id="layerMeaning" class="layer-meaning"></div>
+
           <div class="metrics" id="metrics"></div>
+
           <div class="tabs">
-            <button class="tab active" data-tab="paper">Paper</button>
-            <button class="tab" data-tab="clusters">Branches</button>
+            <button class="tab" data-tab="paper">Paper</button>
+            <button class="tab active" data-tab="topic">Topic</button>
+            <button class="tab" data-tab="radar">Radar</button>
+            <button class="tab" data-tab="cluster">Branches</button>
             <button class="tab" data-tab="story">Story</button>
           </div>
-          <div id="paperPane" class="pane active"></div>
+
+          <div id="paperPane" class="pane"></div>
+          <div id="topicPane" class="pane active"></div>
+          <div id="radarPane" class="pane"></div>
           <div id="clusterPane" class="pane"></div>
           <div id="storyPane" class="pane"></div>
         </aside>
@@ -44,12 +60,34 @@
         <section class="stage">
           <canvas id="edgeCanvas"></canvas>
           <canvas id="graphCanvas"></canvas>
+
+          <div class="layer-dock" aria-label="Graph layers">
+            <label><input type="checkbox" data-layer="main_path" checked />Main</label>
+            <label><input type="checkbox" data-layer="topic" checked />Co-cite</label>
+            <label><input type="checkbox" data-layer="citation" />Cite</label>
+            <label><input type="checkbox" data-layer="semantic" />Semantic</label>
+            <label><input type="checkbox" data-layer="future" checked />Future</label>
+            <label><input type="checkbox" data-layer="bottleneck" checked />Bottleneck</label>
+            <label><input type="checkbox" data-layer="uncertainty" checked />Uncertainty</label>
+          </div>
+
+          <div class="timeline-dock">
+            <button id="playBtn" aria-label="Play timeline">Play</button>
+            <input id="timeSlider" type="range" min="1995" max="2026" value="1995" />
+            <strong id="timeLabel">1995</strong>
+            <span id="growthLabel">0 papers</span>
+          </div>
+
           <div class="legend">
             <span><i class="dot main"></i>Main path</span>
-            <span><i class="dot future"></i>Future anchor</span>
-            <span><i class="dot bottleneck"></i>Limitation</span>
-            <span><i class="dot paper"></i>Paper</span>
+            <span><i class="dot topic"></i>Branch</span>
+            <span><i class="dot future"></i>Future</span>
+            <span><i class="dot bottleneck"></i>Bottleneck</span>
+            <span><i class="dot uncertainty"></i>Uncertainty</span>
           </div>
+
+          <div id="explainDock" class="explain-dock"></div>
+
           <div id="hoverCard" class="hover-card hidden"></div>
         </section>
       </section>

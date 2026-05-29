@@ -19,6 +19,8 @@
 9. [调优手册](#9-调优手册)
 10. [报告解读](#10-报告解读)
 11. [预估成本](#11-预估成本)
+12. [多 Corpus 与季度更新](#12-多-corpus-与季度更新)
+13. [Topic Lens 查询接口](#13-topic-lens-查询接口)
 
 ---
 
@@ -574,6 +576,105 @@ MUTATION_PURPLE_BURST_PERCENTILE = 0.95   # 紫色分位数
 | Step 8 Layout | ~2h |
 | Step 9 Report | ~0.1h |
 | **合计** | **~21.6h** |
+
+---
+
+## 12. 多 Corpus 与季度更新
+
+### 12.1 按 corpus 跑全链路
+
+所有主要 step 均支持 `--corpus-id`。推荐通过 Make 环境变量统一传递:
+
+```bash
+V14B_CORPUS_ID=optics make product-chain
+V14B_CORPUS_ID=cs make product-chain
+V14B_CORPUS_ID=materials make product-chain
+```
+
+### 12.2 季度增量更新
+
+新增季度编排入口:
+
+```bash
+V14B_CORPUS_ID=optics \
+V14B_CORPUS_SET_SPEC=physics:physics:optics \
+make quarterly-run
+```
+
+`make quarterly-run` 现在会按 `corpus_id` 自动回填默认 `set-spec`:
+
+- `optics -> physics:physics:optics`
+- `cs -> cs:cs`
+- `materials -> cond-mat:cond-mat.mtrl-sci`
+
+并默认带资源参数:
+
+- `V14B_Q_THREADS=4` (映射到 `OMP/VECLIB/MKL/NUMEXPR`)
+- `V14B_Q_EMBED_BATCH=16` (映射到 `V14B_EMBEDDING_BATCH_SIZE`)
+
+### 12.3 季度模板命令（optics/cs/materials）
+
+直接使用以下模板:
+
+```bash
+# optics
+make quarterly-run-optics
+
+# cs
+make quarterly-run-cs
+
+# materials
+make quarterly-run-materials
+```
+
+覆盖资源参数示例:
+
+```bash
+V14B_Q_THREADS=6 V14B_Q_EMBED_BATCH=12 make quarterly-run-cs
+V14B_Q_THREADS=4 V14B_Q_EMBED_BATCH=16 make quarterly-run-materials
+```
+
+覆盖季度窗口示例:
+
+```bash
+V14B_QUARTER_ID=2026Q3 \
+V14B_FROM_DATE=2026-07-01 \
+V14B_TO_DATE=2026-09-30 \
+make quarterly-run-cs
+```
+
+该入口会执行:
+
+1. 季度增量 crawl (默认按上次 snapshot 时间继续)
+2. `id-repair -> graph-features -> embeddings -> quality-audit`
+3. `reset-pilot -> Step2..Step6 -> Step13(Claim Card + Lineage) -> Step7..Step10 -> Step12`
+4. 写入 `corpus_runs / corpus_snapshots` 并生成季度 delta 报告
+
+核心表:
+
+- `corpus_registry`
+- `paper_corpora`
+- `corpus_runs`
+- `corpus_snapshots`
+
+---
+
+## 13. Topic Lens 查询接口
+
+新增 Sci-Bot 风格 Topic Lens:
+
+```http
+GET /graph/visual/topic-lens?topic=laser+optics&top_k=50&corpus_id=optics
+```
+
+返回内容包括:
+
+- 相关论文列表
+- cluster / branch 分布
+- topic 历史主路径与关键转折论文
+- unresolved limitations
+- future growth 边与 future directions
+- 第一性原理五问报告 (结构化)
 
 ---
 

@@ -24,6 +24,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, List, Tuple
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     SCIBERT_MODEL_ID, SCIBERT_BATCH_SIZE, SCIBERT_CONFIDENCE_THRESHOLD,
@@ -268,14 +269,24 @@ def load_subgraph_edges_with_context(
     conn_v14: sqlite3.Connection,
     conn_main: sqlite3.Connection,
     limit: Optional[int] = None,
+    corpus_id: str | None = None,
 ) -> Tuple[List[dict], dict[str, dict]]:
     """
     加载子图边及论文标题(用于分类上下文)。
     """
-    q = """
+    scope_where = (
+        """
+          AND e.citing_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+          AND e.cited_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+        """
+        if corpus_id
+        else ""
+    )
+    q = f"""
         SELECT e.citing_id, e.cited_id
         FROM subgraph_edges e
         WHERE e.citation_function IS NULL
+        {scope_where}
     """
     if limit:
         q += f" LIMIT {limit}"
@@ -436,6 +447,7 @@ def run_scibert(
     limit: Optional[int] = None,
     resume: bool = True,
     use_llm: bool = False,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 5a: SciBERT 引用功能分类"""
     step_name = "step5a_scibert"
@@ -448,11 +460,18 @@ def run_scibert(
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
 
-    edges, metadata = load_subgraph_edges_with_context(conn_v14, conn_main, limit=limit)
+    edges, metadata = load_subgraph_edges_with_context(
+        conn_v14,
+        conn_main,
+        limit=limit,
+        corpus_id=corpus_id,
+    )
     logger.info("待分类边: %d", len(edges))
 
     if not edges:
@@ -480,6 +499,8 @@ def run_scibert(
 
     stats = {
         "records_n": n_written,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else None,
         "function_distribution": dict(func_counts),
         "evidence_distribution": dict(evidence_counts),
         "method": method,
@@ -513,6 +534,7 @@ def main(argv=None):
         db_main=db_main, db_v14=db_v14,
         limit=limit, resume=args.resume,
         use_llm=args.use_llm,
+        corpus_id=args.corpus_id,
     )
 
 

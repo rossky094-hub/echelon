@@ -325,6 +325,12 @@ def add_common_args(parser) -> None:
         default=None,
         help="并发数 (默认: config.CONCURRENCY)",
     )
+    parser.add_argument(
+        "--corpus-id",
+        type=str,
+        default=None,
+        help="语料库 ID (如 optics/cs/materials); 启用后仅处理该 corpus 的论文",
+    )
 
 
 # ---------------------------------------------------------------------------

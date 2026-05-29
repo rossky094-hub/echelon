@@ -27,6 +27,7 @@ from typing import Optional
 
 import numpy as np
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     UMAP_N_NEIGHBORS, UMAP_MIN_DIST, UMAP_N_COMPONENTS, UMAP_RANDOM_STATE,
@@ -252,6 +253,7 @@ def run_layout(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 8: UMAP-3D 布局"""
     step_name = "step8_layout"
@@ -264,6 +266,8 @@ def run_layout(
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
@@ -271,6 +275,15 @@ def run_layout(
     # 读取子图节点
     rows = conn_v14.execute("SELECT paper_id FROM subgraph_nodes").fetchall()
     node_ids = [row[0] for row in rows]
+    if corpus_id:
+        node_ids = [
+            pid
+            for pid in node_ids
+            if conn_main.execute(
+                "SELECT 1 FROM temp.v14b_corpus_papers WHERE paper_id = ? LIMIT 1",
+                (pid,),
+            ).fetchone()
+        ]
     if limit:
         node_ids = node_ids[:limit]
     logger.info("布局节点数: %d", len(node_ids))
@@ -289,7 +302,12 @@ def run_layout(
     conn_main.close()
     conn_v14.close()
 
-    stats = {"records_n": n_written, "n_nodes": len(node_ids)}
+    stats = {
+        "records_n": n_written,
+        "n_nodes": len(node_ids),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(node_ids),
+    }
     ck.mark_done(records_n=n_written, meta=stats)
     logger.info("Step8 完成: %d nodes laid out", n_written)
     return stats
@@ -310,7 +328,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_layout(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_layout(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

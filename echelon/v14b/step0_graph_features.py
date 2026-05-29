@@ -11,6 +11,7 @@ from typing import Optional
 
 from echelon.v14b.config import DB_MAIN
 from echelon.v14b.utils import setup_logging, table_columns
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 
 logger = logging.getLogger("echelon.v14b.step0_graph_features")
 
@@ -67,27 +68,41 @@ def ensure_signal_columns(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def derive_graph_features(db_path: Path = DB_MAIN, limit: Optional[int] = None) -> dict:
+def derive_graph_features(
+    db_path: Path = DB_MAIN,
+    limit: Optional[int] = None,
+    corpus_id: Optional[str] = None,
+) -> dict:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    ensure_corpus_schema(conn)
+    scoped_count = create_temp_corpus_table(conn, corpus_id)
     ensure_signal_columns(conn)
 
-    rows = conn.execute("""
+    scope_join = (
+        "JOIN temp.v14b_corpus_papers cp ON cp.paper_id = p.id"
+        if corpus_id
+        else ""
+    )
+    rows = conn.execute(f"""
         SELECT p.id, p.title, p.abstract, p.publication_year, p.publication_date,
                p.cited_by_count, p.venue_id,
                COALESCE(refs.ref_count, 0) AS ref_count,
                COALESCE(linked.linked_refs, 0) AS linked_refs
         FROM papers p
+        {scope_join}
         LEFT JOIN (
             SELECT citing_paper_id, COUNT(*) AS ref_count
             FROM paper_references
+            {"WHERE citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
             GROUP BY citing_paper_id
         ) refs ON refs.citing_paper_id = p.id
         LEFT JOIN (
             SELECT citing_paper_id, COUNT(*) AS linked_refs
             FROM paper_references
             WHERE cited_paper_id_internal IS NOT NULL
+            {"AND citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
             GROUP BY citing_paper_id
         ) linked ON linked.citing_paper_id = p.id
         ORDER BY p.id
@@ -106,18 +121,20 @@ def derive_graph_features(db_path: Path = DB_MAIN, limit: Optional[int] = None) 
 
     # Cross-field bridge score from direct linked neighbors.
     bridge_scores: dict[str, float] = {}
-    bridge_rows = conn.execute("""
+    bridge_rows = conn.execute(f"""
         WITH neighbor_fields AS (
             SELECT pr.citing_paper_id AS paper_id, p.primary_field_id AS field_id
             FROM paper_references pr
             JOIN papers p ON p.id = pr.cited_paper_id_internal
             WHERE p.primary_field_id IS NOT NULL
+              {"AND pr.citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers) AND pr.cited_paper_id_internal IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
             UNION
             SELECT pr.cited_paper_id_internal AS paper_id, p.primary_field_id AS field_id
             FROM paper_references pr
             JOIN papers p ON p.id = pr.citing_paper_id
             WHERE pr.cited_paper_id_internal IS NOT NULL
               AND p.primary_field_id IS NOT NULL
+              {"AND pr.citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers) AND pr.cited_paper_id_internal IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
         )
         SELECT paper_id, COUNT(DISTINCT field_id) AS n_fields
         FROM neighbor_fields
@@ -174,7 +191,11 @@ def derive_graph_features(db_path: Path = DB_MAIN, limit: Optional[int] = None) 
     conn.commit()
     conn.close()
 
-    stats = {"records_n": len(updates)}
+    stats = {
+        "records_n": len(updates),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else len(updates),
+    }
     logger.info("Graph feature derivation done: %s", stats)
     return stats
 
@@ -183,9 +204,10 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Derive V14B graph feature signals")
     parser.add_argument("--db", type=Path, default=DB_MAIN)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--corpus-id", type=str, default=None)
     args = parser.parse_args(argv)
     setup_logging("step0_graph_features")
-    derive_graph_features(args.db, limit=args.limit)
+    derive_graph_features(args.db, limit=args.limit, corpus_id=args.corpus_id)
 
 
 if __name__ == "__main__":

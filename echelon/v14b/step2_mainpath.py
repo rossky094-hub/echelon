@@ -34,6 +34,7 @@ from typing import Optional
 import networkx as nx
 
 from echelon.v14b.config import DB_MAIN, DB_V14, SPC_MAIN_PATH_PERCENTILE, LIMIT
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import (
     setup_logging, Checkpoint, add_common_args, make_progress,
@@ -99,6 +100,7 @@ def _temporal_status(cited: dict, citing: dict) -> str:
 def load_citation_graph(
     db_main: Path,
     limit: Optional[int] = None,
+    corpus_id: str | None = None,
 ) -> nx.DiGraph:
     """
     从 echelon_library.sqlite3 加载引用图。
@@ -115,12 +117,19 @@ def load_citation_graph(
     conn = sqlite3.connect(str(db_main))
     conn.row_factory = sqlite3.Row
     ensure_library_schema_compat(conn)
+    ensure_corpus_schema(conn)
+    scoped_count = create_temp_corpus_table(conn, corpus_id)
 
     # 加载所有 paper 及时间信息
     cols = table_columns(conn, "papers")
     date_expr = "publication_date" if "publication_date" in cols else "NULL AS publication_date"
     year_expr = "publication_year" if "publication_year" in cols else "NULL AS publication_year"
-    papers_q = f"SELECT id, {date_expr}, {year_expr} FROM papers"
+    scope_join = (
+        "JOIN temp.v14b_corpus_papers cp ON cp.paper_id = papers.id"
+        if corpus_id
+        else ""
+    )
+    papers_q = f"SELECT papers.id, {date_expr}, {year_expr} FROM papers {scope_join}"
     if limit:
         papers_q += f" LIMIT {limit}"
     papers = {}
@@ -137,13 +146,27 @@ def load_citation_graph(
 
     # 加载引用边 (paper_references 表)
     # citing → cited (reversed for our time-forward graph: cited → citing)
-    edges_q = """
+    edge_scope = (
+        """
+          AND citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+          AND cited_paper_id_internal IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+        """
+        if corpus_id
+        else ""
+    )
+    edges_q = f"""
         SELECT citing_paper_id, cited_paper_id_internal
         FROM paper_references
         WHERE cited_paper_id_internal IS NOT NULL
+        {edge_scope}
     """
     rows = conn.execute(edges_q).fetchall()
-    logger.info("原始引用边: %d", len(rows))
+    logger.info(
+        "原始引用边: %d (corpus=%s scoped_papers=%s)",
+        len(rows),
+        corpus_id or "all",
+        scoped_count if corpus_id else "all",
+    )
     conn.close()
 
     G = nx.DiGraph()
@@ -486,6 +509,7 @@ def run_mainpath(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 2: SPC Main Path"""
     step_name = "step2_mainpath"
@@ -500,7 +524,7 @@ def run_mainpath(
     upsert_step_meta(conn_v14, step_name, "running")
 
     # 1. 加载引用图
-    G = load_citation_graph(db_main, limit=limit)
+    G = load_citation_graph(db_main, limit=limit, corpus_id=corpus_id)
 
     # 2. 将含环引用图压缩为 SCC condensation DAG 后计算 SPC
     spc_dag, edge_map, cycle_records, dag_stats = build_spc_dag(G)
@@ -526,6 +550,7 @@ def run_mainpath(
         "total_edges": len(edges),
         "main_path_edges": main_path_count,
         "records_n": n_written,
+        "corpus_id": corpus_id,
         **dag_stats,
     }
 
@@ -552,7 +577,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_mainpath(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_mainpath(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

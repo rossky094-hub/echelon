@@ -22,6 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
     DB_MAIN, DB_V14,
     REPORT_DIR, REPORT_ALGO_VALIDATION, REPORT_FUTURE_DIRECTIONS,
@@ -88,6 +89,14 @@ def safe_count(conn, table: str, where: str = "") -> int:
         return 0
 
 
+def safe_scalar(conn, sql: str, params=()) -> int:
+    try:
+        row = conn.execute(sql, params).fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+    except Exception:
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # 算法验证报告 (13 章节)
 # ---------------------------------------------------------------------------
@@ -95,14 +104,28 @@ def safe_count(conn, table: str, where: str = "") -> int:
 def generate_algo_report(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
 ) -> str:
     """生成 V14B Pilot 算法验证报告"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    scope = "id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else "1=1"
+    corpus_label = corpus_id or "all"
+
     # 基础统计
-    total_papers = safe_count(conn_main, "papers")
-    enriched_papers = safe_count(conn_main, "papers", "openalex_enriched = 1")
-    total_refs = safe_count(conn_main, "paper_references")
+    total_papers = safe_count(conn_main, "papers", scope)
+    enriched_papers = safe_count(conn_main, "papers", f"{scope} AND openalex_enriched = 1")
+    total_refs = safe_scalar(
+        conn_main,
+        f"""
+        SELECT COUNT(*)
+        FROM paper_references
+        WHERE citing_paper_id IN (
+            SELECT id FROM papers WHERE {scope}
+        )
+        """,
+    )
 
     # 主干道统计
     main_path_edges = safe_count(conn_v14, "main_path_edges")
@@ -194,9 +217,10 @@ def generate_algo_report(
     """)
 
     # V14 vs V13 top100 重叠率(近似)
-    v14_top100 = safe_query(conn_main, """
+    v14_top100 = safe_query(conn_main, f"""
         SELECT id FROM papers
-        WHERE keystone_score_v14 IS NOT NULL
+        WHERE {scope}
+          AND keystone_score_v14 IS NOT NULL
         ORDER BY keystone_score_v14 DESC LIMIT 100
     """)
     v14_top_ids = {r["id"] for r in v14_top100}
@@ -210,7 +234,7 @@ def generate_algo_report(
         f"# V14-B Pilot 算法验证报告",
         f"",
         f"**生成时间**: {now}",
-        f"**数据规模**: {total_papers:,} 篇论文 (physics.optics arXiv 1991-2026)",
+        f"**数据规模**: {total_papers:,} 篇论文 (corpus={corpus_label})",
         f"",
         f"---",
         f"",
@@ -279,7 +303,7 @@ def generate_algo_report(
         f"| 子图边数 | **{subgraph_edges:,}** |",
         f"",
         f"**结论边界**: Step4 是 `{subgraph_scope_row.get('conclusion_scope', 'pilot_evidence_subgraph')}`；"
-        f"任何只来自该子图的结论必须标为 pilot/evidence，完整 optics 图谱以 Step10 visual graph 为准。",
+        f"任何只来自该子图的结论必须标为 pilot/evidence，完整 {corpus_label} 图谱以 Step10 visual graph 为准。",
         f"",
         f"- 节点覆盖率: {float(subgraph_scope_row.get('node_coverage') or 0) * 100:.1f}%",
         f"- 边覆盖率: {float(subgraph_scope_row.get('edge_coverage') or 0) * 100:.1f}%",
@@ -456,6 +480,8 @@ def _go_nogo_recommendation(future_dirs: int, predicted_edges: int, total_atoms:
 def generate_future_directions_report(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
 ) -> str:
     """生成未来方向预测交集报告"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -473,6 +499,7 @@ def generate_future_directions_report(
         f"# 未来颠覆性方向预测 — 三路融合交集报告",
         f"",
         f"**生成时间**: {now}",
+        f"**Corpus**: {corpus_id or 'all'}",
         f"**方法**: VGAE+主干道延伸 × Limitation未解决方向 × Link Prediction 三路融合",
         f"**总方向数**: **{len(directions)}** 个",
         f"",
@@ -549,6 +576,7 @@ def run_report(
     db_main: Path = DB_MAIN,
     db_v14: Path = DB_V14,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 9: 报告生成"""
     step_name = "step9_report"
@@ -561,6 +589,8 @@ def run_report(
 
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     upsert_step_meta(conn_v14, step_name, "running")
@@ -569,12 +599,12 @@ def run_report(
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     # 生成算法验证报告
-    algo_report = generate_algo_report(conn_main, conn_v14)
+    algo_report = generate_algo_report(conn_main, conn_v14, corpus_id=corpus_id)
     REPORT_ALGO_VALIDATION.write_text(algo_report, encoding="utf-8")
     logger.info("算法验证报告: %s", REPORT_ALGO_VALIDATION)
 
     # 生成未来方向报告
-    future_report = generate_future_directions_report(conn_main, conn_v14)
+    future_report = generate_future_directions_report(conn_main, conn_v14, corpus_id=corpus_id)
     REPORT_FUTURE_DIRECTIONS.write_text(future_report, encoding="utf-8")
     logger.info("未来方向报告: %s", REPORT_FUTURE_DIRECTIONS)
     upsert_step_meta(conn_v14, step_name, "done", records_n=2)
@@ -585,6 +615,8 @@ def run_report(
     stats = {
         "algo_report": str(REPORT_ALGO_VALIDATION),
         "future_report": str(REPORT_FUTURE_DIRECTIONS),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else None,
         "records_n": 2,
     }
     ck.mark_done(records_n=2, meta=stats)
@@ -606,7 +638,12 @@ def main(argv=None):
     db_main = Path(args.db) if args.db else DB_MAIN
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
 
-    run_report(db_main=db_main, db_v14=db_v14, resume=args.resume)
+    run_report(
+        db_main=db_main,
+        db_v14=db_v14,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

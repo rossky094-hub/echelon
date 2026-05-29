@@ -1,25 +1,52 @@
 const token = "pilot-viewer-token";
+
 const state = {
   apiBase: "http://127.0.0.1:8000",
   nodes: [],
   edges: [],
   clusters: [],
+  lineages: [],
   story: [],
+  nodeById: new Map(),
+  edgeById: new Map(),
+  visibleNodes: [],
   selected: null,
-  hover: null,
+  topicLens: null,
+  mode: "topic",
   scale: 0.86,
   panX: 0,
   panY: 0,
-  filterRole: null,
+  highlightIds: new Set(),
+  loadedEdgeKeys: new Set(["base"]),
+  layers: {
+    main_path: true,
+    topic: true,
+    citation: false,
+    semantic: false,
+    future: true,
+    bottleneck: true,
+    uncertainty: true,
+  },
+  time: {
+    min: 1995,
+    max: 2026,
+    current: 1995,
+    playing: false,
+    raf: null,
+    lastTick: 0,
+    yearsPerSecond: 7.5,
+  },
 };
+
+const LAYER_ORDER = ["main_path", "topic", "citation", "semantic", "future", "bottleneck", "uncertainty"];
 
 const els = {
   apiBase: document.getElementById("apiBase"),
   loadBtn: document.getElementById("loadBtn"),
-  storyBtn: document.getElementById("storyBtn"),
-  mainPathBtn: document.getElementById("mainPathBtn"),
-  futureBtn: document.getElementById("futureBtn"),
   status: document.getElementById("statusText"),
+  contextTitle: document.getElementById("contextTitle"),
+  contextMeta: document.getElementById("contextMeta"),
+  layerMeaning: document.getElementById("layerMeaning"),
   metrics: document.getElementById("metrics"),
   graph: document.getElementById("graphCanvas"),
   edges: document.getElementById("edgeCanvas"),
@@ -27,8 +54,17 @@ const els = {
   searchForm: document.getElementById("searchForm"),
   searchInput: document.getElementById("searchInput"),
   paperPane: document.getElementById("paperPane"),
+  topicPane: document.getElementById("topicPane"),
+  radarPane: document.getElementById("radarPane"),
   clusterPane: document.getElementById("clusterPane"),
   storyPane: document.getElementById("storyPane"),
+  explainDock: document.getElementById("explainDock"),
+  playBtn: document.getElementById("playBtn"),
+  timeSlider: document.getElementById("timeSlider"),
+  timeLabel: document.getElementById("timeLabel"),
+  growthLabel: document.getElementById("growthLabel"),
+  modeButtons: Array.from(document.querySelectorAll(".mode")),
+  layerInputs: Array.from(document.querySelectorAll("[data-layer]")),
 };
 
 const gl = els.graph.getContext("webgl", { antialias: true, alpha: true });
@@ -36,6 +72,64 @@ const edgeCtx = els.edges.getContext("2d");
 
 let program;
 let buffers = {};
+
+const DEFAULT_VALUE_MODEL = {
+  layout_distance: {
+    algorithm: "paper embedding/community layout projected with publication year",
+    relationship: "nearby dots are semantically/community close; vertical growth is time; edges carry evidence",
+    display: "2.5D evolution projection: X is semantic branch space, Y is year-dominant growth axis",
+  },
+  layers: {
+    main_path: {
+      algorithm: "SPC main path on SCC-condensed citation DAG",
+      relationship: "historical trunk: older cited paper -> newer citing paper",
+      display: "black thick edges",
+    },
+    topic: {
+      algorithm: "co-citation/co-reference affinity",
+      relationship: "shared intellectual neighborhood",
+      display: "blue-green soft branch edges",
+    },
+    citation: {
+      algorithm: "ID-relinked local references",
+      relationship: "real citation edge",
+      display: "thin grey local edges",
+    },
+    semantic: {
+      algorithm: "embedding kNN",
+      relationship: "text/section similarity",
+      display: "thin blue proximity edges",
+    },
+    future: {
+      algorithm: "calibrated temporal link prediction plus fusion when materialized",
+      relationship: "candidate future growth hypothesis",
+      display: "purple dashed arcs",
+    },
+    bottleneck: {
+      algorithm: "section-level limitation/claim atoms",
+      relationship: "unresolved constraints",
+      display: "red/orange node role",
+    },
+    uncertainty: {
+      algorithm: "coverage and calibration quality gates",
+      relationship: "where evidence is weaker",
+      display: "amber node marker",
+    },
+    fusion_value: {
+      algorithm: "Step6 tiered fusion + Step13 Claim Card gates",
+      relationship: "decision value = path support + calibrated probability + bottleneck evidence + section quality",
+      display: "Radar and Claim Cards",
+    },
+  },
+  counts: { edges_by_layer: {}, future_directions: 0, claim_cards: 0, fusion_adequacy: "unknown" },
+  model_components: {
+    gnn_future_growth: {
+      name: "Step5b VGAE / GCN link-prediction model",
+      role: "GNN future-growth candidate generator. Needs Step6/Step13 evidence before investment-grade claims.",
+    },
+  },
+  fusion_status: "unknown",
+};
 
 function api(path, options = {}) {
   return fetch(`${state.apiBase}${path}`, {
@@ -56,6 +150,86 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+function esc(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function fmt(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function pct(value) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return `${Math.round(Number(value) * 100)}%`;
+}
+
+function clamp(value, lo, hi) {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+function asArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function truncate(value, max = 150) {
+  const text = String(value || "");
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function renderAccessLinks(links = []) {
+  if (!Array.isArray(links) || !links.length) return "<p>No access link recorded.</p>";
+  return links.slice(0, 8).map((link) => {
+    const url = esc(link.url || "");
+    const label = esc(link.label || link.kind || "Open");
+    const level = esc(link.access_level || "external");
+    return `<p><a href="${url}" target="_blank" rel="noreferrer">${label}</a> <small>${level}</small></p>`;
+  }).join("");
+}
+
+function renderLocalContent(content = {}, availability = {}) {
+  const sections = Array.isArray(content.sections) ? content.sections : [];
+  const decisionSections = Array.isArray(content.decision_evidence_sections)
+    ? content.decision_evidence_sections
+    : [];
+  const badges = [
+    availability.has_local_abstract ? "abstract" : null,
+    sections.length ? `${sections.length} sections` : null,
+    decisionSections.length ? `${decisionSections.length} evidence sections` : null,
+    content.limitation_atoms ? `${content.limitation_atoms} limitations` : null,
+    content.claim_cards ? `${content.claim_cards} claim cards` : null,
+  ].filter(Boolean);
+  return badges.length ? esc(badges.join(" / ")) : "metadata only";
+}
+
+function evidencePaperButtons(papers = [], limit = 5) {
+  const items = (papers || []).filter((p) => p && p.paper_id).slice(0, limit);
+  if (!items.length) return "";
+  return `
+    <div class="evidence-list">
+      ${items.map((paper) => `
+        <button class="evidence-paper" data-paper="${esc(paper.paper_id)}">
+          <strong>${esc(truncate(paper.title || paper.paper_id, 92))}</strong>
+          <small>${esc(paper.paper_id)} / ${esc(paper.year || "?")} ${paper.why ? `/ ${esc(paper.why)}` : ""}</small>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
 function shader(type, source) {
   const s = gl.createShader(type);
   gl.shaderSource(s, source);
@@ -67,6 +241,7 @@ function shader(type, source) {
 }
 
 function initGl() {
+  if (!gl) throw new Error("WebGL is not available in this browser.");
   const vs = shader(gl.VERTEX_SHADER, `
     attribute vec3 a_pos;
     attribute vec3 a_color;
@@ -77,7 +252,7 @@ function initGl() {
     void main() {
       vec2 xy = a_pos.xy * u_scale + u_pan;
       gl_Position = vec4(xy, 0.0, 1.0);
-      gl_PointSize = clamp(a_size, 2.0, 18.0);
+      gl_PointSize = clamp(a_size, 2.0, 22.0);
       v_color = a_color;
     }
   `);
@@ -88,7 +263,7 @@ function initGl() {
       vec2 p = gl_PointCoord - vec2(0.5);
       float d = dot(p, p);
       if (d > 0.25) discard;
-      float alpha = smoothstep(0.25, 0.08, d);
+      float alpha = smoothstep(0.25, 0.07, d);
       gl_FragColor = vec4(v_color, alpha);
     }
   `);
@@ -105,43 +280,82 @@ function initGl() {
 }
 
 function hexToRgb(hex) {
-  const safe = /^#[0-9a-f]{6}$/i.test(hex || "") ? hex : "#0f7b6c";
+  const safe = /^#[0-9a-f]{6}$/i.test(hex || "") ? hex : "#176b5f";
   const n = Number.parseInt(safe.slice(1), 16);
   return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255];
 }
 
+function yearOf(node) {
+  const y = Number(node.year || node.publication_year || node.z);
+  return Number.isFinite(y) ? y : null;
+}
+
+function nodeVisibleByTime(node) {
+  const y = yearOf(node);
+  return y == null || y <= Number(state.time.current || state.time.max);
+}
+
+function timeAxisY(year) {
+  const min = Number(state.time.min || 1995);
+  const max = Number(state.time.max || 2026);
+  const span = Math.max(1, max - min);
+  const value = Number.isFinite(Number(year)) ? Number(year) : (min + max) / 2;
+  const norm = clamp((value - min) / span, 0, 1);
+  return -0.92 + norm * 1.84;
+}
+
+function projectNode(node) {
+  const semanticX = Number(node.x || 0);
+  const semanticY = Number(node.y || 0);
+  const yearY = timeAxisY(yearOf(node));
+  return {
+    x: semanticX * 0.88,
+    y: yearY * 0.72 + semanticY * 0.28,
+    z: Number(node.z || yearOf(node) || 0),
+  };
+}
+
+function toScreenPoint(point, width, height) {
+  const x = (Number(point.x || 0) * state.scale + state.panX) * 0.5 + 0.5;
+  const y = 0.5 - (Number(point.y || 0) * state.scale + state.panY) * 0.5;
+  return { x: x * width, y: y * height };
+}
+
 function roleColor(node) {
+  const highlighted = state.highlightIds.has(node.paper_id);
+  if (state.selected && state.selected.paper_id === node.paper_id) return [0.02, 0.02, 0.02];
+  if (highlighted) return [0.05, 0.28, 0.82];
   if (node.visual_role === "main_path") return [0.06, 0.06, 0.06];
-  if (node.visual_role === "future_anchor") return [0.48, 0.25, 0.95];
-  if (node.visual_role === "limitation_bottleneck") return [0.82, 0.29, 0.20];
+  if (node.visual_role === "future_anchor") return [0.43, 0.22, 0.76];
+  if (state.layers.bottleneck && node.visual_role === "limitation_bottleneck") return [0.81, 0.30, 0.19];
+  if (state.layers.uncertainty && Number(node.uncertainty_score || 0) >= 0.62) return [0.76, 0.48, 0.02];
   return hexToRgb(node.color_hex);
 }
 
-function resize() {
-  const rect = els.graph.getBoundingClientRect();
-  for (const canvas of [els.graph, els.edges]) {
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-  }
-  gl.viewport(0, 0, els.graph.width, els.graph.height);
-  draw();
+function nodeDrawSize(node) {
+  const base = Math.max(2, Math.min(18, Number(node.node_size || 4)));
+  if (state.selected && state.selected.paper_id === node.paper_id) return base + 7;
+  if (state.highlightIds.has(node.paper_id)) return base + 5;
+  if (state.layers.uncertainty && Number(node.uncertainty_score || 0) >= 0.75) return base + 1.8;
+  return base;
+}
+
+function visibleNodes() {
+  return state.nodes.filter(nodeVisibleByTime);
 }
 
 function uploadNodes() {
-  const visible = state.filterRole
-    ? state.nodes.filter((node) => node.visual_role === state.filterRole)
-    : state.nodes;
+  const visible = visibleNodes();
   const pos = new Float32Array(visible.length * 3);
   const color = new Float32Array(visible.length * 3);
   const size = new Float32Array(visible.length);
   visible.forEach((node, i) => {
-    pos[i * 3] = Number(node.x || 0);
-    pos[i * 3 + 1] = Number(node.y || 0);
-    pos[i * 3 + 2] = Number(node.z || 0);
-    const c = roleColor(node);
-    color.set(c, i * 3);
-    size[i] = Math.max(2, Math.min(18, Number(node.node_size || 4)));
+    const projected = projectNode(node);
+    pos[i * 3] = projected.x;
+    pos[i * 3 + 1] = projected.y;
+    pos[i * 3 + 2] = projected.z;
+    color.set(roleColor(node), i * 3);
+    size[i] = nodeDrawSize(node);
   });
   state.visibleNodes = visible;
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.pos);
@@ -150,6 +364,37 @@ function uploadNodes() {
   gl.bufferData(gl.ARRAY_BUFFER, color, gl.STATIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffers.size);
   gl.bufferData(gl.ARRAY_BUFFER, size, gl.STATIC_DRAW);
+  updateTimelineLabels();
+}
+
+function toScreen(node, width, height) {
+  return toScreenPoint(projectNode(node), width, height);
+}
+
+function edgeKey(edge) {
+  if (edge.is_main_path || edge.edge_type === "main_path") return "main_path";
+  if (edge.layer === "future" || edge.edge_type === "future_growth") return "future";
+  if (edge.layer === "semantic") return "semantic";
+  if (edge.layer === "topic") return "topic";
+  if (edge.layer === "citation") return "citation";
+  return edge.layer || edge.edge_type || "citation";
+}
+
+function edgeVisible(edge, visibleIds) {
+  const key = edgeKey(edge);
+  if (!state.layers[key]) return false;
+  if (key === "future" && Number(state.time.current) < Number(state.time.max)) return false;
+  if (!visibleIds.has(edge.source_paper_id) || !visibleIds.has(edge.target_paper_id)) return false;
+  return true;
+}
+
+function edgePaint(edge) {
+  const key = edgeKey(edge);
+  if (key === "main_path") return { color: "rgba(17,17,17,.86)", width: 1.7, dash: [] };
+  if (key === "future") return { color: "rgba(111,66,193,.72)", width: 1.4, dash: [6, 5] };
+  if (key === "topic") return { color: "rgba(21,127,149,.20)", width: 0.75, dash: [] };
+  if (key === "semantic") return { color: "rgba(45,108,223,.13)", width: 0.65, dash: [] };
+  return { color: "rgba(82,88,95,.14)", width: 0.65, dash: [] };
 }
 
 function drawEdges() {
@@ -158,20 +403,69 @@ function drawEdges() {
   const h = els.edges.height / dpr;
   edgeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   edgeCtx.clearRect(0, 0, w, h);
-  const byId = new Map(state.nodes.map((node) => [node.paper_id, node]));
-  edgeCtx.lineWidth = 1;
+  drawYearGuides(w, h);
+  const visibleIds = new Set(state.visibleNodes.map((node) => node.paper_id));
+  const layerCounts = {};
+  const maxByLayer = {
+    main_path: 5000,
+    future: 1500,
+    topic: 36000,
+    semantic: 24000,
+    citation: 22000,
+  };
   for (const edge of state.edges) {
-    const a = byId.get(edge.source_paper_id);
-    const b = byId.get(edge.target_paper_id);
+    const key = edgeKey(edge);
+    layerCounts[key] = layerCounts[key] || 0;
+    if (layerCounts[key] >= (maxByLayer[key] || 12000)) continue;
+    if (!edgeVisible(edge, visibleIds)) continue;
+    const a = state.nodeById.get(edge.source_paper_id);
+    const b = state.nodeById.get(edge.target_paper_id);
     if (!a || !b) continue;
     const pa = toScreen(a, w, h);
     const pb = toScreen(b, w, h);
-    edgeCtx.strokeStyle = edge.is_main_path ? "rgba(17,17,17,.82)" : "rgba(90,86,78,.16)";
+    const paint = edgePaint(edge);
+    edgeCtx.strokeStyle = paint.color;
+    edgeCtx.lineWidth = paint.width;
+    edgeCtx.setLineDash(paint.dash);
     edgeCtx.beginPath();
-    edgeCtx.moveTo(pa.x, pa.y);
-    edgeCtx.lineTo(pb.x, pb.y);
+    if (key === "future") {
+      const mx = (pa.x + pb.x) / 2;
+      const my = (pa.y + pb.y) / 2 - Math.min(110, Math.hypot(pa.x - pb.x, pa.y - pb.y) * 0.14 + 16);
+      edgeCtx.moveTo(pa.x, pa.y);
+      edgeCtx.quadraticCurveTo(mx, my, pb.x, pb.y);
+    } else {
+      edgeCtx.moveTo(pa.x, pa.y);
+      edgeCtx.lineTo(pb.x, pb.y);
+    }
     edgeCtx.stroke();
+    layerCounts[key] += 1;
   }
+  edgeCtx.setLineDash([]);
+}
+
+function drawYearGuides(w, h) {
+  const min = Math.ceil(Number(state.time.min || 1995) / 5) * 5;
+  const max = Math.floor(Number(state.time.max || 2026) / 5) * 5;
+  edgeCtx.save();
+  edgeCtx.font = "11px Inter, system-ui, sans-serif";
+  edgeCtx.fillStyle = "rgba(96,102,109,.68)";
+  edgeCtx.strokeStyle = "rgba(23,25,28,.075)";
+  edgeCtx.lineWidth = 1;
+  for (let year = min; year <= max; year += 5) {
+    const p = toScreenPoint({ x: 0, y: timeAxisY(year) }, w, h);
+    edgeCtx.beginPath();
+    edgeCtx.moveTo(0, p.y);
+    edgeCtx.lineTo(w, p.y);
+    edgeCtx.stroke();
+    edgeCtx.fillText(String(year), 12, clamp(p.y - 5, 12, h - 10));
+  }
+  const current = toScreenPoint({ x: 0, y: timeAxisY(state.time.current) }, w, h);
+  edgeCtx.strokeStyle = "rgba(15,118,110,.42)";
+  edgeCtx.beginPath();
+  edgeCtx.moveTo(0, current.y);
+  edgeCtx.lineTo(w, current.y);
+  edgeCtx.stroke();
+  edgeCtx.restore();
 }
 
 function draw() {
@@ -200,10 +494,15 @@ function draw() {
   drawEdges();
 }
 
-function toScreen(node, width, height) {
-  const x = (Number(node.x || 0) * state.scale + state.panX) * 0.5 + 0.5;
-  const y = 0.5 - (Number(node.y || 0) * state.scale + state.panY) * 0.5;
-  return { x: x * width, y: y * height };
+function resize() {
+  const rect = els.graph.getBoundingClientRect();
+  for (const canvas of [els.graph, els.edges]) {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+  }
+  gl.viewport(0, 0, els.graph.width, els.graph.height);
+  draw();
 }
 
 function nearestNode(evt) {
@@ -211,7 +510,7 @@ function nearestNode(evt) {
   const x = evt.clientX - rect.left;
   const y = evt.clientY - rect.top;
   let best = null;
-  let bestD = 16 * 16;
+  let bestD = 17 * 17;
   for (const node of state.visibleNodes || []) {
     const p = toScreen(node, rect.width, rect.height);
     const dx = p.x - x;
@@ -225,7 +524,108 @@ function nearestNode(evt) {
   return best;
 }
 
-function renderMetrics(status) {
+function mergeEdges(edges) {
+  for (const edge of edges || []) {
+    state.edgeById.set(edge.edge_id, edge);
+  }
+  state.edges = Array.from(state.edgeById.values());
+}
+
+async function ensureLayerEdges(layer) {
+  if (state.loadedEdgeKeys.has(layer)) return;
+  if (layer === "semantic") {
+    setStatus("Loading semantic layer...");
+    const data = await api("/graph/visual/edges?layer=semantic&lod_max=2&limit=60000");
+    mergeEdges(data.edges || []);
+  } else if (layer === "citation") {
+    setStatus("Loading citation layer...");
+    const data = await api("/graph/visual/edges?layer=citation&lod_max=3&limit=70000");
+    mergeEdges((data.edges || []).filter((edge) => edge.edge_type !== "main_path"));
+  } else if (layer === "topic") {
+    setStatus("Loading co-citation layer...");
+    const data = await api("/graph/visual/edges?layer=topic&lod_max=1&limit=100000");
+    mergeEdges(data.edges || []);
+  }
+  state.loadedEdgeKeys.add(layer);
+}
+
+function fitToNodes(nodes = state.nodes) {
+  const pool = nodes.length ? nodes : state.nodes;
+  if (!pool.length) return;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const node of pool) {
+    const projected = projectNode(node);
+    const x = Number(projected.x || 0);
+    const y = Number(projected.y || 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+  if (!Number.isFinite(minX)) return;
+  const span = Math.max(maxX - minX, maxY - minY, 0.01);
+  state.scale = clamp(1.72 / span, 0.35, 5.5);
+  state.panX = -((minX + maxX) / 2) * state.scale;
+  state.panY = -((minY + maxY) / 2) * state.scale;
+}
+
+function focusPaperIds(ids) {
+  const focus = Array.from(ids || [])
+    .map((id) => state.nodeById.get(id))
+    .filter(Boolean);
+  if (!focus.length) return;
+  fitToNodes(focus);
+}
+
+function updateTimelineLabels() {
+  const year = Math.round(Number(state.time.current || state.time.max));
+  els.timeLabel.textContent = String(year);
+  els.timeSlider.value = String(year);
+  els.growthLabel.textContent = `${fmt(state.visibleNodes.length)} papers`;
+  els.playBtn.textContent = state.time.playing ? "Pause" : "Play";
+}
+
+function setTimeCutoff(year, options = {}) {
+  state.time.current = clamp(Number(year), state.time.min, state.time.max);
+  uploadNodes();
+  if (options.draw !== false) draw();
+}
+
+function stopPlayback() {
+  state.time.playing = false;
+  if (state.time.raf) cancelAnimationFrame(state.time.raf);
+  state.time.raf = null;
+  updateTimelineLabels();
+}
+
+function playbackTick(ts) {
+  if (!state.time.playing) return;
+  if (!state.time.lastTick) state.time.lastTick = ts;
+  const dt = Math.min(0.08, (ts - state.time.lastTick) / 1000);
+  state.time.lastTick = ts;
+  const next = state.time.current + dt * state.time.yearsPerSecond;
+  if (next >= state.time.max) {
+    setTimeCutoff(state.time.max);
+    stopPlayback();
+    return;
+  }
+  setTimeCutoff(next);
+  state.time.raf = requestAnimationFrame(playbackTick);
+}
+
+function startPlayback(fromStart = false) {
+  if (fromStart) state.time.current = state.time.min;
+  state.time.playing = true;
+  state.time.lastTick = 0;
+  updateTimelineLabels();
+  state.time.raf = requestAnimationFrame(playbackTick);
+}
+
+function renderMetrics(status = {}) {
   const counts = status.counts || {};
   const items = [
     ["Nodes", counts.visual_nodes || state.nodes.length],
@@ -234,64 +634,719 @@ function renderMetrics(status) {
     ["Tiles", counts.visual_tiles || 0],
   ];
   els.metrics.innerHTML = items.map(([label, value]) => (
-    `<div class="metric"><strong>${Number(value || 0).toLocaleString()}</strong><span>${label}</span></div>`
+    `<div class="metric"><strong>${fmt(value)}</strong><span>${label}</span></div>`
   )).join("");
 }
 
+function renderExplainDock(model = null) {
+  const valueModel = model || state.topicLens?.value_model || DEFAULT_VALUE_MODEL;
+  const layers = valueModel.layers || DEFAULT_VALUE_MODEL.layers;
+  const counts = valueModel.counts || {};
+  const edgeCounts = counts.edges_by_layer || {};
+  const gnn = valueModel.model_components?.gnn_future_growth || DEFAULT_VALUE_MODEL.model_components.gnn_future_growth;
+  const combos = valueModel.layer_combinations || [];
+  const rows = [
+    ["Main", layers.main_path, edgeCounts.main_path],
+    ["Co-cite", layers.topic, edgeCounts.topic],
+    ["Cite", layers.citation, edgeCounts.citation],
+    ["Semantic", layers.semantic, edgeCounts.semantic],
+    ["Future", layers.future, edgeCounts.future],
+    ["Bottleneck", layers.bottleneck, null],
+    ["Uncertainty", layers.uncertainty, null],
+    ["Fusion value", layers.fusion_value, null],
+  ];
+  const layout = valueModel.layout_distance || DEFAULT_VALUE_MODEL.layout_distance;
+  els.explainDock.innerHTML = `
+    <details open>
+      <summary>How to read this evolution map</summary>
+      <p><strong>Point distance.</strong> ${esc(layout.relationship || "")}</p>
+      <p><strong>Projection.</strong> ${esc(layout.display || "")}</p>
+      <p><strong>GNN.</strong> ${esc(gnn.name || "Step5b VGAE")}：${esc(gnn.role || "")}</p>
+      <div class="layer-explain-list">
+        ${rows.map(([label, item, count]) => `
+          <div class="layer-explain">
+            <strong>${esc(label)}${count == null ? "" : ` ${fmt(count)}`}</strong>
+            <span>${esc(item?.algorithm || "")}</span>
+            <small>${esc(item?.relationship || "")} ${esc(item?.display || "")}</small>
+          </div>
+        `).join("")}
+      </div>
+      <details>
+        <summary>Useful layer combinations</summary>
+        <div class="layer-explain-list">
+          ${combos.map((combo) => `
+            <div class="layer-explain combo">
+              <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>
+              <span>${esc((combo.layers || []).join(" + "))}</span>
+              <small>${esc(combo.question || "")} ${esc(combo.decision_use || "")}</small>
+            </div>
+          `).join("")}
+        </div>
+      </details>
+      <p class="mini">Fusion status: ${esc(valueModel.fusion_status || "unknown")} / Step6 adequacy ${esc(counts.fusion_adequacy || "unknown")} / claim cards ${fmt(counts.claim_cards || 0)}</p>
+    </details>
+  `;
+}
+
+function activeLayerKeys() {
+  return Object.entries(state.layers)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key)
+    .sort((a, b) => LAYER_ORDER.indexOf(a) - LAYER_ORDER.indexOf(b));
+}
+
+function sameLayerSet(a = [], b = []) {
+  if (a.length !== b.length) return false;
+  const sa = new Set(a);
+  return b.every((x) => sa.has(x));
+}
+
+function activeLayerCombination(keys, valueModel = null) {
+  const combos = (valueModel || state.topicLens?.value_model || DEFAULT_VALUE_MODEL).layer_combinations || [];
+  const exact = combos.find((combo) => sameLayerSet(combo.layers || [], keys));
+  if (exact) return exact;
+  const subset = combos
+    .filter((combo) => (combo.layers || []).every((layer) => keys.includes(layer)))
+    .sort((a, b) => (b.layers || []).length - (a.layers || []).length)[0];
+  return subset || null;
+}
+
+function activeLayerInterpretation(keys, valueModel = null) {
+  const combo = activeLayerCombination(keys, valueModel);
+  if (combo) {
+    return `${combo.label || "组合视图"}：${combo.question || ""} ${combo.relationship || ""} ${combo.decision_use || ""}`;
+  }
+  const set = new Set(keys);
+  if (set.size === 1 && set.has("main_path")) {
+    return "只看 Main：这是历史主干。它回答哪些论文承担了演化树的骨架，但不会显示每个局部主题团。";
+  }
+  if (set.has("main_path") && set.has("topic") && set.size <= 2) {
+    return "Main + Co-cite：先看历史主干，再看哪些主题块围绕主干成团。这是理解“为什么长成这样”的推荐组合。";
+  }
+  if (set.has("future") && !set.has("bottleneck")) {
+    return "Future 单独看只能说明 GNN/VGAE 预测了可能连接，不能说明为什么值得下注；应同时打开 Bottleneck 或 Radar。";
+  }
+  if (set.has("future") && set.has("bottleneck") && set.has("uncertainty")) {
+    return "Future + Bottleneck + Uncertainty：这是投资/立项视角，重点看未来候选是否被未解卡点支持，以及证据哪里薄。";
+  }
+  if (set.has("semantic") && !set.has("citation") && !set.has("main_path")) {
+    return "只看 Semantic：这是相似论文地图，适合找相关工作，不等于历史演化或因果链。";
+  }
+  return "组合视图：点距给语义/时间位置，边层给证据。Main 是历史骨架，Co-cite 是主题团，Cite 是真实引用，Semantic 是相似，Future 是候选，Bottleneck/Uncertainty 决定可信度。";
+}
+
+function renderLayerMeaning(model = null) {
+  const valueModel = model || state.topicLens?.value_model || DEFAULT_VALUE_MODEL;
+  const layers = valueModel.layers || DEFAULT_VALUE_MODEL.layers;
+  const keys = activeLayerKeys();
+  const combo = activeLayerCombination(keys, valueModel);
+  const labels = {
+    main_path: "Main",
+    topic: "Co-cite",
+    citation: "Cite",
+    semantic: "Semantic",
+    future: "Future",
+    bottleneck: "Bottleneck",
+    uncertainty: "Uncertainty",
+  };
+  const activeRows = keys.map((key) => {
+    const item = layers[key] || {};
+    return `<p><strong>${esc(labels[key] || key)}</strong>：${esc(item.relationship || "")}<br><small>${esc(item.display || "")}</small></p>`;
+  }).join("");
+  els.layerMeaning.innerHTML = `
+    <strong>当前图层读法</strong>
+    <p>${esc(activeLayerInterpretation(keys, valueModel))}</p>
+    ${combo ? `
+      <div class="combo-card">
+        <strong>${esc(combo.label || "Layer combination")}</strong>
+        <p>${esc(combo.question || "")}</p>
+        <small>${esc(combo.display || "")}</small>
+      </div>
+    ` : ""}
+    ${activeRows}
+  `;
+}
+
+function lineageByBranch() {
+  return new Map(state.lineages.map((lineage) => [lineage.branch_id, lineage]));
+}
+
 function renderClusters() {
-  els.clusterPane.innerHTML = state.clusters.slice(0, 80).map((cluster) => `
+  const lineages = lineageByBranch();
+  const intro = `
     <div class="item">
-      <button data-cluster="${cluster.cluster_id}">
-        <strong>${cluster.label || cluster.cluster_id}</strong><br>
-        <small>${cluster.cluster_id} / ${cluster.n_nodes || 0} papers / ${cluster.year_start || "?"}-${cluster.year_end || "?"}</small>
-      </button>
+      <strong>Branches 怎么看</strong>
+      <p>Branch 不是前端随便画的分组，而是 Step10 把 semantic/community layout、co-citation 主题团、main-path 邻域和 branch lineage 证据合成后的演化分支。</p>
+      <p class="mini">parent 表示该分支从哪个父分支裂变；split/confidence 表示分裂年份和证据强度。它回答“这个 topic 为什么从旧主干长出这个新方向”。</p>
     </div>
-  `).join("");
+  `;
+  els.clusterPane.innerHTML = intro + state.clusters.slice(0, 120).map((cluster) => {
+    const lineage = lineages.get(cluster.branch_id) || {};
+    const confidence = lineage.split_confidence == null ? "-" : pct(lineage.split_confidence);
+    const terms = (cluster.top_terms || []).slice(0, 5).map((t) => `<span class="pill">${esc(t)}</span>`).join("");
+    return `
+      <div class="item">
+        <button data-cluster="${esc(cluster.cluster_id)}">
+          <strong>${esc(cluster.label || cluster.cluster_id)}</strong><br>
+          <small>${esc(cluster.cluster_id)} / ${fmt(cluster.n_nodes)} papers / ${esc(cluster.year_start || "?")}-${esc(cluster.year_end || "?")}</small>
+        </button>
+        <div class="pill-row">${terms}</div>
+        <p class="mini">parent ${esc(lineage.parent_branch_id || "-")} / split ${esc(lineage.split_year || "-")} / confidence ${confidence}</p>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderStory() {
   els.storyPane.innerHTML = state.story.map((step) => `
     <div class="item">
-      <button data-story="${step.story_step_id}">
-        <strong>${step.title || step.story_step_id}</strong><br>
-        <small>${step.year_start || ""}-${step.year_end || ""}</small>
-        <p>${step.narrative || ""}</p>
+      <button data-story="${esc(step.story_step_id)}">
+        <strong>${esc(step.title || step.story_step_id)}</strong><br>
+        <small>${esc(step.year_start || "")}-${esc(step.year_end || "")} / ${esc(step.focus_cluster_id || "")}</small>
+        <p>${esc(step.narrative || "")}</p>
       </button>
     </div>
-  `).join("");
+  `).join("") || '<div class="item">Story steps are not materialized yet.</div>';
 }
 
 function renderPaper(paper, edges = []) {
   if (!paper) {
-    els.paperPane.innerHTML = '<div class="item">Click a node or search to inspect a paper.</div>';
+    els.paperPane.innerHTML = '<div class="item">Select a paper from the graph or Topic Lens.</div>';
     return;
   }
   const ids = paper.ids || {};
+  const localContent = paper.local_content || {};
+  const availability = paper.content_availability || {};
+  const paperRole = paper.paper_role || {};
+  const visualRole = paperRole.role || paper.visual_role || paper.visual?.role || "paper";
+  const sections = [
+    ...asArray(localContent.decision_evidence_sections),
+    ...asArray(localContent.sections),
+  ].slice(0, 6);
+  const edgeCounts = paperRole.edge_counts_by_layer || {};
+  state.selected = paper;
   els.paperPane.innerHTML = `
     <div class="item">
-      <strong>${paper.title || paper.paper_id}</strong>
-      <div class="paper-meta">${paper.paper_id} / ${paper.year || "year unknown"} / ${paper.cluster_label || ""}</div>
+      <strong>${esc(paper.title || paper.paper_id)}</strong>
+      <div class="paper-meta">${esc(paper.paper_id)} / ${esc(paper.year || "year unknown")} / ${esc(paper.cluster_label || "")}</div>
+      <div class="pill-row">
+        <span class="pill">${esc(visualRole)}</span>
+        <span class="pill">branch ${esc(paper.branch_id || "-")}</span>
+      </div>
+    </div>
+    <div class="item important">
+      <div class="paper-meta">为什么给你看这篇</div>
+      ${(paperRole.why_selected || [paper.reason?.why]).filter(Boolean).map((why) => `<p>${esc(why)}</p>`).join("") || "<p>Topic Lens / graph neighborhood selected this paper.</p>"}
+      <div class="pill-row">
+        ${Object.entries(edgeCounts).map(([layer, n]) => `<span class="pill">${esc(layer)} ${fmt(n)}</span>`).join("")}
+      </div>
+      <p class="mini">${esc(paperRole.evidence_gap || "")}</p>
+      ${paper.reason ? `<p class="mini">选择依据：${esc(paper.reason.why || "")} ${esc(paper.reason.role || "")} / ${esc(paper.reason.relationship_scope || "")}</p>` : ""}
     </div>
     <div class="item">
       <div class="paper-meta">IDs</div>
-      <small>DOI: ${ids.doi || "-"}<br>arXiv: ${ids.arxiv_id || "-"}<br>OpenAlex: ${ids.openalex_work_id || "-"}</small>
+      <small>DOI: ${esc(ids.doi || "-")}<br>arXiv: ${esc(ids.arxiv_id || "-")}<br>OpenAlex: ${esc(ids.openalex_work_id || "-")}</small>
+    </div>
+    <div class="item">
+      <div class="paper-meta">Local content</div>
+      <small>${renderLocalContent(localContent, availability)}<br>storage: ${esc(paper.storage_policy || "metadata_only")}</small>
+    </div>
+    <div class="item">
+      <div class="paper-meta">Access</div>
+      ${renderAccessLinks(paper.access_links || [])}
     </div>
     <div class="item">
       <div class="paper-meta">Abstract</div>
-      <p>${paper.abstract || "No abstract available."}</p>
+      <p>${esc(paper.abstract || "No abstract available.")}</p>
+    </div>
+    <div class="item">
+      <div class="paper-meta">Evidence sections</div>
+      ${sections.map((section) => `
+        <p><strong>${esc(section.section_type || section.title || "section")}</strong> ${esc(truncate(section.text || section.content || section.snippet || "", 260))}</p>
+      `).join("") || "<p>No local section evidence yet. 当前只能用 abstract/metadata，不能作为强证据。</p>"}
     </div>
     <div class="item">
       <div class="paper-meta">Limitations</div>
-      ${(paper.limitations || []).map((lim) => `<p>${lim.description || JSON.stringify(lim)}</p>`).join("") || "<p>No limitation atoms yet.</p>"}
+      ${(paper.limitations || []).slice(0, 6).map((lim) => `<p>${esc(lim.description || JSON.stringify(lim))}</p>`).join("") || "<p>No limitation atoms yet.</p>"}
     </div>
     <div class="item">
       <div class="paper-meta">Local edges</div>
       <small>${edges.length} loaded</small>
     </div>
   `;
+  uploadNodes();
+  draw();
 }
 
-async function loadGraph() {
+function collectTopicIds(lens) {
+  const ids = new Set();
+  for (const p of lens?.related_papers || []) ids.add(p.paper_id);
+  for (const p of lens?.history_main_path?.key_turning_papers || []) ids.add(p.paper_id);
+  for (const lim of lens?.unresolved_limitations || []) ids.add(lim.paper_id);
+  for (const edge of lens?.future_growth?.predicted_edges || []) {
+    ids.add(edge.source_paper_id);
+    ids.add(edge.target_paper_id);
+  }
+  for (const direction of lens?.future_growth?.future_directions || []) {
+    for (const pid of asArray(direction.paper_ids_json)) ids.add(pid);
+  }
+  return ids;
+}
+
+function renderPaperList(papers, limit = 12) {
+  return (papers || []).slice(0, limit).map((paper) => `
+    <div class="item">
+      <button data-paper="${esc(paper.paper_id)}">
+        <strong>${esc(paper.title || paper.paper_id)}</strong><br>
+        <small>${esc(paper.paper_id)} / ${esc(paper.year || "?")} / ${esc(paper.cluster_label || paper.cluster_id || "")}</small>
+      </button>
+      ${paper.reason ? `<p class="mini">为什么关键：${esc(paper.reason.why || "")} ${esc(paper.reason.role || "")} / scope ${esc(paper.reason.relationship_scope || "graph")}</p>` : ""}
+      ${Array.isArray(paper.access_links) && paper.access_links.length ? `<p class="mini">可访问：${paper.access_links.slice(0, 3).map((link) => `<a href="${esc(link.url)}" target="_blank" rel="noreferrer">${esc(link.label)}</a>`).join(" / ")}</p>` : ""}
+    </div>
+  `).join("");
+}
+
+function paperLabel(paper, fallback) {
+  if (!paper) return fallback || "";
+  const title = paper.title || paper.paper_id || fallback || "";
+  const year = paper.year ? ` (${paper.year})` : "";
+  return `${title}${year}`;
+}
+
+function renderTopicDossier(dossier = {}) {
+  const strength = dossier.evidence_strength || {};
+  const splits = dossier.branch_splits || [];
+  const bottlenecks = dossier.hard_bottlenecks || [];
+  const directions = dossier.validation_directions || [];
+  const solved = dossier.solved_vs_open || {};
+  return `
+    <div class="dossier-hero">
+      <strong>${esc(dossier.headline || "Topic dossier is being assembled.")}</strong>
+      ${dossier.value_claim ? `<p class="value-claim">${esc(dossier.value_claim)}</p>` : ""}
+      <p>${esc(dossier.decision_summary || "")}</p>
+      <div class="score-row">
+        <span class="score"><small>主路径证据</small><strong>${fmt(strength.main_path_context_edges || 0)}</strong></span>
+        <span class="score"><small>未来候选</small><strong>${fmt(strength.future_candidate_edges || 0)}</strong></span>
+        <span class="score"><small>Section 覆盖</small><strong>${pct(strength.primary_section_coverage_in_results || 0)}</strong></span>
+        <span class="score"><small>Limitation 覆盖</small><strong>${pct(strength.limitation_atom_coverage_in_results || 0)}</strong></span>
+      </div>
+      <div class="pill-row">
+        ${(dossier.branch_labels || []).slice(0, 4).map((x) => `<span class="pill">${esc(x)}</span>`).join("")}
+        ${(dossier.core_bottlenecks || []).slice(0, 5).map((x) => `<span class="pill warn">${esc(x)}</span>`).join("")}
+      </div>
+      <p class="mini">${esc(dossier.warning || "")}</p>
+    </div>
+    <div class="item important">
+      <div class="paper-meta">当前真实分支</div>
+      ${splits.slice(0, 7).map((split) => `
+        <div class="branch-card">
+          <strong>${esc(split.name)}</strong>
+          <small>${fmt(split.paper_count || 0)} papers / first seen ${esc(split.first_seen_year || "?")}</small>
+          <p><strong>为什么出现：</strong>${esc(split.why_appeared || "")}</p>
+          <p><strong>历史卡点：</strong>${esc(split.historical_bottleneck || "")}</p>
+          <p><strong>使能条件：</strong>${esc(split.enabling_condition || "")}</p>
+          ${evidencePaperButtons(split.driver_papers || [], 3)}
+        </div>
+      `).join("") || "<p>No interpretable branch split has enough evidence yet.</p>"}
+    </div>
+    <div class="item important">
+      <div class="paper-meta">硬卡点：已部分解决 vs 仍未解决</div>
+      <p><strong>仍未解决：</strong>${esc((solved.still_open || []).slice(0, 6).join(" / ") || "N/A")}</p>
+      <p><strong>部分解决：</strong>${esc((solved.partially_addressed || []).slice(0, 6).join(" / ") || "等待 section-level resolution 证据")}</p>
+      <p class="mini">${esc(solved.rule || "")}</p>
+      ${bottlenecks.slice(0, 6).map((b) => `
+        <div class="branch-card bottleneck-card">
+          <strong>${esc(b.name)}</strong>
+          <small>${fmt(b.evidence_count || 0)} evidence atoms / ${esc(b.evidence_quality || "unknown")}</small>
+          <p>${esc(b.why_it_matters || "")}</p>
+          ${evidencePaperButtons(b.evidence_papers || [], 4)}
+        </div>
+      `).join("") || "<p>No bottleneck evidence matched.</p>"}
+    </div>
+    <div class="item important">
+      <div class="paper-meta">未来 6-18 个月值得验证的方向</div>
+      ${directions.slice(0, 5).map((d) => `
+        <div class="branch-card direction-card">
+          <strong>${esc(d.name)}</strong>
+          <small>${esc(d.claim_scope || "exploratory")} / evidence ${esc(d.evidence_strength || "unknown")} / ${esc(d.source || "")}</small>
+          <p><strong>为什么值得试：</strong>${esc(d.why_worth_testing || "")}</p>
+          ${d.why_not_ready ? `<p><strong>为什么还不能下注：</strong>${esc(d.why_not_ready)}</p>` : ""}
+          ${d.minimal_validation_experiment ? `<p><strong>最小验证实验：</strong>${esc(d.minimal_validation_experiment)}</p>` : ""}
+          ${evidencePaperButtons(d.evidence_papers || [], 5)}
+        </div>
+      `).join("") || "<p>No validation direction has enough evidence yet.</p>"}
+    </div>
+  `;
+}
+
+function renderBranchDossiers(branches = []) {
+  return `
+    <div class="item">
+      <div class="paper-meta">Branch Dossier</div>
+      <p class="mini">先看分支，而不是先看点。每个分支都要回答：它是什么、从哪里裂变、由哪些论文推动、证据强度如何。</p>
+      ${branches.slice(0, 6).map((branch) => `
+        <div class="branch-card">
+          <strong>${esc(branch.label || branch.cluster_id)}</strong>
+          <small>${esc(branch.cluster_id || "")} / ${esc(branch.branch_id || "")} / topic share ${pct(branch.topic_share || 0)} / ${esc((branch.year_range || []).join("-"))}</small>
+          <p>${esc(branch.interpretation || "")}</p>
+          <div class="pill-row">
+            ${(branch.top_terms || []).slice(0, 6).map((term) => `<span class="pill">${esc(term)}</span>`).join("")}
+          </div>
+          <p class="mini">parent ${esc(branch.parent_branch_id || "-")} / split ${esc(branch.split_year || "-")} / confidence ${pct(branch.split_confidence || 0)}</p>
+          ${renderPaperList(branch.representative_papers || [], 3)}
+        </div>
+      `).join("") || "<p>No branch dossiers matched.</p>"}
+    </div>
+  `;
+}
+
+function renderBottleneckLineage(lineage = {}) {
+  const constraints = lineage.constraints || [];
+  return `
+    <div class="item">
+      <div class="paper-meta">Bottleneck Lineage</div>
+      <p>${esc(lineage.summary || "")}</p>
+      <div class="pill-row">
+        ${(lineage.top_unresolved_keywords || []).slice(0, 8).map((x) => `<span class="pill warn">${esc(x.keyword)} ${fmt(x.count)}</span>`).join("")}
+      </div>
+      ${constraints.slice(0, 4).map((c) => `
+        <div class="claim">
+          <strong>${esc(c.name || c.principle_id)}</strong>
+          <p>${esc(c.root_cause || "")}</p>
+          <small>risk ${esc(c.risk_label || "unknown")} / unresolved ${fmt(c.unresolved_atoms || 0)} / resolved ${fmt(c.resolved_atoms || 0)} / peak ${esc(c.peak_backlog_year || "-")}</small>
+          <div class="pill-row">${(c.top_keywords || []).slice(0, 5).map((kw) => `<span class="pill">${esc(kw)}</span>`).join("")}</div>
+        </div>
+      `).join("") || "<p>No bottleneck lineage matched.</p>"}
+    </div>
+  `;
+}
+
+function renderDossierRadar(radar = {}) {
+  const claimCards = radar.claim_cards || [];
+  const candidatePool = radar.candidate_pool || [];
+  return `
+    <div class="item">
+      <div class="paper-meta">Claim Card / R&D Radar</div>
+      <p>${esc(radar.summary || "")}</p>
+      ${claimCards.length ? claimCards.slice(0, 5).map((item) => `
+        <div class="branch-card">
+          <strong>${esc(item.title || "candidate")}</strong>
+          <div class="score-row">
+            <span class="score"><small>优先级</small><strong>${pct(item.priority || 0)}</strong></span>
+            <span class="score"><small>技术概率</small><strong>${pct(item.technical_probability || 0)}</strong></span>
+            <span class="score"><small>状态</small><strong>${esc(item.claim_scope || "exploratory")}</strong></span>
+          </div>
+          <p>${esc(item.plain_language || "")}</p>
+          ${(item.missing_gates || []).length ? `<p class="mini">缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
+        </div>
+      `).join("") : `
+        <div class="branch-card warning-card">
+          <strong>No decision-grade Claim Cards yet</strong>
+          <p>Radar 主视图不会展示裸 GNN 边。下面只放候选池，必须等 Step6/Step13 生成五问卡片后才能进入 Radar。</p>
+        </div>
+      `}
+      <details>
+        <summary>Future candidate generator pool (${fmt(candidatePool.length)})</summary>
+        ${candidatePool.slice(0, 8).map((item) => `
+          <div class="candidate-card">
+            <strong>${esc(item.title || "candidate edge")}</strong>
+            <small>technical ${pct(item.technical_probability || 0)} / scope ${esc(item.claim_scope || "candidate")}</small>
+            <p>${esc(item.plain_language || "")}</p>
+            <p class="mini">缺口：${(item.missing_gates || []).map(esc).join(" / ")}</p>
+            ${evidencePaperButtons(item.evidence_papers || [], 2)}
+          </div>
+        `).join("") || "<p>No future candidates matched.</p>"}
+      </details>
+    </div>
+  `;
+}
+
+function renderEvidenceMapSummary(evidence = {}) {
+  const combos = evidence.recommended_layer_combinations || [];
+  return `
+    <div class="item">
+      <div class="paper-meta">Evidence Map</div>
+      <p>${esc(evidence.summary || "")}</p>
+      ${combos.map((combo) => `
+        <div class="combo-card">
+          <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>
+          <p>${esc(combo.question || "")}</p>
+          <small>${esc((combo.layers || []).join(" + "))} / ${esc(combo.use || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderTopicLens(lens) {
+  if (!lens) {
+    els.topicPane.innerHTML = `
+      <div class="dossier-hero">
+        <strong>Topic Dossier first</strong>
+        <p>输入一个 topic，例如 Metalens。第一屏会先给演化分支、历史卡点、转折论文、未解约束和可验证方向；右侧图谱用于审计这些判断，不是默认让你看星云。</p>
+        <p class="mini">所有分支、卡点和方向都会尽量带可点击证据论文。没有 section/Claim Card 的结论会自动降级为 exploratory。</p>
+      </div>
+    `;
+    return;
+  }
+  const clusters = (lens.cluster_distribution || []).slice(0, 8).map((cluster) => (
+    `<span class="pill">${esc(cluster.cluster_id)} ${fmt(cluster.n || cluster.count || 0)}</span>`
+  )).join("");
+  const questions = lens.first_principles?.five_questions || [];
+  const limitations = lens.unresolved_limitations || [];
+  const futureEdges = lens.future_growth?.predicted_edges || [];
+  const valueModel = lens.value_model || DEFAULT_VALUE_MODEL;
+  const fusionCounts = valueModel.counts || {};
+  els.topicPane.innerHTML = `
+    ${renderTopicDossier(lens.topic_dossier || {})}
+    <div class="item">
+      <strong>${esc(lens.topic)}</strong>
+      <div class="paper-meta">Evidence scope: ${fmt(lens.total_related)} related papers / ${fmt(futureEdges.length)} GNN candidates / ${fmt(lens.history_main_path?.edges?.length || 0)} main-path context edges</div>
+      <div class="pill-row">${clusters}</div>
+      <p class="mini">scope: ${esc(lens.context?.scope || "direct_papers")} / seed matches ${fmt(lens.context?.seed_matches || lens.total_related)} / context papers ${fmt(lens.context?.context_papers || 0)}</p>
+      <p class="mini">fusion: ${esc(valueModel.fusion_status || "unknown")} / directions ${fmt(fusionCounts.future_directions || 0)} / claim cards ${fmt(fusionCounts.claim_cards || 0)} / adequacy ${esc(fusionCounts.fusion_adequacy || "unknown")}</p>
+    </div>
+    ${renderBranchDossiers(lens.branch_dossiers || [])}
+    ${renderBottleneckLineage(lens.bottleneck_lineage || {})}
+    ${renderDossierRadar(lens.rd_radar || {})}
+    ${renderEvidenceMapSummary(lens.evidence_map || {})}
+    <div class="item">
+      <div class="paper-meta">First principles</div>
+      <div class="claim-grid">
+        ${questions.map((qa) => `
+          <div class="claim">
+            <strong>${esc(qa.question || "")}</strong>
+            <p>${esc(qa.answer || "")}</p>
+          </div>
+        `).join("") || "<p>No claim card evidence yet.</p>"}
+      </div>
+    </div>
+    <div class="item">
+      <div class="paper-meta">Key turning papers</div>
+      <p class="mini">判定逻辑：这些论文位于该 topic 所属 cluster/branch 的 Main Path 高权重边上；优先按 main_path_weight 累计贡献排序。</p>
+      ${renderPaperList(lens.history_main_path?.key_turning_papers || [], 8) || "<p>No main-path match.</p>"}
+    </div>
+    <div class="item">
+      <div class="paper-meta">Future candidate generator pool</div>
+      <p class="mini">这里是 Step5b GNN/VGAE 候选生成器，不是结论。只有经过 Step6 融合和 Step13 五问 Claim Card 的方向，才会进入 Radar 主视图。</p>
+      ${futureEdges.slice(0, 8).map((edge) => `
+        <p><strong>${esc(paperLabel(edge.source_paper, edge.source_paper_id))}</strong><br>
+        <span class="mini">可能连接到</span><br>
+        <strong>${esc(paperLabel(edge.target_paper, edge.target_paper_id))}</strong><br>
+        <small>GNN/VGAE confidence ${pct(edge.confidence || edge.weight)} / ${esc(edge.evidence?.relationship_scope || "graph")}</small><br>
+        <small>${esc(edge.plain_language || "")}</small></p>
+        ${evidencePaperButtons([edge.source_paper, edge.target_paper].filter(Boolean), 2)}
+      `).join("") || "<p>No future edge matched this topic context yet.</p>"}
+    </div>
+    <div class="item">
+      <div class="paper-meta">Unresolved bottlenecks</div>
+      ${limitations.slice(0, 8).map((lim) => `
+        <p><strong>${esc(lim.keyword || "limitation")}</strong> ${esc(truncate(lim.description || "", 220))}<br>
+        <small>${esc(lim.paper_id || "")} / evidence ${esc(lim.evidence_quality || "unknown")}</small></p>
+      `).join("") || "<p>No limitation evidence matched.</p>"}
+    </div>
+    <div class="item">
+      <div class="paper-meta">Related papers</div>
+      ${renderPaperList(lens.related_papers || [], 12) || "<p>No matches.</p>"}
+    </div>
+  `;
+}
+
+function validationCost(direction) {
+  const experiment = direction.claim_card?.minimal_validation_experiment || {};
+  const level = String(experiment.cost_level || "").toLowerCase();
+  if (level.includes("low")) return 0.35;
+  if (level.includes("high")) return 0.9;
+  if (level.includes("medium")) return 0.6;
+  const weeks = Number(experiment.cycle_weeks);
+  if (Number.isFinite(weeks) && weeks > 0) return clamp(weeks / 26, 0.25, 0.95);
+  return 0.65;
+}
+
+function radarScore(direction) {
+  const technical = clamp(Number(direction.confidence || direction.weight || 0.45), 0, 1);
+  const commercial = clamp(Number(direction.commercial_relevance || direction.market_relevance || 0.5), 0, 1);
+  const cost = validationCost(direction);
+  return clamp((technical * (0.55 + commercial)) / (0.65 + cost), 0, 1);
+}
+
+function renderClaimCard(direction) {
+  const card = direction.claim_card || {};
+  const root = card.root_constraint || {};
+  const attempts = card.attempts_last_10y || [];
+  const enabling = card.enabling_conditions || {};
+  const bottleneck = card.unresolved_bottleneck || {};
+  const experiment = card.minimal_validation_experiment || {};
+  const attemptText = attempts.slice(0, 3).map((x) => `${x.year || "?"}: ${x.keyword || x.attempt || "attempt"}`).join("; ");
+  const bottleneckItems = asArray(bottleneck.items).map((x) => x.keyword || x.description).filter(Boolean).slice(0, 3).join("; ");
+  return `
+    <div class="claim-grid">
+      <div class="claim"><strong>Root constraint</strong><p>${esc(root.constraint || root.type || "N/A")}</p></div>
+      <div class="claim"><strong>Last 10 years</strong><p>${esc(attemptText || "N/A")}</p></div>
+      <div class="claim"><strong>New enablers</strong><p>${esc(asArray(enabling.new_enablers).join("; ") || "N/A")}</p></div>
+      <div class="claim"><strong>Open bottleneck</strong><p>${esc(bottleneckItems || bottleneck.keyword || "N/A")} <small>${esc(card.evidence_strength_level || "unknown")}</small></p></div>
+      <div class="claim"><strong>Minimal validation</strong><p>${esc(experiment.experiment || "N/A")} <small>${esc(experiment.cost_level || "-")} / ${esc(experiment.cycle_weeks || "-")} weeks</small></p></div>
+    </div>
+  `;
+}
+
+function renderFutureEdgeRadar(edge, score) {
+  return `
+    <div class="item">
+      <strong>探索候选：${esc(paperLabel(edge.source_paper, edge.source_paper_id))}</strong>
+      <p class="mini">可能连接到</p>
+      <strong>${esc(paperLabel(edge.target_paper, edge.target_paper_id))}</strong>
+      <div class="score-row">
+        <span class="score"><small>优先级</small><strong>${pct(score)}</strong></span>
+        <span class="score"><small>技术概率</small><strong>${pct(edge.confidence || edge.weight)}</strong></span>
+        <span class="score"><small>商业相关</small><strong>待评估</strong></span>
+        <span class="score"><small>验证成本</small><strong>待设计</strong></span>
+      </div>
+      <div class="pill-row">
+        <span class="pill">exploratory edge</span>
+        <span class="pill">GNN/VGAE</span>
+        <span class="pill">${esc(edge.evidence?.relationship_scope || "graph")}</span>
+      </div>
+      <p class="mini">${esc(edge.plain_language || "这是未来生长候选边，不是高置信方向。")}</p>
+      <p class="mini">还不能下注：缺 Step6 融合证据、Step13 五问 Claim Card、商业相关和最小验证实验。</p>
+    </div>
+  `;
+}
+
+function renderRadar(lens = state.topicLens) {
+  if (lens?.rd_radar?.items?.length) {
+    els.radarPane.innerHTML = renderDossierRadar(lens.rd_radar);
+    return;
+  }
+  const directions = lens?.future_growth?.future_directions || [];
+  const predicted = lens
+    ? (lens.future_growth?.predicted_edges || [])
+    : state.edges.filter((edge) => edgeKey(edge) === "future").slice(0, 40);
+  const cards = directions.length
+    ? directions.map((direction) => ({ type: "direction", direction, score: radarScore(direction) }))
+    : predicted.slice(0, 12).map((edge) => ({
+      type: "edge",
+      edge,
+      score: clamp(Number(edge.confidence || edge.weight || 0.45), 0, 1) * 0.55,
+    }));
+  cards.sort((a, b) => b.score - a.score);
+  els.radarPane.innerHTML = `
+    <div class="item">
+      <strong>${esc(lens?.topic || "All optics")}</strong>
+      <div class="paper-meta">${fmt(cards.length)} candidates / directions</div>
+      <p class="mini">Radar 只把“可行动方向”排给研究员/研发负责人。当前若只有 edge candidate，说明只是 GNN/VGAE 候选边，还没有完成 Step6/Step13 Claim Card，不能当高置信研发方向。</p>
+    </div>
+    ${cards.slice(0, 15).map(({ type, direction, edge, score }) => type === "edge" ? renderFutureEdgeRadar(edge, score) : `
+      <div class="item">
+        <strong>${esc(direction.direction_name || direction.direction_id || "future direction")}</strong>
+        <div class="score-row">
+          <span class="score"><small>优先级</small><strong>${pct(score)}</strong></span>
+          <span class="score"><small>技术概率</small><strong>${pct(direction.confidence || direction.weight)}</strong></span>
+          <span class="score"><small>商业相关</small><strong>${pct(direction.commercial_relevance || 0.5)}</strong></span>
+          <span class="score"><small>验证成本</small><strong>${pct(validationCost(direction))}</strong></span>
+        </div>
+        <div class="pill-row">
+          <span class="pill">${esc(direction.claim_scope || "exploratory")}</span>
+          <span class="pill">${esc(direction.evidence_tier || "graph")}</span>
+          <span class="pill">eligible ${direction.claim_card?.high_confidence_eligible ? "yes" : "no"}</span>
+        </div>
+        ${direction.claim_card ? renderClaimCard(direction) : "<p class=\"mini\">Claim Card awaits Step6/Step13 materialization for this candidate.</p>"}
+      </div>
+    `).join("") || '<div class="item">No radar candidates yet.</div>'}
+  `;
+}
+
+async function runSearchFallback(text) {
+  const result = await api("/graph/visual/search", {
+    method: "POST",
+    body: JSON.stringify({ query_type: "semantic", query_text: text, top_k: 40 }),
+  });
+  const hits = result.hits || [];
+  state.topicLens = {
+    topic: text,
+    related_papers: hits,
+    total_related: hits.length,
+    cluster_distribution: [],
+    history_main_path: { key_turning_papers: [] },
+    unresolved_limitations: [],
+    future_growth: { predicted_edges: [], future_directions: [] },
+    first_principles: { five_questions: [] },
+  };
+  state.highlightIds = new Set(hits.map((hit) => hit.paper_id));
+  renderTopicLens(state.topicLens);
+  renderRadar(state.topicLens);
+  renderExplainDock(DEFAULT_VALUE_MODEL);
+  renderLayerMeaning(DEFAULT_VALUE_MODEL);
+  focusPaperIds(state.highlightIds);
+  setTimeCutoff(state.time.max);
+}
+
+async function runTopicLens(text) {
+  const topic = text.trim();
+  if (!topic) return;
+  stopPlayback();
+  setStatus("Running Topic Lens...");
+  try {
+    const lens = await api(`/graph/visual/topic-lens?topic=${encodeURIComponent(topic)}&top_k=50`);
+    state.topicLens = lens;
+    state.highlightIds = collectTopicIds(lens);
+    renderTopicLens(lens);
+    renderRadar(lens);
+    renderExplainDock(lens.value_model);
+    renderLayerMeaning(lens.value_model);
+    focusPaperIds(state.highlightIds);
+    setTimeCutoff(state.time.max);
+    setMode("topic");
+    setActiveTab("topic");
+    setStatus(`Topic Lens: ${fmt(lens.total_related)} papers`);
+  } catch (err) {
+    if (String(err.message || "").includes("Not Found")) {
+      await runSearchFallback(topic);
+      setMode("topic");
+      setActiveTab("topic");
+      setStatus("Topic Lens route not loaded; used semantic search");
+    } else {
+      throw err;
+    }
+  }
+}
+
+async function inspectPaper(paperId) {
+  setStatus(`Loading ${paperId}...`);
+  const detail = await api(`/graph/visual/papers/${encodeURIComponent(paperId)}?edge_limit=100`);
+  if (detail.paper) {
+    renderPaper(detail.paper, detail.edges || []);
+    state.highlightIds.add(detail.paper.paper_id);
+  }
+  setMode("topic");
+  setActiveTab("paper");
+  setStatus("Ready");
+}
+
+function setActiveTab(name) {
+  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
+  document.querySelectorAll(".pane").forEach((pane) => pane.classList.remove("active"));
+  const pane = document.getElementById(`${name}Pane`);
+  if (pane) pane.classList.add("active");
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  els.modeButtons.forEach((button) => button.classList.toggle("active", button.dataset.mode === mode));
+  const titles = {
+    map: ["Field Evolution Map", "Optics corpus"],
+    topic: ["Topic Lens", state.topicLens?.topic || "Topic query"],
+    radar: ["Claim Card / R&D Radar", state.topicLens?.topic || "All candidates"],
+  };
+  els.contextTitle.textContent = titles[mode][0];
+  els.contextMeta.textContent = titles[mode][1];
+  if (mode === "topic") setActiveTab("topic");
+  if (mode === "radar") setActiveTab("radar");
+  if (mode === "map" && !document.querySelector(".pane.active")) setActiveTab("paper");
+}
+
+async function loadGraph({ autoplay = true } = {}) {
+  stopPlayback();
   state.apiBase = els.apiBase.value.replace(/\/$/, "");
   setStatus("Checking visual graph...");
   const status = await api("/graph/visual/status");
@@ -301,76 +1356,72 @@ async function loadGraph() {
     return;
   }
   setStatus("Loading branches...");
-  const clusters = await api("/graph/visual/clusters?limit=300");
+  const clusters = await api("/graph/visual/clusters?limit=700");
   state.clusters = clusters.clusters || [];
+  state.lineages = clusters.branch_lineages || [];
   renderClusters();
   setStatus("Loading nodes...");
   const nodes = await api("/graph/visual/nodes?limit=80000");
   state.nodes = nodes.nodes || [];
-  setStatus("Loading LOD edges...");
-  const edges = await api("/graph/visual/edges?lod_max=0&limit=50000");
-  state.edges = edges.edges || [];
+  state.nodeById = new Map(state.nodes.map((node) => [node.paper_id, node]));
+  const years = state.nodes.map(yearOf).filter((y) => y != null);
+  state.time.min = Math.min(...years);
+  state.time.max = Math.max(...years);
+  els.timeSlider.min = String(state.time.min);
+  els.timeSlider.max = String(state.time.max);
+  setStatus("Loading evolution edges...");
+  state.edgeById = new Map();
+  state.loadedEdgeKeys = new Set(["base"]);
+  const edges = await api("/graph/visual/edges?lod_max=1&limit=100000");
+  mergeEdges(edges.edges || []);
   const story = await api("/graph/visual/story");
   state.story = story.story_steps || [];
   renderStory();
-  uploadNodes();
+  renderExplainDock(DEFAULT_VALUE_MODEL);
+  renderLayerMeaning(DEFAULT_VALUE_MODEL);
+  fitToNodes();
+  setMode("map");
+  setTimeCutoff(autoplay ? state.time.min : state.time.max, { draw: false });
   draw();
-  setStatus(`Ready: ${state.nodes.length.toLocaleString()} nodes, ${state.edges.length.toLocaleString()} LOD edges`);
-}
-
-async function inspectPaper(paperId) {
-  setStatus(`Loading ${paperId}...`);
-  const detail = await api(`/graph/visual/papers/${encodeURIComponent(paperId)}?edge_limit=80`);
-  if (detail.paper) {
-    state.selected = detail.paper;
-    renderPaper(detail.paper, detail.edges || []);
-  }
-  setStatus("Ready");
-}
-
-async function runSearch(text) {
-  if (!text.trim()) return;
-  setStatus("Searching...");
-  const result = await api("/graph/visual/search", {
-    method: "POST",
-    body: JSON.stringify({ query_type: "semantic", query_text: text, top_k: 30 }),
-  });
-  const hits = result.hits || [];
-  els.paperPane.innerHTML = hits.map((hit) => `
-    <div class="item">
-      <button data-paper="${hit.paper_id}">
-        <strong>${hit.title || hit.paper_id}</strong><br>
-        <small>${hit.paper_id} / ${hit.year || "?"} / ${hit.cluster_label || ""}</small>
-      </button>
-    </div>
-  `).join("") || '<div class="item">No matches.</div>';
-  setActiveTab("paper");
-  setStatus(`Search: ${hits.length} hits`);
-}
-
-function setActiveTab(name) {
-  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
-  document.querySelectorAll(".pane").forEach((pane) => pane.classList.remove("active"));
-  document.getElementById(`${name}Pane`).classList.add("active");
+  renderPaper(null);
+  renderTopicLens(state.topicLens);
+  renderRadar(state.topicLens);
+  setStatus(`Ready: ${fmt(state.nodes.length)} nodes, ${fmt(state.edges.length)} loaded edges`);
+  if (autoplay) startPlayback(false);
 }
 
 function bindEvents() {
-  els.loadBtn.addEventListener("click", () => loadGraph().catch((err) => setStatus(err.message)));
+  els.loadBtn.addEventListener("click", () => loadGraph({ autoplay: true }).catch((err) => setStatus(err.message)));
   els.searchForm.addEventListener("submit", (evt) => {
     evt.preventDefault();
-    runSearch(els.searchInput.value).catch((err) => setStatus(err.message));
+    runTopicLens(els.searchInput.value).catch((err) => setStatus(err.message));
   });
-  els.mainPathBtn.addEventListener("click", () => {
-    state.filterRole = state.filterRole === "main_path" ? null : "main_path";
-    uploadNodes();
-    draw();
+  els.modeButtons.forEach((button) => {
+    button.addEventListener("click", () => setMode(button.dataset.mode));
   });
-  els.futureBtn.addEventListener("click", () => {
-    state.filterRole = state.filterRole === "future_anchor" ? null : "future_anchor";
-    uploadNodes();
-    draw();
+  els.layerInputs.forEach((input) => {
+    input.addEventListener("change", async () => {
+      const layer = input.dataset.layer;
+      state.layers[layer] = input.checked;
+      if (input.checked) await ensureLayerEdges(layer).catch((err) => setStatus(err.message));
+      renderLayerMeaning();
+      renderExplainDock();
+      uploadNodes();
+      draw();
+      setStatus("Ready");
+    });
   });
-  els.storyBtn.addEventListener("click", () => setActiveTab("story"));
+  els.playBtn.addEventListener("click", () => {
+    if (state.time.playing) {
+      stopPlayback();
+    } else {
+      startPlayback(state.time.current >= state.time.max);
+    }
+  });
+  els.timeSlider.addEventListener("input", () => {
+    stopPlayback();
+    setTimeCutoff(Number(els.timeSlider.value));
+  });
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => setActiveTab(tab.dataset.tab)));
   document.body.addEventListener("click", (evt) => {
     const paper = evt.target.closest("[data-paper]");
@@ -378,13 +1429,31 @@ function bindEvents() {
     const cluster = evt.target.closest("[data-cluster]");
     if (cluster) {
       const cid = cluster.dataset.cluster;
-      state.filterRole = null;
       api(`/graph/visual/nodes?cluster_id=${encodeURIComponent(cid)}&limit=80000`).then((data) => {
-        state.nodes = data.nodes || [];
-        uploadNodes();
-        draw();
-        setStatus(`Cluster ${cid}: ${state.nodes.length} nodes`);
+        const clusterNodes = data.nodes || [];
+        state.highlightIds = new Set(clusterNodes.map((node) => node.paper_id));
+        focusPaperIds(state.highlightIds);
+        setTimeCutoff(state.time.max);
+        setMode("map");
+        setStatus(`Cluster ${cid}: ${fmt(clusterNodes.length)} nodes`);
       }).catch((err) => setStatus(err.message));
+    }
+    const story = evt.target.closest("[data-story]");
+    if (story) {
+      const step = state.story.find((x) => x.story_step_id === story.dataset.story);
+      if (step) {
+        stopPlayback();
+        state.highlightIds = new Set((step.focus_papers || []).map((paper) => paper.paper_id));
+        if (step.focus_cluster_id) {
+          const cluster = state.clusters.find((c) => c.cluster_id === step.focus_cluster_id);
+          if (cluster?.centroid) {
+            state.panX = -Number(cluster.centroid.x || 0) * state.scale;
+            state.panY = -Number(cluster.centroid.y || 0) * state.scale;
+          }
+        }
+        setTimeCutoff(step.year_end || state.time.max);
+        setMode("map");
+      }
     }
   });
   els.graph.addEventListener("mousemove", (evt) => {
@@ -396,7 +1465,10 @@ function bindEvents() {
     els.hover.classList.remove("hidden");
     els.hover.style.left = `${evt.offsetX + 14}px`;
     els.hover.style.top = `${evt.offsetY + 14}px`;
-    els.hover.innerHTML = `<strong>${node.title || node.paper_id}</strong><br><small>${node.paper_id} / ${node.year || ""}</small>`;
+    els.hover.innerHTML = `
+      <strong>${esc(node.title || node.paper_id)}</strong><br>
+      <small>${esc(node.paper_id)} / ${esc(node.year || "")} / ${esc(node.cluster_id || "")}</small>
+    `;
   });
   els.graph.addEventListener("click", (evt) => {
     const node = nearestNode(evt);
@@ -405,7 +1477,7 @@ function bindEvents() {
   els.graph.addEventListener("wheel", (evt) => {
     evt.preventDefault();
     const factor = evt.deltaY < 0 ? 1.08 : 0.92;
-    state.scale = Math.max(0.2, Math.min(6, state.scale * factor));
+    state.scale = clamp(state.scale * factor, 0.18, 8);
     draw();
   }, { passive: false });
   let dragging = false;
@@ -430,7 +1502,20 @@ function bindEvents() {
   window.addEventListener("resize", resize);
 }
 
-initGl();
-bindEvents();
-resize();
-renderPaper(null);
+try {
+  initGl();
+  bindEvents();
+  resize();
+  renderPaper(null);
+  renderTopicLens(null);
+  renderRadar(null);
+  renderExplainDock(DEFAULT_VALUE_MODEL);
+  renderLayerMeaning(DEFAULT_VALUE_MODEL);
+  setMode("topic");
+  setActiveTab("topic");
+  setTimeout(() => {
+    loadGraph({ autoplay: true }).catch((err) => setStatus(err.message));
+  }, 80);
+} catch (err) {
+  setStatus(err.message);
+}

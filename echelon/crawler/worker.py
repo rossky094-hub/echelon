@@ -30,6 +30,7 @@ from typing import Optional
 
 from echelon.library.db import (
     LIBRARY_DB_PATH,
+    get_session,
     get_db_stats,
     get_hwm_v14,
     init_db,
@@ -43,6 +44,7 @@ from echelon.library.db import (
 from echelon.library.schema import IngestionJob, JobStatusEnum
 from echelon.core.ulid_utils import ulid_new
 from echelon.crawler.dedup import find_duplicate
+from echelon.v14b.corpus_registry import ensure_corpus_schema, normalize_corpus_id
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +91,7 @@ async def run_ingestion(
     do_enrich = query_params.get("enrich", False)
     do_refresh = query_params.get("refresh", False)
     harvest_mode = (query_params.get("harvest_mode") or "search").lower()
+    corpus_id = query_params.get("corpus_id")
 
     full_harvest = bool(query_params.get("full_harvest", False))
     backfill_harvest = bool(query_params.get("backfill_harvest", False))
@@ -231,6 +234,29 @@ async def run_ingestion(
     )
 
     elapsed = time.time() - start_time
+    if corpus_id:
+        cid = normalize_corpus_id(str(corpus_id))
+        with get_session(db_path) as db:
+            ensure_corpus_schema(db)
+            db.execute(
+                """
+                INSERT OR IGNORE INTO paper_corpora
+                    (paper_id, corpus_id, assigned_at, assignment_source, score)
+                SELECT id, ?, CURRENT_TIMESTAMP, 'crawler_ingest_job', NULL
+                FROM papers
+                WHERE ingestion_job_id = ?
+                """,
+                (cid, job_id),
+            )
+            db.execute(
+                """
+                UPDATE papers
+                SET corpus_id = COALESCE(corpus_id, ?)
+                WHERE ingestion_job_id = ?
+                """,
+                (cid, job_id),
+            )
+
     result = {
         "papers_ingested": papers_ingested,
         "papers_refreshed": papers_refreshed,
@@ -241,6 +267,7 @@ async def run_ingestion(
         "set_spec": set_spec,
         "from_date": str(from_date),
         "to_date": str(to_date),
+        "corpus_id": corpus_id,
     }
     logger.info(f"[worker] 摄入完成: {result}")
     return result
@@ -308,6 +335,8 @@ def main():
                         help="调 OpenAlex 补充元数据")
     parser.add_argument("--stats", action="store_true", default=False,
                         help="完成后打印数据库统计")
+    parser.add_argument("--corpus-id", default=None,
+                        help="写入 paper_corpora 的 corpus_id (如 optics/cs/materials)")
 
     args = parser.parse_args()
 
@@ -327,6 +356,7 @@ def main():
         "full_harvest": args.full,
         "backfill_harvest": args.backfill,
         "harvest_mode": args.harvest_mode,
+        "corpus_id": args.corpus_id,
     }
 
     # 创建任务记录
@@ -353,6 +383,7 @@ def main():
     print(f"delay     : {args.delay}s/请求")
     print(f"refresh   : {args.refresh}")
     print(f"db        : {args.db_path}")
+    print(f"corpus_id : {args.corpus_id or '(none)'}")
     print(f"job_id    : {job_id}")
     print(f"启动时间  : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 40 + "\n")

@@ -1,7 +1,7 @@
 # V14-B Pilot 算法验证报告
 
-**生成时间**: 2026-05-28 13:37
-**数据规模**: 55,391 篇论文 (physics.optics arXiv 1991-2026)
+**生成时间**: 2026-05-29 09:36
+**数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
 
@@ -12,14 +12,14 @@
 | 总论文数 | **55,391** |
 | OpenAlex enrich 成功率 | **99.0%** (54,844/55,391) |
 | 引用关系总数 | **3,016,141** |
-| 主干道边数 (top 1%) | **2,771** / 277,195 |
+| 主干道边数 (top 1%) | **2,775** / 277,526 |
 | 子图节点数 | **5,000** |
-| 子图边数 | **38,794** |
+| 子图边数 | **38,538** |
 | 子图结论范围 | **pilot_evidence_subgraph** |
 | SciBERT 分类完成率 | **100.0%** |
 | VGAE 预测未来边数 | **1,000** |
-| Limitation atoms 总数 | **1,066** |
-| 三路融合方向数 | **20** |
+| Limitation atoms 总数 | **730** |
+| 三路融合方向数 | **0** |
 
 ---
 
@@ -33,8 +33,8 @@
 
 ## 3. 全网 Main Path
 
-- **SPC 主干道边数**: 2,771 (top 1%)
-- **总边数**: 277,195
+- **SPC 主干道边数**: 2,775 (top 1%)
+- **总边数**: 277,526
 
 ### 主干道代表性论文 (case study)
 
@@ -60,12 +60,12 @@
 | Keystone 节点 | **1,000** |
 | Fresh (2024+) 节点 | **500** |
 | 1 度邻居节点 | **3,500** |
-| 子图边数 | **38,794** |
+| 子图边数 | **38,538** |
 
-**结论边界**: Step4 是 `pilot_evidence_subgraph`；任何只来自该子图的结论必须标为 pilot/evidence，完整 optics 图谱以 Step10 visual graph 为准。
+**结论边界**: Step4 是 `pilot_evidence_subgraph`；任何只来自该子图的结论必须标为 pilot/evidence，完整 all 图谱以 Step10 visual graph 为准。
 
 - 节点覆盖率: 9.0%
-- 边覆盖率: 9.4%
+- 边覆盖率: 9.3%
 - 适配性: `pilot_adequate_for_algorithmic_evidence`
 - 推荐子图上限: 5,000
 
@@ -75,26 +75,26 @@
 
 | 引用功能 | 边数 | 占比 |
 |---|---|---|
-| usage | 19,890 | 51.3% |
-| background | 9,899 | 25.5% |
-| similarity | 4,754 | 12.3% |
-| extension | 3,384 | 8.7% |
-| motivation | 867 | 2.2% |
+| usage | 19,737 | 51.2% |
+| background | 9,936 | 25.8% |
+| similarity | 4,786 | 12.4% |
+| extension | 3,240 | 8.4% |
+| motivation | 839 | 2.2% |
 
-**高权重 (extension+motivation+usage) 总占比**: 62.2%
+**高权重 (extension+motivation+usage) 总占比**: 61.8%
 
 **证据解释**: citation function 在没有全文 citation context 时是弱证据层，只应用作 fusion / visual evidence 的权重修正，不能当作真实引用意图的 ground truth。
 
 | 证据等级 | 边数 | 平均权重 |
 |---|---:|---:|
-| weak_paper_metadata | 38,794 | 0.222 |
+| weak_paper_metadata | 38,538 | 0.222 |
 
 ---
 
 ## 7. VGAE Link Prediction
 
 - **预测边总数**: 1,000
-- **跨 Field 边占比**: **3.7%** (37/1,000)
+- **跨 Field 边占比**: **6.0%** (60/1,000)
 
 ### Top 5 预测边 (case study)
 
@@ -105,9 +105,9 @@
 
 ## 8. Limitation Tracking
 
-- **Limitation atoms 总数**: 1,066
-- **高严重性 atoms**: 191
-- **Resolution 记录数**: 1,743
+- **Limitation atoms 总数**: 730
+- **高严重性 atoms**: 83
+- **Resolution 记录数**: 1,001
 
 ### Top 10 未解决 Limitations
 
@@ -118,17 +118,12 @@
 
 ## 9. 三路融合交集
 
-- **融合方向数**: **20**
+- **融合方向数**: **0**
 
 ### Top 5 未来方向预览
 
 | 方向 | 置信度 | 预期时间 |
 |---|---|---|
-| Broadband electro-optic frequency comb generation in an integrated mic | 0.62 | 2026-2030 |
-| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.62 | 2026-2030 |
-| High-efficiency and broadband coherent optical comb generation in inte | 0.62 | 2026-2030 |
-| Efficient Kerr soliton comb generation in micro-resonator with interfe | 0.62 | 2026-2030 |
-| Hybrid Kerr-electro-optic frequency combs on thin-film lithium niobate | 0.62 | 2026-2030 |
 
 > 详细见: 未来方向预测_交集报告.md
 
@@ -138,10 +133,10 @@
 
 | 类型 | 数量 | 含义 |
 |---|---|---|
-| 🔴 红色 (CD-index 突变) | **1,954** | mature 论文 CD-index > 0.3 |
-| 🟠 橙色 (跨 Field 桥接) | **1,762** | 跨领域桥接分数 > p90 |
-| 🟣 紫色 (Burstiness) | **1,708** | 18 月内被引突增 > p95 |
-| **合计** | **5,424** | 子图 5,000 节点中的 108.5% |
+| 🔴 红色 (CD-index 突变) | **2,031** | mature 论文 CD-index > 0.3 |
+| 🟠 橙色 (跨 Field 桥接) | **1,058** | 跨领域桥接分数 > p90 |
+| 🟣 紫色 (Burstiness) | **1,790** | 18 月内被引突增 > p95 |
+| **合计** | **4,879** | 子图 5,000 节点中的 97.6% |
 
 ---
 
@@ -161,19 +156,19 @@
 | 数据规模 | 2,000 篇 | **13,606 篇** |
 | 引用图 | 仅 arXiv 内部 | **OpenAlex 跨库** |
 | 评分算法 | V13 均等权重 | **V14 生命周期自适应** |
-| 未来方向 | 无 | **20 个三路融合方向** |
+| 未来方向 | 无 | **0 个三路融合方向** |
 
 ---
 
 ## 13. 下一步建议
 
-### 建议: **GO** — 算法验证通过,可启动 V14-B 前端开发
+### 建议: **REVISE** — 部分指标达标,建议调优后再启动前端
 
 **前端启动条件**:
-- [ ] 三路融合方向 ≥ 10 个 (当前: 20)
+- [ ] 三路融合方向 ≥ 10 个 (当前: 0)
 - [ ] VGAE test AUC > 0.80 (需验证)
 - [ ] 主干道节点 100-200 个 (当前: TBD)
-- [ ] 突变节点 100-300 个 (当前: 5424)
+- [ ] 突变节点 100-300 个 (当前: 4879)
 
 **重型算法调优建议**:
 1. SciBERT: 如 extension+motivation+usage 占比 < 40%,考虑换 LLM 分类
@@ -182,4 +177,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-28 13:37*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-29 09:36*

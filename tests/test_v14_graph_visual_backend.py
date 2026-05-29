@@ -277,3 +277,97 @@ def test_visual_edit_roundtrip(tmp_path, monkeypatch):
 
     history = client.get("/graph/visual/edits/history/expert_alice").json()
     assert history["total_matches"] == 1
+
+
+def test_visual_topic_lens(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get(
+        "/graph/visual/topic-lens",
+        headers=VIEWER_HEADERS,
+        params={"topic": "laser optics", "top_k": 20},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is True
+    assert data["topic"] == "laser optics"
+    assert data["total_related"] >= 1
+    assert isinstance(data["cluster_distribution"], list)
+    assert "history_main_path" in data
+    assert "future_growth" in data
+    assert "value_model" in data
+    assert "topic_dossier" in data
+    assert "branch_dossiers" in data
+    assert "bottleneck_lineage" in data
+    assert "rd_radar" in data
+    assert "evidence_map" in data
+    assert data["related_papers"][0]["access_links"]
+
+
+def test_visual_topic_lens_expands_to_cluster_context(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        INSERT INTO visual_nodes
+            (paper_id, cluster_id, branch_id, x, y, z, publication_year,
+             node_size, color_hex, visual_role, uncertainty_score, flags_json)
+        VALUES ('p3', 'C0001', 'B0001', 0.4, 0.35, 0.9, 2025,
+                5.0, '#ffffff', 'future_anchor', 0.2, '{}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO visual_paper_details
+            (paper_id, ids_json, metadata_json, abstract, sections_json,
+             limitations_json, recommendation_json)
+        VALUES ('p3', '{}',
+                '{"title":"Nonmatching future branch paper","year":2025,"branch_label":"integrated photonics"}',
+                'A branch-context paper without the query term.',
+                '[]', '[]', '{}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO visual_edges
+            (edge_id, source_paper_id, target_paper_id, edge_type, layer,
+             weight, confidence, is_directed, is_main_path, lod_min,
+             style_json, evidence_json)
+        VALUES ('main:p2:p3', 'p2', 'p3', 'main_path', 'citation',
+                9.0, 1.0, 1, 1, 0, '{}', '{}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO visual_edges
+            (edge_id, source_paper_id, target_paper_id, edge_type, layer,
+             weight, confidence, is_directed, is_main_path, lod_min,
+             style_json, evidence_json)
+        VALUES ('future:p2:p3', 'p2', 'p3', 'future_growth', 'future',
+                0.82, 0.77, 1, 0, 0, '{}', '{}')
+        """
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get(
+        "/graph/visual/topic-lens",
+        headers=VIEWER_HEADERS,
+        params={"topic": "laser", "top_k": 5},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["context"]["scope"] == "topic_cluster_branch_context"
+    assert any(
+        e["edge_id"] == "future:p2:p3"
+        for e in data["future_growth"]["predicted_edges"]
+    )
+    assert any(
+        e["evidence"]["relationship_scope"] == "cluster_branch_context"
+        for e in data["history_main_path"]["edges"]
+    )

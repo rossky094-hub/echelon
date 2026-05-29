@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from difflib import SequenceMatcher
 import logging
 import re
 import sqlite3
@@ -10,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlencode
 
 import httpx
 
@@ -26,7 +28,8 @@ from echelon.v14b.utils import make_progress, setup_logging
 logger = logging.getLogger("echelon.v14b.step0_openalex_backfill")
 
 OPENALEX_FIELDS = (
-    "id,cited_by_count,primary_topic,topics,referenced_works,authorships"
+    "id,doi,title,publication_year,cited_by_count,primary_topic,topics,"
+    "referenced_works,authorships,locations,ids"
 )
 
 
@@ -79,39 +82,122 @@ def memory_capped_concurrency(requested: int) -> int:
 
 def load_targets(conn: sqlite3.Connection, limit: Optional[int] = None) -> list[dict]:
     q = """
-        SELECT id, doi, arxiv_id
+        SELECT id, title, doi, arxiv_id, publication_year
         FROM papers
-        WHERE (primary_field_id IS NULL OR primary_topic_id LIKE 'S2F:%')
-          AND (
-              doi IS NOT NULL OR arxiv_id IS NOT NULL
+        WHERE (
+              openalex_id IS NULL
+              OR openalex_id NOT LIKE 'W%'
+              OR primary_field_id IS NULL
+              OR primary_topic_id LIKE 'S2F:%'
           )
-        ORDER BY publication_date, id
+          AND (
+              (doi IS NOT NULL AND doi != '')
+              OR (arxiv_id IS NOT NULL AND arxiv_id != '')
+          )
+        ORDER BY
+          -- DOI lookups are exact and high-yield.  Run them before arXiv-only
+          -- lookups so an interrupted conservative backfill improves OpenAlex
+          -- coverage instead of spending hours on low-yield arXiv URL misses.
+          CASE
+            WHEN doi IS NOT NULL AND doi != '' THEN 0
+            ELSE 1
+          END,
+          CASE
+            WHEN openalex_id IS NULL OR openalex_id NOT LIKE 'W%' THEN 0
+            ELSE 1
+          END,
+          publication_date,
+          id
     """
     if limit:
         q += f" LIMIT {int(limit)}"
     return [dict(r) for r in conn.execute(q).fetchall()]
 
 
-def openalex_urls(doi: Optional[str], arxiv_id: Optional[str]) -> list[str]:
-    urls: list[str] = []
-    clean_doi = normalize_doi(doi)
-    clean_arxiv = normalize_arxiv_id(arxiv_id)
+def _text_key(text: Optional[str]) -> str:
+    value = (text or "").lower()
+    value = re.sub(r"[^a-z0-9]+", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _title_similarity(a: Optional[str], b: Optional[str]) -> float:
+    left = _text_key(a)
+    right = _text_key(b)
+    if not left or not right:
+        return 0.0
+    return SequenceMatcher(None, left, right).ratio()
+
+
+def _work_mentions_arxiv(work: dict, clean_arxiv: Optional[str]) -> bool:
+    if not clean_arxiv:
+        return False
+    compact = clean_arxiv.lower().replace("arxiv:", "")
+    payload = str(work.get("ids") or "") + " " + str(work.get("locations") or "")
+    return compact in payload.lower()
+
+
+def _verified_search_match(paper: dict, work: dict) -> bool:
+    """Conservative guard for title-search fallback results."""
+
+    clean_doi = normalize_doi(paper.get("doi"))
+    work_doi = normalize_doi(work.get("doi"))
+    if clean_doi and work_doi and clean_doi == work_doi:
+        return True
+
+    clean_arxiv = normalize_arxiv_id(paper.get("arxiv_id"))
+    if _work_mentions_arxiv(work, clean_arxiv):
+        return True
+
+    sim = _title_similarity(paper.get("title"), work.get("title"))
+    if sim >= 0.94:
+        return True
+    paper_year = paper.get("publication_year")
+    work_year = work.get("publication_year")
+    try:
+        year_close = abs(int(paper_year) - int(work_year)) <= 1
+    except Exception:
+        year_close = False
+    return bool(year_close and sim >= 0.90)
+
+
+def openalex_urls(paper: dict) -> list[tuple[str, str]]:
+    urls: list[tuple[str, str]] = []
+    clean_doi = normalize_doi(paper.get("doi"))
+    clean_arxiv = normalize_arxiv_id(paper.get("arxiv_id"))
     if clean_doi:
-        urls.append(
+        urls.append((
             "https://api.openalex.org/works/doi:"
-            f"{clean_doi}?select={OPENALEX_FIELDS}&mailto={OPENALEX_EMAIL}"
-        )
+            f"{clean_doi}?select={OPENALEX_FIELDS}&mailto={OPENALEX_EMAIL}",
+            "doi",
+        ))
     if clean_arxiv:
-        urls.append(
+        urls.append((
             "https://api.openalex.org/works?"
             f"filter=locations.landing_page_url:https://arxiv.org/abs/{clean_arxiv}"
-            f"&per_page=1&select={OPENALEX_FIELDS}&mailto={OPENALEX_EMAIL}"
+            f"&per_page=1&select={OPENALEX_FIELDS}&mailto={OPENALEX_EMAIL}",
+            "arxiv_url",
+        ))
+    title = _text_key(paper.get("title"))
+    if len(title) >= 12:
+        urls.append(
+            (
+                "https://api.openalex.org/works?"
+                + urlencode(
+                    {
+                        "search": paper.get("title") or title,
+                        "per_page": "3",
+                        "select": OPENALEX_FIELDS,
+                        "mailto": OPENALEX_EMAIL,
+                    }
+                ),
+                "title_verified",
+            )
         )
     return urls
 
 
 async def fetch_openalex_one(client: httpx.AsyncClient, paper: dict, delay: float) -> Optional[dict]:
-    for url in openalex_urls(paper.get("doi"), paper.get("arxiv_id")):
+    for url, mode in openalex_urls(paper):
         for attempt in range(6):
             resp = await client.get(url, timeout=45.0)
             if resp.status_code == 200:
@@ -119,7 +205,15 @@ async def fetch_openalex_one(client: httpx.AsyncClient, paper: dict, delay: floa
                 await asyncio.sleep(delay)
                 if isinstance(data, dict) and "results" in data:
                     results = data.get("results") or []
-                    return results[0] if results else None
+                    if not results:
+                        break
+                    if mode == "title_verified":
+                        for candidate in results:
+                            if isinstance(candidate, dict) and _verified_search_match(paper, candidate):
+                                return candidate
+                        logger.debug("OpenAlex title search rejected paper=%s", paper.get("id"))
+                        break
+                    return results[0]
                 return data
             if resp.status_code == 404:
                 break

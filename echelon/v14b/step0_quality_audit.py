@@ -34,16 +34,24 @@ from typing import Any, Iterable, Optional
 
 from echelon.v14b.config import DB_MAIN, REPORT_DIR, LOG_DIR
 from echelon.v14b.utils import setup_logging, table_columns
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 
 logger = logging.getLogger("echelon.v14b.step0_quality_audit")
 
-OPTICS_WHERE = """
-arxiv_id IS NOT NULL AND (
-    primary_topic_id LIKE '%optics%'
-    OR raw_jsonb LIKE '%physics.optics%'
-    OR raw_jsonb LIKE '%"physics.optics"%'
-)
-"""
+DEFAULT_SCOPE_WHERE = "1=1"
+
+
+def scope_where_expr(
+    *,
+    corpus_id: str | None,
+    alias: str = "",
+    id_col: str = "id",
+) -> str:
+    """Return SQL where-clause for full library or a corpus temp table."""
+    if not corpus_id:
+        return DEFAULT_SCOPE_WHERE
+    prefix = f"{alias}." if alias else ""
+    return f"{prefix}{id_col} IN (SELECT paper_id FROM v14b_corpus_papers)"
 
 
 @dataclass
@@ -176,7 +184,7 @@ def collect_log_events(log_paths: list[Path]) -> tuple[list[dict], dict[str, int
     return events, dict(counts)
 
 
-def provider_rows(conn: sqlite3.Connection, optics_total: int) -> list[dict]:
+def provider_rows(conn: sqlite3.Connection, scoped_total: int, scope_where: str) -> list[dict]:
     rows = _fetchall_dict(conn, f"""
         SELECT COALESCE(source_provider, '(null)') AS provider,
                COUNT(*) AS papers,
@@ -185,23 +193,23 @@ def provider_rows(conn: sqlite3.Connection, optics_total: int) -> list[dict]:
                SUM(CASE WHEN doi IS NOT NULL AND length(trim(doi)) > 0 THEN 1 ELSE 0 END) AS with_doi,
                SUM(CASE WHEN openalex_id IS NOT NULL AND length(trim(openalex_id)) > 0 THEN 1 ELSE 0 END) AS with_external_work_id
         FROM papers
-        WHERE {OPTICS_WHERE}
+        WHERE {scope_where}
         GROUP BY COALESCE(source_provider, '(null)')
         ORDER BY papers DESC
     """)
     for r in rows:
-        r["paper_pct"] = f"{100 * pct(r['papers'], optics_total):.2f}"
+        r["paper_pct"] = f"{100 * pct(r['papers'], scoped_total):.2f}"
         r["enriched_pct_within_provider"] = f"{100 * pct(r['enriched'] or 0, r['papers']):.2f}"
         r["abstract_pct_within_provider"] = f"{100 * pct(r['with_abstract'] or 0, r['papers']):.2f}"
     return rows
 
 
-def reference_rows(conn: sqlite3.Connection) -> list[dict]:
+def reference_rows(conn: sqlite3.Connection, scope_where: str) -> list[dict]:
     return _fetchall_dict(conn, f"""
         WITH optic AS (
             SELECT id, CAST(substr(publication_date, 1, 4) AS INTEGER) AS year
             FROM papers
-            WHERE {OPTICS_WHERE}
+            WHERE {scope_where}
         ),
         ref_by_paper AS (
             SELECT o.id, o.year,
@@ -222,7 +230,7 @@ def reference_rows(conn: sqlite3.Connection) -> list[dict]:
     """)
 
 
-def sample_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
+def sample_rows(conn: sqlite3.Connection, limit: int, scope_where: str) -> list[dict]:
     suspicious = _fetchall_dict(conn, f"""
         SELECT id, arxiv_id, doi, title, abstract, publication_date, source_provider,
                primary_topic_id, cited_by_count, openalex_enriched,
@@ -234,11 +242,11 @@ def sample_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
             FROM paper_references
             GROUP BY citing_paper_id
         ) refs ON refs.citing_paper_id = p.id
-        WHERE {OPTICS_WHERE}
+        WHERE {scope_where}
           AND (
               abstract IS NULL OR length(trim(abstract)) = 0
               OR COALESCE(refs.ref_count, 0) = 0
-              OR primary_topic_id NOT LIKE '%optics%'
+              OR primary_topic_id IS NULL
           )
         ORDER BY cited_by_count DESC, publication_date DESC
         LIMIT ?
@@ -248,7 +256,7 @@ def sample_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
                primary_topic_id, cited_by_count, openalex_enriched,
                0 AS missing_abstract, 0 AS zero_refs
         FROM papers p
-        WHERE {OPTICS_WHERE}
+        WHERE {scope_where}
         ORDER BY abs(random())
         LIMIT ?
     """, (max(1, limit - len(suspicious)),))
@@ -262,7 +270,7 @@ def sample_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
     return out[:limit]
 
 
-def expert_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
+def expert_rows(conn: sqlite3.Connection, limit: int, scope_where: str) -> list[dict]:
     rows = _fetchall_dict(conn, f"""
         SELECT p.id, p.arxiv_id, p.doi, p.title, p.publication_date,
                p.source_provider, p.primary_topic_id, p.cited_by_count,
@@ -274,7 +282,7 @@ def expert_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
             FROM paper_references
             GROUP BY citing_paper_id
         ) refs ON refs.citing_paper_id = p.id
-        WHERE {OPTICS_WHERE}
+        WHERE {scope_where}
         ORDER BY COALESCE(p.keystone_score_v14, 0) DESC,
                  COALESCE(p.cited_by_count, 0) DESC,
                  p.publication_date DESC
@@ -286,6 +294,8 @@ def expert_rows(conn: sqlite3.Connection, limit: int) -> list[dict]:
 def build_audit(
     conn: sqlite3.Connection,
     *,
+    corpus_id: str | None,
+    scope_where: str,
     out_dir: Path,
     expected_total: Optional[int],
     missing_ids: list[str],
@@ -294,25 +304,25 @@ def build_audit(
     expert_limit: int,
 ) -> dict:
     cols = table_columns(conn, "papers")
-    optics_total = int(_fetchone(conn, f"SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}") or 0)
+    scoped_total = int(_fetchone(conn, f"SELECT COUNT(*) FROM papers WHERE {scope_where}") or 0)
     total_papers = int(_fetchone(conn, "SELECT COUNT(*) FROM papers") or 0)
     enriched = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE} AND openalex_enriched = 1
+        SELECT COUNT(*) FROM papers WHERE {scope_where} AND openalex_enriched = 1
     """) or 0)
     with_abstract = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+        SELECT COUNT(*) FROM papers WHERE {scope_where}
           AND abstract IS NOT NULL AND length(trim(abstract)) > 0
     """) or 0)
     with_doi = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+        SELECT COUNT(*) FROM papers WHERE {scope_where}
           AND doi IS NOT NULL AND length(trim(doi)) > 0
     """) or 0)
     with_external = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+        SELECT COUNT(*) FROM papers WHERE {scope_where}
           AND openalex_id IS NOT NULL AND length(trim(openalex_id)) > 0
     """) or 0)
     with_field = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+        SELECT COUNT(*) FROM papers WHERE {scope_where}
           AND primary_field_id IS NOT NULL AND length(trim(primary_field_id)) > 0
     """) or 0)
     signal_cols = [
@@ -325,7 +335,7 @@ def build_audit(
     signal_ready = 0
     if present_signal_cols:
         signal_ready = int(_fetchone(conn, f"""
-            SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+            SELECT COUNT(*) FROM papers WHERE {scope_where}
               AND {" AND ".join(f"{c} IS NOT NULL" for c in present_signal_cols)}
         """) or 0)
     embedding_ready = 0
@@ -334,10 +344,10 @@ def build_audit(
             SELECT COUNT(*)
             FROM papers p
             JOIN paper_embeddings e ON e.paper_id = p.id
-            WHERE {OPTICS_WHERE.replace("arxiv_id", "p.arxiv_id").replace("primary_topic_id", "p.primary_topic_id").replace("raw_jsonb", "p.raw_jsonb")}
+            WHERE {scope_where_expr(corpus_id=corpus_id, alias='p')}
         """) or 0)
     s2_in_openalex_col = int(_fetchone(conn, f"""
-        SELECT COUNT(*) FROM papers WHERE {OPTICS_WHERE}
+        SELECT COUNT(*) FROM papers WHERE {scope_where}
           AND openalex_id IS NOT NULL
           AND openalex_id NOT LIKE 'W%'
           AND source_provider = 'semantic_scholar'
@@ -345,7 +355,7 @@ def build_audit(
     missing_abstract_top_cited = _fetchall_dict(conn, f"""
         SELECT arxiv_id, title, cited_by_count, publication_date, source_provider
         FROM papers
-        WHERE {OPTICS_WHERE}
+        WHERE {scope_where}
           AND (abstract IS NULL OR length(trim(abstract)) = 0)
         ORDER BY cited_by_count DESC
         LIMIT 20
@@ -357,15 +367,23 @@ def build_audit(
             SELECT COUNT(pr.cited_paper_id_external)
             FROM papers p
             LEFT JOIN paper_references pr ON pr.citing_paper_id = p.id
-            WHERE {OPTICS_WHERE.replace("arxiv_id", "p.arxiv_id").replace("primary_topic_id", "p.primary_topic_id").replace("raw_jsonb", "p.raw_jsonb")}
+            WHERE {scope_where_expr(corpus_id=corpus_id, alias='p')}
             GROUP BY p.id
         """).fetchall()
     ]
-    refs_total = int(_fetchone(conn, "SELECT COUNT(*) FROM paper_references") or 0)
-    linked_refs = int(_fetchone(
-        conn,
-        "SELECT COUNT(*) FROM paper_references WHERE cited_paper_id_internal IS NOT NULL",
-    ) or 0)
+    refs_total = int(_fetchone(conn, f"""
+        SELECT COUNT(*)
+        FROM paper_references pr
+        JOIN papers p ON p.id = pr.citing_paper_id
+        WHERE {scope_where_expr(corpus_id=corpus_id, alias='p')}
+    """) or 0)
+    linked_refs = int(_fetchone(conn, f"""
+        SELECT COUNT(*)
+        FROM paper_references pr
+        JOIN papers p ON p.id = pr.citing_paper_id
+        WHERE {scope_where_expr(corpus_id=corpus_id, alias='p')}
+          AND pr.cited_paper_id_internal IS NOT NULL
+    """) or 0)
     papers_with_refs = sum(1 for x in ref_counts if x > 0)
 
     dup_doi = int(_fetchone(conn, """
@@ -387,24 +405,24 @@ def build_audit(
         )
     """) or 0)
 
-    expected = expected_total or optics_total
-    coverage_ratio = pct(optics_total, expected)
+    expected = expected_total or scoped_total
+    coverage_ratio = pct(scoped_total, expected)
     missing_ratio = pct(len(missing_ids), expected)
-    enrich_ratio = pct(enriched, optics_total)
-    abstract_ratio = pct(with_abstract, optics_total)
-    refs_ratio = pct(papers_with_refs, optics_total)
+    enrich_ratio = pct(enriched, scoped_total)
+    abstract_ratio = pct(with_abstract, scoped_total)
+    refs_ratio = pct(papers_with_refs, scoped_total)
     linked_ratio = pct(linked_refs, refs_total)
-    field_ratio = pct(with_field, optics_total)
-    signal_ratio = pct(signal_ready, optics_total) if len(present_signal_cols) == len(signal_cols) else 0.0
-    embedding_ratio = pct(embedding_ready, optics_total)
+    field_ratio = pct(with_field, scoped_total)
+    signal_ratio = pct(signal_ready, scoped_total) if len(present_signal_cols) == len(signal_cols) else 0.0
+    embedding_ratio = pct(embedding_ready, scoped_total)
 
     gates = [
         Gate(
-            "arxiv_optics_coverage",
+            "scope_coverage",
             status_for(coverage_ratio, 0.97, 0.995),
             pct_str(coverage_ratio),
             "pass >= 99.5%, warn >= 97%",
-            f"optics={optics_total}, expected={expected}",
+            f"scoped={scoped_total}, expected={expected}",
         ),
         Gate(
             "missing_id_file",
@@ -418,21 +436,21 @@ def build_audit(
             status_for(enrich_ratio, 0.85, 0.95),
             pct_str(enrich_ratio),
             "pass >= 95%, warn >= 85%",
-            f"enriched={enriched}, optics={optics_total}",
+            f"enriched={enriched}, scoped={scoped_total}",
         ),
         Gate(
             "abstract_completeness",
             status_for(abstract_ratio, 0.90, 0.98),
             pct_str(abstract_ratio),
             "pass >= 98%, warn >= 90%",
-            f"with_abstract={with_abstract}, optics={optics_total}",
+            f"with_abstract={with_abstract}, scoped={scoped_total}",
         ),
         Gate(
             "reference_coverage",
             status_for(refs_ratio, 0.60, 0.80),
             pct_str(refs_ratio),
             "pass >= 80%, warn >= 60%",
-            f"papers_with_refs={papers_with_refs}, optics={optics_total}",
+            f"papers_with_refs={papers_with_refs}, scoped={scoped_total}",
         ),
         Gate(
             "reference_internal_linkage",
@@ -446,7 +464,7 @@ def build_audit(
             status_for(field_ratio, 0.60, 0.90),
             pct_str(field_ratio),
             "pass >= 90%, warn >= 60%",
-            f"with_field={with_field}, optics={optics_total}",
+            f"with_field={with_field}, scoped={scoped_total}",
         ),
         Gate(
             "graph_signal_coverage",
@@ -460,7 +478,7 @@ def build_audit(
             status_for(embedding_ratio, 0.85, 0.95),
             pct_str(embedding_ratio),
             "pass >= 95%, warn >= 85%",
-            f"embedding_ready={embedding_ready}, optics={optics_total}",
+            f"embedding_ready={embedding_ready}, scoped={scoped_total}",
         ),
         Gate(
             "duplicate_core_ids",
@@ -490,7 +508,7 @@ def build_audit(
 
     ref_stats = {
         "papers_with_refs": papers_with_refs,
-        "papers_zero_refs": optics_total - papers_with_refs,
+        "papers_zero_refs": scoped_total - papers_with_refs,
         "refs_total": refs_total,
         "linked_refs": linked_refs,
         "refs_per_paper_median": median(ref_counts) if ref_counts else 0,
@@ -504,7 +522,8 @@ def build_audit(
         "overall_status": overall,
         "summary": {
             "total_papers": total_papers,
-            "optics_papers": optics_total,
+            "scoped_papers": scoped_total,
+            "corpus_id": corpus_id,
             "expected_total": expected_total,
             "coverage_ratio": coverage_ratio,
             "missing_ids": len(missing_ids),
@@ -513,9 +532,9 @@ def build_audit(
             "with_abstract": with_abstract,
             "abstract_ratio": abstract_ratio,
             "with_doi": with_doi,
-            "doi_ratio": pct(with_doi, optics_total),
+            "doi_ratio": pct(with_doi, scoped_total),
             "with_external_work_id": with_external,
-            "external_work_id_ratio": pct(with_external, optics_total),
+            "external_work_id_ratio": pct(with_external, scoped_total),
             "with_field": with_field,
             "field_ratio": field_ratio,
             "signal_ready": signal_ready,
@@ -534,6 +553,7 @@ def build_audit(
         "gates": [g.__dict__ for g in gates],
         "missing_by_year": missing_by_year,
         "missing_abstract_top_cited": missing_abstract_top_cited,
+        "scope_where": scope_where,
         "sample_limit": sample_limit,
         "expert_limit": expert_limit,
     }
@@ -542,15 +562,17 @@ def build_audit(
 def write_markdown(path: Path, audit: dict) -> None:
     s = audit["summary"]
     r = audit["references"]
+    corpus_label = s.get("corpus_id") or "all"
     lines = [
-        "# V14B Optics Coverage / Quality Audit",
+        "# V14B Coverage / Quality Audit",
         "",
         f"- Generated: {audit['generated_at']}",
+        f"- Corpus scope: **{corpus_label}**",
         f"- Overall status: **{audit['overall_status'].upper()}**",
         "",
         "## Core Metrics",
         "",
-        f"- Optics papers: **{s['optics_papers']}**",
+        f"- Scoped papers: **{s['scoped_papers']}**",
         f"- Expected total: **{s['expected_total'] or '(not supplied)'}**",
         f"- Coverage: **{pct_str(s['coverage_ratio'])}**",
         f"- Missing IDs in latest diff file: **{s['missing_ids']}**",
@@ -597,6 +619,7 @@ def write_markdown(path: Path, audit: dict) -> None:
         "- `sample_for_llm_review.jsonl` is for semantic spot-checking, not full-library counting.",
         "- `expert_review_sample.csv` is for final human validation of high-impact / high-score papers.",
         "- `provider_id_semantics` warns when Semantic Scholar IDs are stored in the historical `openalex_id` column.",
+        "- Set `--corpus-id` to audit an isolated corpus (optics/cs/materials).",
         "",
     ])
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -637,6 +660,7 @@ def run_audit(
     *,
     db_path: Path,
     out_dir: Path,
+    corpus_id: str | None = None,
     expected_total: Optional[int] = None,
     missing_file: Optional[Path] = None,
     sample_limit: int = 200,
@@ -658,10 +682,17 @@ def run_audit(
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=20000")
     try:
+        ensure_corpus_schema(conn)
+        scoped_count = create_temp_corpus_table(conn, corpus_id)
+        scope_where = scope_where_expr(corpus_id=corpus_id)
+        if corpus_id:
+            logger.info("Quality audit scope: corpus_id=%s papers=%d", corpus_id, scoped_count)
         # Keep all audit queries on one read snapshot even while crawlers write.
         conn.execute("BEGIN")
         audit = build_audit(
             conn,
+            corpus_id=corpus_id,
+            scope_where=scope_where,
             out_dir=out_dir,
             expected_total=expected_total,
             missing_ids=missing_ids,
@@ -669,10 +700,10 @@ def run_audit(
             sample_limit=sample_limit,
             expert_limit=expert_limit,
         )
-        providers = provider_rows(conn, audit["summary"]["optics_papers"])
-        refs_by_year = reference_rows(conn)
-        llm_sample = sample_rows(conn, sample_limit)
-        expert_sample = expert_rows(conn, expert_limit)
+        providers = provider_rows(conn, audit["summary"]["scoped_papers"], scope_where)
+        refs_by_year = reference_rows(conn, scope_where)
+        llm_sample = sample_rows(conn, sample_limit, scope_where)
+        expert_sample = expert_rows(conn, expert_limit, scope_where)
         conn.rollback()
     finally:
         conn.close()
@@ -718,10 +749,11 @@ def run_audit(
     )
     write_markdown(out_dir / "coverage_quality_audit.md", audit)
     logger.info(
-        "Quality audit done: status=%s optics=%s missing=%s",
+        "Quality audit done: status=%s scoped=%s missing=%s corpus=%s",
         audit["overall_status"],
-        audit["summary"]["optics_papers"],
+        audit["summary"]["scoped_papers"],
         audit["summary"]["missing_ids"],
+        audit["summary"].get("corpus_id"),
     )
     return audit
 
@@ -747,6 +779,7 @@ def main(argv=None) -> int:
     parser.add_argument("--missing-file", default=None)
     parser.add_argument("--sample-limit", type=int, default=200)
     parser.add_argument("--expert-limit", type=int, default=120)
+    parser.add_argument("--corpus-id", default=None, help="仅审计该 corpus")
     parser.add_argument("--fail-on", choices=("none", "warn", "fail"), default="none")
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
@@ -757,6 +790,7 @@ def main(argv=None) -> int:
     audit = run_audit(
         db_path=Path(args.db),
         out_dir=Path(args.out_dir),
+        corpus_id=args.corpus_id,
         expected_total=args.expected_total,
         missing_file=Path(args.missing_file) if args.missing_file else None,
         sample_limit=args.sample_limit,

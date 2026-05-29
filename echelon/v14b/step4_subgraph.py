@@ -28,6 +28,7 @@ from echelon.v14b.config import (
     SUBGRAPH_TOP_KEYSTONE, SUBGRAPH_TOP_FRESH, SUBGRAPH_FRESH_YEAR,
     SUBGRAPH_MAX_SIZE, LIMIT,
 )
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.db_schema import ensure_v14b_text_paper_ids, get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, make_progress, table_columns
 
@@ -43,6 +44,7 @@ def select_seed_nodes(
     top_keystone: int = SUBGRAPH_TOP_KEYSTONE,
     top_fresh: int = SUBGRAPH_TOP_FRESH,
     fresh_year: int = SUBGRAPH_FRESH_YEAR,
+    corpus_id: str | None = None,
 ) -> tuple[Set[str], Set[str]]:
     """
     选取种子节点。
@@ -51,8 +53,14 @@ def select_seed_nodes(
         (keystone_set, fresh_set)
     """
     # Top keystone (all lifecycle)
-    rows = conn_main.execute("""
+    corpus_join = (
+        "JOIN temp.v14b_corpus_papers cp ON cp.paper_id = papers.id"
+        if corpus_id
+        else ""
+    )
+    rows = conn_main.execute(f"""
         SELECT id FROM papers
+        {corpus_join}
         WHERE keystone_score_v14 IS NOT NULL
         ORDER BY keystone_score_v14 DESC
         LIMIT ?
@@ -61,8 +69,9 @@ def select_seed_nodes(
     logger.info("Top keystone 节点: %d", len(keystone_ids))
 
     # Top fresh
-    rows = conn_main.execute("""
+    rows = conn_main.execute(f"""
         SELECT id FROM papers
+        {corpus_join}
         WHERE keystone_score_v14 IS NOT NULL
           AND (
             (publication_date IS NOT NULL AND CAST(SUBSTR(publication_date, 1, 4) AS INTEGER) >= ?)
@@ -81,6 +90,7 @@ def expand_to_neighbors(
     conn_main: sqlite3.Connection,
     seed_ids: Set[str],
     max_size: int = SUBGRAPH_MAX_SIZE,
+    corpus_id: str | None = None,
 ) -> Set[str]:
     """
     将种子节点扩展到 1 度引用邻居。
@@ -100,6 +110,7 @@ def expand_to_neighbors(
         FROM paper_references
         WHERE citing_paper_id IN ({placeholders})
           AND cited_paper_id_internal IS NOT NULL
+          {"AND cited_paper_id_internal IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
     """, list(seed_ids)).fetchall()
     for row in rows:
         if row[0] not in seed_ids:
@@ -110,6 +121,7 @@ def expand_to_neighbors(
         SELECT citing_paper_id
         FROM paper_references
         WHERE cited_paper_id_internal IN ({placeholders})
+          {"AND citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
     """, list(seed_ids)).fetchall()
     for row in rows:
         if row[0] not in seed_ids:
@@ -301,14 +313,27 @@ def evaluate_subgraph_scope(
     configured_max_size: int,
     selected_nodes: int,
     selected_edges: int,
+    corpus_id: str | None = None,
 ) -> dict:
     """Audit whether Step4 should be interpreted as pilot evidence or full graph."""
-    total_papers = conn_main.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
-    total_linked_refs = conn_main.execute("""
+    if corpus_id:
+        total_papers = conn_main.execute(
+            "SELECT COUNT(*) FROM temp.v14b_corpus_papers"
+        ).fetchone()[0]
+        total_linked_refs = conn_main.execute("""
+            SELECT COUNT(*)
+            FROM paper_references
+            WHERE cited_paper_id_internal IS NOT NULL
+              AND citing_paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+              AND cited_paper_id_internal IN (SELECT paper_id FROM temp.v14b_corpus_papers)
+        """).fetchone()[0]
+    else:
+        total_papers = conn_main.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
+        total_linked_refs = conn_main.execute("""
         SELECT COUNT(*)
         FROM paper_references
         WHERE cited_paper_id_internal IS NOT NULL
-    """).fetchone()[0]
+        """).fetchone()[0]
 
     node_coverage = selected_nodes / max(1, total_papers)
     edge_coverage = selected_edges / max(1, total_linked_refs)
@@ -379,6 +404,7 @@ def run_subgraph(
     db_v14: Path = DB_V14,
     limit: Optional[int] = None,
     resume: bool = True,
+    corpus_id: str | None = None,
 ) -> dict:
     """执行 Step 4: 子图构建"""
     step_name = "step4_subgraph"
@@ -392,6 +418,8 @@ def run_subgraph(
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
     conn_main.execute("PRAGMA journal_mode=WAL")
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
     ensure_v14b_text_paper_ids(conn_v14)
@@ -400,14 +428,24 @@ def run_subgraph(
     # 选取种子
     top_k = SUBGRAPH_TOP_KEYSTONE if not limit else min(SUBGRAPH_TOP_KEYSTONE, limit)
     top_f = SUBGRAPH_TOP_FRESH if not limit else min(SUBGRAPH_TOP_FRESH, limit // 3)
-    keystone_ids, fresh_ids = select_seed_nodes(conn_main, top_k, top_f)
+    keystone_ids, fresh_ids = select_seed_nodes(
+        conn_main,
+        top_k,
+        top_f,
+        corpus_id=corpus_id,
+    )
 
     seed_ids = keystone_ids | fresh_ids
     logger.info("种子节点总数: %d", len(seed_ids))
 
     # 扩展邻居
     max_size = SUBGRAPH_MAX_SIZE if not limit else limit
-    neighbor_ids = expand_to_neighbors(conn_main, seed_ids, max_size=max_size)
+    neighbor_ids = expand_to_neighbors(
+        conn_main,
+        seed_ids,
+        max_size=max_size,
+        corpus_id=corpus_id,
+    )
 
     all_nodes = seed_ids | neighbor_ids
     logger.info("子图节点总数: %d", len(all_nodes))
@@ -427,6 +465,7 @@ def run_subgraph(
         configured_max_size=max_size,
         selected_nodes=n_nodes,
         selected_edges=n_edges,
+        corpus_id=corpus_id,
     )
 
     # 验收检查
@@ -439,6 +478,8 @@ def run_subgraph(
         "neighbor_nodes": len(neighbor_ids),
         "scope_audit": scope_audit,
         "records_n": n_nodes,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else n_nodes,
     }
 
     upsert_step_meta(
@@ -470,7 +511,13 @@ def main(argv=None):
     db_v14 = Path(args.db_v14) if args.db_v14 else DB_V14
     limit = args.limit or LIMIT
 
-    run_subgraph(db_main=db_main, db_v14=db_v14, limit=limit, resume=args.resume)
+    run_subgraph(
+        db_main=db_main,
+        db_v14=db_v14,
+        limit=limit,
+        resume=args.resume,
+        corpus_id=args.corpus_id,
+    )
 
 
 if __name__ == "__main__":

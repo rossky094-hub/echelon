@@ -13,6 +13,7 @@ import numpy as np
 
 from echelon.v14b.config import DB_MAIN
 from echelon.v14b.utils import make_progress, setup_logging
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 
 logger = logging.getLogger("echelon.v14b.step0_embeddings")
 
@@ -86,6 +87,7 @@ def build_embeddings(
     model_id: str = "sentence-transformers/all-mpnet-base-v2",
     batch_size: int = 16,
     limit: Optional[int] = None,
+    corpus_id: Optional[str] = None,
 ) -> dict:
     """Generate sentence-transformer embeddings for title + abstract."""
     try:
@@ -98,14 +100,22 @@ def build_embeddings(
 
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn)
+    scoped_count = create_temp_corpus_table(conn, corpus_id)
     ensure_embedding_table(conn)
     batch_size = memory_capped_batch_size(batch_size)
 
-    q = """
+    corpus_join = (
+        "AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    q = f"""
         SELECT id, title, abstract
         FROM papers
         WHERE abstract IS NOT NULL
           AND length(trim(abstract)) > 0
+          {corpus_join}
           AND id NOT IN (SELECT paper_id FROM paper_embeddings WHERE model_id = ?)
         ORDER BY publication_date, id
     """
@@ -117,7 +127,7 @@ def build_embeddings(
     logger.info("待生成 embedding: %d", len(rows))
     if not rows:
         conn.close()
-        return {"records_n": 0, "model_id": model_id}
+        return {"records_n": 0, "model_id": model_id, "corpus_id": corpus_id, "scoped_papers": scoped_count}
 
     model = SentenceTransformer(model_id)
     written = 0
@@ -148,7 +158,12 @@ def build_embeddings(
             pbar.set_postfix(written=written)
 
     conn.close()
-    stats = {"records_n": written, "model_id": model_id}
+    stats = {
+        "records_n": written,
+        "model_id": model_id,
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else written,
+    }
     logger.info("Embedding build done: %s", stats)
     return stats
 
@@ -159,6 +174,7 @@ def main(argv=None) -> None:
     parser.add_argument("--model", default="sentence-transformers/all-mpnet-base-v2")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--corpus-id", type=str, default=None)
     args = parser.parse_args(argv)
     setup_logging("step0_embeddings")
     build_embeddings(
@@ -166,6 +182,7 @@ def main(argv=None) -> None:
         model_id=args.model,
         batch_size=args.batch_size,
         limit=args.limit,
+        corpus_id=args.corpus_id,
     )
 
 

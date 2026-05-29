@@ -75,6 +75,7 @@ class CrawlJobRequest(BaseModel):
     max_results: Optional[int] = None
     delay: float = 3.0
     enrich: bool = False
+    corpus_id: Optional[str] = None
 
 
 class ExpandRequest(BaseModel):
@@ -372,6 +373,7 @@ async def crawl_by_query(
         "max_results": request.max_results,
         "delay": request.delay,
         "enrich": request.enrich,
+        "corpus_id": request.corpus_id,
     }
 
     job_id = schedule_ingestion_job(

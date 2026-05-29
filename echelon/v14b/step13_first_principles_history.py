@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import DB_MAIN, DB_V14, REPORT_DIR
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import add_common_args, setup_logging
@@ -161,6 +162,21 @@ FALLBACK_PRINCIPLE = PrincipleDef(
     ),
 )
 
+PRINCIPLE_TO_ROOT_CONSTRAINT = {
+    "FP_PHYSICAL_CONSTRAINT": "physical",
+    "FP_SCALING_INTEGRATION": "engineering",
+    "FP_OPT_GEOM": "engineering",
+    "FP_INFO_CAPACITY": "data",
+    "FP_GENERALIZATION_SHIFT": "data",
+    "FP_OTHER": "cost",
+}
+
+COST_TERMS = re.compile(
+    r"\b(cost|expensive|budget|resource|compute|latency|throughput|"
+    r"memory|time-consuming|slow|infrastructure)\b",
+    re.I,
+)
+
 
 def jdumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -212,8 +228,65 @@ def ensure_schema(conn_v14: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_fp_history_year
             ON first_principles_history_events(event_year);
+
+        CREATE TABLE IF NOT EXISTS bottleneck_lineage_triples (
+            triple_id TEXT PRIMARY KEY,
+            principle_id TEXT NOT NULL,
+            direction_id INTEGER,
+            atom_id INTEGER,
+            edge_order INTEGER NOT NULL,
+            source_stage TEXT NOT NULL,
+            target_stage TEXT NOT NULL,
+            source_text TEXT,
+            target_text TEXT,
+            relation_type TEXT,
+            paper_id TEXT,
+            resolver_paper_id TEXT,
+            event_year INTEGER,
+            evidence_section TEXT,
+            evidence_page INTEGER,
+            evidence_quality TEXT,
+            evidence_weight REAL,
+            metadata_json TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_lineage_principle
+            ON bottleneck_lineage_triples(principle_id, event_year DESC);
+        CREATE INDEX IF NOT EXISTS idx_lineage_direction
+            ON bottleneck_lineage_triples(direction_id, event_year DESC);
+
+        CREATE TABLE IF NOT EXISTS direction_claim_cards (
+            claim_card_id TEXT PRIMARY KEY,
+            direction_id INTEGER NOT NULL,
+            direction_name TEXT NOT NULL,
+            root_constraint_json TEXT NOT NULL,
+            attempts_last_10y_json TEXT NOT NULL,
+            enabling_conditions_json TEXT NOT NULL,
+            unresolved_bottleneck_json TEXT NOT NULL,
+            minimal_validation_experiment_json TEXT NOT NULL,
+            evidence_strength_level TEXT NOT NULL,
+            claim_scope TEXT NOT NULL,
+            five_question_complete INTEGER NOT NULL DEFAULT 0,
+            high_confidence_eligible INTEGER NOT NULL DEFAULT 0,
+            quality_gate_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_claim_cards_direction
+            ON direction_claim_cards(direction_id);
         """
     )
+    cols = {
+        row[1] for row in conn_v14.execute("PRAGMA table_info(future_directions)").fetchall()
+    }
+    if "claim_card_id" not in cols:
+        conn_v14.execute("ALTER TABLE future_directions ADD COLUMN claim_card_id TEXT")
+    if "claim_card_complete" not in cols:
+        conn_v14.execute("ALTER TABLE future_directions ADD COLUMN claim_card_complete INTEGER DEFAULT 0")
+    if "high_confidence_eligible" not in cols:
+        conn_v14.execute("ALTER TABLE future_directions ADD COLUMN high_confidence_eligible INTEGER DEFAULT 0")
+    if "quality_gate_json" not in cols:
+        conn_v14.execute("ALTER TABLE future_directions ADD COLUMN quality_gate_json TEXT")
     conn_v14.commit()
 
 
@@ -229,7 +302,12 @@ def classify_principle(text: str) -> PrincipleDef:
     return best if best and best_hits > 0 else FALLBACK_PRINCIPLE
 
 
-def load_atoms(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection) -> list[dict]:
+def load_atoms(
+    conn_main: sqlite3.Connection,
+    conn_v14: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> list[dict]:
     if not table_exists(conn_v14, "limitation_atoms"):
         return []
 
@@ -271,11 +349,17 @@ def load_atoms(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection) -> l
     paper_meta: dict[str, dict] = {}
     if paper_ids:
         placeholders = ",".join("?" * len(paper_ids))
+        scope_sql = (
+            "AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+            if corpus_id
+            else ""
+        )
         p_rows = conn_main.execute(
             f"""
             SELECT id, title, publication_year, COALESCE(primary_field_id, '') AS primary_field_id
             FROM papers
             WHERE id IN ({placeholders})
+              {scope_sql}
             """,
             paper_ids,
         ).fetchall()
@@ -300,6 +384,8 @@ def load_atoms(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection) -> l
     for row in rows:
         atom = dict(row)
         meta = paper_meta.get(str(atom.get("paper_id") or ""), {})
+        if corpus_id and not meta:
+            continue
         atom["paper_title"] = meta.get("title") or ""
         atom["publication_year"] = meta.get("publication_year")
         atom["primary_field_id"] = meta.get("primary_field_id") or ""
@@ -319,7 +405,12 @@ def load_atoms(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection) -> l
     return atoms
 
 
-def load_future_edges(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection) -> list[dict]:
+def load_future_edges(
+    conn_main: sqlite3.Connection,
+    conn_v14: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> list[dict]:
     if not table_exists(conn_v14, "predicted_future_edges"):
         return []
     have_visual = table_exists(conn_v14, "visual_nodes")
@@ -363,6 +454,11 @@ def load_future_edges(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connectio
     meta: dict[str, dict] = {}
     if ids:
         placeholders = ",".join("?" * len(ids))
+        scope_sql = (
+            "AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+            if corpus_id
+            else ""
+        )
         p_rows = conn_main.execute(
             f"""
             SELECT
@@ -373,6 +469,7 @@ def load_future_edges(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connectio
                 COALESCE(primary_field_id, '') AS primary_field_id
             FROM papers
             WHERE id IN ({placeholders})
+              {scope_sql}
             """,
             ids,
         ).fetchall()
@@ -381,6 +478,11 @@ def load_future_edges(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connectio
     enriched = []
     for row in rows:
         rec = dict(row)
+        if corpus_id and (
+            str(rec.get("src_paper_id") or "") not in meta
+            or str(rec.get("dst_paper_id") or "") not in meta
+        ):
+            continue
         src = meta.get(str(rec.get("src_paper_id") or ""), {})
         dst = meta.get(str(rec.get("dst_paper_id") or ""), {})
         rec["src_year"] = int(src.get("publication_year") or rec.get("src_year_raw") or 0)
@@ -407,11 +509,161 @@ def load_future_directions(conn_v14: sqlite3.Connection) -> list[dict]:
             COALESCE(vgae_evidence, '') AS vgae_evidence,
             COALESCE(limitation_evidence, '') AS limitation_evidence,
             COALESCE(paper_ids_json, '[]') AS paper_ids_json,
-            COALESCE(evidence_json, '{}') AS evidence_json
+            COALESCE(evidence_json, '{}') AS evidence_json,
+            COALESCE(calibration_label, '') AS calibration_label
         FROM future_directions
         """
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def load_section_page_index(
+    conn_main: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> dict[tuple[str, str], list[int]]:
+    table_names = {
+        row[0] for row in conn_main.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    table = "paper_sections" if "paper_sections" in table_names else None
+    if not table:
+        return {}
+
+    cols = {
+        row[1] for row in conn_main.execute(
+            f"PRAGMA table_info({table})"
+        ).fetchall()
+    }
+    if "section_pages_json" not in cols:
+        return {}
+
+    scope_sql = (
+        "WHERE paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id else ""
+    )
+    rows = conn_main.execute(
+        f"""
+        SELECT paper_id, section_name, COALESCE(section_pages_json, '[]') AS pages_json
+        FROM {table}
+        {scope_sql}
+        """
+    ).fetchall()
+    out: dict[tuple[str, str], list[int]] = {}
+    for row in rows:
+        key = (str(row["paper_id"]), str(row["section_name"] or "").strip().lower())
+        pages = _safe_json_loads(row["pages_json"], [])
+        if not isinstance(pages, list):
+            pages = []
+        out[key] = sorted(
+            {
+                int(p)
+                for p in pages
+                if isinstance(p, (int, float, str)) and str(p).isdigit() and int(p) > 0
+            }
+        )
+    return out
+
+
+def load_resolution_rows(conn_v14: sqlite3.Connection) -> list[dict]:
+    if not table_exists(conn_v14, "limitation_resolutions"):
+        return []
+    rows = conn_v14.execute(
+        """
+        SELECT atom_id, resolver_paper_id, resolution_year, confidence, evidence_text
+        FROM limitation_resolutions
+        """
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def load_vgae_calibration_audit(conn_v14: sqlite3.Connection) -> dict:
+    if not table_exists(conn_v14, "vgae_calibration_audit"):
+        return {}
+    row = conn_v14.execute(
+        """
+        SELECT method, label, support, base_rate, avg_raw_auc, avg_calibrated_auc,
+               summary_json, rolling_backtest_json, curve_json
+        FROM vgae_calibration_audit
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if not row:
+        return {}
+    payload = dict(row)
+    payload["summary"] = _safe_json_loads(payload.pop("summary_json", "{}"), {})
+    payload["rolling_backtest"] = _safe_json_loads(payload.pop("rolling_backtest_json", "{}"), {})
+    payload["curve"] = _safe_json_loads(payload.pop("curve_json", "[]"), [])
+    return payload
+
+
+def infer_root_constraint_type(principle_id: str, text: str) -> str:
+    if COST_TERMS.search(text or ""):
+        return "cost"
+    return PRINCIPLE_TO_ROOT_CONSTRAINT.get(principle_id, "engineering")
+
+
+def evidence_strength_level_from_atoms(atoms: list[dict]) -> str:
+    if not atoms:
+        return "weak"
+    qualities = Counter((a.get("evidence_quality") or "unknown") for a in atoms)
+    section = int(qualities.get("section_level", 0) + qualities.get("structured_sections", 0))
+    weak = int(qualities.get("weak_abstract", 0))
+    ratio = section / max(1, len(atoms))
+    if ratio >= 0.70:
+        return "strong"
+    if ratio >= 0.35 and weak < len(atoms):
+        return "moderate"
+    return "weak"
+
+
+def minimal_experiment_template(
+    *,
+    root_type: str,
+    keyword: str,
+) -> dict:
+    kw = keyword or "target bottleneck"
+    if root_type == "physical":
+        return {
+            "experiment": f"Build A/B prototype isolating `{kw}` and measure physical constraint margins.",
+            "cost_level": "medium",
+            "cycle_weeks": 6,
+            "success_criteria": [
+                "Measured constraint margin improves >=20% vs baseline",
+                "Performance gain remains stable across 3 repeated runs",
+            ],
+        }
+    if root_type == "data":
+        return {
+            "experiment": f"Run held-out-distribution validation focused on `{kw}` with explicit failure slicing.",
+            "cost_level": "low",
+            "cycle_weeks": 3,
+            "success_criteria": [
+                "Out-of-distribution failure rate drops >=15%",
+                "No significant regression on in-distribution benchmark",
+            ],
+        }
+    if root_type == "cost":
+        return {
+            "experiment": f"Run cost-per-result benchmark for `{kw}` under fixed throughput target.",
+            "cost_level": "low",
+            "cycle_weeks": 2,
+            "success_criteria": [
+                "Cost/latency improves >=20%",
+                "Quality metrics stay within 5% of baseline",
+            ],
+        }
+    return {
+        "experiment": f"Implement minimal system refactor targeting `{kw}` and benchmark integration overhead.",
+        "cost_level": "medium",
+        "cycle_weeks": 4,
+        "success_criteria": [
+            "Integration complexity (time or lines touched) reduced >=20%",
+            "Core task performance no worse than baseline",
+        ],
+    }
 
 
 def score_atom(atom: dict) -> float:
@@ -678,6 +930,433 @@ def build_principle_summary(
     return principle_rows, history_rows, totals
 
 
+def _normalize_section_name(raw: str) -> str:
+    name = (raw or "").strip().lower()
+    if not name:
+        return ""
+    # source_section_name may contain comma-separated names.
+    return name.split(",")[0].strip()
+
+
+def build_bottleneck_lineage_triples(
+    *,
+    atoms: list[dict],
+    resolution_rows: list[dict],
+    section_pages: dict[tuple[str, str], list[int]],
+    future_directions: list[dict],
+) -> list[dict]:
+    direction_by_paper: dict[str, list[dict]] = defaultdict(list)
+    direction_tokens: dict[int, set[str]] = {}
+    for d in future_directions:
+        did = int(d.get("direction_id") or 0)
+        if did <= 0:
+            continue
+        pids = _safe_json_loads(d.get("paper_ids_json") or "[]", [])
+        if isinstance(pids, list):
+            for pid in pids:
+                if pid:
+                    direction_by_paper[str(pid)].append(d)
+        direction_tokens[did] = {
+            t for t in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", (d.get("direction_name") or "").lower())
+        }
+
+    resolution_by_atom: dict[int, list[dict]] = defaultdict(list)
+    for r in resolution_rows:
+        resolution_by_atom[int(r.get("atom_id") or 0)].append(r)
+
+    keyword_future_atoms: dict[str, list[dict]] = defaultdict(list)
+    for atom in atoms:
+        kw = (atom.get("keyword") or "").strip().lower()
+        if kw:
+            keyword_future_atoms[kw].append(atom)
+    for kw in keyword_future_atoms:
+        keyword_future_atoms[kw].sort(key=lambda x: int(x.get("publication_year") or 0))
+
+    triples: list[dict] = []
+    for atom in atoms:
+        atom_id = int(atom.get("atom_id") or 0)
+        desc = str(atom.get("description") or "").strip()
+        kw = (atom.get("keyword") or "").strip().lower() or "unknown_constraint"
+        year = int(atom.get("publication_year") or 0)
+        paper_id = str(atom.get("paper_id") or "")
+        section_name = _normalize_section_name(str(atom.get("source_section_name") or ""))
+        pages = section_pages.get((paper_id, section_name), [])
+        principle = classify_principle(
+            " ".join(
+                [
+                    str(atom.get("keyword") or ""),
+                    desc,
+                    str(atom.get("paper_title") or ""),
+                ]
+            )
+        )
+        root_type = infer_root_constraint_type(principle.principle_id, desc)
+
+        direction_id = None
+        if direction_by_paper.get(paper_id):
+            direction_id = int(direction_by_paper[paper_id][0].get("direction_id") or 0) or None
+        if direction_id is None:
+            for did, toks in direction_tokens.items():
+                if kw and kw.replace(" ", "") and any(kw_part in toks for kw_part in kw.split()):
+                    direction_id = did
+                    break
+
+        constraint_text = f"{root_type}:{kw}"
+        failure_text = desc[:280]
+        attempt_text = "historical attempt unresolved"
+        local_fix_text = "no validated local fix yet"
+        next_constraint_text = "unresolved follow-on constraint"
+        rel_rows = resolution_by_atom.get(atom_id, [])
+        if rel_rows:
+            best = max(rel_rows, key=lambda r: float(r.get("confidence") or 0.0))
+            attempt_text = f"resolver:{best.get('resolver_paper_id')}"
+            local_fix_text = str(best.get("evidence_text") or "reported mitigation")[:280]
+        siblings = keyword_future_atoms.get(kw, [])
+        newer = [a for a in siblings if int(a.get("publication_year") or 0) > year]
+        if newer:
+            next_constraint_text = str(newer[0].get("description") or "")[:280]
+
+        def add_edge(
+            edge_order: int,
+            src_stage: str,
+            dst_stage: str,
+            src_text: str,
+            dst_text: str,
+            relation_type: str,
+            resolver_paper_id: str | None = None,
+            event_year: int | None = None,
+        ) -> None:
+            triple_id = f"{atom_id}:{edge_order}:{direction_id or 'na'}"
+            triples.append(
+                {
+                    "triple_id": triple_id,
+                    "principle_id": principle.principle_id,
+                    "direction_id": direction_id,
+                    "atom_id": atom_id,
+                    "edge_order": edge_order,
+                    "source_stage": src_stage,
+                    "target_stage": dst_stage,
+                    "source_text": src_text[:280],
+                    "target_text": dst_text[:280],
+                    "relation_type": relation_type,
+                    "paper_id": paper_id,
+                    "resolver_paper_id": resolver_paper_id,
+                    "event_year": int(event_year or year or 0),
+                    "evidence_section": section_name or None,
+                    "evidence_page": int(pages[0]) if pages else None,
+                    "evidence_quality": atom.get("evidence_quality") or "unknown",
+                    "evidence_weight": float(atom.get("evidence_weight") or 0.35),
+                    "metadata_json": jdumps(
+                        {
+                            "root_constraint_type": root_type,
+                            "severity": atom.get("severity"),
+                            "n_resolutions": len(rel_rows),
+                            "page_candidates": pages,
+                        }
+                    ),
+                }
+            )
+
+        add_edge(
+            1,
+            "constraint",
+            "failure_mechanism",
+            constraint_text,
+            failure_text,
+            "constraint_causes_failure",
+        )
+        add_edge(
+            2,
+            "failure_mechanism",
+            "attempt_path",
+            failure_text,
+            attempt_text,
+            "failure_triggers_attempt",
+        )
+        add_edge(
+            3,
+            "attempt_path",
+            "local_fix",
+            attempt_text,
+            local_fix_text,
+            "attempt_produces_local_fix",
+            resolver_paper_id=(rel_rows[0].get("resolver_paper_id") if rel_rows else None),
+            event_year=(
+                int(rel_rows[0].get("resolution_year") or year)
+                if rel_rows else year
+            ),
+        )
+        add_edge(
+            4,
+            "local_fix",
+            "new_constraint",
+            local_fix_text,
+            next_constraint_text,
+            "local_fix_reveals_new_constraint",
+        )
+    return triples
+
+
+def build_direction_claim_cards(
+    *,
+    atoms: list[dict],
+    future_directions: list[dict],
+    principle_rows: list[dict],
+    calibration_audit: dict,
+) -> tuple[list[dict], list[dict]]:
+    principles_by_id = {p["principle_id"]: p for p in principle_rows}
+    now_year = datetime.utcnow().year
+    atom_by_paper: dict[str, list[dict]] = defaultdict(list)
+    for atom in atoms:
+        atom_by_paper[str(atom.get("paper_id") or "")].append(atom)
+
+    cards: list[dict] = []
+    updates: list[dict] = []
+    for d in future_directions:
+        direction_id = int(d.get("direction_id") or 0)
+        if direction_id <= 0:
+            continue
+        direction_name = str(d.get("direction_name") or "").strip() or f"direction_{direction_id}"
+        pids = _safe_json_loads(d.get("paper_ids_json") or "[]", [])
+        if not isinstance(pids, list):
+            pids = []
+        direction_atoms = [
+            atom
+            for pid in pids
+            for atom in atom_by_paper.get(str(pid), [])
+        ]
+        if not direction_atoms:
+            direction_atoms = [
+                atom for atom in atoms
+                if (atom.get("keyword") or "").lower() in direction_name.lower()
+            ][:8]
+
+        weighted_principles: Counter[str] = Counter()
+        for atom in direction_atoms:
+            pid = classify_principle(
+                " ".join(
+                    [
+                        str(atom.get("keyword") or ""),
+                        str(atom.get("description") or ""),
+                        str(atom.get("paper_title") or ""),
+                    ]
+                )
+            ).principle_id
+            weighted_principles[pid] += float(score_atom(atom))
+        top_principle_id = weighted_principles.most_common(1)[0][0] if weighted_principles else "FP_OTHER"
+        top_principle = principles_by_id.get(top_principle_id, {})
+
+        top_atom = sorted(
+            direction_atoms,
+            key=lambda a: float(score_atom(a)),
+            reverse=True,
+        )[0] if direction_atoms else {}
+        root_text = (
+            str(top_principle.get("root_cause") or "")
+            or str(top_atom.get("description") or "")
+            or "insufficient evidence"
+        )
+        root_type = infer_root_constraint_type(
+            top_principle_id,
+            " ".join(
+                [root_text, str(top_atom.get("keyword") or ""), direction_name]
+            ),
+        )
+        root_constraint = {
+            "type": root_type,
+            "constraint": root_text[:320],
+            "principle_id": top_principle_id,
+            "principle_name": top_principle.get("principle_name"),
+        }
+
+        attempts = []
+        for atom in sorted(
+            direction_atoms,
+            key=lambda a: int(a.get("publication_year") or 0),
+            reverse=True,
+        ):
+            year = int(atom.get("publication_year") or 0)
+            if year and year < now_year - 10:
+                continue
+            attempts.append(
+                {
+                    "paper_id": atom.get("paper_id"),
+                    "year": year,
+                    "attempt_path": str(atom.get("paper_title") or "")[:180],
+                    "why_failed": str(atom.get("description") or "")[:220],
+                    "keyword": atom.get("keyword"),
+                    "severity": atom.get("severity"),
+                    "evidence_quality": atom.get("evidence_quality"),
+                }
+            )
+            if len(attempts) >= 8:
+                break
+
+        calibration_ready = bool(calibration_audit.get("method"))
+        rolling_avg_auc = float(calibration_audit.get("avg_calibrated_auc") or 0.0)
+        section_strength = evidence_strength_level_from_atoms(direction_atoms)
+        enabling_conditions = {
+            "new_enablers": [
+                "temporal calibration curve available" if calibration_ready else "calibration missing",
+                "rolling held-out-year backtest available" if rolling_avg_auc > 0 else "rolling backtest missing",
+                f"evidence_strength={section_strength}",
+            ],
+            "prediction_confidence": float(d.get("confidence") or 0.0),
+            "calibration_label": d.get("calibration_label"),
+            "rolling_avg_calibrated_auc": rolling_avg_auc,
+        }
+
+        unresolved = [
+            {
+                "paper_id": atom.get("paper_id"),
+                "description": str(atom.get("description") or "")[:220],
+                "keyword": atom.get("keyword"),
+                "severity": atom.get("severity"),
+                "evidence_quality": atom.get("evidence_quality"),
+                "evidence_weight": float(atom.get("evidence_weight") or 0.35),
+            }
+            for atom in sorted(
+                [a for a in direction_atoms if int(a.get("is_resolved") or 0) == 0],
+                key=lambda a: float(score_atom(a)),
+                reverse=True,
+            )[:6]
+        ]
+        top_kw = str((top_atom.get("keyword") or "technical bottleneck")).strip()
+        minimal_experiment = minimal_experiment_template(
+            root_type=root_type,
+            keyword=top_kw,
+        )
+
+        q1 = bool(root_constraint.get("constraint"))
+        q2 = bool(attempts)
+        q3 = bool(enabling_conditions.get("new_enablers"))
+        q4 = bool(unresolved)
+        q5 = bool(minimal_experiment.get("experiment"))
+        five_complete = int(all([q1, q2, q3, q4, q5]))
+
+        high_confidence_eligible = int(
+            five_complete == 1
+            and section_strength == "strong"
+            and calibration_ready
+            and rolling_avg_auc >= 0.65
+            and float(d.get("confidence") or 0.0) >= 0.70
+        )
+        claim_scope = (
+            "validated_candidate"
+            if high_confidence_eligible
+            else ("exploratory_with_claim_card" if five_complete else "exploratory_incomplete_card")
+        )
+
+        quality_gate = {
+            "five_questions": {
+                "root_constraint": q1,
+                "past_attempts_10y": q2,
+                "new_enablers": q3,
+                "unresolved_bottleneck": q4,
+                "minimal_validation_experiment": q5,
+            },
+            "five_question_complete": bool(five_complete),
+            "section_evidence_strength": section_strength,
+            "calibration_ready": calibration_ready,
+            "rolling_avg_calibrated_auc": rolling_avg_auc,
+            "high_confidence_eligible": bool(high_confidence_eligible),
+        }
+
+        card_id = f"claim:{direction_id}"
+        cards.append(
+            {
+                "claim_card_id": card_id,
+                "direction_id": direction_id,
+                "direction_name": direction_name,
+                "root_constraint_json": jdumps(root_constraint),
+                "attempts_last_10y_json": jdumps(attempts),
+                "enabling_conditions_json": jdumps(enabling_conditions),
+                "unresolved_bottleneck_json": jdumps(
+                    {
+                        "items": unresolved,
+                        "evidence_strength_level": section_strength,
+                    }
+                ),
+                "minimal_validation_experiment_json": jdumps(minimal_experiment),
+                "evidence_strength_level": section_strength,
+                "claim_scope": claim_scope,
+                "five_question_complete": five_complete,
+                "high_confidence_eligible": high_confidence_eligible,
+                "quality_gate_json": jdumps(quality_gate),
+            }
+        )
+        updates.append(
+            {
+                "direction_id": direction_id,
+                "claim_card_id": card_id,
+                "claim_card_complete": five_complete,
+                "high_confidence_eligible": high_confidence_eligible,
+                "claim_scope": claim_scope,
+                "quality_gate_json": jdumps(quality_gate),
+            }
+        )
+    return cards, updates
+
+
+def write_lineage_and_claim_cards(
+    conn_v14: sqlite3.Connection,
+    *,
+    triples: list[dict],
+    cards: list[dict],
+    direction_updates: list[dict],
+) -> None:
+    conn_v14.execute("DELETE FROM bottleneck_lineage_triples")
+    conn_v14.execute("DELETE FROM direction_claim_cards")
+    if triples:
+        conn_v14.executemany(
+            """
+            INSERT INTO bottleneck_lineage_triples (
+                triple_id, principle_id, direction_id, atom_id, edge_order,
+                source_stage, target_stage, source_text, target_text, relation_type,
+                paper_id, resolver_paper_id, event_year, evidence_section, evidence_page,
+                evidence_quality, evidence_weight, metadata_json
+            ) VALUES (
+                :triple_id, :principle_id, :direction_id, :atom_id, :edge_order,
+                :source_stage, :target_stage, :source_text, :target_text, :relation_type,
+                :paper_id, :resolver_paper_id, :event_year, :evidence_section, :evidence_page,
+                :evidence_quality, :evidence_weight, :metadata_json
+            )
+            """,
+            triples,
+        )
+    if cards:
+        conn_v14.executemany(
+            """
+            INSERT INTO direction_claim_cards (
+                claim_card_id, direction_id, direction_name, root_constraint_json,
+                attempts_last_10y_json, enabling_conditions_json, unresolved_bottleneck_json,
+                minimal_validation_experiment_json, evidence_strength_level, claim_scope,
+                five_question_complete, high_confidence_eligible, quality_gate_json
+            ) VALUES (
+                :claim_card_id, :direction_id, :direction_name, :root_constraint_json,
+                :attempts_last_10y_json, :enabling_conditions_json, :unresolved_bottleneck_json,
+                :minimal_validation_experiment_json, :evidence_strength_level, :claim_scope,
+                :five_question_complete, :high_confidence_eligible, :quality_gate_json
+            )
+            """,
+            cards,
+        )
+    if direction_updates:
+        conn_v14.executemany(
+            """
+            UPDATE future_directions
+            SET claim_card_id = :claim_card_id,
+                claim_card_complete = :claim_card_complete,
+                high_confidence_eligible = :high_confidence_eligible,
+                claim_scope = :claim_scope,
+                quality_gate_json = :quality_gate_json
+            WHERE direction_id = :direction_id
+            """,
+            direction_updates,
+        )
+    conn_v14.commit()
+
+
 def write_db(
     conn_v14: sqlite3.Connection,
     principle_rows: list[dict],
@@ -747,6 +1426,10 @@ def build_markdown(principle_rows: list[dict], totals: dict) -> str:
         f"- section-level atoms: {int(totals.get('section_level_total') or 0):,}",
         f"- future edges considered: {int(totals.get('future_edges_total') or 0):,}",
         f"- future directions considered: {int(totals.get('future_directions_total') or 0):,}",
+        f"- bottleneck lineage triples: {int(totals.get('lineage_triples_total') or 0):,}",
+        f"- direction claim cards: {int(totals.get('claim_cards_total') or 0):,}",
+        f"- high-confidence eligible directions: {int(totals.get('high_confidence_eligible_directions') or 0):,}",
+        f"- calibration method: {totals.get('calibration_method') or 'missing'}",
         f"- timeline window: {totals.get('year_min')} - {totals.get('year_max')}",
         "",
         "该报告只基于当前入库证据生成，不对缺失证据区域做强推断。",
@@ -826,8 +1509,11 @@ def build_markdown(principle_rows: list[dict], totals: dict) -> str:
         "## 使用边界",
         "",
         "1. 本报告是 evidence-aware 诊断层,不把 exploratory 信号伪装为高置信结论。",
-        "2. 若 section-level 证据比例低,卡点解释应标注为弱证据区。",
-        "3. 若未来边匹配稀疏,应优先增强候选生成/校准/分支验证,而不是降低阈值。",
+        "2. 每条未来方向的高置信资格由 claim card 五问质量门决定；五问不全不得进入高置信。",
+        "3. bottleneck lineage triples 来自 limitation/resolution/section 证据链，并保留 section/page 线索。",
+        "4. 若 calibration/backtest 缺失，future growth 只能作为探索线索。",
+        "5. 若 section-level 证据比例低,卡点解释应标注为弱证据区。",
+        "6. 若未来边匹配稀疏,应优先增强候选生成/校准/分支验证,而不是降低阈值。",
         "",
     ]
     return "\n".join(lines) + "\n"
@@ -837,26 +1523,58 @@ def run_first_principles_history(
     db_main: Path = DB_MAIN,
     db_v14: Path = DB_V14,
     out_dir: Path = REPORT_DIR,
+    corpus_id: str | None = None,
 ) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
+    ensure_corpus_schema(conn_main)
+    scoped_count = create_temp_corpus_table(conn_main, corpus_id)
     conn_v14 = get_v14b_conn(db_v14)
 
     ensure_schema(conn_v14)
-    atoms = load_atoms(conn_main, conn_v14)
-    future_edges = load_future_edges(conn_main, conn_v14)
+    atoms = load_atoms(conn_main, conn_v14, corpus_id=corpus_id)
+    section_pages = load_section_page_index(conn_main, corpus_id=corpus_id)
+    resolution_rows = load_resolution_rows(conn_v14)
+    future_edges = load_future_edges(conn_main, conn_v14, corpus_id=corpus_id)
     future_directions = load_future_directions(conn_v14)
+    calibration_audit = load_vgae_calibration_audit(conn_v14)
     principle_rows, history_rows, totals = build_principle_summary(
         atoms=atoms,
         future_edges=future_edges,
         future_directions=future_directions,
     )
+    lineage_triples = build_bottleneck_lineage_triples(
+        atoms=atoms,
+        resolution_rows=resolution_rows,
+        section_pages=section_pages,
+        future_directions=future_directions,
+    )
+    claim_cards, direction_updates = build_direction_claim_cards(
+        atoms=atoms,
+        future_directions=future_directions,
+        principle_rows=principle_rows,
+        calibration_audit=calibration_audit,
+    )
     write_db(conn_v14, principle_rows, history_rows)
+    write_lineage_and_claim_cards(
+        conn_v14,
+        triples=lineage_triples,
+        cards=claim_cards,
+        direction_updates=direction_updates,
+    )
+
+    totals["lineage_triples_total"] = len(lineage_triples)
+    totals["claim_cards_total"] = len(claim_cards)
+    totals["high_confidence_eligible_directions"] = sum(
+        int(c.get("high_confidence_eligible") or 0) for c in claim_cards
+    )
+    totals["calibration_method"] = calibration_audit.get("method")
 
     md_text = build_markdown(principle_rows, totals)
-    report_md = out_dir / "第一性原理_卡点历史脉络报告.md"
-    report_json = out_dir / "first_principles_bottleneck_history.json"
+    suffix = f"_{corpus_id}" if corpus_id else ""
+    report_md = out_dir / f"第一性原理_卡点历史脉络报告{suffix}.md"
+    report_json = out_dir / f"first_principles_bottleneck_history{suffix}.json"
     report_md.write_text(md_text, encoding="utf-8")
     report_json.write_text(
         json.dumps(
@@ -865,6 +1583,8 @@ def run_first_principles_history(
                 "totals": totals,
                 "principles": principle_rows,
                 "history_events": history_rows,
+                "lineage_triples": lineage_triples,
+                "direction_claim_cards": claim_cards,
             },
             ensure_ascii=False,
             indent=2,
@@ -875,9 +1595,14 @@ def run_first_principles_history(
     summary = {
         "report_md": str(report_md),
         "report_json": str(report_json),
+        "corpus_id": corpus_id,
+        "scoped_papers": scoped_count if corpus_id else None,
         "principles": len(principle_rows),
         "atoms_total": int(totals.get("atoms_total") or 0),
         "history_events": len(history_rows),
+        "lineage_triples": len(lineage_triples),
+        "claim_cards": len(claim_cards),
+        "high_confidence_eligible_directions": int(totals.get("high_confidence_eligible_directions") or 0),
     }
     upsert_step_meta(
         conn_v14,
@@ -907,6 +1632,7 @@ def main(argv=None) -> None:
         db_main=db_main,
         db_v14=db_v14,
         out_dir=Path(args.out_dir),
+        corpus_id=args.corpus_id,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
