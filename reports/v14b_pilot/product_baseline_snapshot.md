@@ -1,17 +1,17 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-29T13:27:08Z`
+- Snapshot: `2026-05-29T13:28:42Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
 ## Coverage
 
 - Papers: 55,391
-- OpenAlex W IDs: 33,618 / 55,391 (60.7%); missing 21,773
+- OpenAlex W IDs: 33,631 / 55,391 (60.7%); missing 21,760
 - Invalid OpenAlex IDs: 0
 - Pending enrich: 543
 - Primary Field coverage: 55,342 / 55,391 (99.9%)
-- References: 3,187,558; linked refs: 440,978 (13.8%)
+- References: 3,188,017; linked refs: 440,978 (13.8%)
 - Section rows: 1,241; section papers: 690; primary evidence papers: 690 (1.2%)
 
 ## Derived Product Tables
@@ -61,4 +61,4 @@
 
 ## Next Gate
 
-Phase 0 is complete only when this snapshot and the task list are committed.  Phase 1 starts by turning the Metalens baseline into a regression fixture.
+P0-P2 are complete in the first engineering pass: the baseline, Metalens regression, and evidence-object UI loop now exist.  The next gate is P3: make Step13 Claim Cards a hard eligibility layer for Radar.

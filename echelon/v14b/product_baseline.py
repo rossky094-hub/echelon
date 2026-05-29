@@ -615,9 +615,12 @@ def render_tasklist_md(tasks: list[dict[str, Any]]) -> str:
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for task in tasks:
+        task_id = str(task["id"])
         status = "todo"
-        if str(task["id"]).startswith("P0-"):
-            status = "in_progress"
+        if task_id.startswith(("P0-", "P1-", "P2-")):
+            status = "completed"
+        elif task_id.startswith("P3-"):
+            status = "next"
         lines.append(
             "| {id} | {window} | {title} | {output} | {gate} | {status} |".format(
                 id=task["id"],
@@ -698,8 +701,9 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
             "",
             "## Next Gate",
             "",
-            "Phase 0 is complete only when this snapshot and the task list are committed.  "
-            "Phase 1 starts by turning the Metalens baseline into a regression fixture.",
+            "P0-P2 are complete in the first engineering pass: the baseline, Metalens regression, "
+            "and evidence-object UI loop now exist.  The next gate is P3: make Step13 Claim Cards "
+            "a hard eligibility layer for Radar.",
         ]
     )
     return "\n".join(lines) + "\n"

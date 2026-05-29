@@ -4,18 +4,18 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 
 | ID | Window | Task | Output | Gate | Status |
 | --- | --- | --- | --- | --- | --- |
-| P0-01 | 0-3h | 固定当前指标快照 | product_baseline_snapshot.{json,md} | papers/OpenAlex/section/linked refs/Claim Cards/visual graph counts are recorded | in_progress |
-| P0-02 | 0-3h | 建立 Metalens 验收基准 | metalens expected branches and quality gaps in baseline snapshot | Metalens branches, bottlenecks, turning-paper evidence, future evidence are scored | in_progress |
-| P0-03 | 0-3h | 写 Topic Dossier 质量 rubric | Topic Dossier rubric in baseline snapshot | generic statements are demoted unless backed by clickable evidence | in_progress |
-| P1-04 | 3-8h | 做 Metalens gold topic fixture | tests/v14b Metalens regression fixture | fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation | todo |
-| P1-05 | 3-8h | Metalens 分支识别自动测试 | automated topic-lens regression | each expected branch returns driver papers, bottleneck, enabler, evidence gap | todo |
-| P1-06 | 3-8h | Metalens 审计报告 | reports/v14b_pilot/metalens_topic_regression.md | report shows what improved, what is still generic, and which evidence is missing | todo |
-| P2-07 | 8-14h | Topic Lens 结论 evidence_objects 化 | API returns evidence_objects for every branch/bottleneck/turning/future statement | evidence types include paper, section, limitation_atom, main_path_edge, branch_lineage, future_candidate | todo |
-| P2-08 | 8-14h | 无证据结论降级 | insufficient_evidence blocks in Topic Dossier | no evidence-backed UI card is rendered from naked prose | todo |
-| P2-09 | 8-14h | 前端可点击证据闭环 | branch/bottleneck/turning/future cards open paper/section/evidence detail | each visible conclusion has an inspectable evidence drawer | todo |
-| P3-10 | 14-19h | Step13 五问 Claim Card 硬约束 | Claim Card quality gate | missing root/history/enabler/bottleneck/experiment prevents Radar promotion | todo |
-| P3-11 | 14-19h | Radar 主视图只展示完整卡 | candidate pool separated from R&D Radar | GNN-only edges are never shown as investable directions | todo |
-| P3-12 | 14-19h | Claim Card 缺口提示 | missing_gates, claim_scope, evidence_strength in API/UI | user can see exactly why a candidate is not actionable | todo |
+| P0-01 | 0-3h | 固定当前指标快照 | product_baseline_snapshot.{json,md} | papers/OpenAlex/section/linked refs/Claim Cards/visual graph counts are recorded | completed |
+| P0-02 | 0-3h | 建立 Metalens 验收基准 | metalens expected branches and quality gaps in baseline snapshot | Metalens branches, bottlenecks, turning-paper evidence, future evidence are scored | completed |
+| P0-03 | 0-3h | 写 Topic Dossier 质量 rubric | Topic Dossier rubric in baseline snapshot | generic statements are demoted unless backed by clickable evidence | completed |
+| P1-04 | 3-8h | 做 Metalens gold topic fixture | tests/v14b Metalens regression fixture | fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation | completed |
+| P1-05 | 3-8h | Metalens 分支识别自动测试 | automated topic-lens regression | each expected branch returns driver papers, bottleneck, enabler, evidence gap | completed |
+| P1-06 | 3-8h | Metalens 审计报告 | reports/v14b_pilot/metalens_topic_regression.md | report shows what improved, what is still generic, and which evidence is missing | completed |
+| P2-07 | 8-14h | Topic Lens 结论 evidence_objects 化 | API returns evidence_objects for every branch/bottleneck/turning/future statement | evidence types include paper, section, limitation_atom, main_path_edge, branch_lineage, future_candidate | completed |
+| P2-08 | 8-14h | 无证据结论降级 | insufficient_evidence blocks in Topic Dossier | no evidence-backed UI card is rendered from naked prose | completed |
+| P2-09 | 8-14h | 前端可点击证据闭环 | branch/bottleneck/turning/future cards open paper/section/evidence detail | each visible conclusion has an inspectable evidence drawer | completed |
+| P3-10 | 14-19h | Step13 五问 Claim Card 硬约束 | Claim Card quality gate | missing root/history/enabler/bottleneck/experiment prevents Radar promotion | next |
+| P3-11 | 14-19h | Radar 主视图只展示完整卡 | candidate pool separated from R&D Radar | GNN-only edges are never shown as investable directions | next |
+| P3-12 | 14-19h | Claim Card 缺口提示 | missing_gates, claim_scope, evidence_strength in API/UI | user can see exactly why a candidate is not actionable | next |
 | P4-13 | 19-24h | Access Link 完整性审计 | access gap table/report | key turning papers, branch drivers, future endpoints are audited | todo |
 | P4-14 | 19-24h | 自动合成外部访问链接 | arXiv/DOI/S2/OpenAlex links in paper detail | known IDs produce clickable links; missing IDs become explicit access gaps | todo |
 | P4-15 | 19-24h | 前端显示 local evidence / external access / access gap | paper detail access panel | researchers know whether they can inspect local evidence or must open an external source | todo |
