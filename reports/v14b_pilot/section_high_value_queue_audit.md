@@ -1,9 +1,16 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-29T13:04:50Z`
+- audit_ts: `2026-05-29T17:19:30Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,600`
-- next delta queue with PDF and missing primary section: `12,227`
+- next delta queue needing primary section/action: `12,227`
+
+## Failure / Retry Classes
+
+| retry_class | count |
+|---|---:|
+| not_attempted_pdf_available | 12,227 |
+| covered | 373 |
 
 ## Category Coverage
 

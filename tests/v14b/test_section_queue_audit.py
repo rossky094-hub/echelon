@@ -45,6 +45,16 @@ def test_watchdog_done_and_primary_section_gate(tmp_path):
             section_name TEXT,
             section_text TEXT
         );
+        CREATE TABLE section_ingest_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paper_id TEXT,
+            attempt_ts TEXT,
+            outcome TEXT,
+            source_url TEXT,
+            detail TEXT,
+            inserted_sections INTEGER,
+            primary_sections INTEGER
+        );
         """
     )
     conn.executemany(
@@ -111,6 +121,16 @@ def _make_main_db(path: Path) -> None:
             section_name TEXT,
             section_text TEXT
         );
+        CREATE TABLE section_ingest_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paper_id TEXT,
+            attempt_ts TEXT,
+            outcome TEXT,
+            source_url TEXT,
+            detail TEXT,
+            inserted_sections INTEGER,
+            primary_sections INTEGER
+        );
         """
     )
     conn.executemany(
@@ -125,6 +145,17 @@ def _make_main_db(path: Path) -> None:
     conn.execute(
         "INSERT INTO paper_sections VALUES ('p_done', 'discussion', ?)",
         ("section evidence " * 20,),
+    )
+    conn.executemany(
+        """
+        INSERT INTO section_ingest_attempts
+            (paper_id, attempt_ts, outcome, source_url, detail, inserted_sections, primary_sections)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            ("p_main", "2026-01-01T00:00:00Z", "parse_timeout", "https://arxiv.org/pdf/2001.00001.pdf", "", 0, 0),
+            ("p_branch", "2026-01-01T00:00:01Z", "no_target_sections", "https://arxiv.org/pdf/2201.00003.pdf", "", 0, 0),
+        ],
     )
     conn.commit()
     conn.close()
@@ -212,14 +243,19 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
         topic_terms=["metalens"],
     )
 
-    assert result["delta_queue"] >= 3
+    assert result["delta_queue"] >= 2
+    assert result["retry_class_counts"]["retryable_pdf_failure"] >= 1
+    assert result["retry_class_counts"]["no_target_sections"] >= 1
     assert (tmp_path / "data" / "section_delta_queue.csv").exists()
     conn = sqlite3.connect(str(db_v14))
     try:
-        rows = conn.execute("SELECT paper_id, reasons_json FROM section_priority_papers").fetchall()
+        rows = conn.execute("SELECT paper_id, reasons_json, retry_class FROM section_priority_papers").fetchall()
     finally:
         conn.close()
-    reasons = {pid: json.loads(raw) for pid, raw in rows}
+    reasons = {pid: json.loads(raw) for pid, raw, _retry in rows}
+    retries = {pid: retry for pid, _raw, retry in rows}
     assert "main_path_node" in reasons["p_main"]
     assert "future_endpoint" in reasons["p_future"]
     assert "branch_split_driver" in reasons["p_branch"]
+    assert retries["p_main"] == "retryable_pdf_failure"
+    assert retries["p_branch"] == "no_target_sections"

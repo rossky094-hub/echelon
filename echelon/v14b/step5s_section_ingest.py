@@ -15,6 +15,7 @@ import re
 import signal
 import sqlite3
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -72,6 +73,22 @@ SECTION_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("experiments", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(experiment|experiments|experimental setup)\s*$", re.I)),
 ]
 
+SECTION_INGEST_OUTCOMES = {
+    "already_has_primary",
+    "no_pdf_url",
+    "pdf_download_failed",
+    "parse_timeout",
+    "parser_exception",
+    "parse_no_blocks",
+    "no_target_sections",
+    "success_primary",
+    "success_secondary_only",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     row = conn.execute(
@@ -109,7 +126,73 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE paper_sections ADD COLUMN section_pages_json TEXT")
     if "section_meta_json" not in cols:
         conn.execute("ALTER TABLE paper_sections ADD COLUMN section_meta_json TEXT")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS section_ingest_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paper_id TEXT NOT NULL,
+            attempt_ts TEXT NOT NULL,
+            run_id TEXT,
+            outcome TEXT NOT NULL,
+            source_url TEXT,
+            detail TEXT,
+            inserted_sections INTEGER NOT NULL DEFAULT 0,
+            primary_sections INTEGER NOT NULL DEFAULT 0,
+            candidate_file TEXT,
+            parser_name TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_section_ingest_attempts_paper_ts
+        ON section_ingest_attempts(paper_id, attempt_ts DESC)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_section_ingest_attempts_outcome
+        ON section_ingest_attempts(outcome, attempt_ts DESC)
+        """
+    )
     conn.commit()
+
+
+def record_ingest_attempt(
+    conn: sqlite3.Connection,
+    *,
+    paper_id: str,
+    outcome: str,
+    run_id: str,
+    source_url: str = "",
+    detail: str = "",
+    inserted_sections: int = 0,
+    primary_sections: int = 0,
+    candidate_file: Path | None = None,
+) -> None:
+    """Record why a high-value paper did or did not yield local section evidence."""
+    if outcome not in SECTION_INGEST_OUTCOMES:
+        outcome = "parse_no_blocks"
+    conn.execute(
+        """
+        INSERT INTO section_ingest_attempts
+            (paper_id, attempt_ts, run_id, outcome, source_url, detail,
+             inserted_sections, primary_sections, candidate_file, parser_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            paper_id,
+            utc_now(),
+            run_id,
+            outcome,
+            source_url,
+            detail[:1000],
+            int(inserted_sections or 0),
+            int(primary_sections or 0),
+            str(candidate_file) if candidate_file else None,
+            "v14b_section_ingest_v2",
+        ),
+    )
 
 
 def _arxiv_pdf_url(arxiv_id: Optional[str], doi: Optional[str]) -> Optional[str]:
@@ -637,6 +720,7 @@ def run_section_ingest(
     skipped_no_pdf = 0
     failed_parse = 0
     section_counter = {name: 0 for name, _ in SECTION_PATTERNS}
+    run_id = f"section_ingest_{utc_now()}"
 
     # Keep concurrency intentionally low to avoid memory pressure on local Macs.
     limits = httpx.Limits(max_connections=max(1, SECTION_INGEST_CONCURRENCY))
@@ -647,15 +731,42 @@ def run_section_ingest(
                 if _has_primary_sections(conn_main, pid):
                     skipped_existing += 1
                     primary_hit += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="already_has_primary",
+                        run_id=run_id,
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
 
                 pdf_url = resolve_pdf_url(client, paper)
                 if not pdf_url:
                     skipped_no_pdf += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="no_pdf_url",
+                        run_id=run_id,
+                        detail="No arXiv PDF and Semantic Scholar openAccessPdf unavailable or disabled.",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
                 blob = download_pdf(client, pdf_url)
                 if not blob:
                     skipped_no_pdf += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="pdf_download_failed",
+                        run_id=run_id,
+                        source_url=pdf_url,
+                        detail="PDF request returned no bytes.",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
 
                 with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -666,6 +777,30 @@ def run_section_ingest(
                 except TimeoutError as exc:
                     logger.warning("PDF parse timeout paper=%s url=%s: %s", pid, pdf_url, exc)
                     failed_parse += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="parse_timeout",
+                        run_id=run_id,
+                        source_url=pdf_url,
+                        detail=str(exc),
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
+                    continue
+                except Exception as exc:
+                    logger.warning("PDF parse failed paper=%s url=%s: %s", pid, pdf_url, exc)
+                    failed_parse += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="parser_exception",
+                        run_id=run_id,
+                        source_url=pdf_url,
+                        detail=f"{type(exc).__name__}: {exc}",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
                 finally:
                     try:
@@ -674,19 +809,51 @@ def run_section_ingest(
                         pass
                 if not blocks:
                     failed_parse += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="parse_no_blocks",
+                        run_id=run_id,
+                        source_url=pdf_url,
+                        detail="Parser returned zero text blocks.",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
 
                 sections = extract_sections_with_metadata(blocks)
                 if not sections:
                     failed_parse += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="no_target_sections",
+                        run_id=run_id,
+                        source_url=pdf_url,
+                        detail="PDF parsed, but no target evidence sections were detected.",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
                     continue
 
                 parsed_papers += 1
-                inserted_sections += upsert_sections(conn_main, pid, sections, pdf_url)
+                inserted_now = upsert_sections(conn_main, pid, sections, pdf_url)
+                inserted_sections += inserted_now
                 for sec_name in sections:
                     section_counter[sec_name] = section_counter.get(sec_name, 0) + 1
+                primary_now = sum(1 for sec in sections if sec in PRIMARY_SECTION_NAMES)
+                record_ingest_attempt(
+                    conn_main,
+                    paper_id=pid,
+                    outcome="success_primary" if primary_now else "success_secondary_only",
+                    run_id=run_id,
+                    source_url=pdf_url,
+                    inserted_sections=inserted_now,
+                    primary_sections=primary_now,
+                    candidate_file=candidate_file,
+                )
                 conn_main.commit()
-                if any(sec in sections for sec in PRIMARY_SECTION_NAMES):
+                if primary_now:
                     primary_hit += 1
 
                 pbar.set_postfix(

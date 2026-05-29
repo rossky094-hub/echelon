@@ -1,15 +1,15 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-29T17:09:42Z`
+- generated_at: `2026-05-29T17:19:39Z`
 - readiness_level: `candidate_generator_only`
 
 ## Metrics
 
-- linked refs: 442,988 / 3,199,200 (13.8%)
-- OpenAlex W IDs: 34,396 (62.1%)
+- linked refs: 442,988 / 3,199,564 (13.8%)
+- OpenAlex W IDs: 34,436 (62.2%)
 - section evidence: 1,241 rows / 690 papers
 - primary section evidence: 690 papers (1.2%)
-- section frontfill health: soft_stall (done=1015/12000, no_evidence_delta=0, no_evidence_hours=9.8)
+- section frontfill health: soft_stall (done=1024/12000, no_evidence_delta=9, no_evidence_hours=10.2)
 - predicted future edges: 1,000
 - visual future edges: 1,000
 - future directions: 0
@@ -19,9 +19,9 @@
 
 - **citation_graph_bone** (high): linked refs are 13.8%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
 - **section_evidence** (high): primary section evidence covers only 690 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **section_frontfill_efficiency** (high): section frontfill is soft_stall: candidate delta unknown and 9.8h since last evidence growth. Next: Do not wait passively for topN. Run queue audit/delta handoff for high-value papers and classify no-target-section/no-PDF/timeout failures before promoting bottleneck claims.
+- **section_frontfill_efficiency** (high): section frontfill is soft_stall: 9 candidates and 10.2h since last evidence growth. Next: Do not wait passively for topN. Run queue audit/delta handoff for high-value papers and classify no-target-section/no-PDF/timeout failures before promoting bottleneck claims.
 - **fusion_materialization** (high): Step5b produced future candidates but live future_directions is empty. Next: After section evidence improves, rerun Step5c -> Step6 -> Step13; do not promote raw GNN edges.
-- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.1%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
+- **openalex_topic_coverage** (medium): OpenAlex W coverage is 62.2%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit
 

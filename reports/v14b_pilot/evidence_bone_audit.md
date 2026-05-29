@@ -1,16 +1,16 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-29T17:08:00Z`
+- generated_at: `2026-05-29T17:19:36Z`
 
 ## Reference Linkage
 
-- linked refs: 442,988 / 3,199,092 (13.8%)
-- unlinked refs: 2,756,104
+- linked refs: 442,988 / 3,199,564 (13.8%)
+- unlinked refs: 2,756,576
 
 | unlinked kind | count |
 | --- | ---: |
 | doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,280,194 |
+| openalex_unlinked | 1,280,666 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
@@ -41,15 +41,15 @@
 | download_failure | 22,614 |
 | pdf_graphics_warning | 3,044 |
 
-- section progress: 1023/12000
+- section progress: 1027/12000
 
 ## Frontfill Health
 
 - status: `soft_stall`
-- progress: `1015/12000`
+- progress: `1024/12000`
 - rows / papers / primary papers: `1,241` / `690` / `690`
-- candidates since last evidence growth: `0`
-- seconds since last evidence growth: `35,272`
+- candidates since last evidence growth: `9`
+- seconds since last evidence growth: `36,878`
 - recommendation: Do not wait for topN completion as if it were productive evidence growth. Keep the single live process conservative, but prepare/advance the high-value delta queue and classify no-PDF/no-target-section/timeouts before downstream claims.
 
 ## Recommended Next Actions

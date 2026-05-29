@@ -4,8 +4,10 @@ import sqlite3
 from echelon.v14b.step5s_section_ingest import (
     _arxiv_pdf_url,
     _select_candidate_ids,
+    ensure_sections_table,
     extract_sections_from_blocks,
     extract_sections_with_metadata,
+    record_ingest_attempt,
     read_candidate_file,
 )
 
@@ -181,3 +183,32 @@ def test_read_candidate_file_accepts_delta_queue_csv(tmp_path):
 
     assert read_candidate_file(queue) == ["p1", "p2"]
     assert read_candidate_file(queue, limit=1) == ["p1"]
+
+
+def test_section_ingest_records_attempt_outcomes(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db))
+    ensure_sections_table(conn)
+
+    record_ingest_attempt(
+        conn,
+        paper_id="p1",
+        outcome="no_target_sections",
+        run_id="run1",
+        source_url="https://arxiv.org/pdf/2401.00001.pdf",
+        detail="parsed but no target section",
+        inserted_sections=0,
+        primary_sections=0,
+    )
+    conn.commit()
+
+    row = conn.execute(
+        "SELECT paper_id, outcome, source_url, detail FROM section_ingest_attempts"
+    ).fetchone()
+    conn.close()
+    assert row == (
+        "p1",
+        "no_target_sections",
+        "https://arxiv.org/pdf/2401.00001.pdf",
+        "parsed but no target section",
+    )

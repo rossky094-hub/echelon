@@ -156,6 +156,35 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
         LIMIT 20
         """,
     )
+    latest_attempts = []
+    attempt_totals = []
+    if table_exists(conn_main, "section_ingest_attempts"):
+        attempt_totals = _rows(
+            conn_main,
+            """
+            SELECT outcome, COUNT(*) AS n
+            FROM section_ingest_attempts
+            GROUP BY outcome
+            ORDER BY n DESC
+            """,
+        )
+        latest_attempts = _rows(
+            conn_main,
+            """
+            SELECT outcome, COUNT(*) AS n
+            FROM (
+                SELECT paper_id, outcome,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY paper_id
+                           ORDER BY attempt_ts DESC, attempt_id DESC
+                       ) AS rn
+                FROM section_ingest_attempts
+            )
+            WHERE rn = 1
+            GROUP BY outcome
+            ORDER BY n DESC
+            """,
+        )
     priority_summary = []
     priority_totals = {}
     if table_exists(conn_v14, "section_priority_summary"):
@@ -195,13 +224,19 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
         "section_papers": papers,
         "primary_section_papers": primary,
         "section_name_distribution": section_name_rows,
+        "attempt_totals": attempt_totals,
+        "latest_attempt_outcomes": latest_attempts,
         "priority_totals": priority_totals,
         "priority_summary": priority_summary,
-        "next_actions": _section_next_actions(priority_summary, priority_totals),
+        "next_actions": _section_next_actions(priority_summary, priority_totals, latest_attempts),
     }
 
 
-def _section_next_actions(summary: list[dict[str, Any]], totals: dict[str, Any]) -> list[str]:
+def _section_next_actions(
+    summary: list[dict[str, Any]],
+    totals: dict[str, Any],
+    latest_attempts: list[dict[str, Any]] | None = None,
+) -> list[str]:
     actions: list[str] = []
     if totals.get("missing_primary_with_pdf", 0):
         actions.append("After top12000 completes, run delta queue for high-value papers missing primary sections.")
@@ -212,6 +247,13 @@ def _section_next_actions(summary: list[dict[str, Any]], totals: dict[str, Any])
     ]
     if weak_categories:
         actions.append("Prioritize section evidence for weak high-value classes: " + ", ".join(weak_categories[:8]))
+    attempt_counts = {str(r.get("outcome")): int(r.get("n") or 0) for r in (latest_attempts or [])}
+    if attempt_counts.get("no_pdf_url", 0):
+        actions.append("For no_pdf_url papers, synthesize access links and backfill OA PDF metadata before retrying section ingest.")
+    if attempt_counts.get("pdf_download_failed", 0) or attempt_counts.get("parse_timeout", 0):
+        actions.append("Retry only high-value retryable PDF failures with conservative concurrency; do not broaden to all PDFs.")
+    if attempt_counts.get("no_target_sections", 0):
+        actions.append("Mark no_target_sections papers as weak evidence unless alternate parser/Sci-Bot sections are available.")
     return actions
 
 
@@ -488,6 +530,18 @@ def render_markdown(result: dict[str, Any]) -> str:
                 f"| {row['category']} | {int(row['total']):,} | {int(row['in_top_n']):,} | "
                 f"{int(row['any_section']):,} | {int(row['primary_section']):,} | {int(row['eligible_pdf']):,} |"
             )
+        if sections.get("latest_attempt_outcomes"):
+            lines.extend(
+                [
+                    "",
+                    "### Latest Section Ingest Outcomes",
+                    "",
+                    "| outcome | papers |",
+                    "| --- | ---: |",
+                ]
+            )
+            for row in sections.get("latest_attempt_outcomes") or []:
+                lines.append(f"| {row['outcome']} | {int(row['n']):,} |")
     else:
         lines.append(f"- unavailable: {sections.get('reason')}")
     lines.extend(["", "## Frontfill Log Signals", "", "| event | count |", "| --- | ---: |"])

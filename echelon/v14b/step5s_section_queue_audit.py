@@ -65,6 +65,11 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             has_any_section INTEGER NOT NULL DEFAULT 0,
             has_primary_section INTEGER NOT NULL DEFAULT 0,
             eligible_pdf INTEGER NOT NULL DEFAULT 0,
+            last_attempt_outcome TEXT,
+            last_attempt_ts TEXT,
+            retry_class TEXT,
+            retry_priority REAL NOT NULL DEFAULT 0,
+            access_strategy TEXT,
             title TEXT,
             publication_year INTEGER,
             source_url TEXT,
@@ -87,6 +92,16 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             ON section_priority_papers(has_primary_section, priority_score DESC);
         """
     )
+    cols = _cols(conn_v14, "section_priority_papers")
+    for col, ddl in {
+        "last_attempt_outcome": "ALTER TABLE section_priority_papers ADD COLUMN last_attempt_outcome TEXT",
+        "last_attempt_ts": "ALTER TABLE section_priority_papers ADD COLUMN last_attempt_ts TEXT",
+        "retry_class": "ALTER TABLE section_priority_papers ADD COLUMN retry_class TEXT",
+        "retry_priority": "ALTER TABLE section_priority_papers ADD COLUMN retry_priority REAL NOT NULL DEFAULT 0",
+        "access_strategy": "ALTER TABLE section_priority_papers ADD COLUMN access_strategy TEXT",
+    }.items():
+        if col not in cols:
+            conn_v14.execute(ddl)
 
 
 def _add(
@@ -296,6 +311,53 @@ def _section_status(conn_main: sqlite3.Connection) -> tuple[set[str], set[str]]:
     return any_section, primary_section
 
 
+def _latest_attempts(conn_main: sqlite3.Connection, paper_ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not paper_ids or not _table_exists(conn_main, "section_ingest_attempts"):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for i in range(0, len(paper_ids), 800):
+        chunk = paper_ids[i:i + 800]
+        ph = ",".join("?" for _ in chunk)
+        rows = conn_main.execute(
+            f"""
+            SELECT paper_id, attempt_ts, outcome, source_url, detail,
+                   inserted_sections, primary_sections
+            FROM (
+                SELECT *,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY paper_id
+                           ORDER BY attempt_ts DESC, attempt_id DESC
+                       ) AS rn
+                FROM section_ingest_attempts
+                WHERE paper_id IN ({ph})
+            )
+            WHERE rn = 1
+            """,
+            chunk,
+        ).fetchall()
+        for row in rows:
+            out[str(row["paper_id"])] = dict(row)
+    return out
+
+
+def _retry_class_and_strategy(*, outcome: str, eligible_pdf: bool, has_primary: bool) -> tuple[str, float, str]:
+    if has_primary or outcome == "success_primary":
+        return "covered", 0.0, "local_section_ready"
+    if outcome == "success_secondary_only":
+        return "partial_section", 2.0, "keep as weak evidence; retry if paper is decision-critical"
+    if outcome in {"pdf_download_failed", "parse_timeout", "parser_exception"}:
+        return "retryable_pdf_failure", 4.0, "retry with conservative timeout or alternate open-access URL"
+    if outcome == "parse_no_blocks":
+        return "parser_failure", 3.5, "retry with alternate parser or mark as external-access evidence gap"
+    if outcome == "no_target_sections":
+        return "no_target_sections", 1.0, "do not treat as strong bottleneck evidence; use abstract/metadata only with weak scope"
+    if outcome == "no_pdf_url":
+        return "needs_access_link", 2.5, "synthesize DOI/S2/OpenAlex/arXiv links and try Semantic Scholar/OpenAlex OA metadata"
+    if eligible_pdf:
+        return "not_attempted_pdf_available", 5.0, "high-priority delta ingest candidate"
+    return "not_attempted_no_pdf", 1.5, "needs external access link or OA metadata backfill"
+
+
 def _paper_metadata(conn_main: sqlite3.Connection, paper_ids: list[str]) -> dict[str, dict[str, Any]]:
     if not paper_ids:
         return {}
@@ -346,21 +408,33 @@ def run_section_queue_audit(
     any_section, primary_section = _section_status(conn_main)
     all_ids = sorted(reasons.keys(), key=lambda pid: (-scores[pid], pid))
     meta = _paper_metadata(conn_main, all_ids)
+    attempts = _latest_attempts(conn_main, all_ids)
     audit_ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
     rows = []
     for pid in all_ids:
         m = meta.get(pid, {})
         eligible = bool(m.get("source_url"))
+        attempt = attempts.get(pid, {})
+        retry_class, retry_boost, access_strategy = _retry_class_and_strategy(
+            outcome=str(attempt.get("outcome") or ""),
+            eligible_pdf=eligible,
+            has_primary=pid in primary_section,
+        )
         rows.append(
             {
                 "paper_id": pid,
-                "priority_score": round(float(scores[pid]), 4),
+                "priority_score": round(float(scores[pid]) + retry_boost, 4),
                 "reasons": sorted(reasons[pid]),
                 "in_top_n": pid in candidate_set,
                 "has_any_section": pid in any_section,
                 "has_primary_section": pid in primary_section,
                 "eligible_pdf": eligible,
+                "last_attempt_outcome": attempt.get("outcome") or "",
+                "last_attempt_ts": attempt.get("attempt_ts") or "",
+                "retry_class": retry_class,
+                "retry_priority": retry_boost,
+                "access_strategy": access_strategy,
                 "title": m.get("title") or "",
                 "publication_year": m.get("publication_year") or (str(m.get("publication_date") or "")[:4] or None),
                 "source_url": m.get("source_url") or "",
@@ -376,8 +450,10 @@ def run_section_queue_audit(
         """
         INSERT OR REPLACE INTO section_priority_papers
             (paper_id, priority_score, reasons_json, in_top_n, has_any_section,
-             has_primary_section, eligible_pdf, title, publication_year, source_url, audit_ts)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             has_primary_section, eligible_pdf, last_attempt_outcome, last_attempt_ts,
+             retry_class, retry_priority, access_strategy, title, publication_year,
+             source_url, audit_ts)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -388,6 +464,11 @@ def run_section_queue_audit(
                 int(r["has_any_section"]),
                 int(r["has_primary_section"]),
                 int(r["eligible_pdf"]),
+                r["last_attempt_outcome"],
+                r["last_attempt_ts"],
+                r["retry_class"],
+                r["retry_priority"],
+                r["access_strategy"],
                 r["title"],
                 int(r["publication_year"]) if str(r["publication_year"] or "").isdigit() else None,
                 r["source_url"],
@@ -443,8 +524,11 @@ def run_section_queue_audit(
 
     delta_rows = [
         r for r in rows
-        if not r["has_primary_section"] and r["eligible_pdf"]
+        if not r["has_primary_section"]
+        and r["retry_class"] not in {"covered", "no_target_sections"}
+        and (r["eligible_pdf"] or r["retry_class"] in {"needs_access_link", "retryable_pdf_failure", "parser_failure"})
     ]
+    delta_rows = sorted(delta_rows, key=lambda r: (-float(r["priority_score"]), r["retry_class"], r["paper_id"]))
     out_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "section_high_value_queue_audit.json"
@@ -458,6 +542,7 @@ def run_section_queue_audit(
         "high_value_papers": len(rows),
         "candidate_top_n": len(candidate_set),
         "delta_queue": len(delta_rows),
+        "retry_class_counts": dict(Counter(str(r["retry_class"]) for r in rows)),
         "summary": summary_rows,
         "top_delta": delta_rows[:200],
         "outputs": {
@@ -472,7 +557,8 @@ def run_section_queue_audit(
             f,
             fieldnames=[
                 "paper_id", "priority_score", "reasons", "in_top_n", "has_any_section",
-                "has_primary_section", "eligible_pdf", "publication_year", "title",
+                "has_primary_section", "eligible_pdf", "last_attempt_outcome", "last_attempt_ts",
+                "retry_class", "retry_priority", "access_strategy", "publication_year", "title",
                 "source_url", "doi", "arxiv_id", "openalex_id", "s2_paper_id",
             ],
         )
@@ -488,13 +574,23 @@ def run_section_queue_audit(
         f"- audit_ts: `{audit_ts}`",
         f"- current top_n budget: `{top_n}`",
         f"- high-value papers considered: `{len(rows):,}`",
-        f"- next delta queue with PDF and missing primary section: `{len(delta_rows):,}`",
+        f"- next delta queue needing primary section/action: `{len(delta_rows):,}`",
+        "",
+        "## Failure / Retry Classes",
+        "",
+        "| retry_class | count |",
+        "|---|---:|",
+    ]
+    retry_counts = Counter(str(r["retry_class"]) for r in rows)
+    for cls, count in retry_counts.most_common():
+        lines.append(f"| {cls} | {count:,} |")
+    lines.extend([
         "",
         "## Category Coverage",
         "",
         "| category | total | in topN | any section | primary section | eligible PDF |",
         "|---|---:|---:|---:|---:|---:|",
-    ]
+    ])
     for s in summary_rows:
         lines.append(
             f"| {s['category']} | {s['total']:,} | {s['in_top_n']:,} | "
