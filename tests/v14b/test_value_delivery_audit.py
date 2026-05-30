@@ -136,6 +136,7 @@ def _write_product_sources(root: Path) -> None:
         "def get_visual_nodes(): return _visual_node_role_contract\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         "def _limitation_atom_contract(): return weak_bottleneck_hypothesis + section_limitation_context + claim_scope + evidence_grade + uncertainty_reasons\n"
+        'def _build_bottleneck_lineage(): return {"can_explain": ["x"], "cannot_explain": ["a proven causal root-cause chain when section-level typed triples are missing", "that a bottleneck is solved without linked resolution atoms"]}\n'
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         'def _build_validation_directions(): return {"can_explain": ["x"], "cannot_explain": ["that the direction is ready for Radar", "Radar promotion without a complete Claim Card"], "required_evidence": ["x"]}\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
@@ -160,6 +161,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
         "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
+        "function renderBottleneckLineage() { return c.can_explain + c.cannot_explain + '不能说明'; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
@@ -405,6 +407,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
 
     assert len(result["gates"]) == 14
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
+    bottleneck_gate = next(g for g in result["gates"] if g["issue"] == "Bottleneck Lineage Graph")
+    assert bottleneck_gate["checks"]["api_bottleneck_constraints_carry_limits"] is True
+    assert bottleneck_gate["checks"]["ui_renders_bottleneck_lineage_limits"] is True
     branch_gate = next(g for g in result["gates"] if g["issue"] == "Branch Lineage Validity")
     assert branch_gate["checks"]["api_visual_clusters_carry_lineage_contract"] is True
     assert branch_gate["checks"]["ui_cluster_panel_renders_lineage_contract"] is True

@@ -96,6 +96,45 @@ def _make_visual_db(path):
             focus_papers_json TEXT,
             evidence_json TEXT
         );
+        CREATE TABLE first_principles_principles (
+            principle_id TEXT PRIMARY KEY,
+            principle_name TEXT,
+            root_cause TEXT,
+            bottleneck_score REAL,
+            unresolved_atoms INTEGER,
+            resolved_atoms INTEGER,
+            emergence_year INTEGER,
+            peak_backlog_year INTEGER,
+            current_backlog INTEGER,
+            evidence_quality_json TEXT,
+            top_keywords_json TEXT,
+            top_branches_json TEXT,
+            top_papers_json TEXT,
+            future_alignment_json TEXT,
+            direction_tier_json TEXT,
+            risk_label TEXT,
+            notes_json TEXT
+        );
+        CREATE TABLE bottleneck_lineage_triples (
+            triple_id TEXT PRIMARY KEY,
+            principle_id TEXT,
+            direction_id INTEGER,
+            atom_id INTEGER,
+            edge_order INTEGER,
+            source_stage TEXT,
+            target_stage TEXT,
+            source_text TEXT,
+            target_text TEXT,
+            relation_type TEXT,
+            paper_id TEXT,
+            resolver_paper_id TEXT,
+            event_year INTEGER,
+            evidence_section TEXT,
+            evidence_page INTEGER,
+            evidence_quality TEXT,
+            evidence_weight REAL,
+            metadata_json TEXT
+        );
         """
     )
     try:
@@ -262,6 +301,36 @@ def _make_visual_db(path):
         (
             json.dumps({"source": "predicted_future_edges + limitation_atoms + direction_claim_cards"}),
         ),
+    )
+    conn.execute(
+        """
+        INSERT INTO first_principles_principles
+            (principle_id, principle_name, root_cause, bottleneck_score,
+             unresolved_atoms, resolved_atoms, emergence_year, peak_backlog_year,
+             current_backlog, evidence_quality_json, top_keywords_json,
+             top_branches_json, top_papers_json, future_alignment_json,
+             direction_tier_json, risk_label, notes_json)
+        VALUES ('bp1', 'Laser stability constraint',
+                'Device stability limits repeatable laser optics experiments.',
+                0.91, 3, 1, 2020, 2024, 2, '{}',
+                '[{"key":"laser"},{"key":"stability"}]',
+                '[]', '[]', '{}', '{}', 'open_constraint', '{}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO bottleneck_lineage_triples
+            (triple_id, principle_id, direction_id, atom_id, edge_order,
+             source_stage, target_stage, source_text, target_text, relation_type,
+             paper_id, resolver_paper_id, event_year, evidence_section,
+             evidence_page, evidence_quality, evidence_weight, metadata_json)
+        VALUES ('bt1', 'bp1', NULL, NULL, 1,
+                'constraint', 'failure_mechanism',
+                'laser stability constraint',
+                'instability causes measurement drift',
+                'causes', 'p1', NULL, 2024,
+                'discussion', 4, 'section_level', 1.0, '{}')
+        """
     )
     conn.commit()
     conn.close()
@@ -460,6 +529,14 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert direction["required_evidence"]
     assert direction["uncertainty_reasons"]
     assert direction["evidence_objects"]
+    constraint = data["bottleneck_lineage"]["constraints"][0]
+    assert constraint["claim_scope"]
+    assert constraint["evidence_grade"]
+    assert constraint["can_explain"]
+    assert constraint["cannot_explain"]
+    assert constraint["required_evidence"]
+    assert constraint["uncertainty_reasons"]
+    assert constraint["evidence_objects"]
     assert data["related_papers"][0]["access_links"]
     related = data["related_papers"][0]
     assert related["claim_scope"]

@@ -198,7 +198,7 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def audit_bottleneck_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+def audit_bottleneck_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     if not table_exists(conn_v14, "bottleneck_lineage_triples"):
         return {
             "issue": "Bottleneck Lineage Graph",
@@ -216,15 +216,49 @@ def audit_bottleneck_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     missing = sorted(EXPECTED_LINEAGE_STAGES - stage_pairs)
     quality_grade = grade_from_qualities([r[2] for r in rows])
     pages = sum(1 for r in rows if r[3] not in (None, ""))
+    data_status = "pass"
     if not rows or missing:
-        status = "fail" if missing else "warn"
+        data_status = "fail" if missing else "warn"
     elif pages == 0:
-        status = "warn"
-    else:
-        status = "pass"
+        data_status = "warn"
+    source_checks = {
+        "api_bottleneck_constraints_carry_limits": False,
+        "ui_renders_bottleneck_lineage_limits": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_bottleneck_constraints_carry_limits": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _build_bottleneck_lineage",
+                    '"can_explain": [',
+                    '"cannot_explain": [',
+                    "a proven causal root-cause chain when section-level typed triples are missing",
+                    "that a bottleneck is solved without linked resolution atoms",
+                ),
+            ),
+            "ui_renders_bottleneck_lineage_limits": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "function renderBottleneckLineage",
+                    "c.can_explain",
+                    "c.cannot_explain",
+                    "不能说明",
+                ),
+            ),
+        }
+    checks = {
+        "typed_stage_chain_complete": not missing and bool(rows),
+        "typed_triples_have_page_evidence": pages > 0,
+        **source_checks,
+    }
+    status = data_status
+    if data_status == "pass" and not all(source_checks.values()):
+        status = "fail"
     return {
         "issue": "Bottleneck Lineage Graph",
         "status": status,
+        "checks": checks,
         "triples": len(rows),
         "stage_pairs": sorted([f"{a}->{b}" for a, b in stage_pairs]),
         "missing_stage_pairs": [f"{a}->{b}" for a, b in missing],
@@ -1922,7 +1956,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
         )
         gates = [
             audit_evidence_bone(metrics),
-            audit_bottleneck_lineage(conn_v14),
+            audit_bottleneck_lineage(conn_v14, repo_root),
             audit_branch_lineage(conn_v14, repo_root),
             audit_future_growth(conn_v14),
             audit_claim_card_engine(conn_v14, repo_root),

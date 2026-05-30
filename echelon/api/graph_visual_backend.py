@@ -3947,7 +3947,9 @@ def _build_bottleneck_lineage(
         else:
             evidence_grade = "aggregate_bottleneck_history"
             claim_scope = "lineage_prior_until_typed_section_evidence"
-        uncertainty = []
+        uncertainty = [
+            "bottleneck lineage is evidence context; high-confidence direction claims still require Step6/Step13 Claim Card gates"
+        ]
         if not triples:
             uncertainty.append("no typed constraint->failure->attempt lineage triples matched this principle")
         if not has_section_triple:
@@ -4006,6 +4008,16 @@ def _build_bottleneck_lineage(
                 "typed_chain": typed_chain,
                 "claim_scope": claim_scope,
                 "evidence_grade": evidence_grade,
+                "can_explain": [
+                    "which root constraint is linked to limitation atoms and typed lineage triples",
+                    "how constraint/failure/attempt/fix stages appear in the available evidence",
+                    "where to inspect section-level bottleneck evidence before Claim Card promotion",
+                ],
+                "cannot_explain": [
+                    "a proven causal root-cause chain when section-level typed triples are missing",
+                    "that a bottleneck is solved without linked resolution atoms",
+                    "high-confidence R&D direction value without Step6/Step13 Claim Cards",
+                ],
                 "uncertainty_reasons": sorted(set(uncertainty)),
                 "required_evidence": required_evidence,
                 "evidence_objects": evidence_objects,

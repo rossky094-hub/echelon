@@ -1332,6 +1332,8 @@ function renderBottleneckLineage(lineage = {}) {
             <span class="pill">${esc(c.evidence_grade || "lineage evidence unknown")}</span>
           </div>
           <div class="pill-row">${(c.top_keywords || []).slice(0, 5).map((kw) => `<span class="pill">${esc(kw)}</span>`).join("")}</div>
+          ${(c.can_explain || []).length ? `<p class="mini"><strong>能说明：</strong>${(c.can_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(c.cannot_explain || []).length ? `<p class="mini"><strong>不能说明：</strong>${(c.cannot_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
           ${(c.typed_chain || []).length ? `
             <details>
               <summary>Typed lineage chain (${fmt((c.typed_chain || []).length)})</summary>

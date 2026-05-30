@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:30:51Z`
+- generated_at: `2026-05-30T16:37:35Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -74,6 +74,12 @@
 
 ```json
 {
+  "checks": {
+    "api_bottleneck_constraints_carry_limits": true,
+    "typed_stage_chain_complete": true,
+    "typed_triples_have_page_evidence": true,
+    "ui_renders_bottleneck_lineage_limits": true
+  },
   "evidence_grade": "strong_section",
   "issue": "Bottleneck Lineage Graph",
   "missing_stage_pairs": [],
