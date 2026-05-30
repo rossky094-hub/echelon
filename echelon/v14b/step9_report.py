@@ -75,7 +75,10 @@ def _loads_json(value, default):
 
 def _future_candidate_evidence_text(value: object) -> str:
     text = str(value or "N/A")
-    return text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+    return (
+        text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+        .replace("confidence=", "candidate_score=")
+    )
 
 
 def _normalise_subgraph_scope_row(row: dict) -> dict:
@@ -478,7 +481,7 @@ def generate_algo_report(
         f"",
         f"### Top 5 候选边 (case study)",
         f"",
-        f"| 源论文 | 目标论文 | 候选概率 | 源年 | 目标年 |",
+        f"| 源论文 | 目标论文 | 候选排序分数 | 源年 | 目标年 |",
         f"|---|---|---|---|---|",
     ]
 

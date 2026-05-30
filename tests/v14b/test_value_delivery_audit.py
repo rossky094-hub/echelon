@@ -150,7 +150,7 @@ def _write_product_sources(root: Path) -> None:
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
-        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge'\n"
+        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n"
         "topic_readiness = build_topic_readiness_preflight\n",
         encoding="utf-8",
     )
@@ -255,6 +255,7 @@ def _write_product_sources(root: Path) -> None:
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
         "Citation-function evidence 覆盖率 Citation Function Evidence\n"
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
+        "_future_candidate_evidence_text candidate_score= 候选排序分数\n"
         "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
         "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
         "_normalise_subgraph_scope_row "

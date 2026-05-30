@@ -377,7 +377,7 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
                 )
                 and _source_absent(
                     repo_root / "echelon/api/graph_visual_backend.py",
-                    ("model predicts",),
+                    ("model predicts", "branch split confidence and audit trail"),
                 )
             ),
         }
@@ -501,8 +501,10 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
         ),
         "step6_future_evidence_avoids_prediction_copy": (
             _source_contains(step6_path, ("GNN/VGAE candidate edge", "Future candidate generator"))
-            and _source_contains(api_path, ("_future_candidate_evidence_text", "GNN/VGAE candidate edge"))
+            and _source_contains(api_path, ("_future_candidate_evidence_text", "GNN/VGAE candidate edge", "candidate_score="))
+            and _source_contains(step9_path, ("_future_candidate_evidence_text", "candidate_score=", "候选排序分数"))
             and _source_absent(step6_path, ("VGAE pred:", "VGAE predicted future connections", "Link Prediction"))
+            and _source_absent(step9_path, ("| 源论文 | 目标论文 | 候选概率 |",))
         ),
         "current_docs_label_future_edges_as_candidates": all(
             _source_absent(path, ("predicted future edges", "cross-field predicted edges"))
@@ -528,6 +530,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                     "temporal link prediction",
                     "GNN/VGAE confidence",
                     "technical probability",
+                    "calibrated probability",
                 ),
             )
         ),

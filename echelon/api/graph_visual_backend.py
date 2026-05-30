@@ -74,7 +74,10 @@ def _connect_main() -> sqlite3.Connection | None:
 
 def _future_candidate_evidence_text(value: Any) -> str:
     text = str(value or "")
-    return text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+    return (
+        text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+        .replace("confidence=", "candidate_score=")
+    )
 
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
@@ -3337,7 +3340,7 @@ def _branch_lineage_contract(item: dict[str, Any], lineage_payload: dict[str, An
             "parent_branch_id with time-forward citation support",
             "driver papers with local primary section evidence",
             "constraint shift tied to limitation/discussion/conclusion/results sections",
-            "branch split confidence and audit trail",
+            "branch split support score and audit trail",
         ],
         "evidence_objects": _compact_evidence_objects(
             [
@@ -3349,7 +3352,7 @@ def _branch_lineage_contract(item: dict[str, Any], lineage_payload: dict[str, An
                     "label": f"{item.get('parent_branch_id') or 'root'} -> {item.get('branch_id') or '-'}",
                     "relationship": "split_evidence",
                     "lineage_status": lineage_status,
-                    "confidence": item.get("split_confidence"),
+                    "support_score": item.get("split_confidence"),
                     "description": item.get("split_reason"),
                     "claim_scope": claim_scope,
                     "evidence_grade": evidence_grade,
@@ -3830,7 +3833,7 @@ def _build_branch_dossiers(
             "parent_branch_id with time-forward citation support",
             "driver papers with local primary section evidence",
             "constraint shift tied to limitation/discussion/conclusion/results sections",
-            "branch split confidence and audit trail",
+            "branch split support score and audit trail",
         ]
         branch_evidence_objects = [
             {
@@ -3841,7 +3844,7 @@ def _build_branch_dossiers(
                 "label": f"{row.get('parent_branch_id') or 'root'} -> {branch_id or cid}",
                 "relationship": "split_evidence",
                 "lineage_status": lineage_status,
-                "confidence": split_confidence,
+                "support_score": split_confidence,
                 "description": split_reason,
                 "claim_scope": claim_scope,
                 "evidence_grade": evidence_grade,

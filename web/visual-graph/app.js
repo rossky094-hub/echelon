@@ -118,7 +118,7 @@ const DEFAULT_VALUE_MODEL = {
     },
     fusion_value: {
       algorithm: "Step6 tiered fusion + Step13 Claim Card gates",
-      relationship: "decision value = path support + calibrated probability + bottleneck evidence + section quality",
+      relationship: "decision value = path support + calibrated candidate score + bottleneck evidence + section quality",
       display: "Radar and Claim Cards",
     },
   },
