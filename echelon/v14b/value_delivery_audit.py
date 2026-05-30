@@ -1444,6 +1444,19 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
     live_status = "not_run"
     if live_results:
         live_status = "fail" if failed_topics else "pass"
+    benchmark_fixture_contract_ok = bool(live_results) and all(
+        (r.get("benchmark_fixture_contract") or {}).get("role")
+        == "regression_fixture_not_product_allowlist"
+        and (r.get("benchmark_fixture_contract") or {}).get("llm_policy")
+        == "no_llm_required_for_topic_preflight"
+        for r in live_results
+    )
+    no_gold_topic_fields = bool(live_results) and all(
+        "gold_branch_coverage" not in r for r in live_results
+    )
+    contract_fail = bool(live_results) and not (
+        benchmark_fixture_contract_ok and no_gold_topic_fields
+    )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
     topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
     topic_gap_blocking = topic_gap_queue_papers > 0 and topic_gap_primary_rate < 0.70
@@ -1451,9 +1464,14 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
         "issue": "Multi-topic Regression",
         "status": (
             "fail"
-            if missing or failed_topics or topic_gap_blocking
+            if missing or failed_topics or topic_gap_blocking or contract_fail
             else ("pass" if live_results else "warn")
         ),
+        "checks": {
+            "benchmark_topics_defined": not missing,
+            "live_results_have_fixture_contract": benchmark_fixture_contract_ok,
+            "live_results_avoid_gold_topic_fields": no_gold_topic_fields,
+        },
         "benchmark_topics": sorted(defined),
         "missing_topics": missing,
         "live_regression_status": live_status,
@@ -1462,7 +1480,10 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
         "topic_gap_primary_section_papers": int(metrics.get("topic_gap_primary_section_papers") or 0),
         "topic_gap_primary_section_rate": topic_gap_primary_rate,
         "topic_gap_blocking": topic_gap_blocking,
-        "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens.",
+        "policy": (
+            "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
+            "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates."
+        ),
     }
 
 

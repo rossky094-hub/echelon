@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-30T14:35:37Z`
+- Audit: `2026-05-30T14:43:07Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -46,6 +46,7 @@
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
 - Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
+- Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.
 
 ## Quality Gaps

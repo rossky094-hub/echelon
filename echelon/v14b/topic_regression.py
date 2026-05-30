@@ -848,9 +848,13 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
         "audit_ts": utc_now(),
         "topic": benchmark.topic,
         "benchmark_topic": True,
+        "benchmark_fixture_contract": {
+            "role": "regression_fixture_not_product_allowlist",
+            "product_scope": "arbitrary_topics_use_deterministic_readiness_preflight",
+            "llm_policy": "no_llm_required_for_topic_preflight",
+        },
         "overall_status": overall,
         "benchmark_branch_coverage": branch_coverage,
-        "gold_branch_coverage": branch_coverage,
         "deterministic_readiness": run_topic_readiness_preflight(lens, benchmark.topic),
         "gates": gates,
         "branch_results": branch_results,
@@ -924,6 +928,7 @@ def render_regression_md(result: dict[str, Any]) -> str:
             f"- Five-question evidence contracts: {q.get('with_clickable_evidence', 0)}/{q.get('total', 0)} have claim scope, evidence grade, uncertainty, and clickable evidence.",
             f"- Bottleneck lineage contracts: {lineage.get('with_clickable_evidence', 0)}/{lineage.get('total', 0)} constraints have typed/clickable evidence contracts.",
             f"- Reading path contracts: {reading.get('with_clickable_evidence', 0)}/{reading.get('total', 0)} steps are auditable; modes={', '.join(reading.get('modes') or []) or 'N/A'}.",
+            "- Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.",
             "- This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.",
         ]
     )
@@ -1011,7 +1016,6 @@ def render_multi_regression_md(results: list[dict[str, Any]]) -> str:
                 status=result.get("overall_status"),
                 coverage=float(
                     result.get("benchmark_branch_coverage")
-                    or result.get("gold_branch_coverage")
                     or baseline.get("expected_branch_coverage")
                     or 0.0
                 ),

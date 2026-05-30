@@ -125,6 +125,10 @@ def test_metalens_regression_passes_on_decision_grade_fixture():
     result = run_topic_regression(lens)
 
     assert result["overall_status"] == "pass"
+    assert result["benchmark_fixture_contract"]["role"] == "regression_fixture_not_product_allowlist"
+    assert result["benchmark_fixture_contract"]["llm_policy"] == "no_llm_required_for_topic_preflight"
+    assert "benchmark_branch_coverage" in result
+    assert "gold_branch_coverage" not in result
     assert all(row["status"] == "pass" for row in result["branch_results"])
     assert all(row["status"] == "pass" for row in result["bottleneck_results"])
 

@@ -11,6 +11,7 @@ from echelon.v14b.value_delivery_audit import (
     audit_legacy_flow_isolation_contract,
     audit_llm_evidence_boundary,
     audit_main_path_uncertainty_contract,
+    audit_multi_topic_regression,
     audit_online_topic_readiness_contract,
     audit_rd_radar_promotion_contract,
     collect_value_gates,
@@ -354,7 +355,20 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     report_dir = tmp_path / "reports"
     report_dir.mkdir()
     (report_dir / "multi_topic_regression.json").write_text(
-        json.dumps([{"topic": "metalens", "overall_status": "pass"}]),
+        json.dumps(
+            [
+                {
+                    "topic": "metalens",
+                    "overall_status": "pass",
+                    "benchmark_topic": True,
+                    "benchmark_branch_coverage": 1.0,
+                    "benchmark_fixture_contract": {
+                        "role": "regression_fixture_not_product_allowlist",
+                        "llm_policy": "no_llm_required_for_topic_preflight",
+                    },
+                }
+            ]
+        ),
         encoding="utf-8",
     )
 
@@ -679,6 +693,35 @@ def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
     assert multi["failed_topics"] == ["quantum light source"]
 
 
+def test_multi_topic_audit_rejects_gold_topic_fixture_outputs(tmp_path):
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    (report_dir / "multi_topic_regression.json").write_text(
+        json.dumps(
+            [
+                {
+                    "topic": "metalens",
+                    "overall_status": "pass",
+                    "benchmark_topic": True,
+                    "benchmark_branch_coverage": 1.0,
+                    "benchmark_fixture_contract": {
+                        "role": "regression_fixture_not_product_allowlist",
+                        "llm_policy": "no_llm_required_for_topic_preflight",
+                    },
+                    "gold_branch_coverage": 1.0,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = audit_multi_topic_regression(report_dir)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["live_results_avoid_gold_topic_fields"] is False
+    assert result["checks"]["live_results_have_fixture_contract"] is True
+
+
 def test_value_delivery_audit_fails_when_benchmark_topic_gap_sections_missing(tmp_path):
     main = tmp_path / "main.sqlite3"
     v14 = tmp_path / "v14.sqlite3"
@@ -691,7 +734,20 @@ def test_value_delivery_audit_fails_when_benchmark_topic_gap_sections_missing(tm
     report_dir = tmp_path / "reports"
     report_dir.mkdir()
     (report_dir / "multi_topic_regression.json").write_text(
-        json.dumps([{"topic": "metalens", "overall_status": "pass"}]),
+        json.dumps(
+            [
+                {
+                    "topic": "metalens",
+                    "overall_status": "pass",
+                    "benchmark_topic": True,
+                    "benchmark_branch_coverage": 1.0,
+                    "benchmark_fixture_contract": {
+                        "role": "regression_fixture_not_product_allowlist",
+                        "llm_policy": "no_llm_required_for_topic_preflight",
+                    },
+                }
+            ]
+        ),
         encoding="utf-8",
     )
     queue_dir = tmp_path / "data/v14b"
