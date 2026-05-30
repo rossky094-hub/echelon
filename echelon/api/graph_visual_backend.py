@@ -4181,6 +4181,8 @@ def _reading_path_item(
     uncertainty_reasons: list[str] | None = None,
     evidence_objects: list[dict[str, Any] | None] | None = None,
     required_evidence: list[str] | None = None,
+    can_explain: list[str] | None = None,
+    cannot_explain: list[str] | None = None,
 ) -> dict[str, Any] | None:
     papers = [p for p in papers if p and p.get("paper_id")]
     objects = _compact_evidence_objects(
@@ -4213,6 +4215,15 @@ def _reading_path_item(
         "why": why,
         "claim_scope": claim_scope,
         "evidence_grade": evidence_grade if objects else "insufficient",
+        "can_explain": can_explain or [
+            "why these papers are worth reading next",
+            "what evidence object or graph context selected this step",
+        ],
+        "cannot_explain": cannot_explain or [
+            "a standalone scientific conclusion",
+            "Radar promotion without complete Step13 Claim Cards",
+            "causal history without linked citation and section evidence",
+        ],
         "uncertainty_reasons": sorted(set(uncertainty)),
         "required_evidence": required_evidence or [
             "clickable paper record",
@@ -4266,6 +4277,8 @@ def _build_reading_path(
         uncertainty_reasons=[
             "starter papers are selected by topic relevance, not by proof of future direction",
         ],
+        can_explain=["topic vocabulary", "representative starting context", "which papers to inspect before lineage claims"],
+        cannot_explain=["key turning status", "branch causality", "future direction value"],
     )
     if item:
         path.append(item)
@@ -4288,6 +4301,8 @@ def _build_reading_path(
             "broader field context papers must not be narrated as topic-specific turning papers",
         ],
         required_evidence=["topic-specific text/facet match", "main-path context", "access link or local section evidence"],
+        can_explain=["candidate turning-paper context", "where topic text overlaps main-path context", "which papers need citation audit"],
+        cannot_explain=["complete historical causality while linked refs are below target", "bottleneck resolution", "Radar direction value"],
     )
     if item:
         path.append(item)
@@ -4315,6 +4330,8 @@ def _build_reading_path(
         ],
         evidence_objects=branch_evidence[:8],
         required_evidence=["driver papers", "branch lineage status", "section-level constraint shift evidence"],
+        can_explain=["candidate branch context", "which driver papers support a split hypothesis", "where branch-lineage evidence should be audited"],
+        cannot_explain=["evidence-backed parent-child split without lineage support", "root constraint shift without section evidence", "investment-ready direction"],
     )
     if item:
         path.append(item)
@@ -4340,6 +4357,8 @@ def _build_reading_path(
         ],
         evidence_objects=bottleneck_evidence[:10],
         required_evidence=["limitation/discussion/conclusion/results sections", "resolution atoms", "paper access links"],
+        can_explain=["which limitation atoms anchor the bottleneck", "where section evidence should be read", "which constraints still look unresolved"],
+        cannot_explain=["that a bottleneck is solved without resolution atoms", "high-confidence Claim Card evidence before section provenance passes", "commercial priority"],
     )
     if item:
         path.append(item)
@@ -4364,6 +4383,8 @@ def _build_reading_path(
             ],
             evidence_objects=card_evidence,
             required_evidence=["complete five-question card", "calibrated future candidate", "section bottleneck evidence"],
+            can_explain=["which candidates have complete five-question cards", "which evidence objects support the card", "what minimal validation experiment to inspect"],
+            cannot_explain=["high-confidence status when section/calibration gates fail", "successful validation before experiment results", "raw GNN edge conclusions"],
         )
     else:
         future_papers: list[dict[str, Any]] = []
@@ -4387,6 +4408,8 @@ def _build_reading_path(
             ],
             evidence_objects=future_evidence,
             required_evidence=["calibration audit", "Step6 fusion evidence", "complete Step13 Claim Card"],
+            can_explain=["which future endpoints to inspect as hypotheses", "where Step6/Step13 should gather evidence next", "candidate-pool scope"],
+            cannot_explain=["that the future direction is valid", "that the bottleneck will be solved", "Radar promotion without a complete Claim Card"],
         )
     if item:
         path.append(item)

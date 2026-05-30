@@ -1176,6 +1176,8 @@ function renderTopicDossier(dossier = {}) {
             <span class="pill">${esc(item.evidence_grade || "evidence unknown")}</span>
           </div>
           <p>${esc(item.why || "")}</p>
+          ${(item.can_explain || []).length ? `<p class="mini"><strong>能说明：</strong>${(item.can_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(item.cannot_explain || []).length ? `<p class="mini"><strong>不能说明：</strong>${(item.cannot_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
           ${(item.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(item.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
           ${(item.uncertainty_reasons || []).length ? `
             <details>
@@ -1716,6 +1718,8 @@ function buildSearchFallbackTopicLens(text, hits = []) {
             "section-level bottleneck evidence",
             "Step6/Step13 Claim Card generation",
           ],
+          can_explain: ["which papers matched the fallback retrieval query"],
+          cannot_explain: ["real branch splits", "key turning papers", "unresolved bottlenecks", "future direction value"],
           papers: readingPapers,
           evidence_objects: evidenceObjects,
         },

@@ -870,12 +870,14 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     source_checks = {
         "api_exposes_topic_readiness": False,
         "api_topic_branch_splits_inherit_lineage": False,
+        "api_reading_path_items_carry_limits": False,
         "api_search_hits_carry_contract": False,
         "api_topic_bottlenecks_use_resolution_evidence": False,
         "api_limitation_atoms_carry_contract": False,
         "api_topic_validation_directions_inherit_claim_card_evidence": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
+        "ui_renders_reading_path_limits": False,
         "ui_paper_list_renders_hit_contract": False,
         "ui_renders_topic_dossier_branch_contracts": False,
         "ui_renders_limitation_contracts": False,
@@ -898,6 +900,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "parent_branch_id",
                     "lineage_status",
                     "split_confidence",
+                ),
+            ),
+            "api_reading_path_items_carry_limits": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _reading_path_item",
+                    '"can_explain": can_explain',
+                    '"cannot_explain": cannot_explain',
+                    "Radar promotion without complete Step13 Claim Cards",
+                    "GNN/VGAE is a candidate generator, not a conclusion generator",
                 ),
             ),
             "api_search_hits_carry_contract": _source_contains(
@@ -955,6 +967,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             "ui_renders_topic_readiness": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderTopicReadiness", "topic_readiness"),
+            ),
+            "ui_renders_reading_path_limits": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderTopicDossier",
+                    "readingPath",
+                    "item.can_explain",
+                    "item.cannot_explain",
+                    "不能说明",
+                ),
             ),
             "ui_paper_list_renders_hit_contract": _source_contains(
                 repo_root / "web/visual-graph/app.js",

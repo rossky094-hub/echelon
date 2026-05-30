@@ -125,6 +125,7 @@ def _write_product_sources(root: Path) -> None:
         "def _build_topic_branch_splits(branch_dossiers): branch_contract_by_id parent_branch_id lineage_status split_confidence\n"
         "def _branch_lineage_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
         "def get_visual_clusters(): return _branch_lineage_contract\n"
+        'def _reading_path_item(): return {"can_explain": can_explain, "cannot_explain": cannot_explain, "note": "Radar promotion without complete Step13 Claim Cards GNN/VGAE is a candidate generator, not a conclusion generator"}\n'
         "def _paper_hit_contract(): return visual_search_hit + retrieval_context_only + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def _hydrate_hits(): return _paper_hit_contract\n"
         "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
@@ -159,7 +160,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
         "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
-        "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
+        "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
@@ -419,11 +420,13 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_branch_splits_inherit_lineage"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_reading_path_items_carry_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_search_hits_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_reading_path_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_paper_list_renders_hit_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_limitation_contracts"] is True
@@ -477,9 +480,11 @@ def test_online_topic_readiness_contract_is_arbitrary_topic_and_no_llm(tmp_path)
     assert result["checks"]["no_llm_preflight"] is True
     assert result["checks"]["arbitrary_topic_not_benchmark_gated"] is True
     assert result["checks"]["api_topic_branch_splits_inherit_lineage"] is True
+    assert result["checks"]["api_reading_path_items_carry_limits"] is True
     assert result["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert result["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert result["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
+    assert result["checks"]["ui_renders_reading_path_limits"] is True
     assert result["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert result["checks"]["ui_renders_validation_direction_evidence_objects"] is True
     assert "turning papers with strong/moderate section provenance" in result["observed_gates"]
