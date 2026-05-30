@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T22:46:56Z`
+- generated_at: `2026-05-30T22:53:29Z`
 
 ## Reference Linkage
 
@@ -16,10 +16,10 @@
 
 ## Section Evidence
 
-- section rows: 5,345
+- section rows: 5,353
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 154
+- current parser-contract primary section papers: 161
 
 ### High-Value Priority Coverage
 
@@ -29,10 +29,10 @@
 | active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
 | branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
 | main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 65 | 1,000 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 72 | 1,000 |
 | resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
 | future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 54 | 268 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 61 | 268 |
 | topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
 | topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
 | topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |
@@ -46,8 +46,8 @@
 | outcome | papers |
 | --- | ---: |
 | no_target_sections | 4,976 |
-| success_primary | 1,844 |
-| already_has_primary | 439 |
+| success_primary | 1,851 |
+| already_has_primary | 437 |
 | success_secondary_only | 283 |
 | pdf_download_failed | 46 |
 | parse_no_blocks | 1 |
@@ -56,19 +56,19 @@
 
 | event | count |
 | --- | ---: |
-| pdf_graphics_warning | 55,727 |
+| pdf_graphics_warning | 55,732 |
 | download_failure | 22,646 |
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 180/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 187/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `180/8592`
-- rows / papers / primary papers: `5,345` / `3,020` / `3,020`
+- progress: `187/8592`
+- rows / papers / primary papers: `5,353` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.

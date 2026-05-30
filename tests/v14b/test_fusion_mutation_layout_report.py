@@ -401,6 +401,130 @@ class TestFusion:
         assert candidates[0]["limitation_decision_grade_section_count"] == 1
         assert SECTION_PARSER_CONTRACT_VERSION in candidates[0]["limitation_section_contract_versions"]
 
+    def test_run_fusion_audit_counts_decision_grade_limitation_sections(self, tmp_path):
+        from echelon.v14b.step6_fusion import run_fusion
+
+        db_main = tmp_path / "main.sqlite3"
+        conn_main = sqlite3.connect(str(db_main))
+        conn_main.executescript(
+            """
+            CREATE TABLE papers (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                abstract TEXT,
+                publication_year INTEGER,
+                primary_field_id TEXT
+            );
+            CREATE TABLE paper_sections (
+                paper_id TEXT,
+                section_name TEXT,
+                section_text TEXT,
+                section_meta_json TEXT
+            );
+            """
+        )
+        conn_main.executemany(
+            "INSERT INTO papers VALUES (?, ?, ?, ?, ?)",
+            [
+                ("p_old", "Old main-path paper", "", 2020, "F1"),
+                ("p_anchor", "Fresh main-path anchor", "", 2024, "F1"),
+                ("p_new", "Scalable future target", "scalability remains the bottleneck", 2025, "F1"),
+                ("p_lim", "Limitation source", "scalability bottleneck", 2024, "F1"),
+            ],
+        )
+        conn_main.execute(
+            "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
+            (
+                "p_lim",
+                "discussion",
+                "current contract limitation evidence " * 20,
+                json.dumps(
+                    {
+                        "extraction_strategies": ["explicit_heading"],
+                        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                    }
+                ),
+            ),
+        )
+        conn_main.commit()
+        conn_main.close()
+
+        db_v14 = tmp_path / "v14.sqlite3"
+        conn_v14 = init_v14b_db(db_v14)
+        conn_v14.execute(
+            """
+            INSERT INTO main_path_edges (
+                citing_id, cited_id, source_paper_id, target_paper_id,
+                spc, v13_weight, main_path_weight, is_main_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("p_old", "p_anchor", "p_old", "p_anchor", 1.0, 1.0, 1.0, 1),
+        )
+        conn_v14.execute(
+            """
+            INSERT INTO predicted_future_edges (
+                src_paper_id, dst_paper_id, predicted_prob, raw_predicted_prob,
+                calibrated_prob, prediction_confidence, calibration_label,
+                src_year, dst_year, is_cross_field
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("p_anchor", "p_new", 0.85, 0.9, 0.82, 0.78, "calibrated_temporal_holdout", 2024, 2025, 0),
+        )
+        conn_v14.execute(
+            """
+            INSERT INTO limitation_atoms (
+                paper_id, description, keyword, severity, evidence_source,
+                evidence_quality, evidence_weight, source_section_name, extractor_method
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "p_lim",
+                "Scalability remains unresolved.",
+                "scalability",
+                "high",
+                "structured_sections",
+                "section_level",
+                0.9,
+                "discussion",
+                "heuristic",
+            ),
+        )
+        conn_v14.execute(
+            """
+            CREATE TABLE vgae_calibration_audit (
+                method TEXT,
+                avg_calibrated_auc REAL,
+                label TEXT,
+                created_at TEXT
+            )
+            """
+        )
+        conn_v14.execute(
+            "INSERT INTO vgae_calibration_audit VALUES (?, ?, ?, ?)",
+            ("temporal_platt_logistic", 0.84, "calibrated_temporal_holdout", "2026-01-01T00:00:00Z"),
+        )
+        conn_v14.commit()
+        conn_v14.close()
+
+        stats = run_fusion(db_main=db_main, db_v14=db_v14, resume=False)
+
+        conn_v14 = sqlite3.connect(str(db_v14))
+        conn_v14.row_factory = sqlite3.Row
+        row = conn_v14.execute(
+            "SELECT candidate_tier_json, calibration_json FROM fusion_evidence_audit"
+        ).fetchone()
+        direction = conn_v14.execute(
+            "SELECT evidence_tier, evidence_json FROM future_directions LIMIT 1"
+        ).fetchone()
+        conn_v14.close()
+        calibration = json.loads(row["calibration_json"])
+        direction_evidence = json.loads(direction["evidence_json"])
+        assert stats["n_directions"] == 1
+        assert json.loads(row["candidate_tier_json"])["triangulated_strong"] == 1
+        assert calibration["decision_grade_limitation_sections"] == 1
+        assert direction["evidence_tier"] == "triangulated_strong"
+        assert direction_evidence["limitation_decision_grade_section_count"] == 1
+
 
 # ---------------------------------------------------------------------------
 # 突变标记测试

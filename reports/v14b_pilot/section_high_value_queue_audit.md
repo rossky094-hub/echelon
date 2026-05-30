@@ -1,10 +1,10 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T22:46:41Z`
+- audit_ts: `2026-05-30T22:53:13Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,797`
-- primary section papers: `3,020`; current parser-contract primary: `154`
-- next delta queue needing primary section/action: `8,440`
+- primary section papers: `3,020`; current parser-contract primary: `161`
+- next delta queue needing primary section/action: `8,433`
 - multi-topic evidence-gap rows merged: `28` (42 papers)
 - topic evidence-gap delta queue: `27` papers
 
@@ -14,8 +14,8 @@
 |---|---:|
 | not_attempted_pdf_available | 5,875 |
 | no_target_sections | 4,228 |
-| stale_parser_contract | 2,498 |
-| covered | 152 |
+| stale_parser_contract | 2,491 |
+| covered | 159 |
 | retryable_pdf_failure | 43 |
 | parser_failure | 1 |
 
@@ -27,10 +27,10 @@
 | branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
 | cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 5,946 |
 | future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 54 | 268 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 61 | 268 |
 | main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
 | resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 65 | 1,000 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 72 | 1,000 |
 | topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
 | topic:metasurface holography | 20 | 9 | 7 | 7 | 4 | 20 |
 | topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |

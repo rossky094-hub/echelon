@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T22:46:50Z`
+- Snapshot: `2026-05-30T22:53:20Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -12,7 +12,7 @@
 - Pending enrich: 454
 - Primary Field coverage: 55,359 / 55,391 (99.9%)
 - References: 3,215,130; linked refs: 445,957 (13.9%)
-- Section rows: 5,345; section papers: 3,020; primary evidence papers: 3,020 (5.5%)
+- Section rows: 5,353; section papers: 3,020; primary evidence papers: 3,020 (5.5%)
 
 ## Derived Product Tables
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,797
-- section_priority_summary: 1,547
+- section_priority_summary: 1,562
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,278
@@ -48,10 +48,10 @@
 | active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
 | branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
 | main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 65 | 1,000 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 72 | 1,000 |
 | resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
 | future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 54 | 268 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 61 | 268 |
 | topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
 | topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
 | topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |

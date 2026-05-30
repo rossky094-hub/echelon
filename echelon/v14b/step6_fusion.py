@@ -285,13 +285,25 @@ def attach_limitation_section_contracts(
         )
         section = index.get(key, {})
         item["section_parser_contract_version"] = section.get("section_parser_contract_version") or (
-            "legacy_unknown_contract" if item.get("evidence_quality") in {"section_level", "structured_sections"} else "none"
+            item.get("section_parser_contract_version")
+            or (
+                "legacy_unknown_contract"
+                if item.get("evidence_quality") in {"section_level", "structured_sections"}
+                else "none"
+            )
         )
         item["section_provenance_strength"] = section.get("section_provenance_strength") or (
-            "weak" if item.get("evidence_quality") in {"section_level", "structured_sections"} else "none"
+            item.get("section_provenance_strength")
+            or (
+                "weak"
+                if item.get("evidence_quality") in {"section_level", "structured_sections"}
+                else "none"
+            )
         )
-        item["section_extraction_strategies"] = section.get("section_extraction_strategies") or []
-        item["section_decision_grade"] = bool(section.get("section_decision_grade"))
+        item["section_extraction_strategies"] = (
+            section.get("section_extraction_strategies") or item.get("section_extraction_strategies") or []
+        )
+        item["section_decision_grade"] = bool(section.get("section_decision_grade")) or bool(item.get("section_decision_grade"))
         enriched.append(item)
     return enriched
 
@@ -920,6 +932,7 @@ def run_fusion(
         logger.warning("VGAE run-level calibration audit missing; Step6 will keep VGAE-only evidence as candidate-pool evidence")
 
     unresolved = load_unresolved_limitations(conn_v14)
+    unresolved = attach_limitation_section_contracts(unresolved, conn_main)
     logger.info("未解决 limitations: %d", len(unresolved))
 
     # 三路融合
