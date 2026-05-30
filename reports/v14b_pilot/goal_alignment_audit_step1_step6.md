@@ -1,6 +1,6 @@
 # V14B Goal Alignment Audit
 
-Generated: 2026-05-31 02:34
+Generated: 2026-05-31 02:40
 
 ## Project Goal
 
@@ -11,7 +11,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 - Product graph layer exists: 55,391 visual nodes, 772,947 visual edges, 5,286 clusters, 5,286 branch lineages.
 - Step5b future candidate generator is numerically strong as a ranker: test AUC=0.8371, candidate_edge_rows=1,000, cross_field=60; product evidence score is calibrated separately from raw model score.
 - Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms=730, resolutions=1,001.
-- Section evidence inventory: table_present=True, rows=4,888, primary-section papers=2,788.
+- Section evidence inventory: table_present=True, rows=4,938, primary-section papers=2,814.
 - Step6 fusion output is limited: directions=5, audit_n_directions=5, adequacy=limited_but_usable_with_uncertainty, consistent=True. This is acceptable as an honest signal only when audit/product tables agree.
 - Step13 first-principles bottleneck lineage: principles=6, atoms_covered=730, high_risk_principles=0.
 - Step13 claim cards: total=5, five-question-complete=1, high-confidence-eligible=0, lineage_triples=2,920.
@@ -61,14 +61,14 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 ## Future Direction Evidence Tiers
 
-| tier | directions | avg_confidence |
+| tier | directions | avg_evidence_score |
 |---|---:|---:|
 | exploratory | 5 | 0.810 |
 
 ## Hard Acceptance Gates
 
 - linked_refs_ratio >= 30%: current=0.139 -> risk
-- top-keystone section evidence coverage >= 70%: current=2.788 (2788/1000) -> pass
+- top-keystone section evidence coverage >= 70%: current=2.814 (2814/1000) -> pass
 - every direction has 5-question claim card: current=1/5 -> risk
 - future calibration report present: current=True -> pass
 - fusion audit matches future_directions table: current=True -> pass
@@ -81,7 +81,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 - Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node bounded evidence subgraph and evaluating whether the cap is adequate for extraction support.
 - Step5a now writes method/evidence-level/weight, so title/abstract-only citation-function labels cannot masquerade as ground truth.
 - Step5c now writes limitation evidence source, quality, weight, section name, and extractor method.
-- Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.
+- Step5b now separates raw VGAE scores from calibrated product evidence scores using chronological validation evidence.
 - Step6 now writes evidence tiers and claim scopes, making sparse/exploratory evidence an explicit product signal.
 - Step10 propagates limitation and calibrated future-edge evidence into visual node/edge flags and detail JSON.
 - Step13 reconnects first-principles + bottleneck-history analysis into current V14B evidence chain (non-LLM deterministic baseline).

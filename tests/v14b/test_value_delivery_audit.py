@@ -133,6 +133,7 @@ def _write_product_sources(root: Path) -> None:
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
         "def get_visual_paper_detail(): return {'paper_role': _paper_role_contract()}\n"
+        "def future_plain_language(): return 'generator scores possible bridge'\n"
         "def _visual_node_role_contract(): return visual_node_role + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def get_visual_nodes(): return _visual_node_role_contract\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
@@ -159,8 +160,8 @@ def _write_product_sources(root: Path) -> None:
         "function renderTopicReadiness() { return topic_readiness; }\n"
         "function renderPaperList() { return paper.claim_scope + paper.evidence_grade + paper.uncertainty_reasons + paper.required_evidence + renderEvidenceObjects(paper.evidence_objects); }\n"
         "function renderLimitations() { return lim.claim_scope + lim.evidence_grade + lim.uncertainty_reasons + renderEvidenceObjects(lim.evidence_objects); }\n"
-        "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
-        "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
+        "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + 'edge score' + renderEvidenceObjects(edge.evidence_objects); }\n"
+        "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + 'split/support / support ' + renderEvidenceObjects(lineage.evidence_objects); }\n"
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
         "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
@@ -501,6 +502,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     branch_gate = next(g for g in result["gates"] if g["issue"] == "Branch Lineage Validity")
     assert branch_gate["checks"]["api_visual_clusters_carry_lineage_contract"] is True
     assert branch_gate["checks"]["ui_cluster_panel_renders_lineage_contract"] is True
+    assert branch_gate["checks"]["ui_branch_scores_are_labeled_as_support"] is True
     assert any(g["issue"] == "Multi-topic Regression" and g["status"] == "pass" for g in result["gates"])
     multi_gate = next(g for g in result["gates"] if g["issue"] == "Multi-topic Regression")
     assert multi_gate["checks"]["topic_regression_avoids_gold_topic_aliases"] is True

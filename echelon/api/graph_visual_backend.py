@@ -5240,6 +5240,7 @@ def get_topic_lens(
         for edge in future_growth:
             edge["source_paper"] = edge_paper_map.get(edge.get("source_paper_id"))
             edge["target_paper"] = edge_paper_map.get(edge.get("target_paper_id"))
+            edge.setdefault("candidate_score", edge.get("confidence") or edge.get("weight"))
             calibration_status = _future_edge_calibration_status(edge)
             calibration_phrase = (
                 "run-calibrated exploratory evidence"
@@ -5247,8 +5248,8 @@ def get_topic_lens(
                 else f"uncalibrated candidate evidence ({calibration_status})"
             )
             edge["plain_language"] = (
-                "Future-growth candidate: the model predicts that the source-side idea/bottleneck "
-                f"may connect to the target-side direction; treat as {calibration_phrase} "
+                "Future-growth candidate: the generator scores the source-side idea/bottleneck "
+                f"as a possible bridge to the target-side direction; treat as {calibration_phrase} "
                 "until Step6/Step13 Claim Cards are materialized."
             )
         _apply_future_edge_contracts(future_growth)

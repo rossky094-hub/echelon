@@ -888,12 +888,12 @@ function renderClusters() {
     <div class="item">
       <strong>Branches 怎么看</strong>
       <p>Branch 不是前端随便画的分组，而是 Step10 把 semantic/community layout、co-citation 主题团、main-path 邻域和 branch lineage 证据合成后的演化分支。</p>
-      <p class="mini">parent 表示该分支从哪个父分支裂变；split/confidence 表示分裂年份和证据强度。它回答“这个 topic 为什么从旧主干长出这个新方向”。</p>
+      <p class="mini">parent 表示该分支从哪个父分支裂变；split/support 表示分裂年份和证据支持度。它回答“这个 topic 为什么从旧主干长出这个新方向”。</p>
     </div>
   `;
   els.clusterPane.innerHTML = intro + state.clusters.slice(0, 120).map((cluster) => {
     const lineage = lineages.get(cluster.branch_id) || {};
-    const confidence = lineage.split_confidence == null ? "-" : pct(lineage.split_confidence);
+    const support = lineage.split_confidence == null ? "-" : pct(lineage.split_confidence);
     const terms = (cluster.top_terms || []).slice(0, 5).map((t) => `<span class="pill">${esc(t)}</span>`).join("");
     return `
       <div class="item">
@@ -907,7 +907,7 @@ function renderClusters() {
           <span class="pill">${esc(lineage.claim_scope || "layout_cluster_navigation_only")}</span>
           <span class="pill">${esc(lineage.evidence_grade || "layout_cluster_only")}</span>
         </div>
-        <p class="mini">parent ${esc(lineage.parent_branch_id || "-")} / split ${esc(lineage.split_year || "-")} / confidence ${confidence}</p>
+        <p class="mini">parent ${esc(lineage.parent_branch_id || "-")} / split ${esc(lineage.split_year || "-")} / support ${support}</p>
         ${lineage.split_reason ? `<p class="mini">${esc(lineage.split_reason)}</p>` : ""}
         ${(lineage.required_evidence || []).length ? `<p class="mini"><strong>分支成立还需要：</strong>${(lineage.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
         ${(lineage.uncertainty_reasons || []).length ? `
@@ -952,11 +952,11 @@ function renderLocalEdges(edges = []) {
   return `
     <div class="evidence-list">
       ${items.map((edge) => {
-        const confidence = edge.confidence == null ? "-" : pct(edge.confidence);
+        const edgeScore = edge.confidence == null ? "-" : pct(edge.confidence);
         return `
           <div class="evidence-paper">
             <strong>${esc(edge.edge_type || edge.layer || "edge")}</strong>
-            <small>${esc(edge.source_paper_id || "?")} -> ${esc(edge.target_paper_id || "?")} / weight ${fmt(edge.weight || 0)} / confidence ${confidence}</small>
+            <small>${esc(edge.source_paper_id || "?")} -> ${esc(edge.target_paper_id || "?")} / weight ${fmt(edge.weight || 0)} / edge score ${edgeScore}</small>
             <div class="pill-row">
               <span class="pill">${esc(edge.claim_scope || "graph_edge_context_only")}</span>
               <span class="pill">${esc(edge.evidence_grade || "visual_edge_context")}</span>
@@ -1201,7 +1201,7 @@ function renderTopicDossier(dossier = {}) {
             <span class="pill">${esc(split.claim_scope || "branch claim scope unknown")}</span>
             <span class="pill">${esc(split.evidence_grade || "branch evidence unknown")}</span>
           </div>
-          <p class="mini">parent ${esc(split.parent_branch_id || "unverified")} / split ${esc(split.split_year || "-")} / confidence ${pct(split.split_confidence || 0)}</p>
+          <p class="mini">parent ${esc(split.parent_branch_id || "unverified")} / split ${esc(split.split_year || "-")} / support ${pct(split.split_confidence || 0)}</p>
           <p><strong>为什么出现：</strong>${esc(split.why_appeared || "")}</p>
           ${split.split_reason ? `<p><strong>分叉证据：</strong>${esc(split.split_reason)}</p>` : ""}
           <p><strong>历史卡点：</strong>${esc(split.historical_bottleneck || "")}</p>
@@ -1302,7 +1302,7 @@ function renderBranchDossiers(branches = []) {
           <div class="pill-row">
             ${(branch.top_terms || []).slice(0, 6).map((term) => `<span class="pill">${esc(term)}</span>`).join("")}
           </div>
-          <p class="mini">parent ${esc(branch.parent_branch_id || "-")} / split ${esc(branch.split_year || "-")} / confidence ${pct(branch.split_confidence || 0)}</p>
+          <p class="mini">parent ${esc(branch.parent_branch_id || "-")} / split ${esc(branch.split_year || "-")} / support ${pct(branch.split_confidence || 0)}</p>
           ${(branch.driver_papers || []).length ? `<p><strong>Driver papers</strong></p>${renderPaperList(branch.driver_papers || [], 3)}` : ""}
           ${renderEvidenceObjects(branch.evidence_objects || [], 5)}
           <p><strong>Representative papers</strong></p>

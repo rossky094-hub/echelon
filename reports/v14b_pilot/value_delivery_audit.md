@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T18:35:05Z`
+- generated_at: `2026-05-30T18:40:24Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 19494,
+    "openalex_frontfill_cooldown_remaining_s": 19175,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2792,
+    "primary_section_papers": 2815,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 555,
+        "strong": 578,
         "weak": 2237
       },
-      "primary_section_papers": 2792,
-      "primary_section_rows": 4895,
+      "primary_section_papers": 2815,
+      "primary_section_rows": 4939,
       "strategy_counts": {
-        "embedded_heading": 22,
-        "explicit_heading": 681,
-        "heading_continuation": 987,
-        "inline_heading": 358,
+        "embedded_heading": 23,
+        "explicit_heading": 711,
+        "heading_continuation": 1030,
+        "inline_heading": 373,
         "legacy_unknown_strategy": 3886,
-        "loose_inline_heading": 14,
-        "parser_hint": 11
+        "loose_inline_heading": 15,
+        "parser_hint": 12
       },
-      "strong_or_moderate_papers": 555,
+      "strong_or_moderate_papers": 578,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8012177650429799
+      "weak_only_rate": 0.7946714031971581
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -128,6 +128,7 @@
     "api_visual_clusters_carry_lineage_contract": true,
     "branch_lineage_columns_present": true,
     "branch_lineage_statuses_present": true,
+    "ui_branch_scores_are_labeled_as_support": true,
     "ui_cluster_panel_renders_lineage_contract": true
   },
   "issue": "Branch Lineage Validity",

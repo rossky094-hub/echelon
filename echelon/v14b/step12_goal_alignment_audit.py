@@ -417,7 +417,7 @@ def build_audit(
         "",
         "## Future Direction Evidence Tiers",
         "",
-        "| tier | directions | avg_confidence |",
+        "| tier | directions | avg_evidence_score |",
         "|---|---:|---:|",
     ]
     for r in direction_tiers:
@@ -441,7 +441,7 @@ def build_audit(
         "- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node bounded evidence subgraph and evaluating whether the cap is adequate for extraction support.",
         "- Step5a now writes method/evidence-level/weight, so title/abstract-only citation-function labels cannot masquerade as ground truth.",
         "- Step5c now writes limitation evidence source, quality, weight, section name, and extractor method.",
-        "- Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.",
+        "- Step5b now separates raw VGAE scores from calibrated product evidence scores using chronological validation evidence.",
         "- Step6 now writes evidence tiers and claim scopes, making sparse/exploratory evidence an explicit product signal.",
         "- Step10 propagates limitation and calibrated future-edge evidence into visual node/edge flags and detail JSON.",
         "- Step13 reconnects first-principles + bottleneck-history analysis into current V14B evidence chain (non-LLM deterministic baseline).",

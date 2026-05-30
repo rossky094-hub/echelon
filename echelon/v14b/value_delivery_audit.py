@@ -341,6 +341,7 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
     source_checks = {
         "api_visual_clusters_carry_lineage_contract": True,
         "ui_cluster_panel_renders_lineage_contract": True,
+        "ui_branch_scores_are_labeled_as_support": True,
     }
     if repo_root is not None:
         source_checks = {
@@ -364,6 +365,20 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
                     "lineage.uncertainty_reasons",
                     "renderEvidenceObjects(lineage.evidence_objects",
                 ),
+            ),
+            "ui_branch_scores_are_labeled_as_support": (
+                _source_contains(
+                    repo_root / "web/visual-graph/app.js",
+                    ("split/support", " / support ", "edge score"),
+                )
+                and _source_absent(
+                    repo_root / "web/visual-graph/app.js",
+                    ("split/confidence", " / confidence "),
+                )
+                and _source_absent(
+                    repo_root / "echelon/api/graph_visual_backend.py",
+                    ("model predicts",),
+                )
             ),
         }
     checks = {

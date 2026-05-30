@@ -1,16 +1,16 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T18:35:04Z`
+- generated_at: `2026-05-30T18:40:23Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
 - linked refs: 445,957 / 3,215,130 (13.9%)
 - OpenAlex W IDs: 35,663 (64.4%)
-- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=5.4)
-- section evidence: 4,895 rows / 2,792 papers
-- primary section evidence: 2,792 papers (5.0%)
-- primary section provenance: 555 strong/moderate papers; weak-only=80.1%
+- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=5.3)
+- section evidence: 4,939 rows / 2,815 papers
+- primary section evidence: 2,815 papers (5.1%)
+- primary section provenance: 578 strong/moderate papers; weak-only=79.5%
 - multi-topic evidence-gap queue: 0 / 20 primary-section covered (0.0%)
 - section frontfill health: running_or_unknown [section_delta] (done=634/6603, no_evidence_delta=0, no_evidence_hours=0.0)
 - future candidate edges: 1,000
@@ -21,11 +21,11 @@
 ## Blockers
 
 - **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
-- **section_evidence** (high): primary section evidence covers only 2,792 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 555 papers have strong/moderate parser provenance; weak-only rate is 80.1%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
+- **section_evidence** (high): primary section evidence covers only 2,815 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
+- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 578 papers have strong/moderate parser provenance; weak-only rate is 79.5%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
 - **multi_topic_evidence_gap** (high): multi-topic regression still has primary section evidence for 0/20 queued benchmark-topic papers (0.0%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
-- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=5.4. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
+- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=5.3. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
 
 ## Latest Fusion Audit
 
