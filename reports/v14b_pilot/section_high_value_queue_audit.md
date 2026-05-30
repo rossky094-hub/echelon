@@ -1,6 +1,6 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T20:10:43Z`
+- audit_ts: `2026-05-30T20:17:35Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,777`
 - next delta queue needing primary section/action: `5,993`

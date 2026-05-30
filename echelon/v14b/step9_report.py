@@ -77,6 +77,8 @@ def _future_candidate_evidence_text(value: object) -> str:
     text = str(value or "N/A")
     return (
         text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+        .replace("calibrated=", "calibrated_candidate_score=")
+        .replace("raw=", "raw_candidate_score=")
         .replace("confidence=", "candidate_score=")
     )
 
@@ -550,7 +552,7 @@ def generate_algo_report(
         f"",
         f"### Top 5 未来候选证据合同预览",
         f"",
-        f"| 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
+        f"| 候选方向 | candidate_score (候选排序分数) | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
         f"|---|---:|---|---|---|---:|",
     ]
 
@@ -702,7 +704,7 @@ def generate_future_directions_report(
     lines += [
         f"## 摘要表格",
         f"",
-        f"| # | 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
+        f"| # | 候选方向 | candidate_score (候选排序分数) | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
         f"|---|---|---:|---|---|---|---:|",
     ]
     for i, d in enumerate(directions, 1):
@@ -720,7 +722,7 @@ def generate_future_directions_report(
         lines += [
             f"## 候选方向 {i}: {d['direction_name']}",
             f"",
-            f"- **排序分数**: **{float(d.get('confidence') or 0.0):.2f}** (不是高置信结论)",
+            f"- **candidate_score**: **{float(d.get('confidence') or 0.0):.2f}** (候选排序分数,不是高置信结论)",
             f"- **预期出现时间**: {d.get('expected_period', 'TBD')}",
             f"- **claim_scope**: `{contract['claim_scope']}`",
             f"- **evidence_grade**: `{contract['evidence_grade']}`",

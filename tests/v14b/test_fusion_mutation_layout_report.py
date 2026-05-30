@@ -590,10 +590,15 @@ class TestReportGenerator:
         assert "evidence_grade" in report
         assert "uncertainty_reasons" in report
         assert "candidate_pool_only" in report
+        assert "candidate_score (候选排序分数)" in report
+        assert "- **candidate_score**" in report
         assert "Future Candidate Generator (GNN/VGAE)" in report
-        assert "GNN/VGAE candidate edge: calibrated=0.995" in report
+        assert "GNN/VGAE candidate edge: calibrated_candidate_score=0.995" in report
+        assert "raw_candidate_score=0.991" in report
         assert "VGAE pred:" not in report
         assert "VGAE Link Prediction" not in report
+        assert "calibrated=" not in report
+        assert "raw=" not in report
 
     def test_empty_db_report_has_tbd(self, tmp_path):
         """无数据时报告有 TBD 占位"""

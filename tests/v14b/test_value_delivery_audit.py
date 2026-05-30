@@ -286,7 +286,8 @@ def _write_product_sources(root: Path) -> None:
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
         "Citation-function evidence 覆盖率 Citation Function Evidence\n"
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
-        "_future_candidate_evidence_text candidate_score= 候选排序分数\n"
+        "_future_candidate_evidence_text candidate_score= 候选排序分数 "
+        "candidate_score (候选排序分数) calibrated_candidate_score= raw_candidate_score= **candidate_score**\n"
         "GNN/VGAE 只生成 future candidate edges 公开报告只显示 candidate_score "
         "candidate_score 是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
         "_normalise_subgraph_scope_row "
@@ -524,6 +525,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     future_gate = next(g for g in result["gates"] if g["issue"] == "Future Growth Calibration")
     assert future_gate["checks"]["step9_vgae_language_is_candidate_generator"] is True
     assert future_gate["checks"]["future_report_filename_is_candidate_contract"] is True
+    assert future_gate["checks"]["future_direction_report_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["step6_future_evidence_avoids_prediction_copy"] is True
     assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     assert future_gate["checks"]["public_future_candidate_language_avoids_prediction_copy"] is True
@@ -1177,6 +1179,28 @@ def test_future_growth_audit_rejects_step9_public_prediction_fields(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["step9_vgae_language_is_candidate_generator"] is False
+
+
+def test_future_growth_audit_rejects_future_report_legacy_score_labels(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "未来候选方向_证据合同报告.md").write_text(
+        "| # | 候选方向 | 排序分数 | claim_scope |\n"
+        "| 1 | x | 0.8 | candidate_pool_only |\n"
+        "- **排序分数**: **0.8**\n"
+        "GNN/VGAE candidate edge: calibrated=0.9, raw=0.8, candidate_score=0.7\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["future_direction_report_uses_candidate_score_labels"] is False
 
 
 def test_future_growth_audit_rejects_prediction_report_filename(tmp_path):

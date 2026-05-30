@@ -507,6 +507,12 @@ def audit_future_growth(
         if algorithm_report_path.exists()
         else ""
     )
+    future_report_path = direction_report_base / "未来候选方向_证据合同报告.md"
+    future_report_text = (
+        future_report_path.read_text(encoding="utf-8")
+        if future_report_path.exists()
+        else ""
+    )
     api_path = root / "echelon/api/graph_visual_backend.py"
     app_path = root / "web/visual-graph/app.js"
     current_future_docs = (
@@ -541,6 +547,29 @@ def audit_future_growth(
             _source_contains(config_path, ("REPORT_FUTURE_DIRECTIONS", "未来候选方向_证据合同报告.md"))
             and "未来候选方向_证据合同报告.md" in step9_text
             and "未来方向预测_交集报告.md" not in step9_text
+        ),
+        "future_direction_report_uses_candidate_score_labels": (
+            _source_contains(
+                step9_path,
+                (
+                    "candidate_score (候选排序分数)",
+                    "calibrated_candidate_score=",
+                    "raw_candidate_score=",
+                    "**candidate_score**",
+                ),
+            )
+            and (
+                not future_report_text
+                or (
+                    "candidate_score (候选排序分数)" in future_report_text
+                    and "calibrated_candidate_score=" in future_report_text
+                    and "raw_candidate_score=" in future_report_text
+                    and "calibrated=" not in future_report_text
+                    and "raw=" not in future_report_text
+                    and "| # | 候选方向 | 排序分数 |" not in future_report_text
+                    and "- **排序分数**" not in future_report_text
+                )
+            )
         ),
         "step6_future_evidence_avoids_prediction_copy": (
             _source_contains(step6_path, ("GNN/VGAE candidate edge", "Future candidate generator"))

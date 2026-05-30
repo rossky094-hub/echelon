@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 04:10
+**生成时间**: 2026-05-31 04:16
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -128,7 +128,7 @@
 
 ### Top 5 未来候选证据合同预览
 
-| 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |
+| 候选方向 | candidate_score (候选排序分数) | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |
 |---|---:|---|---|---|---:|
 | Broadband electro-optic frequency comb generation in an integrated mic | 0.81 | exploratory_with_claim_card | exploratory | exploratory_claim_card | 4 |
 | High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 8 |
@@ -189,4 +189,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 04:10*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 04:16*
