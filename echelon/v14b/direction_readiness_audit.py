@@ -519,6 +519,7 @@ def collect_metrics(
             latest_fusion = dict(zip(cols, row)) if row else None
     finally:
         v14.close()
+    future_candidate_edges = counts.pop("predicted_future_edges", 0)
 
     return {
         "papers": papers,
@@ -537,6 +538,7 @@ def collect_metrics(
         "topic_gap_primary_section_papers": topic_gap_primary_section_papers,
         "topic_gap_primary_section_rate": topic_gap_primary_section_papers / max(1, len(topic_gap_ids)),
         "topic_gap_section_evidence_quality": topic_gap_section_quality,
+        "future_candidate_edges": future_candidate_edges,
         **counts,
         "complete_claim_cards": complete_cards,
         "high_confidence_claim_cards": high_conf_cards,
@@ -547,6 +549,7 @@ def collect_metrics(
 
 def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
+    future_candidate_edges = int(m.get("future_candidate_edges") or m.get("predicted_future_edges") or 0)
     if m["linked_ref_rate"] < 0.30:
         blockers.append(
             {
@@ -640,7 +643,7 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 ),
             }
         )
-    if m["predicted_future_edges"] and not m["future_directions"]:
+    if future_candidate_edges and not m["future_directions"]:
         blockers.append(
             {
                 "gate": "fusion_materialization",
@@ -712,11 +715,12 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
 
 
 def readiness_level(m: dict[str, Any], blockers: list[dict[str, str]]) -> str:
+    future_candidate_edges = int(m.get("future_candidate_edges") or m.get("predicted_future_edges") or 0)
     if m["high_confidence_claim_cards"] > 0:
         return "decision_grade_available"
     if m["complete_claim_cards"] > 0:
         return "actionable_but_not_high_confidence"
-    if m["future_visual_edges"] > 0 or m["predicted_future_edges"] > 0:
+    if m["future_visual_edges"] > 0 or future_candidate_edges > 0:
         return "candidate_generator_only"
     return "not_ready"
 
@@ -764,7 +768,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"{int(metrics.get('topic_gap_queue_papers') or 0):,} primary-section covered "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
         *frontfill_line,
-        f"- future candidate edges: {metrics['predicted_future_edges']:,}",
+        f"- future candidate edges: {metrics['future_candidate_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
         f"- future directions: {metrics['future_directions']:,}",
         f"- Claim Cards: {metrics['direction_claim_cards']:,}; complete={metrics['complete_claim_cards']:,}; high_confidence={metrics['high_confidence_claim_cards']:,}",

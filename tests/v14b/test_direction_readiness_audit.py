@@ -67,7 +67,8 @@ def test_direction_readiness_blocks_raw_gnn_promotion(tmp_path):
     metrics = collect_metrics(main, v14)
     blockers = classify_blockers(metrics)
 
-    assert metrics["predicted_future_edges"] == 1
+    assert metrics["future_candidate_edges"] == 1
+    assert "predicted_future_edges" not in metrics
     assert readiness_level(metrics, blockers) == "candidate_generator_only"
     assert any(b["gate"] == "fusion_materialization" for b in blockers)
 
@@ -172,7 +173,7 @@ def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
     metrics = {
         "linked_ref_rate": 0.31,
         "primary_section_papers": 9000,
-        "predicted_future_edges": 0,
+        "future_candidate_edges": 0,
         "future_directions": 0,
         "direction_claim_cards": 0,
         "complete_claim_cards": 0,
@@ -243,7 +244,7 @@ def test_direction_readiness_flags_openalex_frontfill_after_cooldown(tmp_path):
     metrics = {
         "linked_ref_rate": 0.31,
         "primary_section_papers": 9000,
-        "predicted_future_edges": 0,
+        "future_candidate_edges": 0,
         "future_directions": 0,
         "direction_claim_cards": 0,
         "complete_claim_cards": 0,
