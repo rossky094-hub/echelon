@@ -322,6 +322,12 @@ def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monk
     assert role["required_evidence"]
     assert role["evidence_objects"]
     assert role["evidence_objects"][0]["type"] == "paper"
+    edge = resp.json()["edges"][0]
+    assert edge["claim_scope"] == "main_path_context_only"
+    assert edge["evidence_grade"]
+    assert edge["uncertainty_reasons"]
+    assert edge["required_evidence"]
+    assert edge["evidence_objects"][0]["type"] == "visual_edge"
 
 
 def test_visual_nodes_carry_hover_evidence_contract(tmp_path, monkeypatch):
@@ -345,6 +351,24 @@ def test_visual_nodes_carry_hover_evidence_contract(tmp_path, monkeypatch):
     main_path = nodes["p2"]
     assert main_path["claim_scope"] == "main_path_context_only"
     assert main_path["evidence_grade"] == "graph_main_path_node_context"
+
+
+def test_visual_edges_carry_evidence_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get("/graph/visual/edges", headers=VIEWER_HEADERS, params={"lod_max": 1})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    edge = data["edges"][0]
+    assert edge["claim_scope"] == "main_path_context_only"
+    assert edge["evidence_grade"]
+    assert any("main-path" in reason for reason in edge["uncertainty_reasons"])
+    assert edge["required_evidence"]
+    assert edge["evidence_objects"][0]["type"] == "visual_edge"
+    assert edge["evidence_objects"][0]["click_target"]["kind"] == "edge"
 
 
 def test_visual_edit_roundtrip(tmp_path, monkeypatch):

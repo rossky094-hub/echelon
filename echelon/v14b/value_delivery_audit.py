@@ -1096,8 +1096,10 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "api_returns_evidence_map": False,
         "api_evidence_map_future_edges_carry_contract": False,
         "api_evidence_map_branches_carry_contract": False,
+        "api_visual_edges_carry_contract": False,
         "ui_renders_evidence_map_contract": False,
         "ui_renders_future_edge_contracts": False,
+        "ui_renders_local_edge_contracts": False,
         "ui_has_fusion_value_layer_control": False,
     }
     if repo_root is not None:
@@ -1127,6 +1129,17 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                     "uncertainty_reasons",
                 ),
             ),
+            "api_visual_edges_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _visual_edge_contract",
+                    "get_visual_edges",
+                    "visual_edge",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
+                ),
+            ),
             "ui_renders_evidence_map_contract": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderEvidenceMapSummary", "renderComboContract", "Fusion value"),
@@ -1138,6 +1151,16 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                     "edge.claim_scope",
                     "edge.evidence_grade",
                     "edge.required_evidence",
+                    "edge.uncertainty_reasons",
+                    "renderEvidenceObjects(edge.evidence_objects",
+                ),
+            ),
+            "ui_renders_local_edge_contracts": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderLocalEdges",
+                    "edge.claim_scope",
+                    "edge.evidence_grade",
                     "edge.uncertainty_reasons",
                     "renderEvidenceObjects(edge.evidence_objects",
                 ),
@@ -1166,7 +1189,8 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "fusion_status": model.get("fusion_status"),
         "policy": (
             "Each Evidence Map layer and recommended layer combination must say what it shows, "
-            "what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty."
+            "what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; "
+            "individual visual edges must carry the same evidence boundary when exposed in API or paper detail."
         ),
     }
 

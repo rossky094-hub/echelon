@@ -1,6 +1,6 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-30T15:45:03Z`
+- Audit: `2026-05-30T15:53:33Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |

@@ -3377,6 +3377,86 @@ def _visual_node_role_contract(node: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _visual_edge_contract(edge: dict[str, Any], frontfill: dict[str, Any] | None = None) -> dict[str, Any]:
+    layer_key = (
+        "main_path"
+        if edge.get("is_main_path") or edge.get("edge_type") == "main_path"
+        else str(edge.get("layer") or edge.get("edge_type") or "edge")
+    )
+    evidence = edge.get("evidence") if isinstance(edge.get("evidence"), dict) else {}
+    frontfill = frontfill if isinstance(frontfill, dict) else {}
+    linked_ref_rate = float(frontfill.get("linked_ref_rate") or 0.0)
+
+    if layer_key == "future" or edge.get("edge_type") == "future_growth":
+        contract = _future_edge_claim_contract(edge)
+        contract["evidence_objects"] = _compact_evidence_objects(
+            [
+                _edge_evidence_object(edge, edge_type="visual_edge", source="visual_edges"),
+                *contract.get("evidence_objects", []),
+            ],
+            limit=5,
+        )
+        return contract
+    if layer_key == "main_path":
+        claim_scope = "main_path_context_only"
+        evidence_grade = (
+            "citation_backbone_partial_low_linked_refs"
+            if linked_ref_rate < 0.30
+            else "citation_backbone_context"
+        )
+        uncertainty = [
+            "main-path visual edge is historical trunk context, not a standalone causal conclusion",
+        ]
+    elif layer_key == "citation":
+        claim_scope = "citation_context_only"
+        evidence_grade = "local_citation_edge_context"
+        uncertainty = ["citation visual edge needs ID-relinked reference support before causal interpretation"]
+    elif layer_key == "topic":
+        claim_scope = "community_context_only"
+        evidence_grade = "co_citation_context"
+        uncertainty = ["topic/co-citation edge indicates shared community context, not direct influence"]
+    elif layer_key == "semantic":
+        claim_scope = "retrieval_context_only"
+        evidence_grade = "embedding_similarity_context"
+        uncertainty = ["semantic edge is a retrieval expansion aid, not historical evidence"]
+    elif layer_key == "bottleneck":
+        claim_scope = "bottleneck_context_only"
+        evidence_grade = "graph_bottleneck_edge_context"
+        uncertainty = ["bottleneck edge requires section-level limitation/resolution evidence before decision use"]
+    else:
+        claim_scope = "graph_edge_context_only"
+        evidence_grade = "visual_edge_context"
+        uncertainty = ["visual edge is graph context and needs paper-level evidence before decision use"]
+
+    if linked_ref_rate < 0.30 and layer_key in {"main_path", "citation"}:
+        uncertainty.append("linked refs below 30%; citation evolution is incomplete and must stay uncertainty-labeled")
+    if not evidence:
+        uncertainty.append("edge has no supporting evidence payload beyond visual graph metadata")
+
+    evidence_object = _edge_evidence_object(edge, edge_type="visual_edge", source="visual_edges")
+    if evidence_object:
+        evidence_object.update(
+            {
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "layer": layer_key,
+                "relationship_scope": evidence.get("relationship_scope"),
+            }
+        )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "ID-relinked local citation support for citation/main-path claims",
+            "source and target paper detail evidence",
+            "section-level evidence when the edge is used for bottleneck or Claim Card claims",
+            "Step6 fusion and complete Step13 Claim Card before decision promotion",
+        ],
+        "evidence_objects": _compact_evidence_objects([evidence_object], limit=3),
+    }
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -5416,6 +5496,7 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
             """,
             (paper_id, paper_id, max(1, min(int(edge_limit), 500))),
         ).fetchall()
+        frontfill = _frontfill_status(conn)
     edges = []
     layer_counts: Counter[str] = Counter()
     main_weight = 0.0
@@ -5430,6 +5511,7 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
             main_weight += float(item.get("weight") or 0.0)
         if item.get("layer") == "future" or item.get("edge_type") == "future_growth":
             future_weight += float(item.get("confidence") or item.get("weight") or 0.0)
+        item.update(_visual_edge_contract(item, frontfill))
         edges.append(item)
     paper = hits[0]
     visual_role = (paper.get("visual") or {}).get("role") or paper.get("visual_role") or "paper"
@@ -5702,11 +5784,13 @@ def get_visual_edges(
             """,
             params,
         ).fetchall()
+        frontfill = _frontfill_status(conn)
     edges = []
     for row in rows:
         item = dict(row)
         item["style"] = _loads(item.pop("style_json", None), {})
         item["evidence"] = _loads(item.pop("evidence_json", None), {})
+        item.update(_visual_edge_contract(item, frontfill))
         edges.append(item)
     return {
         "schema_version": SCHEMA_VERSION,

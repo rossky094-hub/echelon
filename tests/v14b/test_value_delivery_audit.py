@@ -134,6 +134,8 @@ def _write_product_sources(root: Path) -> None:
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
+        "def _visual_edge_contract(): return visual_edge + claim_scope + evidence_grade + uncertainty_reasons\n"
+        "def get_visual_edges(): return _visual_edge_contract\n"
         "_build_evidence_map recommended_layer_combinations\n"
         '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
@@ -146,6 +148,7 @@ def _write_product_sources(root: Path) -> None:
     web.mkdir(parents=True, exist_ok=True)
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
+        "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
@@ -422,7 +425,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_future_edges_carry_contract"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_branches_carry_contract"] is True
+    assert evidence_map_gate["checks"]["api_visual_edges_carry_contract"] is True
     assert evidence_map_gate["checks"]["ui_renders_future_edge_contracts"] is True
+    assert evidence_map_gate["checks"]["ui_renders_local_edge_contracts"] is True
     radar_gate = next(g for g in result["gates"] if g["issue"] == "R&D Radar Promotion Contract")
     assert radar_gate["status"] == "pass"
     assert radar_gate["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True

@@ -946,6 +946,31 @@ function renderStory() {
   `).join("") || '<div class="item">Story steps are not materialized yet.</div>';
 }
 
+function renderLocalEdges(edges = []) {
+  const items = asArray(edges).slice(0, 6);
+  if (!items.length) return "<small>0 loaded. No local edge context is available yet.</small>";
+  return `
+    <div class="evidence-list">
+      ${items.map((edge) => {
+        const confidence = edge.confidence == null ? "-" : pct(edge.confidence);
+        return `
+          <div class="evidence-paper">
+            <strong>${esc(edge.edge_type || edge.layer || "edge")}</strong>
+            <small>${esc(edge.source_paper_id || "?")} -> ${esc(edge.target_paper_id || "?")} / weight ${fmt(edge.weight || 0)} / confidence ${confidence}</small>
+            <div class="pill-row">
+              <span class="pill">${esc(edge.claim_scope || "graph_edge_context_only")}</span>
+              <span class="pill">${esc(edge.evidence_grade || "visual_edge_context")}</span>
+            </div>
+            ${(edge.uncertainty_reasons || []).length ? `<p class="mini">Edge uncertainty: ${(edge.uncertainty_reasons || []).slice(0, 2).map(esc).join(" / ")}</p>` : ""}
+            ${(edge.required_evidence || []).length ? `<p class="mini"><strong>作为结论还需要：</strong>${(edge.required_evidence || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+            ${renderEvidenceObjects(edge.evidence_objects || [], 2)}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderPaper(paper, edges = []) {
   if (!paper) {
     els.paperPane.innerHTML = '<div class="item">Select a paper from the graph or Topic Lens.</div>';
@@ -1019,6 +1044,7 @@ function renderPaper(paper, edges = []) {
     <div class="item">
       <div class="paper-meta">Local edges</div>
       <small>${edges.length} loaded</small>
+      ${renderLocalEdges(edges)}
     </div>
   `;
   uploadNodes();
