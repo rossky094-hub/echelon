@@ -397,7 +397,11 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
     }
 
 
-def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
+def audit_future_growth(
+    conn_v14: sqlite3.Connection,
+    repo_root: Path | None = None,
+    report_dir: Path | None = None,
+) -> dict[str, Any]:
     predicted = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0) if table_exists(conn_v14, "predicted_future_edges") else 0
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
     edge_calibration = future_edge_calibration_context(conn_v14)
@@ -479,6 +483,14 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
     step10_path = root / "echelon/v14b/step10_visual_graph_builder.py"
     topic_regression_path = root / "echelon/v14b/topic_regression.py"
     product_baseline_path = root / "echelon/v14b/product_baseline.py"
+    direction_readiness_path = root / "echelon/v14b/direction_readiness_audit.py"
+    direction_report_base = report_dir if report_dir is not None else root / "reports/v14b_pilot"
+    direction_report_path = direction_report_base / "direction_readiness_audit.md"
+    direction_report_text = (
+        direction_report_path.read_text(encoding="utf-8")
+        if direction_report_path.exists()
+        else ""
+    )
     api_path = root / "echelon/api/graph_visual_backend.py"
     app_path = root / "web/visual-graph/app.js"
     current_future_docs = (
@@ -577,6 +589,25 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                 '"calibrated_candidate_score": evidence.get("calibrated_candidate_score")',
                 'obj.pop("confidence", None)',
             ),
+        ),
+        "direction_readiness_report_uses_candidate_score_labels": (
+            _source_contains(
+                direction_readiness_path,
+                (
+                    "_public_latest_fusion_audit",
+                    "candidate_ranking_score_avg",
+                    "min_candidate_score_threshold",
+                ),
+            )
+            and (
+                not direction_report_text
+                or (
+                    "candidate_ranking_score_avg" in direction_report_text
+                    and "min_candidate_score_threshold" in direction_report_text
+                    and "prediction_confidence_avg" not in direction_report_text
+                    and "min_vgae_confidence" not in direction_report_text
+                )
+            )
         ),
         "topic_dossier_builders_use_candidate_edges_contract": (
             _source_contains(
@@ -2439,7 +2470,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_openalex_frontfill_guard(repo_root),
             audit_bottleneck_lineage(conn_v14, repo_root),
             audit_branch_lineage(conn_v14, repo_root),
-            audit_future_growth(conn_v14, repo_root),
+            audit_future_growth(conn_v14, repo_root, report_dir),
             audit_claim_card_engine(conn_v14, repo_root),
             audit_claim_card_high_confidence_evidence_contract(conn_v14, repo_root),
             audit_llm_evidence_boundary(conn_v14, repo_root),

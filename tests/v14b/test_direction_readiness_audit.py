@@ -5,12 +5,14 @@ from datetime import datetime
 from pathlib import Path
 
 from echelon.v14b.direction_readiness_audit import (
+    _public_latest_fusion_audit,
     classify_blockers,
     collect_metrics,
     load_openalex_frontfill_state,
     load_section_frontfill_state,
     primary_section_strategy_quality,
     readiness_level,
+    render_markdown,
     run_audit,
     select_section_frontfill_state,
 )
@@ -280,6 +282,68 @@ def test_direction_readiness_prefers_active_delta_watchdog_state(tmp_path):
 
     assert loaded["source"] == "section_delta"
     assert loaded["done"] == 20
+
+
+def test_latest_fusion_audit_renders_candidate_score_labels():
+    public = _public_latest_fusion_audit(
+        {
+            "run_id": "r1",
+            "n_vgae_preds_top": 500,
+            "n_vgae_preds_total": 1000,
+            "n_cross_field_total": 60,
+            "n_unresolved": 50,
+            "n_candidates": 5,
+            "n_directions": 2,
+            "calibration_json": (
+                '{"prediction_confidence_avg": 0.83, "min_vgae_confidence": 0.55, '
+                '"vgae_top_n": 500, "labels": {"calibrated_temporal_holdout": 2}}'
+            ),
+        }
+    )
+
+    assert public["candidate_edges_used"] == 500
+    assert public["future_candidate_edges_total"] == 1000
+    assert public["calibration_summary"]["candidate_ranking_score_avg"] == 0.83
+    assert public["calibration_summary"]["min_candidate_score_threshold"] == 0.55
+    assert "prediction_confidence_avg" not in str(public)
+    assert "min_vgae_confidence" not in str(public)
+
+
+def test_direction_readiness_report_hides_legacy_prediction_confidence_copy():
+    metrics = {
+        "linked_refs": 30,
+        "refs": 100,
+        "linked_ref_rate": 0.3,
+        "openalex_w": 70,
+        "openalex_w_rate": 0.7,
+        "section_rows": 100,
+        "section_papers": 50,
+        "primary_section_papers": 40,
+        "primary_section_rate": 0.4,
+        "section_evidence_quality": {"strong_or_moderate_papers": 30, "weak_only_rate": 0.25},
+        "topic_gap_primary_section_papers": 0,
+        "topic_gap_queue_papers": 0,
+        "topic_gap_primary_section_rate": 0.0,
+        "future_candidate_edges": 1000,
+        "future_visual_edges": 1000,
+        "future_directions": 2,
+        "direction_claim_cards": 2,
+        "complete_claim_cards": 1,
+        "high_confidence_claim_cards": 0,
+        "latest_fusion": {
+            "run_id": "r1",
+            "n_vgae_preds_top": 500,
+            "n_vgae_preds_total": 1000,
+            "calibration_json": '{"prediction_confidence_avg": 0.83, "min_vgae_confidence": 0.55}',
+        },
+    }
+
+    md = render_markdown(metrics, [], "actionable_but_not_high_confidence")
+
+    assert "candidate_ranking_score_avg" in md
+    assert "min_candidate_score_threshold" in md
+    assert "prediction_confidence_avg" not in md
+    assert "min_vgae_confidence" not in md
 
 
 def test_direction_readiness_writes_report(tmp_path):

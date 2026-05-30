@@ -106,6 +106,55 @@ def _json_obj(value: Any) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def _rewrite_candidate_score_keys(value: Any) -> Any:
+    key_map = {
+        "prediction_confidence_avg": "candidate_ranking_score_avg",
+        "min_vgae_confidence": "min_candidate_score_threshold",
+        "vgae_top_n": "candidate_edges_used",
+        "raw_predicted_prob": "raw_candidate_score",
+        "calibrated_predicted_prob": "calibrated_candidate_score",
+    }
+    if isinstance(value, dict):
+        return {key_map.get(str(k), str(k)): _rewrite_candidate_score_keys(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_rewrite_candidate_score_keys(v) for v in value]
+    return value
+
+
+def _public_latest_fusion_audit(row: dict[str, Any] | None) -> dict[str, Any]:
+    """Render Step6 audit metadata with public candidate-generator semantics."""
+    if not row:
+        return {}
+    scalar_key_map = {
+        "run_id": "run_id",
+        "n_terminals": "terminals_considered",
+        "n_vgae_preds_top": "candidate_edges_used",
+        "n_vgae_preds_total": "future_candidate_edges_total",
+        "n_cross_field_total": "cross_field_candidate_edges_total",
+        "n_unresolved": "unresolved_limitations_used",
+        "n_candidates": "fusion_candidates",
+        "n_directions": "fusion_directions",
+        "output_directions": "fusion_directions",
+        "adequacy_label": "adequacy_label",
+        "remaining_risk": "remaining_risk",
+        "created_at": "created_at",
+    }
+    public: dict[str, Any] = {}
+    for old_key, new_key in scalar_key_map.items():
+        if old_key in row and row.get(old_key) is not None:
+            public[new_key] = row.get(old_key)
+    json_key_map = {
+        "limitation_quality_json": "limitation_quality_distribution",
+        "evidence_path_json": "evidence_path_distribution",
+        "candidate_tier_json": "candidate_tier_distribution",
+        "calibration_json": "calibration_summary",
+    }
+    for old_key, new_key in json_key_map.items():
+        if old_key in row and row.get(old_key):
+            public[new_key] = _rewrite_candidate_score_keys(_json_obj(row.get(old_key)))
+    return public
+
+
 def _section_quality_from_strategies(strategies: set[str]) -> str:
     if strategies & STRONG_SECTION_STRATEGIES:
         return "strong"
@@ -781,7 +830,8 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     for b in blockers:
         lines.append(f"- **{b['gate']}** ({b['severity']}): {b['why']} Next: {b['next_action']}")
     if metrics.get("latest_fusion"):
-        lines.extend(["", "## Latest Fusion Audit", "", "```json", json.dumps(metrics["latest_fusion"], ensure_ascii=False, indent=2), "```"])
+        public_fusion = _public_latest_fusion_audit(metrics["latest_fusion"])
+        lines.extend(["", "## Latest Fusion Audit", "", "```json", json.dumps(public_fusion, ensure_ascii=False, indent=2), "```"])
     if metrics.get("candidate_lifecycle_summary"):
         lifecycle = metrics["candidate_lifecycle_summary"]
         lines.extend(

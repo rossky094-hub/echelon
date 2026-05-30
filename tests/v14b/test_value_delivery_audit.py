@@ -204,6 +204,11 @@ def _write_product_sources(root: Path) -> None:
         "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)\n",
         encoding="utf-8",
     )
+    (v14 / "direction_readiness_audit.py").write_text(
+        "def _public_latest_fusion_audit(row):\n"
+        "    return {'candidate_ranking_score_avg': 0.8, 'min_candidate_score_threshold': 0.55}\n",
+        encoding="utf-8",
+    )
     (v14 / "step10_visual_graph_builder.py").write_text(
         '"candidate_edges": child_future\n'
         "Future candidate edges and unresolved limitation bottlenecks\n"
@@ -517,6 +522,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert future_gate["checks"]["step6_future_evidence_avoids_prediction_copy"] is True
     assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     assert future_gate["checks"]["public_future_candidate_language_avoids_prediction_copy"] is True
+    assert future_gate["checks"]["direction_readiness_report_uses_candidate_score_labels"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
     assert openalex_gate["status"] == "pass"
     assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
@@ -1205,6 +1211,25 @@ def test_future_growth_audit_rejects_public_model_probability_keys(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["public_future_model_evidence_uses_candidate_score_labels"] is False
+
+
+def test_future_growth_audit_rejects_direction_readiness_prediction_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "direction_readiness_audit.md").write_text(
+        '"calibration_json": "{\\"prediction_confidence_avg\\": 0.83, \\"min_vgae_confidence\\": 0.55}"\n',
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["direction_readiness_report_uses_candidate_score_labels"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
