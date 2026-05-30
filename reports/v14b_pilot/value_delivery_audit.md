@@ -1,27 +1,28 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:52:39Z`
+- generated_at: `2026-05-30T16:58:06Z`
 - evidence_policy: `insufficient_evidence`
-- gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
+- gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
 ## Product Gates
 
 | # | Gate | Status | What This Enforces |
 | ---: | --- | --- | --- |
 | 1 | Evidence Bone | warn | All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes. |
-| 2 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
-| 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract. |
-| 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
-| 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions. |
-| 6 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
-| 7 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
-| 8 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
-| 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
-| 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
-| 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
-| 13 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression entrypoint must default to the full benchmark suite. |
-| 14 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
+| 2 | OpenAlex Frontfill Guard Contract | pass | OpenAlex field/topic backfill must respect provider 429 cooldowns and avoid duplicate runs; cross-field conclusions remain uncertainty-labeled until coverage and cooldown health recover. |
+| 3 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
+| 4 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract. |
+| 5 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
+| 6 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions. |
+| 7 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
+| 8 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
+| 9 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
+| 10 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
+| 11 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
+| 12 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
+| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression entrypoint must default to the full benchmark suite. |
+| 15 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
 ## Gate Details
 
@@ -33,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 25640,
+    "openalex_frontfill_cooldown_remaining_s": 25313,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2634,
+    "primary_section_papers": 2638,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 397,
+        "strong": 401,
         "weak": 2237
       },
-      "primary_section_papers": 2634,
-      "primary_section_rows": 4596,
+      "primary_section_papers": 2638,
+      "primary_section_rows": 4601,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 480,
-        "heading_continuation": 691,
-        "inline_heading": 247,
+        "explicit_heading": 484,
+        "heading_continuation": 696,
+        "inline_heading": 249,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 12,
         "parser_hint": 8
       },
-      "strong_or_moderate_papers": 397,
+      "strong_or_moderate_papers": 401,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8492786636294609
+      "weak_only_rate": 0.8479909021986354
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -72,6 +73,23 @@
     "OpenAlex frontfill cooling_down_or_stopped; field/topic claims need local fallback and uncertainty",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
+}
+```
+
+### OpenAlex Frontfill Guard Contract
+
+```json
+{
+  "checks": {
+    "guard_blocks_duplicate_backfill": true,
+    "guard_reads_openalex_frontfill_state": true,
+    "guard_respects_429_cooldown": true,
+    "openalex_backfill_runs_guard_before_fetch": true,
+    "openalex_backfill_target_present": true
+  },
+  "issue": "OpenAlex Frontfill Guard Contract",
+  "policy": "OpenAlex field/topic backfill must respect provider 429 cooldowns and avoid duplicate runs; cross-field conclusions remain uncertainty-labeled until coverage and cooldown health recover.",
+  "status": "pass"
 }
 ```
 

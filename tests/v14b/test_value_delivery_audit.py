@@ -12,6 +12,7 @@ from echelon.v14b.value_delivery_audit import (
     audit_llm_evidence_boundary,
     audit_main_path_uncertainty_contract,
     audit_multi_topic_regression,
+    audit_openalex_frontfill_guard,
     audit_online_topic_readiness_contract,
     audit_rd_radar_promotion_contract,
     collect_value_gates,
@@ -231,6 +232,16 @@ def _write_product_sources(root: Path) -> None:
         "run_after_frontfill_product_chain.py\n",
         encoding="utf-8",
     )
+    (scripts / "guard_openalex_backfill.py").write_text(
+        "select_openalex_frontfill_state\n"
+        "cooling_down_or_stopped\n"
+        "cooldown_remaining_s\n"
+        "active 429 cooldown detected\n"
+        "V14B_ALLOW_OPENALEX_BACKFILL_DURING_COOLDOWN\n"
+        "active OpenAlex backfill already detected\n"
+        "V14B_ALLOW_CONCURRENT_OPENALEX_BACKFILL\n",
+        encoding="utf-8",
+    )
 
 
 def _write_makefile_contracts(root: Path) -> None:
@@ -239,6 +250,9 @@ def _write_makefile_contracts(root: Path) -> None:
         "#   make post-frontfill-chain\n"
         "# Legacy compatibility:\n"
         "#   make pilot # LEGACY compatibility only; not current V14B decision workflow\n"
+        "openalex-backfill:\n"
+        "\tpython scripts/guard_openalex_backfill.py --repo-root .\n"
+        "\tpython -m echelon.v14b.step0_openalex_backfill\n"
         "product-chain-fast: id-repair graph-features\n"
         "product-chain: id-repair graph-prep evidence-prep\n"
         "\t$(MAKE) decision-audit\n"
@@ -413,8 +427,12 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
 
     result = collect_value_gates(main, v14, tmp_path, report_dir)
 
-    assert len(result["gates"]) == 14
+    assert len(result["gates"]) == 15
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
+    openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
+    assert openalex_gate["status"] == "pass"
+    assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
+    assert openalex_gate["checks"]["guard_respects_429_cooldown"] is True
     bottleneck_gate = next(g for g in result["gates"] if g["issue"] == "Bottleneck Lineage Graph")
     assert bottleneck_gate["checks"]["api_bottleneck_constraints_carry_limits"] is True
     assert bottleneck_gate["checks"]["ui_renders_bottleneck_lineage_limits"] is True
@@ -547,6 +565,29 @@ def test_main_path_uncertainty_contract_demotes_low_linked_refs(tmp_path):
     assert result["checks"]["low_linked_refs_add_uncertainty"] is True
     assert result["checks"]["main_path_edges_inherit_uncertainty"] is True
     assert result["claim_scope"] == "main_path_context_low_linked_refs"
+
+
+def test_openalex_frontfill_guard_contract_requires_cooldown_guard(tmp_path):
+    _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+
+    result = audit_openalex_frontfill_guard(tmp_path)
+
+    assert result["status"] == "pass"
+    assert result["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
+    assert result["checks"]["guard_blocks_duplicate_backfill"] is True
+
+
+def test_openalex_frontfill_guard_contract_fails_without_guard(tmp_path):
+    (tmp_path / "Makefile").write_text(
+        "openalex-backfill:\n\tpython -m echelon.v14b.step0_openalex_backfill\n",
+        encoding="utf-8",
+    )
+
+    result = audit_openalex_frontfill_guard(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["openalex_backfill_runs_guard_before_fetch"] is False
 
 
 def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):

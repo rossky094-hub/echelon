@@ -212,6 +212,43 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def audit_openalex_frontfill_guard(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify OpenAlex backfill entrypoints respect cooldown and duplicate-run guards."""
+    root = repo_root or Path(".")
+    makefile = (root / "Makefile").read_text(encoding="utf-8") if (root / "Makefile").exists() else ""
+    openalex_context = _make_target_context(makefile, "openalex-backfill", before=0, after=8)
+    guard_path = root / "scripts/guard_openalex_backfill.py"
+    checks = {
+        "openalex_backfill_target_present": bool(re.search(r"^openalex-backfill\s*:", makefile, flags=re.M)),
+        "openalex_backfill_runs_guard_before_fetch": (
+            "scripts/guard_openalex_backfill.py" in openalex_context
+            and openalex_context.find("scripts/guard_openalex_backfill.py")
+            < openalex_context.find("echelon.v14b.step0_openalex_backfill")
+        ),
+        "guard_reads_openalex_frontfill_state": _source_contains(
+            guard_path,
+            ("select_openalex_frontfill_state", "cooling_down_or_stopped", "cooldown_remaining_s"),
+        ),
+        "guard_respects_429_cooldown": _source_contains(
+            guard_path,
+            ("active 429 cooldown detected", "V14B_ALLOW_OPENALEX_BACKFILL_DURING_COOLDOWN"),
+        ),
+        "guard_blocks_duplicate_backfill": _source_contains(
+            guard_path,
+            ("active OpenAlex backfill already detected", "V14B_ALLOW_CONCURRENT_OPENALEX_BACKFILL"),
+        ),
+    }
+    return {
+        "issue": "OpenAlex Frontfill Guard Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "policy": (
+            "OpenAlex field/topic backfill must respect provider 429 cooldowns and avoid duplicate runs; "
+            "cross-field conclusions remain uncertainty-labeled until coverage and cooldown health recover."
+        ),
+    }
+
+
 def audit_bottleneck_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     if not table_exists(conn_v14, "bottleneck_lineage_triples"):
         return {
@@ -1983,6 +2020,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
         )
         gates = [
             audit_evidence_bone(metrics),
+            audit_openalex_frontfill_guard(repo_root),
             audit_bottleneck_lineage(conn_v14, repo_root),
             audit_branch_lineage(conn_v14, repo_root),
             audit_future_growth(conn_v14),

@@ -84,6 +84,7 @@ reference-relink-apply:
 ## Step 0.25: OpenAlex Field/Topic backfill
 openalex-backfill:
 	@echo ">>> Step 0.25: OpenAlex Field/Topic backfill..."
+	$(PYTHON) scripts/guard_openalex_backfill.py --repo-root .
 	$(PYTHON) -m echelon.v14b.step0_openalex_backfill \
 		--db $(DB_MAIN) \
 		--concurrency $${V14B_OPENALEX_BACKFILL_CONCURRENCY:-1} \
