@@ -1,4 +1,4 @@
-"""Echelon seeds module - L2 gold seed selection."""
+"""Echelon seeds module - L2 candidate seed selection."""
 from .consistency import robust_consistency
 from .mmr import mmr_select
 from .score_keystone import safe_clip, KeystoneScore

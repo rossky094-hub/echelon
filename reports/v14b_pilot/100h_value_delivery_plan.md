@@ -48,7 +48,7 @@ Raise the trust floor enough that every user-facing claim carries a correct evid
    - future edge endpoints
    - branch split drivers
    - top keystone papers
-   - topic gold fixtures such as Metalens
+   - benchmark-topic regression fixtures such as Metalens, plus arbitrary-topic readiness samples
 3. Continue OpenAlex backfill conservatively.
 4. Re-run provider ID repair and reference relinking only after identifier coverage improves.
 5. Add evidence-grade labels everywhere:
@@ -264,7 +264,7 @@ Build topic regression across multiple optics directions.
 
 ### Tasks
 
-1. Create gold expectations for each topic.
+1. Define benchmark expectations for each topic under the regression-fixture contract.
 2. Run Topic Lens regression.
 3. Classify failures:
    - retrieval failure

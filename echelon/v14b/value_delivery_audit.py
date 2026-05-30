@@ -2067,6 +2067,7 @@ def audit_multi_topic_regression(
     )
     topic_regression_avoids_gold_topic_aliases = True
     topic_regression_cli_defaults_to_suite = True
+    current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
@@ -2084,10 +2085,27 @@ def audit_multi_topic_regression(
             topic_regression_source,
             ('default="all"', "BENCHMARK_TOPICS"),
         )
+        stale_gold_topic_doc_phrases = (
+            "topic gold fixtures",
+            "Create gold expectations",
+            "Multi-topic Gold Regression",
+            "gold fixtures for",
+            "gold regression fixtures",
+        )
+        current_plan_docs = (
+            repo_root / "reports/v14b_pilot/100h_value_delivery_plan.md",
+            repo_root / "reports/v14b_pilot/end_to_end_audit_goals_20260530.md",
+        )
+        current_plan_docs_avoid_gold_topic_language = all(
+            _source_absent(path, stale_gold_topic_doc_phrases)
+            for path in current_plan_docs
+            if path.exists()
+        )
     contract_fail = bool(live_results) and not (
         benchmark_fixture_contract_ok and no_gold_topic_fields
         and topic_regression_avoids_gold_topic_aliases
         and topic_regression_cli_defaults_to_suite
+        and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
     topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
@@ -2105,6 +2123,7 @@ def audit_multi_topic_regression(
             "live_results_avoid_gold_topic_fields": no_gold_topic_fields,
             "topic_regression_avoids_gold_topic_aliases": topic_regression_avoids_gold_topic_aliases,
             "topic_regression_cli_defaults_to_suite": topic_regression_cli_defaults_to_suite,
+            "current_plan_docs_avoid_gold_topic_language": current_plan_docs_avoid_gold_topic_language,
         },
         "benchmark_topics": sorted(defined),
         "missing_topics": missing,

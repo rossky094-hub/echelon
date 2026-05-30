@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:40:18Z`
+- generated_at: `2026-05-30T17:45:41Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 22782,
+    "openalex_frontfill_cooldown_remaining_s": 22458,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2713,
+    "primary_section_papers": 2715,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 476,
+        "strong": 478,
         "weak": 2237
       },
-      "primary_section_papers": 2713,
-      "primary_section_rows": 4744,
+      "primary_section_papers": 2715,
+      "primary_section_rows": 4752,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 581,
-        "heading_continuation": 837,
-        "inline_heading": 299,
+        "explicit_heading": 585,
+        "heading_continuation": 845,
+        "inline_heading": 304,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 13,
         "parser_hint": 9
       },
-      "strong_or_moderate_papers": 476,
+      "strong_or_moderate_papers": 478,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8245484703280501
+      "weak_only_rate": 0.8239410681399632
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -530,6 +530,7 @@
   ],
   "checks": {
     "benchmark_topics_defined": true,
+    "current_plan_docs_avoid_gold_topic_language": true,
     "live_results_avoid_gold_topic_fields": true,
     "live_results_have_fixture_contract": true,
     "topic_regression_avoids_gold_topic_aliases": true,

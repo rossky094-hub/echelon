@@ -4,8 +4,10 @@ V13: c_mechanism_novelty — LLM-based mechanism novelty scorer.
 Scores 0-3 based on whether a paper introduces a genuinely new physical
 mechanism, material, architecture, or algorithmic paradigm.
 
-Cost estimate: ~$0.0001/paper via pplx (max_tokens=200)
-100 gold seeds = ~$0.01 — acceptable for production.
+V13 legacy note: this optional LLM scorer is not a V14B production evidence
+gate.  Current V14B novelty signals default to deterministic graph/text
+features, and any LLM-derived novelty label must remain weak/audit-only unless
+it is anchored to structured evidence.
 
 Score mapping (0-3 → 0-1):
   0 → 0.00  (no new mechanism)

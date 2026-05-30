@@ -84,8 +84,8 @@ must improve one of three properties:
 
 ### Topic Dossier Product Value
 
-13. **Multi-topic Gold Regression Expansion**
-    - Goal: strengthen gold fixtures for metalens, metasurface holography, photonic crystal cavity, quantum light source.
+13. **Multi-topic Benchmark Regression Expansion**
+    - Goal: strengthen benchmark regression fixtures for metalens, metasurface holography, photonic crystal cavity, quantum light source.
     - Acceptance: each topic has expected branches, bottlenecks, turning-paper anchors, and failure criteria.
 
 14. **Topic Dossier Evidence Object Audit**
@@ -121,6 +121,6 @@ must improve one of three properties:
 ## Recommended Waiting-Time Execution Order
 
 1. Build the coverage/error audits that do not need the frontfill to finish.
-2. Strengthen multi-topic gold regression fixtures and evidence-object checks.
+2. Strengthen multi-topic benchmark regression fixtures and evidence-object checks.
 3. Prepare post-frontfill checkpoint logic and Claim Card missing-gate matrix.
 4. When section/OpenAlex finishes or watchdog hands off delta queue, rerun Step5c -> Step6 -> Step13 -> visual graph -> value audit.
