@@ -2363,12 +2363,32 @@ def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source
     }
 
 
+def _normalise_future_candidate_evidence(edge: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(edge, dict):
+        return {}
+    evidence = edge.get("evidence") if isinstance(edge.get("evidence"), dict) else {}
+    if evidence.get("calibrated_candidate_score") is None and evidence.get("calibrated_prob") is not None:
+        evidence["calibrated_candidate_score"] = evidence.get("calibrated_prob")
+    if evidence.get("raw_candidate_score") is None and evidence.get("raw_predicted_prob") is not None:
+        evidence["raw_candidate_score"] = evidence.get("raw_predicted_prob")
+    evidence.pop("calibrated_prob", None)
+    evidence.pop("raw_predicted_prob", None)
+    edge["evidence"] = evidence
+    edge.setdefault("candidate_score", edge.get("confidence") or edge.get("weight") or evidence.get("candidate_score"))
+    return evidence
+
+
 def _future_edge_calibration_status(edge: dict[str, Any] | None) -> str:
     evidence = (edge or {}).get("evidence") or {}
     status = evidence.get("calibration_status") or evidence.get("lifecycle_calibration_status")
     if status:
         return str(status)
-    if evidence.get("calibration_label") or evidence.get("calibration_method") or evidence.get("calibrated_prob") is not None:
+    if (
+        evidence.get("calibration_label")
+        or evidence.get("calibration_method")
+        or evidence.get("calibrated_candidate_score") is not None
+        or evidence.get("calibrated_prob") is not None
+    ):
         return "edge_calibrated_run_audit_unknown"
     return "not_calibrated"
 
@@ -2419,6 +2439,7 @@ def _future_edge_claim_contract(edge: dict[str, Any] | None) -> dict[str, Any]:
 
 def _apply_future_edge_contracts(future_growth: list[dict[str, Any]]) -> None:
     for edge in future_growth:
+        _normalise_future_candidate_evidence(edge)
         contract = _future_edge_claim_contract(edge)
         edge.setdefault("claim_scope", contract["claim_scope"])
         edge.setdefault("evidence_grade", contract["evidence_grade"])
@@ -4138,10 +4159,10 @@ def _build_rd_radar(
     candidate_pool: list[dict[str, Any]] = []
     candidate_pool.extend(incomplete_cards)
     for e in future_growth[:20]:
+        evidence = _normalise_future_candidate_evidence(e)
         src = (e.get("source_paper") or {}).get("title") or e.get("source_paper_id")
         dst = (e.get("target_paper") or {}).get("title") or e.get("target_paper_id")
         conf = float(e.get("confidence") or e.get("weight") or 0.0)
-        evidence = e.get("evidence") or {}
         lifecycle_missing = evidence.get("missing_gates") or []
         lifecycle_reason = evidence.get("candidate_pool_reason")
         calibration_status = _future_edge_calibration_status(e)
@@ -4158,8 +4179,8 @@ def _build_rd_radar(
                 "model_evidence": {
                     "generator": "Step5b GNN/VGAE future candidate generator",
                     "candidate_score": conf,
-                    "calibrated_prob": evidence.get("calibrated_prob"),
-                    "raw_candidate_score": evidence.get("raw_candidate_score") or evidence.get("raw_predicted_prob"),
+                    "calibrated_candidate_score": evidence.get("calibrated_candidate_score"),
+                    "raw_candidate_score": evidence.get("raw_candidate_score"),
                     "calibration_method": evidence.get("calibration_method"),
                     "calibration_support": evidence.get("calibration_support"),
                     "calibration_label": evidence.get("calibration_label"),

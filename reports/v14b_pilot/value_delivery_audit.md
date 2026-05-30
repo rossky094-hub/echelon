@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T19:09:23Z`
+- generated_at: `2026-05-30T19:14:07Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,7 +34,7 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 17436,
+    "openalex_frontfill_cooldown_remaining_s": 17153,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
@@ -155,6 +155,7 @@
     "edge_level_calibration_not_confused_with_run_audit": true,
     "future_report_filename_is_candidate_contract": true,
     "public_future_candidate_language_avoids_prediction_copy": true,
+    "public_future_model_evidence_uses_candidate_score_labels": true,
     "raw_future_edges_not_radar_eligible": true,
     "run_level_calibration_required_for_direction_claims": true,
     "step6_future_evidence_avoids_prediction_copy": true,

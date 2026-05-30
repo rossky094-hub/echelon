@@ -148,7 +148,7 @@ def _write_product_sources(root: Path) -> None:
         '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
-        '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score\n'
+        '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n"
         "topic_readiness = build_topic_readiness_preflight\n",
@@ -1171,6 +1171,25 @@ def test_future_growth_audit_rejects_builder_predicted_edges_contract(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["topic_dossier_builders_use_candidate_edges_contract"] is False
+
+
+def test_future_growth_audit_rejects_public_model_probability_keys(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    api_path = tmp_path / "echelon/api/graph_visual_backend.py"
+    api_path.write_text(
+        api_path.read_text(encoding="utf-8")
+        + '\nmodel_evidence = {"calibrated_prob": evidence.get("calibrated_prob"), "raw_predicted_prob": evidence.get("raw_predicted_prob")}\n',
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["public_future_model_evidence_uses_candidate_score_labels"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):

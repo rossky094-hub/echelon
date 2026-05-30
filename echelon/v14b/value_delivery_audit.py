@@ -551,6 +551,24 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                 ),
             )
         ),
+        "public_future_model_evidence_uses_candidate_score_labels": (
+            _source_contains(
+                api_path,
+                (
+                    "calibrated_candidate_score",
+                    "raw_candidate_score",
+                    "calibrated_prob",
+                    "raw_predicted_prob",
+                ),
+            )
+            and _source_absent(
+                api_path,
+                (
+                    '"calibrated_prob": evidence.get',
+                    '"raw_predicted_prob": evidence.get',
+                ),
+            )
+        ),
         "topic_dossier_builders_use_candidate_edges_contract": (
             _source_contains(
                 step10_path,

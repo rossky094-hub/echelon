@@ -432,7 +432,8 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     assert radar["incomplete_claim_cards"][0]["uncertainty_reasons"]
     assert any(item["kind"] == "incomplete_claim_card" for item in radar["candidate_pool"])
     edge_items = [item for item in radar["candidate_pool"] if item["kind"] == "candidate_edge"]
-    assert edge_items[0]["model_evidence"]["calibrated_prob"] == 0.75
+    assert edge_items[0]["model_evidence"]["calibrated_candidate_score"] == 0.75
+    assert "calibrated_prob" not in edge_items[0]["model_evidence"]
     assert edge_items[0]["evidence_grade"] == "calibrated_candidate_generator"
     assert edge_items[0]["evidence_objects"]
     assert edge_items[0]["evidence_objects"][0]["type"] == "future_candidate"
