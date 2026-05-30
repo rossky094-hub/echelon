@@ -1917,6 +1917,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     ]
     step9_path = (repo_root or Path(".")) / "echelon/v14b/step9_report.py"
     step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
+    v14_config_path = (repo_root or Path(".")) / "echelon/v14b/config.py"
+    v14_init_path = (repo_root or Path(".")) / "echelon/v14b/__init__.py"
     step9_avoids_old_pilot_instruction = (
         bool(step9_text)
         and "make pilot 全流程" not in step9_text
@@ -1947,6 +1949,32 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         and "突变节点 100-300" not in step9_text
         and "重型算法调优建议" not in step9_text
         and "_go_nogo_recommendation" not in step9_text
+    )
+    step9_algo_report_filename_is_evidence_decision = (
+        _source_contains(v14_config_path, ("REPORT_ALGO_VALIDATION", "V14B_Evidence_Decision_算法验证报告.md"))
+        and "V14B_Evidence_Decision_算法验证报告.md" in step9_text
+        and "V14B_Evidence_Decision_算法验证报告.md" in makefile
+        and "V14B_Pilot_算法验证报告.md" not in step9_text
+        and "V14B_Pilot_算法验证报告.md" not in makefile
+    )
+    package_docstring_avoids_legacy_pilot_flow = (
+        _source_contains(
+            v14_init_path,
+            (
+                "Evidence Decision workflow",
+                "evidence-constrained research decision pipeline",
+                "legacy pilot graph flow",
+                "compatibility-only",
+            ),
+        )
+        and _source_absent(
+            v14_init_path,
+            (
+                "Pilot 模块",
+                "9-step",
+                "Step 1: OpenAlex enrich",
+            ),
+        )
     )
     first_current = min(
         (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
@@ -2018,6 +2046,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "step9_report_avoids_old_pilot_instruction": step9_avoids_old_pilot_instruction,
         "step9_openalex_language_is_coverage_not_success": step9_openalex_language_is_coverage,
         "step9_uses_decision_readiness_not_frontend_launch": step9_decision_readiness_not_frontend_launch,
+        "step9_algo_report_filename_is_evidence_decision": step9_algo_report_filename_is_evidence_decision,
+        "package_docstring_avoids_legacy_pilot_flow": package_docstring_avoids_legacy_pilot_flow,
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context

@@ -323,7 +323,7 @@ NODE_SIZE_MAX: float = 20.0
 # Step 9: 报告生成器
 # ---------------------------------------------------------------------------
 
-REPORT_ALGO_VALIDATION = REPORT_DIR / "V14B_Pilot_算法验证报告.md"
+REPORT_ALGO_VALIDATION = REPORT_DIR / "V14B_Evidence_Decision_算法验证报告.md"
 REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来候选方向_证据合同报告.md"
 
 # ---------------------------------------------------------------------------

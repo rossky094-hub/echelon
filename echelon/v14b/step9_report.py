@@ -2,7 +2,7 @@
 Step 9: 报告生成器
 
 生成两份 Markdown 报告:
-  1. V14B_Pilot_算法验证报告.md (legacy filename; current Evidence Decision report)
+  1. V14B_Evidence_Decision_算法验证报告.md
   2. 未来候选方向_证据合同报告.md (top 20)
 
 从 DB 实查数据填充(无数据时用 TBD 占位)
@@ -181,7 +181,7 @@ def generate_algo_report(
     *,
     corpus_id: str | None = None,
 ) -> str:
-    """生成 V14B Pilot 算法验证报告"""
+    """生成 V14B Evidence Decision 算法验证报告"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     scope = "id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else "1=1"

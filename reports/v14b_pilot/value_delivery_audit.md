@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:59:02Z`
+- generated_at: `2026-05-30T18:05:35Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 21657,
+    "openalex_frontfill_cooldown_remaining_s": 21264,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2732,
+    "primary_section_papers": 2738,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 495,
+        "strong": 501,
         "weak": 2237
       },
-      "primary_section_papers": 2732,
-      "primary_section_rows": 4782,
+      "primary_section_papers": 2738,
+      "primary_section_rows": 4790,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 603,
-        "heading_continuation": 875,
-        "inline_heading": 318,
+        "explicit_heading": 607,
+        "heading_continuation": 883,
+        "inline_heading": 322,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 13,
         "parser_hint": 9
       },
-      "strong_or_moderate_papers": 495,
+      "strong_or_moderate_papers": 501,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.818814055636896
+      "weak_only_rate": 0.8170197224251279
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -426,11 +426,13 @@
     "help_prefers_current_chain": true,
     "legacy_arxiv_scripts_require_explicit_opt_in": true,
     "legacy_targets_labeled": true,
+    "package_docstring_avoids_legacy_pilot_flow": true,
     "pilot_full_is_legacy_compatibility_only": true,
     "post_frontfill_entry_present": true,
     "post_frontfill_uses_topic_gap_repair": true,
     "product_chain_runs_decision_audit": true,
     "product_chains_avoid_legacy_targets": true,
+    "step9_algo_report_filename_is_evidence_decision": true,
     "step9_openalex_language_is_coverage_not_success": true,
     "step9_report_avoids_old_pilot_instruction": true,
     "step9_uses_decision_readiness_not_frontend_launch": true,

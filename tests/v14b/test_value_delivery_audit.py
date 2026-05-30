@@ -193,8 +193,16 @@ def _write_product_sources(root: Path) -> None:
         'V14B_LIMITATION_USE_LLM", "false"\n'
         'V14B_SCIBERT_LLM_FALLBACK", "false"\n'
         'V14B_FUSION_USE_LLM_NAMING", "false"\n'
+        'REPORT_ALGO_VALIDATION = REPORT_DIR / "V14B_Evidence_Decision_算法验证报告.md"\n'
         'REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来候选方向_证据合同报告.md"\n'
         "Low-confidence edges fall back to heuristic correction 不隐式调用 LLM\n",
+        encoding="utf-8",
+    )
+    (v14 / "__init__.py").write_text(
+        "Echelon V14-B Evidence Decision workflow\n"
+        "evidence-constrained research decision pipeline\n"
+        "legacy pilot graph flow\n"
+        "compatibility-only\n",
         encoding="utf-8",
     )
     (v14 / "step5c_limitation.py").write_text(
@@ -230,6 +238,7 @@ def _write_product_sources(root: Path) -> None:
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
         "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
         "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
+        "V14B_Evidence_Decision_算法验证报告.md\n"
         "未来候选方向_证据合同报告.md\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
         "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
@@ -317,6 +326,8 @@ def _write_makefile_contracts(root: Path) -> None:
         "quarterly-run-optics:\n"
         "quarterly-run-cs:\n"
         "quarterly-run-materials:\n"
+        "report:\n"
+        "\t@echo 'reports/v14b_pilot/V14B_Evidence_Decision_算法验证报告.md'\n"
         "help:\n"
         "\t@echo 'make product-chain'\n"
         "\t@echo 'make post-frontfill-chain'\n"
@@ -538,6 +549,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert legacy_gate["checks"]["step9_report_avoids_old_pilot_instruction"] is True
     assert legacy_gate["checks"]["step9_openalex_language_is_coverage_not_success"] is True
     assert legacy_gate["checks"]["step9_uses_decision_readiness_not_frontend_launch"] is True
+    assert legacy_gate["checks"]["step9_algo_report_filename_is_evidence_decision"] is True
+    assert legacy_gate["checks"]["package_docstring_avoids_legacy_pilot_flow"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])
@@ -644,6 +657,8 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
     assert result["checks"]["step9_openalex_language_is_coverage_not_success"] is True
+    assert result["checks"]["step9_algo_report_filename_is_evidence_decision"] is True
+    assert result["checks"]["package_docstring_avoids_legacy_pilot_flow"] is True
     assert result["disallowed_current_deps"] == {}
 
 
@@ -701,6 +716,29 @@ def test_legacy_flow_isolation_contract_rejects_frontend_launch_step9(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["step9_uses_decision_readiness_not_frontend_launch"] is False
+
+
+def test_legacy_flow_isolation_contract_rejects_pilot_report_filename_and_docstring(tmp_path):
+    _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+    _write_legacy_arxiv_script_contracts(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "config.py").write_text(
+        'REPORT_ALGO_VALIDATION = REPORT_DIR / "V14B_Pilot_算法验证报告.md"\n',
+        encoding="utf-8",
+    )
+    (v14 / "__init__.py").write_text(
+        "Echelon V14-B 演化树 Pilot 模块\n"
+        "包含完整的 9-step 演化树分析流程\n"
+        "Step 1: OpenAlex enrich\n",
+        encoding="utf-8",
+    )
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step9_algo_report_filename_is_evidence_decision"] is False
+    assert result["checks"]["package_docstring_avoids_legacy_pilot_flow"] is False
 
 
 def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp_path):
