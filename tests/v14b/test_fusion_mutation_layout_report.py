@@ -525,7 +525,9 @@ class TestReportGenerator:
         conn_v14.execute("""
             INSERT INTO future_directions (direction_name, confidence, expected_period,
                 main_path_evidence, vgae_evidence, limitation_evidence, paper_ids_json)
-            VALUES ('AI photonics', 0.85, '2026-2028', 'mp', 'vgae', 'limit', '[1,2]')
+            VALUES ('AI photonics', 0.85, '2026-2028', 'mp',
+                    'VGAE pred: calibrated=0.995, raw=0.991',
+                    'limit', '[1,2]')
         """)
         conn_v14.commit()
 
@@ -542,6 +544,8 @@ class TestReportGenerator:
         assert "uncertainty_reasons" in report
         assert "candidate_pool_only" in report
         assert "Future Candidate Generator (GNN/VGAE)" in report
+        assert "GNN/VGAE candidate edge: calibrated=0.995" in report
+        assert "VGAE pred:" not in report
         assert "VGAE Link Prediction" not in report
 
     def test_empty_db_report_has_tbd(self, tmp_path):

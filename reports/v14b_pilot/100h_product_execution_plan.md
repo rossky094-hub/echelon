@@ -15,7 +15,7 @@ Mission: turn the optics graph from a visual paper map into a decision-grade res
 - primary field coverage: `55,342 / 55,391` = `99.9%`
 - section evidence: `1,241` rows / `690` papers
 - primary section evidence: `690` papers
-- predicted future edges: `1,000`
+- future candidate edges: `1,000`
 - live future directions: `0`
 - live Claim Cards: `0`
 - visual graph: `55,391` nodes / `739,318` edges / `5,426` branch lineages

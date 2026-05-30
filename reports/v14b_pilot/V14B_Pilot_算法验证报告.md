@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 01:45
+**生成时间**: 2026-05-31 01:54
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -136,7 +136,7 @@
 | Photo-induced cascaded harmonic and comb generation in silicon nitride | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 9 |
 | 11 TeraFLOPs per second photonic convolutional accelerator for deep le | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 9 |
 
-> 详细见: 未来方向预测_交集报告.md
+> 详细见: 未来候选方向_证据合同报告.md
 
 ---
 
@@ -189,4 +189,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:45*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:54*

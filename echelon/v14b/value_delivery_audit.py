@@ -459,6 +459,14 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
     root = repo_root or Path(".")
     step9_path = root / "echelon/v14b/step9_report.py"
     step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
+    config_path = root / "echelon/v14b/config.py"
+    step6_path = root / "echelon/v14b/step6_fusion.py"
+    api_path = root / "echelon/api/graph_visual_backend.py"
+    current_future_docs = (
+        root / "reports/v14b_pilot/100h_product_execution_plan.md",
+        root / "reports/v14b_pilot/100h_value_delivery_plan.md",
+        root / "reports/v14b_pilot/algorithm_audit_step1_step6.md",
+    )
     source_checks = {
         "step9_vgae_language_is_candidate_generator": (
             bool(step9_text)
@@ -469,6 +477,21 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
             and "Step13 complete Claim Card" in step9_text
             and "VGAE 预测未来边数" not in step9_text
             and "VGAE Link Prediction" not in step9_text
+        ),
+        "future_report_filename_is_candidate_contract": (
+            _source_contains(config_path, ("REPORT_FUTURE_DIRECTIONS", "未来候选方向_证据合同报告.md"))
+            and "未来候选方向_证据合同报告.md" in step9_text
+            and "未来方向预测_交集报告.md" not in step9_text
+        ),
+        "step6_future_evidence_avoids_prediction_copy": (
+            _source_contains(step6_path, ("GNN/VGAE candidate edge", "Future candidate generator"))
+            and _source_contains(api_path, ("_future_candidate_evidence_text", "GNN/VGAE candidate edge"))
+            and _source_absent(step6_path, ("VGAE pred:", "VGAE predicted future connections", "Link Prediction"))
+        ),
+        "current_docs_label_future_edges_as_candidates": all(
+            _source_absent(path, ("predicted future edges", "cross-field predicted edges"))
+            for path in current_future_docs
+            if path.exists()
         ),
     }
     if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):

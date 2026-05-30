@@ -7,7 +7,7 @@ Echelon V14-B 演化树 Pilot 模块
   Step 3: V14 调权 KeystoneScore
   Step 4: 子图构建
   Step 5a: SciBERT 引用功能分类
-  Step 5b: VGAE 训练 + Link Prediction
+  Step 5b: VGAE 训练 + calibrated future candidate generator
   Step 5c: Limitation Tracking
   Step 6: 三路融合
   Step 7: 三色突变标记

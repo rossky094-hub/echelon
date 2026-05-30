@@ -1,5 +1,5 @@
 """
-Step 5b: VGAE 训练 + Link Prediction
+Step 5b: VGAE 训练 + calibrated future candidate generator
 
 架构:
   Encoder: 2 层 GCN (797 → 256 → 128 μ/σ)
@@ -787,7 +787,7 @@ def train_vgae(
     limit: Optional[int] = None,
 ) -> dict:
     """
-    训练 VGAE 并执行 Link Prediction。
+    训练 VGAE 并生成校准后的 future candidate edges。
 
     Returns:
         训练统计字典
@@ -928,7 +928,7 @@ def train_vgae(
     )
     logger.info("VGAE rolling held-out-year backtest: %s", rolling_backtest)
 
-    # Link Prediction
+    # Candidate edge generation
     predicted_edges = predict_future_links(
         model=model,
         z=z,
@@ -970,12 +970,12 @@ def predict_future_links(
     auc: float = 0.0,
 ) -> list[dict]:
     """
-    预测未来引用边。
+    生成 future candidate edges。
 
     只保留:
       - 当前不存在的边
       - 时间间隔 >= 1 年
-      - 预测概率 > threshold
+      - 候选概率 > threshold
     """
     import torch
 
@@ -1070,7 +1070,7 @@ def run_vgae(
     resume: bool = True,
     corpus_id: str | None = None,
 ) -> dict:
-    """执行 Step 5b: VGAE 训练 + Link Prediction"""
+    """执行 Step 5b: VGAE 训练 + calibrated future candidate generator"""
     step_name = "step5b_vgae"
     ck = Checkpoint(step_name)
 
@@ -1100,7 +1100,7 @@ def run_vgae(
         ck.mark_done(records_n=0, meta=train_result)
         return train_result
 
-    # 写入预测结果
+    # 写入候选边结果
     predicted = train_result.get("predicted_edges", [])
     if predicted:
         conn_v14.execute("DELETE FROM predicted_future_edges")
@@ -1159,7 +1159,7 @@ def run_vgae(
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="python -m echelon.v14b.step5b_vgae",
-        description="Step 5b: VGAE 训练 + Link Prediction",
+        description="Step 5b: VGAE 训练 + calibrated future candidate generator",
     )
     add_common_args(parser)
     parser.add_argument("--epochs", type=int, default=VGAE_EPOCHS, help="训练轮数")

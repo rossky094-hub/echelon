@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:45:41Z`
+- generated_at: `2026-05-30T17:59:02Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 22458,
+    "openalex_frontfill_cooldown_remaining_s": 21657,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2715,
+    "primary_section_papers": 2732,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 478,
+        "strong": 495,
         "weak": 2237
       },
-      "primary_section_papers": 2715,
-      "primary_section_rows": 4752,
+      "primary_section_papers": 2732,
+      "primary_section_rows": 4782,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 585,
-        "heading_continuation": 845,
-        "inline_heading": 304,
+        "explicit_heading": 603,
+        "heading_continuation": 875,
+        "inline_heading": 318,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 13,
         "parser_hint": 9
       },
-      "strong_or_moderate_papers": 478,
+      "strong_or_moderate_papers": 495,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8239410681399632
+      "weak_only_rate": 0.818814055636896
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -150,9 +150,12 @@
   "calibration_audits": 1,
   "calibration_gap": null,
   "checks": {
+    "current_docs_label_future_edges_as_candidates": true,
     "edge_level_calibration_not_confused_with_run_audit": true,
+    "future_report_filename_is_candidate_contract": true,
     "raw_future_edges_not_radar_eligible": true,
     "run_level_calibration_required_for_direction_claims": true,
+    "step6_future_evidence_avoids_prediction_copy": true,
     "step9_vgae_language_is_candidate_generator": true
   },
   "edge_calibrated_candidates": 1000,

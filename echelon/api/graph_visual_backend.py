@@ -72,6 +72,11 @@ def _connect_main() -> sqlite3.Connection | None:
     return conn
 
 
+def _future_candidate_evidence_text(value: Any) -> str:
+    text = str(value or "")
+    return text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+
+
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'virtual table') AND name = ?",
@@ -5330,6 +5335,7 @@ def get_topic_lens(
             topic_tokens = _token_set(topic_text)
             for row in rows:
                 item = dict(row)
+                item["vgae_evidence"] = _future_candidate_evidence_text(item.get("vgae_evidence"))
                 text = " ".join(
                     str(item.get(k) or "")
                     for k in ("direction_name", "main_path_evidence", "vgae_evidence", "limitation_evidence")
@@ -5546,7 +5552,7 @@ def get_topic_lens(
                 "question": "Q5: 未来最可能往哪长，下一步该怎么证伪？",
                 "answer": (
                     f"候选未来生长边样本：{growth_hint}。应优先针对高频 limitation 关键词做可证伪实验设计，"
-                    "并用后续季度回测验证预测边是否成真。"
+                    "并用后续季度回测验证 candidate edges 是否获得真实证据支持。"
                 ),
             },
         ]

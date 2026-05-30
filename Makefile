@@ -253,9 +253,9 @@ scibert:
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
-## Step 5b: VGAE 训练 + Link Prediction (~4h)
+## Step 5b: VGAE 训练 + calibrated future candidate generator (~4h)
 vgae:
-	@echo ">>> Step 5b: VGAE 训练..."
+	@echo ">>> Step 5b: VGAE future candidate generator..."
 	$(PYTHON) -m echelon.v14b.step5b_vgae \
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
@@ -366,7 +366,7 @@ report:
 	@echo ""
 	@echo "✅ 报告生成完成:"
 	@echo "   reports/v14b_pilot/V14B_Pilot_算法验证报告.md"
-	@echo "   reports/v14b_pilot/未来方向预测_交集报告.md"
+	@echo "   reports/v14b_pilot/未来候选方向_证据合同报告.md"
 
 ## Step 10: 构建 2.5D visual graph product layer
 visual-graph:
@@ -428,7 +428,7 @@ product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilo
 	@echo "======================================"
 	@echo "报告位置:"
 	@echo "  reports/v14b_pilot/V14B_Pilot_算法验证报告.md"
-	@echo "  reports/v14b_pilot/未来方向预测_交集报告.md"
+	@echo "  reports/v14b_pilot/未来候选方向_证据合同报告.md"
 	@echo "数据库:"
 	@echo "  db/v14_pilot.sqlite3"
 
@@ -441,7 +441,7 @@ product-chain: id-repair graph-prep quality-audit reset-pilot mainpath keystone 
 	@echo "======================================"
 	@echo "报告位置:"
 	@echo "  reports/v14b_pilot/V14B_Pilot_算法验证报告.md"
-	@echo "  reports/v14b_pilot/未来方向预测_交集报告.md"
+	@echo "  reports/v14b_pilot/未来候选方向_证据合同报告.md"
 	@echo "数据库:"
 	@echo "  db/v14_pilot.sqlite3"
 
@@ -458,7 +458,7 @@ pilot-graph: id-repair openalex-backfill graph-features embeddings quality-audit
 	@echo "======================================"
 	@echo "报告位置:"
 	@echo "  reports/v14b_pilot/V14B_Pilot_算法验证报告.md"
-	@echo "  reports/v14b_pilot/未来方向预测_交集报告.md"
+	@echo "  reports/v14b_pilot/未来候选方向_证据合同报告.md"
 	@echo "数据库:"
 	@echo "  db/v14_pilot.sqlite3"
 

@@ -3,7 +3,7 @@ Step 9: 报告生成器
 
 生成两份 Markdown 报告:
   1. V14B_Pilot_算法验证报告.md (legacy filename; current Evidence Decision report)
-  2. 未来方向预测_交集报告.md (top 20)
+  2. 未来候选方向_证据合同报告.md (top 20)
 
 从 DB 实查数据填充(无数据时用 TBD 占位)
 
@@ -71,6 +71,11 @@ def _loads_json(value, default):
         return json.loads(str(value))
     except Exception:
         return default
+
+
+def _future_candidate_evidence_text(value: object) -> str:
+    text = str(value or "N/A")
+    return text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
 
 
 def _direction_contract(direction: dict) -> dict:
@@ -516,7 +521,7 @@ def generate_algo_report(
 
     lines += [
         f"",
-        f"> 详细见: 未来方向预测_交集报告.md",
+        f"> 详细见: 未来候选方向_证据合同报告.md",
         f"",
         f"---",
         f"",
@@ -689,7 +694,7 @@ def generate_future_directions_report(
             f"| 证据路径 | 内容 |",
             f"|---|---|",
             f"| 主干道延伸 | {d.get('main_path_evidence') or 'N/A'} |",
-            f"| Future Candidate Generator (GNN/VGAE) | {d.get('vgae_evidence') or 'N/A'} |",
+            f"| Future Candidate Generator (GNN/VGAE) | {_future_candidate_evidence_text(d.get('vgae_evidence'))} |",
             f"| Limitation 驱动 | {d.get('limitation_evidence') or 'N/A'} |",
             f"",
         ]

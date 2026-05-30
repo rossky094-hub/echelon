@@ -764,7 +764,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"{int(metrics.get('topic_gap_queue_papers') or 0):,} primary-section covered "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
         *frontfill_line,
-        f"- predicted future edges: {metrics['predicted_future_edges']:,}",
+        f"- future candidate edges: {metrics['predicted_future_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
         f"- future directions: {metrics['future_directions']:,}",
         f"- Claim Cards: {metrics['direction_claim_cards']:,}; complete={metrics['complete_claim_cards']:,}; high_confidence={metrics['high_confidence_claim_cards']:,}",

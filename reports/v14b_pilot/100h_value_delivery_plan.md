@@ -9,7 +9,7 @@ The system has a usable visual graph shell, but the value engine is not closed y
 - The graph exists: `55,391` papers, `739,318` visual edges, `5,426` branch lineages.
 - The citation bone is still thin: linked refs are about `13.8%`, below the `30%` minimum target.
 - Section evidence is still too sparse: primary section evidence covers about `690` papers.
-- Future candidate generation exists: `1,000` predicted future edges.
+- Future candidate generation exists: `1,000` future candidate edges.
 - Decision output is not ready: live `future_directions=0`, live `Claim Cards=0`.
 - Therefore the current state is `candidate_generator_only`, not `decision_grade_available`.
 

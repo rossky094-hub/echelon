@@ -25,8 +25,8 @@ could be trusted as future-growth evidence.
 - Step4 subgraph nodes: 5,000
 - Step4 subgraph edges: 38,778
 - Step5a classified edges: 38,778
-- Step5b predicted future edges: 1,000
-- Step5b cross-field predicted edges: 41
+- Step5b future candidate edges: 1,000
+- Step5b cross-field candidate edges: 41
 - Step5c limitation atoms: 1,063
 - Step5c limitation resolutions: 1,743
 - Step6 future directions: 6
@@ -223,8 +223,8 @@ After the fixes, Step5b-Step6 were rerun on the current V14B pilot database.
 - Step5b skipped missing-node edges: 54
 - Step5b validation AUC: 0.8861
 - Step5b test AUC: 0.8981
-- Step5b predicted edges written: 1,000
-- Step5b cross-field predicted edges: 41
+- Step5b candidate edges written: 1,000
+- Step5b cross-field candidate edges: 41
 - Step5c limitation atoms: 1,063
 - Step5c resolution records: 1,743
 - Step6 future directions: 6

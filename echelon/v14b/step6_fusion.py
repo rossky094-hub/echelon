@@ -7,8 +7,8 @@ Step 6: 三路融合 + 交集报告
   3. Limitation Tracking: 未解决 limitation_atoms (top 50)
 
 融合逻辑:
-  - 主干道方向延伸 → 主干道末端 2024+ 节点 → 其 VGAE 预测边
-  - 限制驱动方向 → 未解决 atom keyword → 匹配 VGAE 预测边
+  - 主干道方向延伸 → 主干道末端 2024+ 节点 → 其 GNN/VGAE candidate edges
+  - 限制驱动方向 → 未解决 atom keyword → 匹配 GNN/VGAE candidate edges
   - 三路交集 = 候选方向排序信号，仍需 Step13 Claim Card / calibration gates
 
 输出: future_directions 表 + markdown 报告
@@ -53,7 +53,7 @@ generate a concise, specific direction name and key insights.
 Main path terminal papers (2024+):
 {main_path_papers}
 
-VGAE predicted future connections:
+GNN/VGAE future candidate edges:
 {vgae_predictions}
 
 Unresolved limitations pointing to this direction:
@@ -235,7 +235,7 @@ def compute_direction_clusters(
     三路融合:将不同信号聚合为 future direction clusters。
 
     聚类逻辑:
-      1. 以 VGAE 预测边的 dst_paper_id 为候选 direction 锚点
+      1. 以 GNN/VGAE candidate edge 的 dst_paper_id 为候选 direction 锚点
       2. 检查每个候选是否同时被:
          (a) 主干道末端指向
          (b) 未解决 limitation keyword 相关
@@ -254,7 +254,7 @@ def compute_direction_clusters(
         if kw:
             limitations_by_keyword.setdefault(kw, []).append(atom)
 
-    # 读取 VGAE 预测涉及的 dst 论文标题
+    # 读取 GNN/VGAE candidate edges 涉及的 dst 论文标题
     dst_ids = list({p["dst_paper_id"] for p in vgae_preds})
     if not dst_ids:
         return []
@@ -266,7 +266,7 @@ def compute_direction_clusters(
     """, dst_ids).fetchall()
     dst_meta = {str(row[0]): dict(row) for row in rows}
 
-    # 对每个 VGAE 预测边,计算证据分层。Step6 now keeps exploratory
+    # 对每个 GNN/VGAE candidate edge 计算证据分层。Step6 now keeps exploratory
     # candidates when evidence is useful, but labels them explicitly instead of
     # promoting them into strong claims.
     direction_candidates = []
@@ -298,7 +298,7 @@ def compute_direction_clusters(
             )
         )
         vgae_evidence = (
-            f"VGAE pred: calibrated={calibrated_prob:.3f}, "
+            f"GNN/VGAE candidate edge: calibrated={calibrated_prob:.3f}, "
             f"raw={raw_prob:.3f}, confidence={prediction_confidence:.3f}, "
             f"calibration={calibration_label}, status={calibration_status}"
         )
@@ -778,7 +778,7 @@ def run_fusion(
     logger.info("主干道末端节点: %d", len(terminals))
 
     vgae_preds = load_vgae_predictions(conn_v14)
-    logger.info("VGAE 预测边: %d", len(vgae_preds))
+    logger.info("GNN/VGAE candidate edges: %d", len(vgae_preds))
     calibration_context = load_vgae_calibration_context(conn_v14)
     if not calibration_context.get("has_run_audit"):
         logger.warning("VGAE run-level calibration audit missing; Step6 will keep VGAE-only evidence as candidate-pool evidence")

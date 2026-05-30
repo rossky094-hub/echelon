@@ -324,7 +324,7 @@ NODE_SIZE_MAX: float = 20.0
 # ---------------------------------------------------------------------------
 
 REPORT_ALGO_VALIDATION = REPORT_DIR / "V14B_Pilot_算法验证报告.md"
-REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来方向预测_交集报告.md"
+REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来候选方向_证据合同报告.md"
 
 # ---------------------------------------------------------------------------
 # LLM

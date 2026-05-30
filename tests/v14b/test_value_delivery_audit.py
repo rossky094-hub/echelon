@@ -148,6 +148,7 @@ def _write_product_sources(root: Path) -> None:
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         "claim_cards incomplete_claim_cards candidate_pool GNN future edges\n"
+        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge'\n"
         "topic_readiness = build_topic_readiness_preflight\n",
         encoding="utf-8",
     )
@@ -192,6 +193,7 @@ def _write_product_sources(root: Path) -> None:
         'V14B_LIMITATION_USE_LLM", "false"\n'
         'V14B_SCIBERT_LLM_FALLBACK", "false"\n'
         'V14B_FUSION_USE_LLM_NAMING", "false"\n'
+        'REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来候选方向_证据合同报告.md"\n'
         "Low-confidence edges fall back to heuristic correction 不隐式调用 LLM\n",
         encoding="utf-8",
     )
@@ -208,7 +210,8 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "step6_fusion.py").write_text(
-        "FUSION_USE_LLM_NAMING Optional LLM naming\n",
+        "FUSION_USE_LLM_NAMING Optional LLM naming "
+        "Future candidate generator GNN/VGAE candidate edge\n",
         encoding="utf-8",
     )
     (v14 / "step11_llm_edge_audit.py").write_text(
@@ -227,6 +230,7 @@ def _write_product_sources(root: Path) -> None:
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
         "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
         "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
+        "未来候选方向_证据合同报告.md\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
         "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
         "linked resolution evidence 阈值不得下调\n"
@@ -452,6 +456,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert len(result["gates"]) == 15
     future_gate = next(g for g in result["gates"] if g["issue"] == "Future Growth Calibration")
     assert future_gate["checks"]["step9_vgae_language_is_candidate_generator"] is True
+    assert future_gate["checks"]["future_report_filename_is_candidate_contract"] is True
+    assert future_gate["checks"]["step6_future_evidence_avoids_prediction_copy"] is True
+    assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
     assert openalex_gate["status"] == "pass"
     assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
@@ -967,6 +974,43 @@ def test_future_growth_audit_rejects_step9_vgae_prediction_copy(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["step9_vgae_language_is_candidate_generator"] is False
+
+
+def test_future_growth_audit_rejects_prediction_report_filename(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    config_path = tmp_path / "echelon/v14b/config.py"
+    config_path.write_text(
+        'REPORT_FUTURE_DIRECTIONS = REPORT_DIR / "未来方向预测_交集报告.md"\n',
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["future_report_filename_is_candidate_contract"] is False
+
+
+def test_future_growth_audit_rejects_prediction_copy_in_current_docs(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "100h_value_delivery_plan.md").write_text(
+        "Future candidate generation exists: 1,000 predicted future edges.\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["current_docs_label_future_edges_as_candidates"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
