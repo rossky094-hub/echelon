@@ -1105,6 +1105,25 @@ def test_future_growth_audit_rejects_prediction_copy_in_current_docs(tmp_path):
     assert result["checks"]["current_docs_label_future_edges_as_candidates"] is False
 
 
+def test_future_growth_audit_rejects_probability_copy_in_current_docs(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "100h_value_delivery_plan.md").write_text(
+        "Make future growth a calibrated probability product with clear limits.\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["current_docs_label_future_edges_as_candidates"] is False
+
+
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
     main = tmp_path / "main.sqlite3"
     v14 = tmp_path / "v14.sqlite3"

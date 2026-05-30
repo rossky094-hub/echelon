@@ -813,7 +813,7 @@ function activeLayerInterpretation(keys, valueModel = null) {
     return "Main + Co-cite：先看历史主干，再看哪些主题块围绕主干成团。这是理解“为什么长成这样”的推荐组合。";
   }
   if (set.has("future") && !set.has("bottleneck")) {
-    return "Future 单独看只能说明 GNN/VGAE 预测了可能连接，不能说明为什么值得下注；应同时打开 Bottleneck 或 Radar。";
+    return "Future 单独看只能说明 GNN/VGAE 给出了候选连接评分，不能说明为什么值得下注；应同时打开 Bottleneck 或 Radar。";
   }
   if (set.has("future") && set.has("bottleneck") && set.has("uncertainty")) {
     return "Future + Bottleneck + Uncertainty：这是投资/立项视角，重点看未来候选是否被未解卡点支持，以及证据哪里薄；打开 Fusion value 可区分完整 Claim Card 和候选池。";
@@ -1613,10 +1613,10 @@ function validationCost(direction) {
 }
 
 function radarScore(direction) {
-  const technical = clamp(Number(direction.confidence || direction.weight || 0.45), 0, 1);
+  const technicalScore = clamp(Number(direction.technical_score ?? direction.candidate_score ?? direction.confidence ?? direction.weight ?? 0.45), 0, 1);
   const commercial = clamp(Number(direction.commercial_relevance || direction.market_relevance || 0.5), 0, 1);
   const cost = validationCost(direction);
-  return clamp((technical * (0.55 + commercial)) / (0.65 + cost), 0, 1);
+  return clamp((technicalScore * (0.55 + commercial)) / (0.65 + cost), 0, 1);
 }
 
 function renderClaimCard(direction) {

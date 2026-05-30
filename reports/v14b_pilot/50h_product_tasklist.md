@@ -26,7 +26,7 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | P6-20 | 30-35h | 修复 smoke test 阻断点 | reviewable fixes with tests | fixes preserve algorithmic semantics and serve project goals | completed |
 | P7-21 | 35-40h | Branch Lineage 解释增强 | parent, split reason, driver papers, constraint shift in branch cards | layout-only clusters are labeled layout_cluster_only, not true branches | completed |
 | P7-22 | 35-40h | Topic Dossier 分支可信度门 | evidence-backed branch vs weak cluster distinction | only evidence-backed branches are narrated as real branch evolution | completed |
-| P8-23 | 40-44h | Future Growth 可解释化 | GNN/VGAE candidate generator explanation | each future candidate shows model probability, calibration, bottleneck, Step6/13 status | completed |
+| P8-23 | 40-44h | Future Growth 可解释化 | GNN/VGAE candidate generator explanation | each future candidate shows model/candidate score, calibration, bottleneck, Step6/13 status | completed |
 | P8-24 | 40-44h | Future candidate 到 Claim Card 的转化路径 | candidate pool lifecycle state | no Claim Card means no Radar promotion | completed |
 | P9-25 | 44-47h | Topic Lens 第一屏改为 Dossier | topic-first workstation UI | search result answers branch/bottleneck/turning/future before showing raw paper list | completed |
 | P9-26 | 44-47h | 图层组合解释 | Main/Co-cite/Cite/Semantic/Future/Bottleneck/Uncertainty/Fusion value explanations | selected layer combinations explain what the user is seeing and why it matters | completed |

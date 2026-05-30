@@ -975,7 +975,7 @@ def predict_future_links(
     只保留:
       - 当前不存在的边
       - 时间间隔 >= 1 年
-      - 候选概率 > threshold
+      - 候选分数 > threshold
     """
     import torch
 

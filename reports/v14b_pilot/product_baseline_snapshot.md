@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T18:34:49Z`
+- Snapshot: `2026-05-30T18:55:31Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -12,7 +12,7 @@
 - Pending enrich: 454
 - Primary Field coverage: 55,359 / 55,391 (99.9%)
 - References: 3,215,130; linked refs: 445,957 (13.9%)
-- Section rows: 4,889; section papers: 2,789; primary evidence papers: 2,789 (5.0%)
+- Section rows: 5,042; section papers: 2,864; primary evidence papers: 2,864 (5.2%)
 
 ## Derived Product Tables
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,514
-- section_priority_summary: 940
+- section_priority_summary: 1,004
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,286

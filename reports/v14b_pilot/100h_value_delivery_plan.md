@@ -146,14 +146,14 @@ GNN/VGAE can generate candidate edges, but it cannot be treated as a conclusion 
 
 ### 100-Hour Goal
 
-Make future growth a calibrated probability product with clear limits.
+Make future growth a calibrated candidate-score product with clear limits.
 
 ### Tasks
 
 1. Keep Step5b output as candidate generator.
 2. Ensure every future candidate shows:
    - raw model score
-   - calibrated probability
+   - calibrated candidate score
    - calibration method
    - rolling held-out-year backtest result
    - evidence scope

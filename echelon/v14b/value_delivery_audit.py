@@ -507,7 +507,16 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
             and _source_absent(step9_path, ("| 源论文 | 目标论文 | 候选概率 |",))
         ),
         "current_docs_label_future_edges_as_candidates": all(
-            _source_absent(path, ("predicted future edges", "cross-field predicted edges"))
+            _source_absent(
+                path,
+                (
+                    "predicted future edges",
+                    "cross-field predicted edges",
+                    "model probability",
+                    "calibrated probability product",
+                    "calibrated probability",
+                ),
+            )
             for path in current_future_docs
             if path.exists()
         ),
@@ -531,6 +540,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                     "GNN/VGAE confidence",
                     "technical probability",
                     "calibrated probability",
+                    "GNN/VGAE 预测了可能连接",
                 ),
             )
         ),

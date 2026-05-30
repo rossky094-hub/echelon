@@ -199,7 +199,7 @@ TASK_BACKLOG: tuple[dict[str, Any], ...] = (
         "window": "40-44h",
         "title": "Future Growth 可解释化",
         "output": "GNN/VGAE candidate generator explanation",
-        "gate": "each future candidate shows model probability, calibration, bottleneck, Step6/13 status",
+        "gate": "each future candidate shows model/candidate score, calibration, bottleneck, Step6/13 status",
     },
     {
         "id": "P8-24",
