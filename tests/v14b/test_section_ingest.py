@@ -6,6 +6,7 @@ from echelon.v14b.step5s_section_ingest import (
     SECTION_PARSER_NAME,
     _arxiv_pdf_url,
     _checkpoint_step_name,
+    _has_current_primary_sections,
     _has_primary_sections,
     _select_candidate_ids,
     ensure_sections_table,
@@ -379,6 +380,117 @@ def test_upsert_sections_records_parser_contract_version():
     assert row["parser_name"] == SECTION_PARSER_NAME
     assert SECTION_PARSER_CONTRACT_VERSION in row["section_meta_json"]
     assert "toc_dot_leader" in row["section_meta_json"]
+
+
+def test_legacy_primary_sections_do_not_block_current_parser_contract():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+    conn.execute(
+        """
+        INSERT INTO paper_sections
+            (paper_id, section_name, section_text, source_type, parser_name, source_url,
+             section_pages_json, section_meta_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p1",
+            "discussion",
+            "Legacy discussion text should be re-parsed under the current contract. " * 3,
+            "arxiv_pdf",
+            "v14b_section_ingest_v2",
+            "https://arxiv.org/pdf/2401.00001.pdf",
+            "[]",
+            "{}",
+        ),
+    )
+
+    assert _has_primary_sections(conn, "p1")
+    assert not _has_current_primary_sections(conn, "p1")
+
+
+def test_upsert_replaces_legacy_contract_even_when_new_text_is_shorter():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+    conn.execute(
+        """
+        INSERT INTO paper_sections
+            (paper_id, section_name, section_text, source_type, parser_name, source_url,
+             section_pages_json, section_meta_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p1",
+            "discussion",
+            "Legacy noisy table-of-contents and introduction text. " * 12,
+            "arxiv_pdf",
+            "v14b_section_ingest_v2",
+            "https://arxiv.org/pdf/2401.00001.pdf",
+            "[]",
+            "{}",
+        ),
+    )
+
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "Current guarded discussion evidence. " * 6,
+                "pages": [4],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+    )
+
+    row = conn.execute(
+        "SELECT section_text, parser_name, section_meta_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    assert row["section_text"].startswith("Current guarded discussion evidence.")
+    assert row["parser_name"] == SECTION_PARSER_NAME
+    assert SECTION_PARSER_CONTRACT_VERSION in row["section_meta_json"]
+    assert _has_current_primary_sections(conn, "p1")
+
+
+def test_upsert_keeps_longer_current_contract_text():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "Long current discussion evidence. " * 12,
+                "pages": [4],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+    )
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "Short current evidence.",
+                "pages": [5],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+    )
+
+    row = conn.execute(
+        "SELECT section_text, section_pages_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    assert row["section_text"].startswith("Long current discussion evidence.")
+    assert row["section_pages_json"] == "[4]"
 
 
 def test_delta_queue_uses_content_addressed_checkpoint(tmp_path):

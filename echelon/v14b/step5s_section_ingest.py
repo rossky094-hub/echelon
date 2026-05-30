@@ -181,6 +181,18 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _json_obj(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(str(raw))
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
@@ -234,6 +246,11 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    attempt_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(section_ingest_attempts)").fetchall()
+    }
+    if "parser_name" not in attempt_cols:
+        conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN parser_name TEXT")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_section_ingest_attempts_paper_ts
@@ -281,7 +298,7 @@ def record_ingest_attempt(
             int(inserted_sections or 0),
             int(primary_sections or 0),
             str(candidate_file) if candidate_file else None,
-            "v14b_section_ingest_v2",
+            SECTION_PARSER_NAME,
         ),
     )
 
@@ -811,6 +828,25 @@ def _has_primary_sections(conn: sqlite3.Connection, paper_id: str) -> bool:
     return bool(row and row[0])
 
 
+def _has_current_primary_sections(conn: sqlite3.Connection, paper_id: str) -> bool:
+    placeholders = ",".join("?" * len(PRIMARY_SECTION_NAMES))
+    rows = conn.execute(
+        f"""
+        SELECT section_meta_json
+        FROM paper_sections
+        WHERE paper_id = ?
+          AND section_name IN ({placeholders})
+          AND section_text IS NOT NULL
+          AND length(trim(section_text)) >= ?
+        """,
+        (paper_id, *PRIMARY_SECTION_NAMES, SECTION_INGEST_MIN_CHARS),
+    ).fetchall()
+    return any(
+        _json_obj(row[0]).get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION
+        for row in rows
+    )
+
+
 def upsert_sections(
     conn: sqlite3.Connection,
     paper_id: str,
@@ -841,33 +877,57 @@ def upsert_sections(
             },
             ensure_ascii=False,
         )
-        conn.execute(
+        existing = conn.execute(
             """
-            INSERT INTO paper_sections
-                (paper_id, section_name, section_text, source_type, parser_name, source_url,
-                 section_pages_json, section_meta_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(paper_id, section_name) DO UPDATE SET
-                section_text = CASE
-                    WHEN length(excluded.section_text) > length(paper_sections.section_text)
-                    THEN excluded.section_text ELSE paper_sections.section_text END,
-                source_type = excluded.source_type,
-                parser_name = excluded.parser_name,
-                source_url = excluded.source_url,
-                section_pages_json = excluded.section_pages_json,
-                section_meta_json = excluded.section_meta_json
+            SELECT section_text, section_meta_json
+            FROM paper_sections
+            WHERE paper_id = ? AND section_name = ?
             """,
-            (
-                paper_id,
-                sec_name,
-                sec_text,
-                "arxiv_pdf",
-                SECTION_PARSER_NAME,
-                source_url,
-                section_pages_json,
-                section_meta_json,
-            ),
-        )
+            (paper_id, sec_name),
+        ).fetchone()
+        if existing:
+            old_text = str(existing[0] or "")
+            old_meta = _json_obj(existing[1])
+            old_is_current = old_meta.get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION
+            should_replace = (not old_is_current) or len(sec_text) >= len(old_text)
+            if should_replace:
+                conn.execute(
+                    """
+                    UPDATE paper_sections
+                    SET section_text = ?, source_type = ?, parser_name = ?, source_url = ?,
+                        section_pages_json = ?, section_meta_json = ?
+                    WHERE paper_id = ? AND section_name = ?
+                    """,
+                    (
+                        sec_text,
+                        "arxiv_pdf",
+                        SECTION_PARSER_NAME,
+                        source_url,
+                        section_pages_json,
+                        section_meta_json,
+                        paper_id,
+                        sec_name,
+                    ),
+                )
+        else:
+            conn.execute(
+                """
+                INSERT INTO paper_sections
+                    (paper_id, section_name, section_text, source_type, parser_name, source_url,
+                     section_pages_json, section_meta_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    paper_id,
+                    sec_name,
+                    sec_text,
+                    "arxiv_pdf",
+                    SECTION_PARSER_NAME,
+                    source_url,
+                    section_pages_json,
+                    section_meta_json,
+                ),
+            )
         inserted += 1
     return inserted
 
@@ -1002,7 +1062,8 @@ def run_section_ingest(
         with make_progress(papers, desc="Step5s sections") as pbar:
             for paper in pbar:
                 pid = paper["id"]
-                if _has_primary_sections(conn_main, pid):
+                has_any_primary = _has_primary_sections(conn_main, pid)
+                if _has_current_primary_sections(conn_main, pid):
                     skipped_existing += 1
                     primary_hit += 1
                     record_ingest_attempt(
@@ -1029,6 +1090,11 @@ def run_section_ingest(
                     )
                     conn_main.commit()
                     continue
+                if has_any_primary:
+                    logger.info(
+                        "Re-parsing legacy primary section evidence with current parser contract: paper=%s",
+                        pid,
+                    )
                 blob = download_pdf(client, pdf_url)
                 if not blob:
                     skipped_no_pdf += 1
