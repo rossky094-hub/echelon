@@ -875,6 +875,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
         "api_topic_bottlenecks_use_resolution_evidence": False,
         "api_limitation_atoms_carry_contract": False,
         "api_topic_validation_directions_inherit_claim_card_evidence": False,
+        "api_validation_directions_carry_limits": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_reading_path_limits": False,
@@ -883,6 +884,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
         "ui_renders_limitation_contracts": False,
         "ui_renders_topic_bottleneck_resolution_counts": False,
         "ui_renders_validation_direction_evidence_objects": False,
+        "ui_renders_validation_direction_limits": False,
         "topic_regression_uses_shared_contract": False,
     }
     if repo_root is not None:
@@ -952,6 +954,17 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "minimal_validation_experiment",
                     "Step13 Claim Card",
                     '"evidence_objects": item.get("evidence_objects")',
+                ),
+            ),
+            "api_validation_directions_carry_limits": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _build_validation_directions",
+                    '"can_explain": [',
+                    '"cannot_explain": [',
+                    '"required_evidence": [',
+                    "that the direction is ready for Radar",
+                    "Radar promotion without a complete Claim Card",
                 ),
             ),
             "ui_search_fallback_is_insufficient_evidence": _source_contains(
@@ -1025,6 +1038,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "renderTopicDossier",
                     "d.minimal_validation_experiment",
                     "renderEvidenceObjects(d.evidence_objects",
+                ),
+            ),
+            "ui_renders_validation_direction_limits": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderTopicDossier",
+                    "d.can_explain",
+                    "d.cannot_explain",
+                    "d.required_evidence",
+                    "进入 Radar 还需要",
                 ),
             ),
             "topic_regression_uses_shared_contract": _source_contains(

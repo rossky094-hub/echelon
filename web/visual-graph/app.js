@@ -1258,6 +1258,9 @@ function renderTopicDossier(dossier = {}) {
           <p><strong>为什么值得试：</strong>${esc(d.why_worth_testing || "")}</p>
           ${d.why_not_ready ? `<p><strong>为什么还不能下注：</strong>${esc(d.why_not_ready)}</p>` : ""}
           ${d.minimal_validation_experiment ? `<p><strong>最小验证实验：</strong>${esc(d.minimal_validation_experiment)}</p>` : ""}
+          ${(d.can_explain || []).length ? `<p class="mini"><strong>能说明：</strong>${(d.can_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(d.cannot_explain || []).length ? `<p class="mini"><strong>不能说明：</strong>${(d.cannot_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(d.required_evidence || []).length ? `<p class="mini"><strong>进入 Radar 还需要：</strong>${(d.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
           ${(d.uncertainty_reasons || []).length ? `
             <details>
               <summary>为什么仍需谨慎 (${fmt((d.uncertainty_reasons || []).length)})</summary>

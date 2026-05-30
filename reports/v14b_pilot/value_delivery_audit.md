@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:26:17Z`
+- generated_at: `2026-05-30T16:30:51Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2626,
+    "primary_section_papers": 2627,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 389,
+        "strong": 390,
         "weak": 2237
       },
-      "primary_section_papers": 2626,
-      "primary_section_rows": 4585,
+      "primary_section_papers": 2627,
+      "primary_section_rows": 4586,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 473,
-        "heading_continuation": 680,
+        "explicit_heading": 474,
+        "heading_continuation": 681,
         "inline_heading": 242,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 11,
         "parser_hint": 8
       },
-      "strong_or_moderate_papers": 389,
+      "strong_or_moderate_papers": 390,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8518659558263518
+      "weak_only_rate": 0.851541682527598
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -240,6 +240,7 @@
       "api_topic_bottlenecks_use_resolution_evidence": true,
       "api_topic_branch_splits_inherit_lineage": true,
       "api_topic_validation_directions_inherit_claim_card_evidence": true,
+      "api_validation_directions_carry_limits": true,
       "arbitrary_topic_not_benchmark_gated": true,
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
@@ -251,6 +252,7 @@
       "ui_renders_topic_dossier_branch_contracts": true,
       "ui_renders_topic_readiness": true,
       "ui_renders_validation_direction_evidence_objects": true,
+      "ui_renders_validation_direction_limits": true,
       "ui_search_fallback_is_insufficient_evidence": true
     },
     "observed_gates": [

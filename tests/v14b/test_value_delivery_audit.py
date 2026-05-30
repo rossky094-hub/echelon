@@ -137,6 +137,7 @@ def _write_product_sources(root: Path) -> None:
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         "def _limitation_atom_contract(): return weak_bottleneck_hypothesis + section_limitation_context + claim_scope + evidence_grade + uncertainty_reasons\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
+        'def _build_validation_directions(): return {"can_explain": ["x"], "cannot_explain": ["that the direction is ready for Radar", "Radar promotion without a complete Claim Card"], "required_evidence": ["x"]}\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
         "def _visual_edge_contract(): return visual_edge + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def get_visual_edges(): return _visual_edge_contract\n"
@@ -160,7 +161,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
         "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
-        "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
+        "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
@@ -425,6 +426,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_validation_directions_carry_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_reading_path_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_paper_list_renders_hit_contract"] is True
@@ -432,6 +434,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_limitation_contracts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_validation_direction_evidence_objects"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_validation_direction_limits"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
@@ -483,10 +486,12 @@ def test_online_topic_readiness_contract_is_arbitrary_topic_and_no_llm(tmp_path)
     assert result["checks"]["api_reading_path_items_carry_limits"] is True
     assert result["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert result["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
+    assert result["checks"]["api_validation_directions_carry_limits"] is True
     assert result["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert result["checks"]["ui_renders_reading_path_limits"] is True
     assert result["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert result["checks"]["ui_renders_validation_direction_evidence_objects"] is True
+    assert result["checks"]["ui_renders_validation_direction_limits"] is True
     assert "turning papers with strong/moderate section provenance" in result["observed_gates"]
 
 

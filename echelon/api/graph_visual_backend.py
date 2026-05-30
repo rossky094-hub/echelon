@@ -3065,6 +3065,22 @@ def _build_validation_directions(
                 or _format_minimal_validation_experiment(
                     (item.get("claim_card") or {}).get("minimal_validation_experiment")
                 ),
+                "can_explain": [
+                    "what the complete five-question Claim Card proposes to validate",
+                    "which evidence objects and papers support the validation plan",
+                    "which high-confidence gates still block promotion",
+                ],
+                "cannot_explain": [
+                    "high-confidence status when section/calibration gates fail",
+                    "successful validation before the minimal experiment is run",
+                    "raw GNN edge conclusions",
+                ],
+                "required_evidence": item.get("required_evidence") or [
+                    "complete five-question Step13 Claim Card",
+                    "strong/moderate section evidence for unresolved bottleneck claims",
+                    "rolling held-out-year calibration audit",
+                    "minimal validation experiment result with falsification check",
+                ],
                 "evidence_papers": item.get("evidence_papers") or [],
                 "source": "Step6/Step13 Claim Card",
                 "evidence_objects": item.get("evidence_objects") or _claim_card_evidence_objects(item),
@@ -3107,6 +3123,22 @@ def _build_validation_directions(
                     "Define one measurable system-level benchmark, reproduce the relevant branch driver paper, "
                     "then test whether the named bottleneck improves without degrading cost/manufacturability."
                 ),
+                "can_explain": [
+                    "which branch and bottleneck should be tested together",
+                    "why the topic has a plausible 6-18 month validation target",
+                    "which evidence objects should be read before experiment design",
+                ],
+                "cannot_explain": [
+                    "that the direction is ready for Radar",
+                    "that the named bottleneck is solved",
+                    "commercial or investment priority without a complete Claim Card",
+                ],
+                "required_evidence": [
+                    "complete Step13 five-question Claim Card",
+                    "section-level bottleneck and resolution evidence",
+                    "calibrated future candidate or explicit non-GNN rationale",
+                    "minimal validation experiment with success and falsification criteria",
+                ],
                 "evidence_papers": (branch.get("driver_papers") or [])[:3] + (bottleneck.get("evidence_papers") or [])[:2],
                 "source": "topic branch + limitation evidence",
                 "evidence_objects": _compact_evidence_objects(
@@ -3158,6 +3190,22 @@ def _build_validation_directions(
                     "why_worth_testing": "Step5b/GNN suggests a possible growth link; use it for candidate generation only.",
                     "why_not_ready": "Missing Step6 fusion and Step13 Claim Card.",
                     "minimal_validation_experiment": "Read both endpoint papers, map the shared bottleneck, then design a falsifiable experiment.",
+                    "can_explain": [
+                        "which GNN/VGAE endpoint pair to inspect next",
+                        "where to look for shared bottleneck evidence",
+                        "candidate-pool prioritization for Step6/Step13 evidence gathering",
+                    ],
+                    "cannot_explain": [
+                        "that the predicted link will become true",
+                        "that the direction is valid or investable",
+                        "Radar promotion without a complete Claim Card",
+                    ],
+                    "required_evidence": [
+                        "rolling held-out-year calibration audit",
+                        "Step6 fusion evidence",
+                        "Step13 five-question Claim Card",
+                        "section-level bottleneck evidence",
+                    ],
                     "evidence_papers": [
                         _paper_ref(edge.get("source_paper") or {"paper_id": edge.get("source_paper_id")}, "future edge source"),
                         _paper_ref(edge.get("target_paper") or {"paper_id": edge.get("target_paper_id")}, "future edge target"),
