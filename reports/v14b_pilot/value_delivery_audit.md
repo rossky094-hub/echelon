@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T15:00:26Z`
+- generated_at: `2026-05-30T15:06:48Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2600,
+    "primary_section_papers": 2611,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 363,
+        "strong": 374,
         "weak": 2237
       },
-      "primary_section_papers": 2600,
-      "primary_section_rows": 4536,
+      "primary_section_papers": 2611,
+      "primary_section_rows": 4555,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 438,
-        "heading_continuation": 631,
-        "inline_heading": 227,
+        "explicit_heading": 450,
+        "heading_continuation": 650,
+        "inline_heading": 235,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 11,
-        "parser_hint": 7
+        "parser_hint": 8
       },
-      "strong_or_moderate_papers": 363,
+      "strong_or_moderate_papers": 374,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8603846153846154
+      "weak_only_rate": 0.8567598621217924
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -277,6 +277,8 @@
 ```json
 {
   "checks": {
+    "api_evidence_map_branches_carry_contract": true,
+    "api_evidence_map_future_edges_carry_contract": true,
     "api_returns_evidence_map": true,
     "combination_contracts_present": true,
     "fusion_value_is_auditable_layer": true,

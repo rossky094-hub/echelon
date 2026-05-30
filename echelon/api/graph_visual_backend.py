@@ -2214,6 +2214,49 @@ def _future_edge_evidence_grade(edge: dict[str, Any] | None) -> str:
     return "future_candidate_generation_gap"
 
 
+def _future_edge_claim_contract(edge: dict[str, Any] | None) -> dict[str, Any]:
+    calibration_status = _future_edge_calibration_status(edge)
+    evidence_grade = _future_edge_evidence_grade(edge)
+    evidence = (edge or {}).get("evidence") or {}
+    uncertainty = [
+        "GNN/VGAE is a future candidate generator, not a conclusion generator",
+        "future edge cannot be promoted without Step6 fusion and a complete Step13 Claim Card",
+        *(
+            []
+            if calibration_status == "calibrated_with_run_audit"
+            else [calibration_status.replace("_", " ")]
+        ),
+        *list(evidence.get("uncertainty_reasons") or []),
+    ]
+    return {
+        "claim_scope": "candidate_pool_only",
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "rolling held-out-year calibration audit",
+            "Step6 fusion evidence",
+            "Step13 five-question Claim Card",
+            "section-level bottleneck evidence",
+        ],
+        "calibration_status": calibration_status,
+        "evidence_objects": _compact_evidence_objects(
+            [_edge_evidence_object(edge, edge_type="future_candidate", source="Step5b VGAE")],
+            limit=4,
+        ),
+    }
+
+
+def _apply_future_edge_contracts(future_growth: list[dict[str, Any]]) -> None:
+    for edge in future_growth:
+        contract = _future_edge_claim_contract(edge)
+        edge.setdefault("claim_scope", contract["claim_scope"])
+        edge.setdefault("evidence_grade", contract["evidence_grade"])
+        edge.setdefault("uncertainty_reasons", contract["uncertainty_reasons"])
+        edge.setdefault("required_evidence", contract["required_evidence"])
+        edge.setdefault("calibration_status", contract["calibration_status"])
+        edge.setdefault("evidence_objects", contract["evidence_objects"])
+
+
 def _format_minimal_validation_experiment(experiment: dict[str, Any] | None) -> str | None:
     if not isinstance(experiment, dict) or not experiment:
         return None
@@ -4097,7 +4140,46 @@ def _build_evidence_map(
         },
         "future_candidates": {
             "meaning": value_model.get("layers", {}).get("future", {}).get("relationship"),
-            "edges": future_growth[:80],
+            "claim_scope": "candidate_pool_only",
+            "evidence_grade": (
+                "calibrated_candidate_generator"
+                if any(_future_edge_has_run_calibration(edge) for edge in future_growth)
+                else ("uncalibrated_candidate_generator" if future_growth else "future_candidate_generation_gap")
+            ),
+            "uncertainty_reasons": sorted(
+                {
+                    reason
+                    for edge in future_growth[:80]
+                    for reason in (
+                        edge.get("uncertainty_reasons")
+                        or _future_edge_claim_contract(edge).get("uncertainty_reasons")
+                        or []
+                    )
+                }
+            ),
+            "required_evidence": [
+                "rolling held-out-year calibration audit",
+                "Step6 fusion evidence",
+                "Step13 five-question Claim Card",
+                "section-level bottleneck evidence",
+            ],
+            "edges": [
+                {
+                    **edge,
+                    **{
+                        key: edge.get(key) or _future_edge_claim_contract(edge).get(key)
+                        for key in (
+                            "claim_scope",
+                            "evidence_grade",
+                            "uncertainty_reasons",
+                            "required_evidence",
+                            "calibration_status",
+                            "evidence_objects",
+                        )
+                    },
+                }
+                for edge in future_growth[:80]
+            ],
         },
         "branches": [
             {
@@ -4106,6 +4188,13 @@ def _build_evidence_map(
                 "label": b.get("label"),
                 "topic_share": b.get("topic_share"),
                 "split_confidence": b.get("split_confidence"),
+                "parent_branch_id": b.get("parent_branch_id"),
+                "lineage_status": b.get("lineage_status"),
+                "claim_scope": b.get("claim_scope"),
+                "evidence_grade": b.get("evidence_grade"),
+                "uncertainty_reasons": b.get("uncertainty_reasons") or [],
+                "required_evidence": b.get("required_evidence") or [],
+                "evidence_objects": b.get("evidence_objects") or [],
             }
             for b in branch_dossiers[:12]
         ],
@@ -4496,6 +4585,7 @@ def get_topic_lens(
                 f"may connect to the target-side direction; treat as {calibration_phrase} "
                 "until Step6/Step13 Claim Cards are materialized."
             )
+        _apply_future_edge_contracts(future_growth)
 
         unresolved_limitations = []
         for h in hits:

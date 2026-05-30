@@ -4,6 +4,7 @@ import sqlite3
 
 import echelon.api.graph_visual_backend as graph_backend
 from echelon.api.graph_visual_backend import (
+    _apply_future_edge_contracts,
     _build_rd_radar,
     _build_bottleneck_lineage,
     _build_branch_dossiers,
@@ -818,6 +819,66 @@ def test_evidence_map_preserves_layer_combination_contract():
     assert combo["can_explain"] == ["candidate overlap with bottlenecks"]
     assert combo["cannot_explain"] == ["investment-ready direction"]
     assert combo["required_evidence"] == ["calibrated future", "section bottleneck"]
+
+
+def test_evidence_map_future_edges_and_branches_carry_contracts():
+    future_edge = {
+        "edge_id": "future:p1:p2",
+        "source_paper_id": "p1",
+        "target_paper_id": "p2",
+        "confidence": 0.72,
+        "evidence": {
+            "calibration_status": "edge_calibrated_run_audit_unknown",
+            "uncertainty_reasons": ["run-level audit missing"],
+        },
+    }
+    _apply_future_edge_contracts([future_edge])
+    assert future_edge["claim_scope"] == "candidate_pool_only"
+    assert future_edge["evidence_grade"] == "uncalibrated_candidate_generator"
+    assert "Step13 five-question Claim Card" in future_edge["required_evidence"]
+    assert any("candidate generator" in reason for reason in future_edge["uncertainty_reasons"])
+    assert future_edge["evidence_objects"][0]["type"] == "future_candidate"
+
+    evidence_map = _build_evidence_map(
+        main_path_edges=[],
+        turning_hits=[],
+        future_growth=[future_edge],
+        branch_dossiers=[
+            {
+                "cluster_id": "C1",
+                "branch_id": "B1",
+                "parent_branch_id": "B0",
+                "label": "Visible metalens branch",
+                "topic_share": 0.42,
+                "split_confidence": 0.71,
+                "lineage_status": "evidence_backed_split",
+                "claim_scope": "evidence_backed_branch_split_candidate",
+                "evidence_grade": "section_backed_branch_split",
+                "uncertainty_reasons": ["needs broader replication"],
+                "required_evidence": ["parent citation support"],
+                "evidence_objects": [{"type": "branch_lineage", "paper_id": "p1"}],
+            }
+        ],
+        value_model={
+            "layers": {
+                "main_path": {"relationship": "main meaning"},
+                "future": {"relationship": "future meaning"},
+            },
+            "layer_combinations": [],
+        },
+    )
+
+    mapped_edge = evidence_map["future_candidates"]["edges"][0]
+    assert mapped_edge["claim_scope"] == "candidate_pool_only"
+    assert mapped_edge["evidence_grade"] == "uncalibrated_candidate_generator"
+    assert mapped_edge["required_evidence"]
+    assert mapped_edge["evidence_objects"]
+    mapped_branch = evidence_map["branches"][0]
+    assert mapped_branch["parent_branch_id"] == "B0"
+    assert mapped_branch["lineage_status"] == "evidence_backed_split"
+    assert mapped_branch["claim_scope"] == "evidence_backed_branch_split_candidate"
+    assert mapped_branch["evidence_grade"] == "section_backed_branch_split"
+    assert mapped_branch["uncertainty_reasons"] == ["needs broader replication"]
 
 
 def test_history_main_path_contract_demotes_low_linked_refs():

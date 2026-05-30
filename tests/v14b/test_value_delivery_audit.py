@@ -125,7 +125,9 @@ def _write_product_sources(root: Path) -> None:
         "def _build_topic_branch_splits(branch_dossiers): branch_contract_by_id parent_branch_id lineage_status split_confidence\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
+        "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
         "_build_evidence_map recommended_layer_combinations\n"
+        '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         "claim_cards incomplete_claim_cards candidate_pool GNN future edges\n"
@@ -397,6 +399,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
+    assert evidence_map_gate["checks"]["api_evidence_map_future_edges_carry_contract"] is True
+    assert evidence_map_gate["checks"]["api_evidence_map_branches_carry_contract"] is True
     radar_gate = next(g for g in result["gates"] if g["issue"] == "R&D Radar Promotion Contract")
     assert radar_gate["status"] == "pass"
     assert radar_gate["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True

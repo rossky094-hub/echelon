@@ -1053,6 +1053,8 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
     fusion_combo_ok = any("fusion_value" in (combo.get("layers") or []) for combo in combos)
     source_checks = {
         "api_returns_evidence_map": False,
+        "api_evidence_map_future_edges_carry_contract": False,
+        "api_evidence_map_branches_carry_contract": False,
         "ui_renders_evidence_map_contract": False,
         "ui_has_fusion_value_layer_control": False,
     }
@@ -1061,6 +1063,27 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
             "api_returns_evidence_map": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
                 ("_build_evidence_map", "recommended_layer_combinations", '"evidence_map": evidence_map'),
+            ),
+            "api_evidence_map_future_edges_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _apply_future_edge_contracts",
+                    "future_candidates",
+                    "candidate_pool_only",
+                    "required_evidence",
+                    "evidence_objects",
+                ),
+            ),
+            "api_evidence_map_branches_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    '"branches": [',
+                    "parent_branch_id",
+                    "lineage_status",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
+                ),
             ),
             "ui_renders_evidence_map_contract": _source_contains(
                 repo_root / "web/visual-graph/app.js",
