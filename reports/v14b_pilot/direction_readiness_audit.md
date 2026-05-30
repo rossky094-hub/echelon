@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T13:49:33Z`
+- generated_at: `2026-05-30T13:56:19Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
@@ -22,7 +22,7 @@
 - **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
 - **section_evidence** (high): primary section evidence covers only 2,585 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
 - **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 348 papers have strong/moderate parser provenance; weak-only rate is 86.5%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
-- **multi_topic_evidence_gap** (high): multi-topic regression still has primary section evidence for 0/20 queued benchmark-topic papers (0.0%). Next: After the active top12000 ingest finishes, run section-evidence-topic-gaps before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
+- **multi_topic_evidence_gap** (high): multi-topic regression still has primary section evidence for 0/20 queued benchmark-topic papers (0.0%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit

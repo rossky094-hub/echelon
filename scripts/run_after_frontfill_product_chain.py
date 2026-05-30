@@ -483,7 +483,7 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--topic-gap-frontfill-cmd",
-        default=os.getenv("V14B_TOPIC_GAP_FRONTFILL_CMD", "make section-evidence-topic-gaps"),
+        default=os.getenv("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),
     )
     parser.add_argument("--active-section-pattern", default="step5s_section_ingest")
     parser.add_argument("--step", action="append", default=None)

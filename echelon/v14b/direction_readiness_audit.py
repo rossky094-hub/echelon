@@ -483,8 +483,9 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                     f"({pct(float(m.get('topic_gap_primary_section_rate') or 0.0))})."
                 ),
                 "next_action": (
-                    "After the active top12000 ingest finishes, run section-evidence-topic-gaps "
-                    "before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions."
+                    "After the active top12000 ingest finishes, run make topic-gap-repair "
+                    "to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted "
+                    "papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions."
                 ),
             }
         )

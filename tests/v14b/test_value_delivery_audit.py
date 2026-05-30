@@ -173,6 +173,12 @@ def _write_product_sources(root: Path) -> None:
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only\n",
         encoding="utf-8",
     )
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    (scripts / "run_after_frontfill_product_chain.py").write_text(
+        "V14B_TOPIC_GAP_FRONTFILL_CMD make topic-gap-repair\n",
+        encoding="utf-8",
+    )
 
 
 def _write_makefile_contracts(root: Path) -> None:
@@ -185,6 +191,14 @@ def _write_makefile_contracts(root: Path) -> None:
         "product-chain: id-repair graph-prep evidence-prep\n"
         "\t$(MAKE) decision-audit\n"
         "decision-audit:\n"
+        "\t$(MAKE) topic-regression\n"
+        "\t$(MAKE) section-queue-audit\n"
+        "\t$(MAKE) direction-readiness-audit\n"
+        "\t$(MAKE) value-delivery-audit\n"
+        "topic-gap-repair:\n"
+        "\t$(MAKE) topic-regression\n"
+        "\t$(MAKE) section-queue-audit\n"
+        "\t$(MAKE) section-evidence-topic-gaps\n"
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) direction-readiness-audit\n"
@@ -421,6 +435,8 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["help_prefers_current_chain"] is True
     assert result["checks"]["product_chain_runs_decision_audit"] is True
     assert result["checks"]["decision_audit_runs_regression_gap_readiness_value"] is True
+    assert result["checks"]["topic_gap_repair_refreshes_queue_ingests_and_reaudits"] is True
+    assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
     assert result["disallowed_current_deps"] == {}

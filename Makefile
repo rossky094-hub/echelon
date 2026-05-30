@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -292,6 +292,17 @@ section-evidence-topic-gaps:
 		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Topic gap repair: regression gaps -> queue refresh -> targeted ingest -> re-audit
+topic-gap-repair:
+	@echo ">>> Topic gap repair: refresh gaps, ingest targeted sections, then re-audit..."
+	$(MAKE) topic-regression
+	$(MAKE) section-queue-audit
+	$(MAKE) section-evidence-topic-gaps
+	$(MAKE) topic-regression
+	$(MAKE) section-queue-audit
+	$(MAKE) direction-readiness-audit
+	$(MAKE) value-delivery-audit
 
 ## Step 5s-audit: 高价值 section 队列覆盖审计 + delta queue
 section-queue-audit:
@@ -575,6 +586,7 @@ help:
 	@echo "  make product-chain             # 当前证据约束产品链路"
 	@echo "  make post-frontfill-chain      # section/frontfill 完成后的断点推进"
 	@echo "  make decision-audit            # 当前验收闭环: regression/gap/readiness/value"
+	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"
 	@echo ""
 	@echo "Legacy compatibility (not current acceptance path):"

@@ -552,7 +552,12 @@ def _context_contains_ordered_targets(context: str, targets: tuple[str, ...]) ->
             f"${{MAKE}} {target}",
             f"make {target}",
         )
-        positions = [context.find(pattern) for pattern in patterns if context.find(pattern) >= 0]
+        positions = [
+            pos
+            for pattern in patterns
+            for pos in [context.find(pattern, last + 1)]
+            if pos >= 0
+        ]
         if not positions:
             return False
         pos = min(positions)
@@ -1242,7 +1247,17 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     pilot_full_context = legacy_contexts.get("pilot-full", "")
     product_chain_context = _make_target_context(makefile, "product-chain", before=0, after=14)
     decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=10)
+    topic_gap_repair_context = _make_target_context(makefile, "topic-gap-repair", before=0, after=14)
     decision_audit_targets = (
+        "topic-regression",
+        "section-queue-audit",
+        "direction-readiness-audit",
+        "value-delivery-audit",
+    )
+    topic_gap_repair_targets = (
+        "topic-regression",
+        "section-queue-audit",
+        "section-evidence-topic-gaps",
         "topic-regression",
         "section-queue-audit",
         "direction-readiness-audit",
@@ -1252,10 +1267,19 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "current_product_chain_present": bool(re.search(r"^product-chain\s*:", makefile, flags=re.M)),
         "post_frontfill_entry_present": bool(re.search(r"^post-frontfill-chain\s*:", makefile, flags=re.M)),
         "decision_audit_target_present": bool(re.search(r"^decision-audit\s*:", makefile, flags=re.M)),
+        "topic_gap_repair_target_present": bool(re.search(r"^topic-gap-repair\s*:", makefile, flags=re.M)),
         "product_chain_runs_decision_audit": "decision-audit" in product_chain_context,
         "decision_audit_runs_regression_gap_readiness_value": _context_contains_ordered_targets(
             decision_audit_context,
             decision_audit_targets,
+        ),
+        "topic_gap_repair_refreshes_queue_ingests_and_reaudits": _context_contains_ordered_targets(
+            topic_gap_repair_context,
+            topic_gap_repair_targets,
+        ),
+        "post_frontfill_uses_topic_gap_repair": _source_contains(
+            (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
+            ("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),
         ),
         "product_chains_avoid_legacy_targets": not disallowed_current_deps,
         "legacy_targets_labeled": not unlabeled_legacy_targets,
@@ -1276,6 +1300,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "checks": checks,
         "current_target_deps": {target: sorted(deps) for target, deps in target_deps.items()},
         "decision_audit_required_targets": list(decision_audit_targets),
+        "topic_gap_repair_required_targets": list(topic_gap_repair_targets),
         "disallowed_current_deps": disallowed_current_deps,
         "legacy_targets_present": sorted(legacy_contexts),
         "unlabeled_legacy_targets": unlabeled_legacy_targets,
@@ -1284,8 +1309,9 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
             "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction "
-            "readiness, and value delivery. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly "
-            "labeled legacy compatibility targets."
+            "readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that "
+            "refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. "
+            "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
         ),
     }
 
