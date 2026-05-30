@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# LEGACY compatibility: old Step1 arXiv enrich helper.
+# Not current V14B decision workflow; prefer product-chain/post-frontfill-chain.
+#
 # 后台单独跑 Step1: 补全 physics.optics 库内未 enrich 的论文 (含纯 arXiv)
 # 与 Step5c+ 并行: 共用 echelon_library.sqlite3 (WAL), 不碰 v14_pilot.sqlite3
 #
@@ -6,6 +9,11 @@
 #   nohup bash scripts/run_step1_arxiv_enrich.sh >> logs/v14b/step1_arxiv_nohup.log 2>&1 &
 #
 set -euo pipefail
+if [[ "${V14B_RUN_LEGACY_ARXIV_FLOW:-0}" != "1" ]]; then
+  echo "LEGACY compatibility script: old arXiv gap-first flow is not the current V14B decision workflow."
+  echo "Set V14B_RUN_LEGACY_ARXIV_FLOW=1 to run it intentionally; otherwise use make product-chain or make post-frontfill-chain."
+  exit 2
+fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"

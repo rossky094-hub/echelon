@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
+# LEGACY compatibility: old arXiv gap-first closure helper.
+# Not current V14B decision workflow; prefer product-chain/post-frontfill-chain.
 # Directed ingest for arXiv IDs listed in reports/v14b_pilot/arxiv_optics_missing_ids.txt.
 #
 # Default path uses the existing V14B Semantic Scholar provider. arXiv remains
 # available as a fallback:
 #   MISSING_FETCH_PROVIDER=arxiv bash scripts/fetch_missing_arxiv_optics.sh
 set -euo pipefail
+if [[ "${V14B_RUN_LEGACY_ARXIV_FLOW:-0}" != "1" ]]; then
+  echo "LEGACY compatibility script: old arXiv gap-first flow is not the current V14B decision workflow."
+  echo "Set V14B_RUN_LEGACY_ARXIV_FLOW=1 to run it intentionally; otherwise use make product-chain or make post-frontfill-chain."
+  exit 2
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 DB="${ECHELON_LIBRARY_DB:-$ROOT/db/echelon_library.sqlite3}"

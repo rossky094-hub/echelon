@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T13:16:32Z`
+- generated_at: `2026-05-30T13:30:28Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -296,6 +296,7 @@
     "empty_radar_policy_present": true,
     "incomplete_cards_are_candidate_pool_only": true,
     "raw_gnn_edges_are_candidate_pool_only": true,
+    "step9_future_report_has_evidence_contract": true,
     "ui_separates_radar_from_candidate_pool": true
   },
   "incomplete_claim_cards": 1,
@@ -339,10 +340,12 @@
   "checks": {
     "current_product_chain_present": true,
     "help_prefers_current_chain": true,
+    "legacy_arxiv_scripts_require_explicit_opt_in": true,
     "legacy_targets_labeled": true,
     "pilot_full_is_legacy_compatibility_only": true,
     "post_frontfill_entry_present": true,
-    "product_chains_avoid_legacy_targets": true
+    "product_chains_avoid_legacy_targets": true,
+    "step9_report_avoids_old_pilot_instruction": true
   },
   "current_target_deps": {
     "product-chain": [
@@ -389,6 +392,14 @@
   },
   "disallowed_current_deps": {},
   "issue": "Legacy Flow Isolation Contract",
+  "legacy_arxiv_scripts_present": [
+    "scripts/diff_arxiv_optics_vs_db.py",
+    "scripts/fetch_missing_arxiv_optics.sh",
+    "scripts/monitor_optics_full_pipeline.sh",
+    "scripts/run_arxiv_optics_harvest.sh",
+    "scripts/run_arxiv_optics_incremental.sh",
+    "scripts/run_step1_arxiv_enrich.sh"
+  ],
   "legacy_targets_present": [
     "enrich",
     "pilot",
@@ -399,6 +410,7 @@
   ],
   "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
   "status": "pass",
+  "unguarded_legacy_arxiv_scripts": [],
   "unlabeled_legacy_targets": []
 }
 ```

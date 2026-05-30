@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
-"""Diff cat:physics.optics arXiv IDs vs echelon_library.sqlite3."""
+"""LEGACY compatibility: diff cat:physics.optics arXiv IDs vs the DB.
+
+This is not the current V14B decision workflow.  The current path is
+section evidence top12000 plus OpenAlex/local field-topic backfill, then
+`make product-chain` or `make post-frontfill-chain`.
+"""
 from __future__ import annotations
 
 import argparse
 import calendar
 import json
+import os
 import re
 import sqlite3
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -23,6 +30,19 @@ ATOM_NS = {
 PAGE_SIZE = 2000
 MAX_START = 10000
 DEFAULT_DELAY = 3.0
+LEGACY_OPT_IN_ENV = "V14B_RUN_LEGACY_ARXIV_FLOW"
+
+
+def require_legacy_opt_in() -> None:
+    if os.environ.get(LEGACY_OPT_IN_ENV) == "1":
+        return
+    print(
+        "LEGACY compatibility script: old arXiv gap-first flow is not the current "
+        "V14B decision workflow. Set V14B_RUN_LEGACY_ARXIV_FLOW=1 to run it intentionally; "
+        "otherwise use make product-chain or make post-frontfill-chain.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
 
 
 def log(message: str) -> None:
@@ -185,6 +205,7 @@ def api_total() -> int:
 
 
 def main() -> None:
+    require_legacy_opt_in()
     p = argparse.ArgumentParser()
     p.add_argument("--db", default="db/echelon_library.sqlite3")
     p.add_argument("--from", dest="from_date", default="1991-01-01")

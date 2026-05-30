@@ -168,6 +168,11 @@ def _write_product_sources(root: Path) -> None:
         "默认不调用外部 LLM 已入库证据可重跑 section_evidence_strong section_provenance_ready missing_high_confidence_gates\n",
         encoding="utf-8",
     )
+    (v14 / "step9_report.py").write_text(
+        "make product-chain make post-frontfill-chain legacy compatibility "
+        "claim_scope evidence_grade uncertainty_reasons candidate_pool_only\n",
+        encoding="utf-8",
+    )
 
 
 def _write_makefile_contracts(root: Path) -> None:
@@ -206,6 +211,25 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t@echo 'make pilot-full # not current V14B decision workflow'\n",
         encoding="utf-8",
     )
+
+
+def _write_legacy_arxiv_script_contracts(root: Path) -> None:
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "diff_arxiv_optics_vs_db.py",
+        "fetch_missing_arxiv_optics.sh",
+        "monitor_optics_full_pipeline.sh",
+        "run_arxiv_optics_harvest.sh",
+        "run_arxiv_optics_incremental.sh",
+        "run_step1_arxiv_enrich.sh",
+    ):
+        (scripts / name).write_text(
+            "LEGACY compatibility\n"
+            "old arXiv gap-first flow is not the current V14B decision workflow\n"
+            "V14B_RUN_LEGACY_ARXIV_FLOW\n",
+            encoding="utf-8",
+        )
 
 
 def _make_v14_edge_calibrated_without_run_audit(path: Path) -> None:
@@ -288,6 +312,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     _make_main(main)
     _make_v14(v14)
     _write_makefile_contracts(tmp_path)
+    _write_legacy_arxiv_script_contracts(tmp_path)
     q = tmp_path / "echelon/v14b"
     q.mkdir(parents=True)
     (q / "quarterly_run.py").write_text("parser.add_argument('--corpus-id')", encoding="utf-8")
@@ -326,6 +351,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     legacy_gate = next(g for g in result["gates"] if g["issue"] == "Legacy Flow Isolation Contract")
     assert legacy_gate["status"] == "pass"
     assert legacy_gate["checks"]["product_chains_avoid_legacy_targets"] is True
+    assert legacy_gate["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
+    assert legacy_gate["checks"]["step9_report_avoids_old_pilot_instruction"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])
@@ -379,16 +406,20 @@ def test_main_path_uncertainty_contract_demotes_low_linked_refs(tmp_path):
 
 def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+    _write_legacy_arxiv_script_contracts(tmp_path)
 
     result = audit_legacy_flow_isolation_contract(tmp_path)
 
     assert result["status"] == "pass"
     assert result["checks"]["help_prefers_current_chain"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
+    assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
     assert result["disallowed_current_deps"] == {}
 
 
 def test_legacy_flow_isolation_contract_flags_current_chain_using_old_enrich(tmp_path):
+    _write_product_sources(tmp_path)
     (tmp_path / "Makefile").write_text(
         "product-chain: enrich pilot-full\n"
         "product-chain-fast: pilot\n"
@@ -405,6 +436,23 @@ def test_legacy_flow_isolation_contract_flags_current_chain_using_old_enrich(tmp
     assert result["checks"]["product_chains_avoid_legacy_targets"] is False
     assert result["checks"]["legacy_targets_labeled"] is False
     assert "product-chain" in result["disallowed_current_deps"]
+
+
+def test_legacy_flow_isolation_contract_flags_unguarded_arxiv_gap_script(tmp_path):
+    _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    (scripts / "monitor_optics_full_pipeline.sh").write_text(
+        "#!/usr/bin/env bash\nmake pilot-graph\n",
+        encoding="utf-8",
+    )
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is False
+    assert result["unguarded_legacy_arxiv_scripts"] == ["scripts/monitor_optics_full_pipeline.sh"]
 
 
 def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp_path):

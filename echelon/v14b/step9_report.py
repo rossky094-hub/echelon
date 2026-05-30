@@ -64,6 +64,68 @@ def _paper_reference_markdown(paper: dict) -> str:
     return f"{label} — local_id: `{paper.get('id', 'TBD')}`"
 
 
+def _loads_json(value, default):
+    if value is None:
+        return default
+    try:
+        return json.loads(str(value))
+    except Exception:
+        return default
+
+
+def _direction_contract(direction: dict) -> dict:
+    evidence = _loads_json(direction.get("evidence_json"), {})
+    quality_gate = _loads_json(direction.get("quality_gate_json"), {})
+    five_questions = quality_gate.get("five_questions") if isinstance(quality_gate, dict) else {}
+    missing_gates = list(quality_gate.get("missing_gates") or []) if isinstance(quality_gate, dict) else []
+    missing_high_conf = (
+        list(quality_gate.get("missing_high_confidence_gates") or [])
+        if isinstance(quality_gate, dict)
+        else []
+    )
+    claim_card_complete = bool(direction.get("claim_card_complete"))
+    high_confidence = bool(direction.get("high_confidence_eligible"))
+    claim_scope = (
+        direction.get("claim_scope")
+        or (evidence.get("claim_scope") if isinstance(evidence, dict) else None)
+        or ("exploratory_with_claim_card" if claim_card_complete else "candidate_pool_only")
+    )
+    evidence_grade = (
+        direction.get("evidence_tier")
+        or (quality_gate.get("section_evidence_strength") if isinstance(quality_gate, dict) else None)
+        or "metadata_or_algorithmic_candidate"
+    )
+    uncertainty_reasons: list[str] = []
+    if not claim_card_complete:
+        uncertainty_reasons.append("Claim Card five-question contract incomplete")
+    if missing_gates:
+        uncertainty_reasons.extend(f"missing {gate}" for gate in missing_gates[:3])
+    if not high_confidence:
+        uncertainty_reasons.append("not high-confidence eligible")
+    if missing_high_conf:
+        uncertainty_reasons.extend(f"missing high-confidence gate: {gate}" for gate in missing_high_conf[:4])
+    if direction.get("calibration_label") != "calibrated_temporal_holdout":
+        uncertainty_reasons.append("future candidate lacks run-level temporal calibration label")
+    if claim_scope in {"candidate_pool_only", "exploratory_incomplete_card", "not_for_user_claim"}:
+        uncertainty_reasons.append("candidate pool only; not Radar main-view evidence")
+    if not uncertainty_reasons:
+        uncertainty_reasons.append("requires human validation and quarterly snapshot comparison")
+    promotion_status = (
+        "exploratory_claim_card"
+        if claim_card_complete and str(claim_scope).startswith("exploratory")
+        else "candidate_pool_only"
+    )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": uncertainty_reasons,
+        "promotion_status": promotion_status,
+        "claim_card_complete": claim_card_complete,
+        "high_confidence_eligible": high_confidence,
+        "five_questions": five_questions if isinstance(five_questions, dict) else {},
+    }
+
+
 # ---------------------------------------------------------------------------
 # DB 查询工具
 # ---------------------------------------------------------------------------
@@ -95,6 +157,13 @@ def safe_scalar(conn, sql: str, params=()) -> int:
         return int(row[0]) if row and row[0] is not None else 0
     except Exception:
         return 0
+
+
+def table_columns(conn, table: str) -> set[str]:
+    try:
+        return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    except Exception:
+        return set()
 
 
 # ---------------------------------------------------------------------------
@@ -194,12 +263,29 @@ def generate_algo_report(
 
     # 融合方向统计
     future_dirs = safe_count(conn_v14, "future_directions")
-    top_dirs = safe_query(conn_v14, """
-        SELECT direction_name, confidence, expected_period
+    direction_cols = table_columns(conn_v14, "future_directions")
+    direction_preview_cols = [
+        "direction_name",
+        "confidence",
+        "expected_period",
+        "evidence_tier",
+        "claim_scope",
+        "calibration_label",
+        "evidence_json",
+        "claim_card_complete",
+        "high_confidence_eligible",
+        "quality_gate_json",
+    ]
+    top_dir_select = [
+        col if col in direction_cols else f"NULL AS {col}"
+        for col in direction_preview_cols
+    ]
+    top_dirs = safe_query(conn_v14, f"""
+        SELECT {', '.join(top_dir_select)}
         FROM future_directions
         ORDER BY confidence DESC
         LIMIT 5
-    """)
+    """) if direction_cols else []
 
     # 突变统计
     red_count = safe_count(conn_v14, "subgraph_nodes", "mutation_red = 1")
@@ -392,15 +478,18 @@ def generate_algo_report(
         f"",
         f"- **融合方向数**: **{future_dirs:,}**",
         f"",
-        f"### Top 5 未来方向预览",
+        f"### Top 5 未来候选证据合同预览",
         f"",
-        f"| 方向 | 置信度 | 预期时间 |",
-        f"|---|---|---|",
+        f"| 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
+        f"|---|---:|---|---|---|---:|",
     ]
 
     for d in top_dirs:
+        contract = _direction_contract(d)
         lines.append(
-            f"| {d['direction_name'][:70]} | {d['confidence']:.2f} | {d.get('expected_period', 'TBD')} |"
+            f"| {d['direction_name'][:70]} | {float(d.get('confidence') or 0.0):.2f} | "
+            f"{contract['claim_scope']} | {contract['evidence_grade']} | "
+            f"{contract['promotion_status']} | {len(contract['uncertainty_reasons'])} |"
         )
 
     lines += [
@@ -483,25 +572,50 @@ def generate_future_directions_report(
     *,
     corpus_id: str | None = None,
 ) -> str:
-    """生成未来方向预测交集报告"""
+    """生成未来候选方向证据合同报告"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    directions = safe_query(conn_v14, """
-        SELECT direction_id, direction_name, confidence, expected_period,
-               main_path_evidence, vgae_evidence, limitation_evidence,
-               paper_ids_json
+    direction_cols = table_columns(conn_v14, "future_directions")
+    base_cols = [
+        "direction_id",
+        "direction_name",
+        "confidence",
+        "expected_period",
+        "main_path_evidence",
+        "vgae_evidence",
+        "limitation_evidence",
+        "paper_ids_json",
+        "evidence_paths",
+        "evidence_tier",
+        "claim_scope",
+        "calibration_label",
+        "evidence_json",
+        "claim_card_id",
+        "claim_card_complete",
+        "high_confidence_eligible",
+        "quality_gate_json",
+    ]
+    select_cols = [
+        col if col in direction_cols else f"NULL AS {col}"
+        for col in base_cols
+    ]
+    directions = safe_query(conn_v14, f"""
+        SELECT {', '.join(select_cols)}
         FROM future_directions
         ORDER BY confidence DESC
         LIMIT 20
-    """)
+    """) if direction_cols else []
 
     lines = [
-        f"# 未来颠覆性方向预测 — 三路融合交集报告",
+        f"# 未来候选方向证据合同 — Claim Card / Radar 输入报告",
         f"",
         f"**生成时间**: {now}",
         f"**Corpus**: {corpus_id or 'all'}",
-        f"**方法**: VGAE+主干道延伸 × Limitation未解决方向 × Link Prediction 三路融合",
-        f"**总方向数**: **{len(directions)}** 个",
+        f"**方法**: VGAE future candidate generator × limitation/resolution evidence × Step6 fusion × Step13 Claim Card gates",
+        f"**候选方向数**: **{len(directions)}** 个",
+        f"",
+        f"> 本报告不把 GNN/VGAE 边或 Step6 排名分数当作结论。每一项必须携带 "
+        f"`claim_scope`, `evidence_grade`, `uncertainty_reasons`; 未完整回答五问或未达高置信门槛时只能作为 candidate pool / exploratory Claim Card。",
         f"",
         f"---",
         f"",
@@ -509,7 +623,8 @@ def generate_future_directions_report(
 
     if not directions:
         lines += [
-            f"> **TBD**: 尚无数据。请先完成 make pilot 全流程。",
+            f"> **TBD**: 尚无可晋升方向。请先完成当前证据约束链路 `make product-chain`, "
+            f"或在 section/frontfill 完成后运行 `make post-frontfill-chain`；旧 `make pilot` 入口仅保留为 legacy compatibility。",
             f"",
         ]
         return "\n".join(lines)
@@ -517,22 +632,35 @@ def generate_future_directions_report(
     lines += [
         f"## 摘要表格",
         f"",
-        f"| # | 方向名称 | 置信度 | 预期时间 |",
-        f"|---|---|---|---|",
+        f"| # | 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |",
+        f"|---|---|---:|---|---|---|---:|",
     ]
     for i, d in enumerate(directions, 1):
+        contract = _direction_contract(d)
         lines.append(
-            f"| {i} | {d['direction_name'][:70]} | {d['confidence']:.2f} | {d.get('expected_period','TBD')} |"
+            f"| {i} | {d['direction_name'][:70]} | {float(d.get('confidence') or 0.0):.2f} | "
+            f"{contract['claim_scope']} | {contract['evidence_grade']} | "
+            f"{contract['promotion_status']} | {len(contract['uncertainty_reasons'])} |"
         )
 
     lines += [f"", f"---", f""]
 
     for i, d in enumerate(directions, 1):
+        contract = _direction_contract(d)
         lines += [
-            f"## 方向 {i}: {d['direction_name']}",
+            f"## 候选方向 {i}: {d['direction_name']}",
             f"",
-            f"- **综合置信度**: **{d['confidence']:.2f}**",
+            f"- **排序分数**: **{float(d.get('confidence') or 0.0):.2f}** (不是高置信结论)",
             f"- **预期出现时间**: {d.get('expected_period', 'TBD')}",
+            f"- **claim_scope**: `{contract['claim_scope']}`",
+            f"- **evidence_grade**: `{contract['evidence_grade']}`",
+            f"- **Radar 状态**: `{contract['promotion_status']}`",
+            f"- **Claim Card 五问完整**: `{contract['claim_card_complete']}`",
+            f"- **高置信资格**: `{contract['high_confidence_eligible']}`",
+            f"- **uncertainty_reasons**:",
+        ]
+        lines.extend(f"  - {reason}" for reason in contract["uncertainty_reasons"])
+        lines += [
             f"",
             f"### 三路证据",
             f"",

@@ -442,6 +442,9 @@ class TestReportGenerator:
 
         # Should have at least one markdown table
         assert "|---|" in report
+        assert "Top 5 未来候选证据合同预览" in report
+        assert "claim_scope" in report
+        assert "evidence_grade" in report
 
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report
@@ -460,9 +463,13 @@ class TestReportGenerator:
         conn_v14.close()
         conn_main.close()
 
-        assert "未来颠覆性方向" in report
+        assert "未来候选方向证据合同" in report
         assert "AI photonics" in report
         assert "三路证据" in report
+        assert "claim_scope" in report
+        assert "evidence_grade" in report
+        assert "uncertainty_reasons" in report
+        assert "candidate_pool_only" in report
 
     def test_empty_db_report_has_tbd(self, tmp_path):
         """无数据时报告有 TBD 占位"""
@@ -476,6 +483,9 @@ class TestReportGenerator:
         conn_main.close()
 
         assert "TBD" in report or "尚无数据" in report
+        assert "make product-chain" in report
+        assert "make post-frontfill-chain" in report
+        assert "make pilot 全流程" not in report
 
     def test_future_report_links_use_external_ids(self):
         from echelon.v14b.step9_report import _paper_reference_markdown

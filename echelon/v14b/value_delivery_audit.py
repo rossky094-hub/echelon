@@ -67,6 +67,15 @@ LEGACY_FLOW_DISALLOWED_CURRENT_DEPS = {
     "pilot-full",
 }
 
+LEGACY_ARXIV_FLOW_SCRIPTS = (
+    "scripts/diff_arxiv_optics_vs_db.py",
+    "scripts/fetch_missing_arxiv_optics.sh",
+    "scripts/monitor_optics_full_pipeline.sh",
+    "scripts/run_arxiv_optics_harvest.sh",
+    "scripts/run_arxiv_optics_incremental.sh",
+    "scripts/run_step1_arxiv_enrich.sh",
+)
+
 REQUIRED_TOPIC_READINESS_GATES = {
     "topic dossier evidence contract",
     "turning papers with strong/moderate section provenance",
@@ -1028,6 +1037,7 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
     source_checks = {
         "api_exposes_candidate_pool": False,
         "ui_separates_radar_from_candidate_pool": False,
+        "step9_future_report_has_evidence_contract": False,
     }
     if repo_root is not None:
         source_checks = {
@@ -1038,6 +1048,10 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             "ui_separates_radar_from_candidate_pool": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderDossierRadar", "No complete Claim Cards yet", "Future candidate generator pool"),
+            ),
+            "step9_future_report_has_evidence_contract": _source_contains(
+                repo_root / "echelon/v14b/step9_report.py",
+                ("claim_scope", "evidence_grade", "uncertainty_reasons", "candidate_pool_only"),
             ),
         }
     checks.update(source_checks)
@@ -1171,6 +1185,27 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         for target, context in legacy_contexts.items()
         if "LEGACY compatibility" not in context or "not current V14B decision workflow" not in context
     ]
+    legacy_script_contexts: dict[str, str] = {}
+    for rel_path in LEGACY_ARXIV_FLOW_SCRIPTS:
+        path = (repo_root or Path(".")) / rel_path
+        if path.exists():
+            legacy_script_contexts[rel_path] = path.read_text(encoding="utf-8")
+    unguarded_legacy_scripts = [
+        rel_path
+        for rel_path, text in legacy_script_contexts.items()
+        if "LEGACY compatibility" not in text
+        or "not the current V14B decision workflow" not in text
+        or "V14B_RUN_LEGACY_ARXIV_FLOW" not in text
+    ]
+    step9_path = (repo_root or Path(".")) / "echelon/v14b/step9_report.py"
+    step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
+    step9_avoids_old_pilot_instruction = (
+        bool(step9_text)
+        and "make pilot 全流程" not in step9_text
+        and "make product-chain" in step9_text
+        and "make post-frontfill-chain" in step9_text
+        and "legacy compatibility" in step9_text
+    )
     first_current = min(
         (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
         default=-1,
@@ -1192,6 +1227,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "post_frontfill_entry_present": bool(re.search(r"^post-frontfill-chain\s*:", makefile, flags=re.M)),
         "product_chains_avoid_legacy_targets": not disallowed_current_deps,
         "legacy_targets_labeled": not unlabeled_legacy_targets,
+        "legacy_arxiv_scripts_require_explicit_opt_in": not unguarded_legacy_scripts,
+        "step9_report_avoids_old_pilot_instruction": step9_avoids_old_pilot_instruction,
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context
@@ -1209,6 +1246,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "disallowed_current_deps": disallowed_current_deps,
         "legacy_targets_present": sorted(legacy_contexts),
         "unlabeled_legacy_targets": unlabeled_legacy_targets,
+        "legacy_arxiv_scripts_present": sorted(legacy_script_contexts),
+        "unguarded_legacy_arxiv_scripts": unguarded_legacy_scripts,
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."

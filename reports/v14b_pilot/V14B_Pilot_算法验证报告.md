@@ -1,6 +1,6 @@
 # V14-B Pilot 算法验证报告
 
-**生成时间**: 2026-05-29 09:36
+**生成时间**: 2026-05-30 21:30
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -10,8 +10,8 @@
 | 指标 | 数值 |
 |---|---|
 | 总论文数 | **55,391** |
-| OpenAlex enrich 成功率 | **99.0%** (54,844/55,391) |
-| 引用关系总数 | **3,016,141** |
+| OpenAlex enrich 成功率 | **99.2%** (54,937/55,391) |
+| 引用关系总数 | **3,215,130** |
 | 主干道边数 (top 1%) | **2,775** / 277,526 |
 | 子图节点数 | **5,000** |
 | 子图边数 | **38,538** |
@@ -19,15 +19,15 @@
 | SciBERT 分类完成率 | **100.0%** |
 | VGAE 预测未来边数 | **1,000** |
 | Limitation atoms 总数 | **730** |
-| 三路融合方向数 | **0** |
+| 三路融合方向数 | **5** |
 
 ---
 
 ## 2. Enrich 数据质量
 
-- **OpenAlex 命中率**: 99.0%
-- **引用关系总数**: 3,016,141 条
-- **平均每篇引用数**: 55.0
+- **OpenAlex 命中率**: 99.2%
+- **引用关系总数**: 3,215,130 条
+- **平均每篇引用数**: 58.5
 
 ---
 
@@ -118,12 +118,17 @@
 
 ## 9. 三路融合交集
 
-- **融合方向数**: **0**
+- **融合方向数**: **5**
 
-### Top 5 未来方向预览
+### Top 5 未来候选证据合同预览
 
-| 方向 | 置信度 | 预期时间 |
-|---|---|---|
+| 候选方向 | 排序分数 | claim_scope | evidence_grade | Radar 状态 | uncertainty_reasons |
+|---|---:|---|---|---|---:|
+| Broadband electro-optic frequency comb generation in an integrated mic | 0.81 | exploratory_with_claim_card | exploratory | exploratory_claim_card | 4 |
+| High-yield wafer-scale fabrication of ultralow-loss, dispersion-engine | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 8 |
+| Coherent Raman spectro-imaging with laser frequency combs | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 9 |
+| Photo-induced cascaded harmonic and comb generation in silicon nitride | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 9 |
+| 11 TeraFLOPs per second photonic convolutional accelerator for deep le | 0.81 | exploratory_incomplete_card | exploratory | candidate_pool_only | 9 |
 
 > 详细见: 未来方向预测_交集报告.md
 
@@ -156,7 +161,7 @@
 | 数据规模 | 2,000 篇 | **13,606 篇** |
 | 引用图 | 仅 arXiv 内部 | **OpenAlex 跨库** |
 | 评分算法 | V13 均等权重 | **V14 生命周期自适应** |
-| 未来方向 | 无 | **0 个三路融合方向** |
+| 未来方向 | 无 | **5 个三路融合方向** |
 
 ---
 
@@ -165,7 +170,7 @@
 ### 建议: **REVISE** — 部分指标达标,建议调优后再启动前端
 
 **前端启动条件**:
-- [ ] 三路融合方向 ≥ 10 个 (当前: 0)
+- [ ] 三路融合方向 ≥ 10 个 (当前: 5)
 - [ ] VGAE test AUC > 0.80 (需验证)
 - [ ] 主干道节点 100-200 个 (当前: TBD)
 - [ ] 突变节点 100-300 个 (当前: 4879)
@@ -177,4 +182,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-29 09:36*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-30 21:30*
