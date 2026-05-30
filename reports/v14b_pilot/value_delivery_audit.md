@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T19:50:56Z`
+- generated_at: `2026-05-30T19:56:02Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,15 +34,15 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 14943,
+    "openalex_frontfill_cooldown_remaining_s": 14638,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 2942,
-    "section_frontfill_done": 877,
+    "section_frontfill_done": 878,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 877,
+    "section_frontfill_progress_done": 878,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 6603,
     "section_provenance": {
@@ -375,6 +375,7 @@
     "api_exposes_candidate_pool": true,
     "candidate_edges_carry_evidence_contract": true,
     "candidate_pool_items_not_eligible": true,
+    "claim_card_public_scores_are_candidate_scores": true,
     "claim_cards_carry_evidence_contract": true,
     "complete_cards_only_in_main_radar": true,
     "empty_radar_policy_present": true,

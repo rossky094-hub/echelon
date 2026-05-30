@@ -1818,6 +1818,8 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             and c.get("evidence_objects")
             for c in claim_cards
         ),
+        "claim_card_public_scores_are_candidate_scores": bool(claim_cards)
+        and all(c.get("candidate_score") is not None and "technical_score" not in c for c in claim_cards),
         "candidate_edges_carry_evidence_contract": bool(candidate_edges)
         and all(edge.get("evidence_grade") and edge.get("uncertainty_reasons") for edge in candidate_edges),
         "candidate_pool_items_not_eligible": all(not bool(c.get("eligible")) for c in candidate_pool),
@@ -1874,14 +1876,21 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             "radar_public_scores_avoid_probability_copy": (
                 _source_contains(
                     repo_root / "echelon/api/graph_visual_backend.py",
-                    ('"technical_score": d.get("confidence")', '"candidate_score": conf'),
+                    (
+                        '"candidate_score": candidate_score',
+                        '"score_semantics": "candidate ranking score; not validation confidence or a conclusion probability"',
+                        '"candidate_score": conf',
+                    ),
                 )
                 and bool(app_text)
-                and "item.technical_score" in app_text
+                and "候选分数" in app_text
+                and "item.candidate_score" in app_text
                 and "technical_probability" not in app_text
+                and "技术评分" not in app_text
+                and "item.technical_score" not in app_text
                 and _source_absent(
                     repo_root / "echelon/api/graph_visual_backend.py",
-                    ("technical_probability",),
+                    ('"technical_score": d.get("confidence")', "technical_probability"),
                 )
             ),
         }

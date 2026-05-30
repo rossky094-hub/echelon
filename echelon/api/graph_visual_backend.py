@@ -4136,11 +4136,15 @@ def _build_rd_radar(
             *[f"missing five-question gate: {gate}" for gate in missing_gates],
             *[f"missing high-confidence gate: {gate}" for gate in missing_high_conf],
         ]
+        candidate_score = d.get("candidate_score")
+        if candidate_score is None:
+            candidate_score = d.get("confidence")
         item = {
             "kind": "claim_card" if five_complete else "incomplete_claim_card",
             "title": d.get("direction_name") or d.get("direction_id"),
-            "priority": d.get("confidence"),
-            "technical_score": d.get("confidence"),
+            "priority": candidate_score,
+            "candidate_score": candidate_score,
+            "score_semantics": "candidate ranking score; not validation confidence or a conclusion probability",
             "commercial_relevance": d.get("commercial_relevance"),
             "validation_cost": d.get("validation_cost"),
             "claim_scope": d.get("claim_scope") or ("radar_claim_card" if five_complete else "candidate_pool_only"),

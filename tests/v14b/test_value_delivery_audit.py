@@ -148,7 +148,7 @@ def _write_product_sources(root: Path) -> None:
         '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
-        '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
+        '"candidate_score": candidate_score "score_semantics": "candidate ranking score; not validation confidence or a conclusion probability" "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n"
         'if edge_type == "future_candidate": obj.pop("confidence", None) "candidate_score": candidate_score "calibrated_candidate_score": evidence.get("calibrated_candidate_score")\n'
@@ -172,8 +172,8 @@ def _write_product_sources(root: Path) -> None:
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
         "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
-        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool future candidate generator candidate score'; }\n"
-        "function renderRadarScores() { return item.technical_score + item.candidate_score; }\n"
+        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + item.candidate_score + '候选分数 Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool future candidate generator candidate score'; }\n"
+        "function renderRadarScores() { return item.candidate_score; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
@@ -665,11 +665,33 @@ def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_pa
     assert result["checks"]["incomplete_cards_are_candidate_pool_only"] is True
     assert result["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
     assert result["checks"]["claim_cards_carry_evidence_contract"] is True
+    assert result["checks"]["claim_card_public_scores_are_candidate_scores"] is True
     assert result["checks"]["candidate_edges_carry_evidence_contract"] is True
     assert result["checks"]["topic_lens_public_future_growth_uses_candidate_edges"] is True
     assert result["checks"]["ui_radar_main_avoids_raw_edge_cards"] is True
     assert result["checks"]["ui_renders_radar_claim_card_evidence_contract"] is True
     assert result["candidate_edges"] == 1
+
+
+def test_rd_radar_contract_rejects_technical_score_public_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    api_path = tmp_path / "echelon/api/graph_visual_backend.py"
+    app_path = tmp_path / "web/visual-graph/app.js"
+    api_path.write_text(
+        api_path.read_text(encoding="utf-8")
+        + '\nitem = {"technical_score": d.get("confidence"), "technical_probability": 0.8}\n',
+        encoding="utf-8",
+    )
+    app_path.write_text(
+        app_path.read_text(encoding="utf-8")
+        + "\nfunction renderBadRadar() { return item.technical_score + '技术评分'; }\n",
+        encoding="utf-8",
+    )
+
+    result = audit_rd_radar_promotion_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["radar_public_scores_avoid_probability_copy"] is False
 
 
 def test_main_path_uncertainty_contract_demotes_low_linked_refs(tmp_path):
