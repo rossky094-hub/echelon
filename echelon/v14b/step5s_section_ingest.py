@@ -316,12 +316,17 @@ def _candidate_file_digest(path: Path | None) -> str:
     return h.hexdigest()[:12]
 
 
+def _parser_contract_digest() -> str:
+    return hashlib.sha256(SECTION_PARSER_CONTRACT_VERSION.encode("utf-8")).hexdigest()[:8]
+
+
 def _checkpoint_step_name(candidate_file: Path | None) -> tuple[str, str]:
-    """Use separate checkpoints for topN scans and content-addressed delta queues."""
+    """Use separate checkpoints for queue content and parser evidence contract."""
     digest = _candidate_file_digest(candidate_file)
+    contract_digest = _parser_contract_digest()
     if candidate_file:
-        return f"step5s_section_ingest_delta_{digest}", digest
-    return "step5s_section_ingest", digest
+        return f"step5s_section_ingest_delta_{digest}_{contract_digest}", digest
+    return f"step5s_section_ingest_{contract_digest}", digest
 
 
 def _arxiv_pdf_url(arxiv_id: Optional[str], doi: Optional[str]) -> Optional[str]:
@@ -1040,7 +1045,13 @@ def run_section_ingest(
         step_name,
     )
     if not papers:
-        stats = {"records_n": 0, "papers_n": 0, "with_primary_sections": 0}
+        stats = {
+            "records_n": 0,
+            "papers_n": 0,
+            "with_primary_sections": 0,
+            "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            "parser_contract_digest": _parser_contract_digest(),
+        }
         ck.mark_done(records_n=0, meta=stats)
         upsert_step_meta(conn_v14, step_name, "done", records_n=0)
         conn_main.close()
@@ -1219,6 +1230,8 @@ def run_section_ingest(
         "claim_supporting_sections_enabled": list(PRIMARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,
         "candidate_digest": candidate_digest,
+        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+        "parser_contract_digest": _parser_contract_digest(),
         "run_kind": "delta_queue" if candidate_file else "topn_scan",
     }
     logger.info("Step5s done: %s", stats)

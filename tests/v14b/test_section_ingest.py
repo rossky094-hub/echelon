@@ -8,6 +8,7 @@ from echelon.v14b.step5s_section_ingest import (
     _checkpoint_step_name,
     _has_current_primary_sections,
     _has_primary_sections,
+    _parser_contract_digest,
     _select_candidate_ids,
     ensure_sections_table,
     extract_sections_from_blocks,
@@ -500,11 +501,24 @@ def test_delta_queue_uses_content_addressed_checkpoint(tmp_path):
     normal_name, normal_digest = _checkpoint_step_name(None)
     delta_name, delta_digest = _checkpoint_step_name(queue)
 
-    assert normal_name == "step5s_section_ingest"
+    contract_digest = _parser_contract_digest()
+    assert normal_name == f"step5s_section_ingest_{contract_digest}"
     assert normal_digest == ""
     assert delta_name.startswith("step5s_section_ingest_delta_")
     assert delta_digest
     assert delta_digest in delta_name
+    assert contract_digest in delta_name
+
+
+def test_checkpoint_name_changes_with_parser_contract_version(tmp_path):
+    queue = tmp_path / "section_delta_queue.csv"
+    queue.write_text("paper_id\np1\n", encoding="utf-8")
+
+    step_name, candidate_digest = _checkpoint_step_name(queue)
+
+    assert SECTION_PARSER_CONTRACT_VERSION
+    assert candidate_digest in step_name
+    assert _parser_contract_digest() in step_name
 
 
 def test_section_ingest_records_attempt_outcomes(tmp_path):
