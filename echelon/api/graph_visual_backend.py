@@ -504,15 +504,43 @@ def _load_live_limitations(
     if not paper_ids or not _table_exists(conn, "limitation_atoms"):
         return {}
     placeholders = ",".join("?" for _ in paper_ids)
+    resolution_cols = (
+        "0 AS n_resolutions, NULL AS first_resolution_year, "
+        "NULL AS max_resolution_confidence, NULL AS resolver_paper_id, "
+        "NULL AS resolution_evidence_text"
+    )
+    resolution_join = ""
+    if _table_exists(conn, "limitation_resolutions"):
+        resolution_cols = (
+            "COALESCE(r.n_resolutions, 0) AS n_resolutions, "
+            "r.first_resolution_year AS first_resolution_year, "
+            "r.max_resolution_confidence AS max_resolution_confidence, "
+            "r.resolver_paper_id AS resolver_paper_id, "
+            "r.resolution_evidence_text AS resolution_evidence_text"
+        )
+        resolution_join = """
+            LEFT JOIN (
+                SELECT atom_id,
+                       COUNT(*) AS n_resolutions,
+                       MIN(COALESCE(resolution_year, 9999)) AS first_resolution_year,
+                       MAX(confidence) AS max_resolution_confidence,
+                       MIN(resolver_paper_id) AS resolver_paper_id,
+                       MAX(evidence_text) AS resolution_evidence_text
+                FROM limitation_resolutions
+                WHERE COALESCE(confidence, 0) >= 0.6
+                GROUP BY atom_id
+            ) r ON r.atom_id = a.atom_id
+        """
     try:
         rows = conn.execute(
             f"""
-            SELECT paper_id, description, keyword, severity, evidence_source,
-                   evidence_quality, evidence_weight, source_section_name,
-                   extractor_method
-            FROM limitation_atoms
-            WHERE paper_id IN ({placeholders})
-            ORDER BY COALESCE(evidence_weight, 0) DESC, atom_id DESC
+            SELECT a.atom_id, a.paper_id, a.description, a.keyword, a.severity, a.evidence_source,
+                   a.evidence_quality, a.evidence_weight, a.source_section_name,
+                   a.extractor_method, {resolution_cols}
+            FROM limitation_atoms a
+            {resolution_join}
+            WHERE a.paper_id IN ({placeholders})
+            ORDER BY COALESCE(a.evidence_weight, 0) DESC, a.atom_id DESC
             """,
             paper_ids,
         ).fetchall()
@@ -522,6 +550,7 @@ def _load_live_limitations(
     for row in rows:
         out.setdefault(str(row["paper_id"]), []).append(
             {
+                "atom_id": row["atom_id"],
                 "description": row["description"],
                 "keyword": row["keyword"],
                 "severity": row["severity"],
@@ -530,6 +559,16 @@ def _load_live_limitations(
                 "evidence_weight": row["evidence_weight"],
                 "source_section_name": row["source_section_name"],
                 "extractor_method": row["extractor_method"],
+                "is_resolved": 1 if int(row["n_resolutions"] or 0) > 0 else 0,
+                "n_resolutions": int(row["n_resolutions"] or 0),
+                "resolved_year": (
+                    None
+                    if row["first_resolution_year"] in (None, 9999)
+                    else int(row["first_resolution_year"])
+                ),
+                "resolution_confidence": row["max_resolution_confidence"],
+                "resolver_paper_id": row["resolver_paper_id"],
+                "resolution_evidence_text": row["resolution_evidence_text"],
             }
         )
     return out
@@ -591,15 +630,45 @@ def _load_context_limitations(
     if not bottleneck_clauses:
         return []
 
+    resolution_cols = (
+        "0 AS n_resolutions, NULL AS first_resolution_year, "
+        "NULL AS max_resolution_confidence, NULL AS resolver_paper_id, "
+        "NULL AS resolution_evidence_text"
+    )
+    resolution_join = ""
+    if _table_exists(conn, "limitation_resolutions"):
+        resolution_cols = (
+            "COALESCE(r.n_resolutions, 0) AS n_resolutions, "
+            "r.first_resolution_year AS first_resolution_year, "
+            "r.max_resolution_confidence AS max_resolution_confidence, "
+            "r.resolver_paper_id AS resolver_paper_id, "
+            "r.resolution_evidence_text AS resolution_evidence_text"
+        )
+        resolution_join = """
+            LEFT JOIN (
+                SELECT atom_id,
+                       COUNT(*) AS n_resolutions,
+                       MIN(COALESCE(resolution_year, 9999)) AS first_resolution_year,
+                       MAX(confidence) AS max_resolution_confidence,
+                       MIN(resolver_paper_id) AS resolver_paper_id,
+                       MAX(evidence_text) AS resolution_evidence_text
+                FROM limitation_resolutions
+                WHERE COALESCE(confidence, 0) >= 0.6
+                GROUP BY atom_id
+            ) r ON r.atom_id = a.atom_id
+        """
+
     params.append(limit)
     try:
         rows = conn.execute(
             f"""
-            SELECT a.paper_id, a.description, a.keyword, a.severity,
+            SELECT a.atom_id, a.paper_id, a.description, a.keyword, a.severity,
                    a.evidence_source, a.evidence_quality, a.evidence_weight,
                    a.source_section_name, a.extractor_method,
+                   {resolution_cols},
                    n.cluster_id, n.branch_id, d.metadata_json
             FROM limitation_atoms a
+            {resolution_join}
             LEFT JOIN visual_nodes n ON n.paper_id = a.paper_id
             LEFT JOIN visual_paper_details d ON d.paper_id = a.paper_id
             WHERE ({' OR '.join(clauses)})
@@ -632,6 +701,7 @@ def _load_context_limitations(
         relationship_scope = "direct_paper_match" if pid in direct else "cluster_branch_context"
         out.append(
             {
+                "atom_id": row["atom_id"],
                 "paper_id": pid,
                 "title": metadata.get("title") or pid,
                 "branch_id": row["branch_id"],
@@ -645,6 +715,16 @@ def _load_context_limitations(
                 "source_section_name": row["source_section_name"],
                 "extractor_method": row["extractor_method"],
                 "relationship_scope": relationship_scope,
+                "is_resolved": 1 if int(row["n_resolutions"] or 0) > 0 else 0,
+                "n_resolutions": int(row["n_resolutions"] or 0),
+                "resolved_year": (
+                    None
+                    if row["first_resolution_year"] in (None, 9999)
+                    else int(row["first_resolution_year"])
+                ),
+                "resolution_confidence": row["max_resolution_confidence"],
+                "resolver_paper_id": row["resolver_paper_id"],
+                "resolution_evidence_text": row["resolution_evidence_text"],
             }
         )
         if len(out) >= limit:
@@ -2009,7 +2089,52 @@ def _limitation_evidence_object(limitation: dict[str, Any] | None, *, source: st
         "evidence_quality": limitation.get("evidence_quality"),
         "relationship_scope": limitation.get("relationship_scope"),
         "source_section_name": limitation.get("source_section_name"),
+        "atom_id": limitation.get("atom_id"),
+        "is_resolved": int(bool(_limitation_is_resolved(limitation))),
+        "n_resolutions": limitation.get("n_resolutions"),
         "click_target": {"kind": "paper", "id": paper_id} if paper_id else None,
+    }
+
+
+def _limitation_is_resolved(limitation: dict[str, Any] | None) -> bool:
+    if not limitation:
+        return False
+    if int(limitation.get("n_resolutions") or 0) > 0:
+        return True
+    value = limitation.get("is_resolved")
+    if isinstance(value, bool):
+        return value
+    if str(value).strip().lower() in {"1", "true", "yes", "resolved"}:
+        return True
+    try:
+        confidence = float(limitation.get("resolution_confidence") or 0)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    return bool(limitation.get("resolver_paper_id") and confidence >= 0.6)
+
+
+def _limitation_resolution_evidence_object(
+    limitation: dict[str, Any] | None,
+    *,
+    source: str,
+) -> dict[str, Any] | None:
+    if not _limitation_is_resolved(limitation):
+        return None
+    resolver_id = limitation.get("resolver_paper_id")
+    paper_id = limitation.get("paper_id")
+    return {
+        "type": "limitation_resolution",
+        "role": "partial_resolution_evidence",
+        "source": source,
+        "atom_id": limitation.get("atom_id"),
+        "paper_id": paper_id,
+        "resolver_paper_id": resolver_id,
+        "label": limitation.get("keyword") or "resolution evidence",
+        "description": limitation.get("resolution_evidence_text") or limitation.get("description"),
+        "resolution_year": limitation.get("resolved_year"),
+        "resolution_confidence": limitation.get("resolution_confidence"),
+        "n_resolutions": limitation.get("n_resolutions"),
+        "click_target": {"kind": "paper", "id": resolver_id or paper_id} if (resolver_id or paper_id) else None,
     }
 
 
@@ -2451,6 +2576,10 @@ def _build_bottleneck_dossiers(
         buckets.setdefault(label, []).append(lim)
     dossiers = []
     for label, rows in sorted(buckets.items(), key=lambda x: len(x[1]), reverse=True)[:8]:
+        resolved_rows = [r for r in rows if _limitation_is_resolved(r)]
+        unresolved_rows = [r for r in rows if not _limitation_is_resolved(r)]
+        resolved_count = len(resolved_rows)
+        unresolved_count = len(unresolved_rows)
         section_level_count = sum(
             1 for r in rows
             if str(r.get("evidence_quality") or "").lower() in {"section_level", "section"}
@@ -2460,14 +2589,35 @@ def _build_bottleneck_dossiers(
             if str(r.get("relationship_scope") or "direct_paper_match") == "direct_paper_match"
         )
         evidence_grade = (
-            "section_backed_bottleneck_candidate"
-            if section_level_count
-            else "metadata_or_abstract_bottleneck_candidate"
+            "section_backed_partial_resolution_candidate"
+            if resolved_count and section_level_count
+            else (
+                "metadata_partial_resolution_candidate"
+                if resolved_count
+                else (
+                    "section_backed_bottleneck_candidate"
+                    if section_level_count
+                    else "metadata_or_abstract_bottleneck_candidate"
+                )
+            )
         )
         claim_scope = (
-            "topic_bottleneck_candidate"
-            if section_level_count
-            else "weak_bottleneck_hypothesis"
+            "topic_bottleneck_with_partial_resolution_evidence"
+            if resolved_count
+            else (
+                "topic_bottleneck_candidate"
+                if section_level_count
+                else "weak_bottleneck_hypothesis"
+            )
+        )
+        resolution_status = (
+            "partially_addressed_but_still_open"
+            if resolved_count and unresolved_count
+            else (
+                "resolved_evidence_observed_verify_generalization"
+                if resolved_count
+                else "open_no_resolution_evidence"
+            )
         )
         uncertainty = [
             *(
@@ -2480,7 +2630,21 @@ def _build_bottleneck_dossiers(
                 if direct_count
                 else ["bottleneck evidence is cluster/branch context, not a direct topic-paper match"]
             ),
-            "treat as unresolved until Step5c resolution evidence closes the atom",
+            *(
+                ["no Step5c limitation_resolutions evidence is linked to this bottleneck yet"]
+                if not resolved_count
+                else []
+            ),
+            *(
+                ["partial resolution evidence exists, but unresolved atoms remain open"]
+                if resolved_count and unresolved_count
+                else []
+            ),
+            *(
+                ["resolution evidence exists; verify it generalizes across branches before treating the bottleneck as solved"]
+                if resolved_count and not unresolved_count
+                else []
+            ),
         ]
         papers = []
         seen: set[str] = set()
@@ -2493,8 +2657,11 @@ def _build_bottleneck_dossiers(
         dossiers.append(
             {
                 "name": label,
-                "status": "unresolved_or_partially_resolved",
+                "status": resolution_status,
+                "resolution_status": resolution_status,
                 "evidence_count": len(rows),
+                "resolved_evidence_count": resolved_count,
+                "unresolved_evidence_count": unresolved_count,
                 "evidence_quality": rows[0].get("evidence_quality") or "unknown",
                 "claim_scope": claim_scope,
                 "evidence_grade": evidence_grade,
@@ -2502,18 +2669,33 @@ def _build_bottleneck_dossiers(
                 "direct_evidence_count": direct_count,
                 "section_level_evidence_count": section_level_count,
                 "why_it_matters": (
-                    f"{label} recurs in the topic evidence. Treat as a hard constraint until section-level "
-                    "resolution evidence proves it has been solved across branches."
+                    f"{label} recurs in the topic evidence with {unresolved_count} open atom(s) and "
+                    f"{resolved_count} Step5c resolution atom(s). Treat it as solved only when resolution "
+                    "evidence is section-backed and no topic-relevant open atoms remain."
                 ),
                 "evidence_papers": papers[:5],
+                "resolution_evidence": [
+                    {
+                        "atom_id": r.get("atom_id"),
+                        "paper_id": r.get("paper_id"),
+                        "resolver_paper_id": r.get("resolver_paper_id"),
+                        "resolution_year": r.get("resolved_year"),
+                        "resolution_confidence": r.get("resolution_confidence"),
+                        "evidence_text": r.get("resolution_evidence_text"),
+                    }
+                    for r in resolved_rows[:5]
+                ],
                 "sample_evidence": [
                     {
+                        "atom_id": r.get("atom_id"),
                         "paper_id": r.get("paper_id"),
                         "description": r.get("description"),
                         "keyword": r.get("keyword"),
                         "evidence_quality": r.get("evidence_quality"),
-                }
-                for r in rows[:4]
+                        "is_resolved": int(bool(_limitation_is_resolved(r))),
+                        "n_resolutions": int(r.get("n_resolutions") or 0),
+                    }
+                    for r in rows[:4]
             ],
             "evidence_objects": _compact_evidence_objects(
                 [
@@ -2527,6 +2709,10 @@ def _build_bottleneck_dossiers(
                         for lim in rows[:5]
                     ],
                     *[_limitation_evidence_object(lim, source="limitation_atoms") for lim in rows[:5]],
+                    *[
+                        _limitation_resolution_evidence_object(lim, source="limitation_resolutions")
+                        for lim in resolved_rows[:5]
+                    ],
                 ],
                 limit=10,
             ),
@@ -3725,15 +3911,25 @@ def _build_topic_dossier(
             "partially_addressed": [
                 b["name"]
                 for b in bottleneck_dossiers
-                if any(
-                    term in " ".join(str(p.get("title") or "").lower() for p in b.get("evidence_papers", []))
-                    for term in ("mitigat", "achromatic", "enabling", "improve", "hybrid", "compensation")
-                )
+                if int(b.get("resolved_evidence_count") or 0) > 0
             ],
-            "still_open": [b["name"] for b in bottleneck_dossiers[:6]],
+            "resolution_evidence_counts": {
+                b["name"]: {
+                    "resolved": int(b.get("resolved_evidence_count") or 0),
+                    "unresolved": int(b.get("unresolved_evidence_count") or 0),
+                    "status": b.get("resolution_status"),
+                }
+                for b in bottleneck_dossiers[:8]
+            },
+            "still_open": [
+                b["name"]
+                for b in bottleneck_dossiers[:6]
+                if int(b.get("unresolved_evidence_count") or 0) > 0
+            ],
             "rule": (
-                "A bottleneck is only treated as partially addressed when evidence titles/sections include solution language; "
-                "it remains open until section-level resolution evidence is present."
+                "A bottleneck is only treated as partially addressed when Step5c high-confidence "
+                "limitation_resolutions evidence is linked; title words such as improve/mitigate do not close it. "
+                "It remains open while any topic-relevant unresolved limitation atom remains."
             ),
         },
         "branch_labels": branch_labels,

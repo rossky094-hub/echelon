@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T14:43:16Z`
+- generated_at: `2026-05-30T14:52:49Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2595,
+    "primary_section_papers": 2598,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 358,
+        "strong": 361,
         "weak": 2237
       },
-      "primary_section_papers": 2595,
-      "primary_section_rows": 4529,
+      "primary_section_papers": 2598,
+      "primary_section_rows": 4533,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 433,
-        "heading_continuation": 624,
-        "inline_heading": 224,
+        "explicit_heading": 435,
+        "heading_continuation": 628,
+        "inline_heading": 227,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 11,
         "parser_hint": 7
       },
-      "strong_or_moderate_papers": 358,
+      "strong_or_moderate_papers": 361,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8620423892100193
+      "weak_only_rate": 0.8610469591993841
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -228,11 +228,13 @@
   "online_readiness_contract": {
     "checks": {
       "api_exposes_topic_readiness": true,
+      "api_topic_bottlenecks_use_resolution_evidence": true,
       "api_topic_branch_splits_inherit_lineage": true,
       "arbitrary_topic_not_benchmark_gated": true,
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
       "topic_regression_uses_shared_contract": true,
+      "ui_renders_topic_bottleneck_resolution_counts": true,
       "ui_renders_topic_dossier_branch_contracts": true,
       "ui_renders_topic_readiness": true,
       "ui_search_fallback_is_insufficient_evidence": true

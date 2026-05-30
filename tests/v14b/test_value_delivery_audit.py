@@ -123,6 +123,7 @@ def _write_product_sources(root: Path) -> None:
     api.mkdir(parents=True, exist_ok=True)
     (api / "graph_visual_backend.py").write_text(
         "def _build_topic_branch_splits(branch_dossiers): branch_contract_by_id parent_branch_id lineage_status split_confidence\n"
+        "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         "_build_evidence_map recommended_layer_combinations\n"
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
@@ -135,7 +136,7 @@ def _write_product_sources(root: Path) -> None:
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
-        "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons; }\n"
+        "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count; }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
@@ -386,8 +387,10 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_branch_splits_inherit_lineage"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
@@ -422,7 +425,9 @@ def test_online_topic_readiness_contract_is_arbitrary_topic_and_no_llm(tmp_path)
     assert result["checks"]["no_llm_preflight"] is True
     assert result["checks"]["arbitrary_topic_not_benchmark_gated"] is True
     assert result["checks"]["api_topic_branch_splits_inherit_lineage"] is True
+    assert result["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert result["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
+    assert result["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert "turning papers with strong/moderate section provenance" in result["observed_gates"]
 
 

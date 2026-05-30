@@ -829,9 +829,11 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     source_checks = {
         "api_exposes_topic_readiness": False,
         "api_topic_branch_splits_inherit_lineage": False,
+        "api_topic_bottlenecks_use_resolution_evidence": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_topic_dossier_branch_contracts": False,
+        "ui_renders_topic_bottleneck_resolution_counts": False,
         "topic_regression_uses_shared_contract": False,
     }
     if repo_root is not None:
@@ -849,6 +851,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "parent_branch_id",
                     "lineage_status",
                     "split_confidence",
+                ),
+            ),
+            "api_topic_bottlenecks_use_resolution_evidence": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "limitation_resolutions",
+                    "def _limitation_is_resolved",
+                    "resolved_evidence_count",
+                    "unresolved_evidence_count",
+                    "resolution_status",
                 ),
             ),
             "ui_search_fallback_is_insufficient_evidence": _source_contains(
@@ -874,6 +886,15 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "split.claim_scope",
                     "split.evidence_grade",
                     "split.uncertainty_reasons",
+                ),
+            ),
+            "ui_renders_topic_bottleneck_resolution_counts": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderTopicDossier",
+                    "b.resolution_status",
+                    "b.unresolved_evidence_count",
+                    "b.resolved_evidence_count",
                 ),
             ),
             "topic_regression_uses_shared_contract": _source_contains(

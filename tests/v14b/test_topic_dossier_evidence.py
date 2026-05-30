@@ -14,6 +14,7 @@ from echelon.api.graph_visual_backend import (
     _build_topic_readiness_preflight,
     _content_access_payload,
     _evidence_contract_for_five_questions,
+    _load_context_limitations,
     _lineage_status,
     _section_evidence_contract,
     _split_topic_turning_papers,
@@ -89,6 +90,146 @@ def test_topic_dossier_returns_clickable_evidence_objects():
         assert item["required_evidence"]
         assert item["evidence_objects"]
     assert dossier["insufficient_evidence"][0]["claim"] == "investable future direction"
+
+
+def test_topic_dossier_partial_resolution_requires_step5c_resolution_evidence():
+    hit = {
+        "paper_id": "p1",
+        "title": "Improved high efficiency metalens platform",
+        "abstract": "metalens efficiency and fabrication limits",
+        "year": 2024,
+        "cluster_id": "C1",
+        "branch_id": "B1",
+        "cluster_label": "metalens imaging",
+        "content_availability": {"has_primary_evidence_sections": True},
+    }
+    unresolved = {
+        "atom_id": 1,
+        "paper_id": "p1",
+        "title": hit["title"],
+        "keyword": "efficiency",
+        "description": "efficiency remains limited",
+        "evidence_quality": "section_level",
+        "is_resolved": 0,
+        "n_resolutions": 0,
+    }
+    resolved = {
+        "atom_id": 2,
+        "paper_id": "p1",
+        "title": hit["title"],
+        "keyword": "efficiency",
+        "description": "efficiency loss was reduced by a resolver paper",
+        "evidence_quality": "section_level",
+        "is_resolved": 1,
+        "n_resolutions": 1,
+        "resolver_paper_id": "p2",
+        "resolved_year": 2025,
+        "resolution_confidence": 0.81,
+        "resolution_evidence_text": "resolver reports measured efficiency recovery",
+    }
+
+    unresolved_only = _build_topic_dossier(
+        topic="metalens",
+        hits=[hit],
+        turning_hits=[],
+        branch_dossiers=[],
+        bottleneck_lineage={"top_unresolved_keywords": [{"keyword": "efficiency"}]},
+        unresolved_limitations=[unresolved],
+        rd_radar={"claim_cards_ready": False, "claim_cards": []},
+        main_path_edges=[],
+        future_growth=[],
+        value_model={},
+    )
+    assert unresolved_only["solved_vs_open"]["partially_addressed"] == []
+    assert unresolved_only["solved_vs_open"]["still_open"] == ["efficiency"]
+    assert "title words" in unresolved_only["solved_vs_open"]["rule"]
+
+    mixed = _build_topic_dossier(
+        topic="metalens",
+        hits=[hit],
+        turning_hits=[],
+        branch_dossiers=[],
+        bottleneck_lineage={"top_unresolved_keywords": [{"keyword": "efficiency"}]},
+        unresolved_limitations=[unresolved, resolved],
+        rd_radar={"claim_cards_ready": False, "claim_cards": []},
+        main_path_edges=[],
+        future_growth=[],
+        value_model={},
+    )
+
+    bottleneck = mixed["hard_bottlenecks"][0]
+    assert bottleneck["resolution_status"] == "partially_addressed_but_still_open"
+    assert bottleneck["resolved_evidence_count"] == 1
+    assert bottleneck["unresolved_evidence_count"] == 1
+    assert mixed["solved_vs_open"]["partially_addressed"] == ["efficiency"]
+    assert mixed["solved_vs_open"]["still_open"] == ["efficiency"]
+    assert mixed["solved_vs_open"]["resolution_evidence_counts"]["efficiency"]["resolved"] == 1
+    assert any(obj["type"] == "limitation_resolution" for obj in bottleneck["evidence_objects"])
+
+
+def test_context_limitations_attach_step5c_resolution_rows():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        CREATE TABLE limitation_atoms (
+            atom_id INTEGER PRIMARY KEY,
+            paper_id TEXT,
+            description TEXT,
+            keyword TEXT,
+            severity TEXT,
+            evidence_source TEXT,
+            evidence_quality TEXT,
+            evidence_weight REAL,
+            source_section_name TEXT,
+            extractor_method TEXT
+        );
+        CREATE TABLE limitation_resolutions (
+            atom_id INTEGER,
+            resolver_paper_id TEXT,
+            resolution_year INTEGER,
+            confidence REAL,
+            evidence_text TEXT
+        );
+        CREATE TABLE visual_nodes (
+            paper_id TEXT,
+            cluster_id TEXT,
+            branch_id TEXT
+        );
+        CREATE TABLE visual_paper_details (
+            paper_id TEXT,
+            metadata_json TEXT,
+            abstract TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO limitation_atoms VALUES (1, 'p1', 'metalens efficiency remains limited', 'efficiency', 'high', 'section', 'section_level', 0.9, 'discussion', 'heuristic')"
+    )
+    conn.execute(
+        "INSERT INTO limitation_resolutions VALUES (1, 'p2', 2025, 0.82, 'measured efficiency recovery')"
+    )
+    conn.execute("INSERT INTO visual_nodes VALUES ('p1', 'C1', 'B1')")
+    conn.execute(
+        "INSERT INTO visual_paper_details VALUES ('p1', ?, 'metalens efficiency bottleneck')",
+        ('{"title": "Metalens efficiency limitation"}',),
+    )
+
+    rows = _load_context_limitations(
+        conn,
+        topic="metalens efficiency",
+        paper_ids=["p1"],
+        cluster_ids=[],
+        limit=5,
+    )
+    conn.close()
+
+    assert rows
+    assert rows[0]["is_resolved"] == 1
+    assert rows[0]["n_resolutions"] == 1
+    assert rows[0]["resolver_paper_id"] == "p2"
+    assert rows[0]["resolution_confidence"] == 0.82
+    assert rows[0]["resolved_year"] == 2025
 
 
 def test_section_evidence_contract_exposes_extraction_provenance():

@@ -1140,9 +1140,11 @@ function renderTopicDossier(dossier = {}) {
           <strong>${esc(b.name)}</strong>
           <small>${fmt(b.evidence_count || 0)} evidence atoms / ${esc(b.evidence_grade || b.evidence_quality || "unknown")}</small>
           <div class="pill-row">
+            <span class="pill ${b.resolution_status === "open_no_resolution_evidence" ? "warn" : "good"}">${esc(b.resolution_status || "resolution unknown")}</span>
             <span class="pill">${esc(b.claim_scope || "weak_bottleneck_hypothesis")}</span>
             <span class="pill">${esc(b.evidence_grade || "evidence unknown")}</span>
           </div>
+          <p class="mini">open atoms ${fmt(b.unresolved_evidence_count || 0)} / resolution atoms ${fmt(b.resolved_evidence_count || 0)}</p>
           <p>${esc(b.why_it_matters || "")}</p>
           ${(b.uncertainty_reasons || []).length ? `
             <details>
