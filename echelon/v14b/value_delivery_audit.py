@@ -781,6 +781,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     )
     source_checks = {
         "api_exposes_topic_readiness": False,
+        "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_topic_dossier_branch_contracts": False,
         "topic_regression_uses_shared_contract": False,
@@ -790,6 +791,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             "api_exposes_topic_readiness": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
                 ("topic_readiness", "build_topic_readiness_preflight"),
+            ),
+            "ui_search_fallback_is_insufficient_evidence": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "buildSearchFallbackTopicLens",
+                    "ui_search_fallback_readiness",
+                    "insufficient_evidence",
+                    "retrieval_context_only",
+                    "No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card",
+                ),
             ),
             "ui_renders_topic_readiness": _source_contains(
                 repo_root / "web/visual-graph/app.js",

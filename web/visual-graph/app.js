@@ -1530,23 +1530,175 @@ function renderRadar(lens = state.topicLens) {
   `;
 }
 
+function buildSearchFallbackTopicLens(text, hits = []) {
+  const fallbackUncertainty = [
+    "Topic Lens API route was unavailable; this is semantic retrieval only",
+    "No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card was generated for this topic",
+    "No LLM preflight was used",
+  ];
+  const papers = (hits || []).map((hit) => ({
+    ...hit,
+    claim_scope: hit.claim_scope || "retrieval_context_only",
+    evidence_grade: hit.evidence_grade || "metadata_search_hit",
+    uncertainty_reasons: Array.from(new Set([
+      ...asArray(hit.uncertainty_reasons),
+      "semantic search hit is not a Topic Dossier conclusion",
+    ])),
+  }));
+  const evidenceObjects = papers.slice(0, 8).map((paper) => ({
+    type: "paper",
+    role: "semantic_search_fallback_hit",
+    source: "visual_search",
+    paper_id: paper.paper_id,
+    title: paper.title || paper.paper_id,
+    claim_scope: "retrieval_context_only",
+    evidence_grade: "metadata_search_hit",
+    description: "Search-only fallback evidence object. It can guide reading, but cannot support branch, bottleneck, or Radar claims.",
+  }));
+  const retrievalGrade = evidenceObjects.length ? "metadata_search_hits" : "insufficient";
+  const readingPapers = papers.slice(0, 6).map((paper) => ({
+    ...paper,
+    why: "semantic search match; not evidence-backed Topic Dossier evidence",
+  }));
+  const readinessGates = [
+    ["topic dossier evidence contract", "fail", 0, 1],
+    ["bottleneck lineage typed contracts", "fail", 0, 1],
+    ["complete Claim Cards", "fail", 0, 1],
+    ["auditable reading path", readingPapers.length ? "warn" : "fail", readingPapers.length, 4],
+  ].map(([name, status, actual, required]) => ({ name, status, actual, required }));
+  return {
+    topic: text,
+    related_papers: papers,
+    total_related: papers.length,
+    cluster_distribution: [],
+    topic_dossier: {
+      headline: `${text} is in search-only fallback mode`,
+      value_claim: "The only safe next action is to inspect retrieved papers or restore the Topic Lens route, then rerun the V14B evidence chain.",
+      decision_summary: "This fallback is intentionally insufficient evidence. It does not infer real branches, bottlenecks, turning papers, or future directions.",
+      claim_scope: "insufficient_evidence",
+      evidence_grade: "insufficient",
+      uncertainty_reasons: fallbackUncertainty,
+      claim_policy: "Search fallback cannot promote claims. It must stay retrieval_context_only until the Topic Dossier API returns evidence contracts.",
+      branch_splits: [],
+      hard_bottlenecks: [],
+      validation_directions: [],
+      reading_path: [
+        {
+          mode: "fallback_retrieval",
+          title: "Search-only papers",
+          why: "These papers are semantic search results. Use them to recover context, not as evidence-backed branch or direction claims.",
+          claim_scope: "retrieval_context_only",
+          evidence_grade: retrievalGrade,
+          uncertainty_reasons: fallbackUncertainty,
+          required_evidence: [
+            "Topic Lens API route",
+            "main-path context",
+            "section-level bottleneck evidence",
+            "Step6/Step13 Claim Card generation",
+          ],
+          papers: readingPapers,
+          evidence_objects: evidenceObjects,
+        },
+      ],
+      evidence_objects: evidenceObjects,
+      insufficient_evidence: [
+        {
+          claim: "Topic Dossier",
+          reason: "semantic search fallback has no branch, bottleneck, lineage, calibration, or Claim Card synthesis",
+          needed: "/graph/visual/topic-lens route plus current V14B product-chain outputs",
+        },
+        {
+          claim: "R&D Radar direction",
+          reason: "no complete Step13 five-question Claim Card was produced",
+          needed: "Step6 fusion and Step13 Claim Card engine",
+        },
+      ],
+      solved_vs_open: {
+        still_open: [],
+        partially_addressed: [],
+        rule: "Search fallback cannot classify solved vs open bottlenecks.",
+      },
+      warning: "Search fallback is retrieval-only and must not be read as a scientific conclusion.",
+    },
+    topic_readiness: {
+      audit_type: "ui_search_fallback_readiness",
+      readiness_level: "insufficient_evidence",
+      overall_status: "fail",
+      llm_policy: "No LLM preflight; fallback is deterministic retrieval only.",
+      metrics: {
+        branch_splits: 0,
+        bottleneck_candidates: 0,
+        turning_with_strong_or_moderate_section_provenance: 0,
+        complete_claim_cards: 0,
+      },
+      gates: readinessGates,
+    },
+    history_main_path: {
+      claim_scope: "insufficient_evidence",
+      evidence_grade: "insufficient",
+      uncertainty_reasons: fallbackUncertainty,
+      required_evidence: ["Topic Lens API route", "main-path context edges", "linked-ref audit"],
+      evidence_objects: [],
+      key_turning_papers: [],
+    },
+    branch_dossiers: [],
+    bottleneck_lineage: {
+      summary: "Bottleneck lineage unavailable in search-only fallback.",
+      constraints: [],
+      top_unresolved_keywords: [],
+    },
+    unresolved_limitations: [],
+    future_growth: { predicted_edges: [], future_directions: [] },
+    rd_radar: {
+      summary: "Radar is empty because semantic search fallback produced no complete Step13 Claim Cards.",
+      items: [
+        {
+          kind: "radar_empty_state",
+          title: "No complete Claim Cards yet",
+          claim_scope: "insufficient_evidence",
+          evidence_grade: "no_complete_claim_card",
+          uncertainty_reasons: fallbackUncertainty,
+          eligible: false,
+        },
+      ],
+      claim_cards: [],
+      incomplete_claim_cards: [],
+      candidate_pool: [],
+      claim_cards_ready: false,
+      high_confidence_ready: false,
+    },
+    evidence_map: {
+      summary: "Evidence Map is unavailable in search-only fallback; only semantic retrieval context is known.",
+      recommended_layer_combinations: [
+        {
+          layers: ["semantic", "uncertainty"],
+          label: "Search fallback retrieval context",
+          question: "What papers matched the query when the Topic Lens route was unavailable?",
+          relationship: "Semantic search can recover candidate reading material but cannot explain lineage, bottlenecks, or Radar value.",
+          display: "Related paper list plus uncertainty labels.",
+          decision_use: "Use only to recover papers for a later evidence-backed Topic Dossier run.",
+          can_explain: ["candidate papers to inspect"],
+          cannot_explain: ["real branch splits", "key turning papers", "unresolved bottlenecks", "future direction value"],
+          required_evidence: ["Topic Lens API", "section evidence", "main-path and bottleneck lineage contracts"],
+          claim_scope: "retrieval_context_only",
+          evidence_grade: retrievalGrade,
+          uncertainty_reasons: fallbackUncertainty,
+        },
+      ],
+    },
+    first_principles: { five_questions: [] },
+    value_model: DEFAULT_VALUE_MODEL,
+  };
+}
+
 async function runSearchFallback(text) {
   const result = await api("/graph/visual/search", {
     method: "POST",
     body: JSON.stringify({ query_type: "semantic", query_text: text, top_k: 40 }),
   });
   const hits = result.hits || [];
-  state.topicLens = {
-    topic: text,
-    related_papers: hits,
-    total_related: hits.length,
-    cluster_distribution: [],
-    history_main_path: { key_turning_papers: [] },
-    unresolved_limitations: [],
-    future_growth: { predicted_edges: [], future_directions: [] },
-    first_principles: { five_questions: [] },
-  };
-  state.highlightIds = new Set(hits.map((hit) => hit.paper_id));
+  state.topicLens = buildSearchFallbackTopicLens(text, hits);
+  state.highlightIds = new Set(state.topicLens.related_papers.map((hit) => hit.paper_id));
   renderTopicLens(state.topicLens);
   renderRadar(state.topicLens);
   renderExplainDock(DEFAULT_VALUE_MODEL);

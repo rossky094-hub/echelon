@@ -123,6 +123,7 @@ def _write_product_sources(root: Path) -> None:
     web.mkdir(parents=True, exist_ok=True)
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
+        "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return split.claim_scope + split.evidence_grade + split.uncertainty_reasons; }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + 'Claim Card uncertainty No complete Claim Cards yet Future candidate generator pool'; }\n"
@@ -355,6 +356,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     topic_gate = next(g for g in result["gates"] if g["issue"] == "Topic Dossier Product Value")
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
@@ -389,6 +391,7 @@ def test_online_topic_readiness_contract_is_arbitrary_topic_and_no_llm(tmp_path)
     assert result["status"] == "pass"
     assert result["checks"]["no_llm_preflight"] is True
     assert result["checks"]["arbitrary_topic_not_benchmark_gated"] is True
+    assert result["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert "turning papers with strong/moderate section provenance" in result["observed_gates"]
 
 
