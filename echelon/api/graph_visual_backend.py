@@ -3942,6 +3942,14 @@ def _build_rd_radar(
         ]
         if five_complete and not eligible:
             uncertainty.append("complete Claim Card remains exploratory until high-confidence evidence gates pass")
+        required_evidence = [
+            "strong/moderate section evidence for unresolved bottleneck claims",
+            "rolling held-out-year calibration audit for linked future candidates",
+            "successful minimal validation experiment with explicit falsification conditions",
+            "expert review before investment-grade interpretation",
+            *[f"missing five-question gate: {gate}" for gate in missing_gates],
+            *[f"missing high-confidence gate: {gate}" for gate in missing_high_conf],
+        ]
         item = {
             "kind": "claim_card" if five_complete else "incomplete_claim_card",
             "title": d.get("direction_name") or d.get("direction_id"),
@@ -3949,9 +3957,10 @@ def _build_rd_radar(
             "technical_probability": d.get("confidence"),
             "commercial_relevance": d.get("commercial_relevance"),
             "validation_cost": d.get("validation_cost"),
-            "claim_scope": d.get("claim_scope"),
+            "claim_scope": d.get("claim_scope") or ("radar_claim_card" if five_complete else "candidate_pool_only"),
             "evidence_grade": evidence_grade,
             "uncertainty_reasons": sorted(set(uncertainty)),
+            "required_evidence": sorted(set(required_evidence)),
             "evidence_tier": d.get("evidence_tier"),
             "eligible": eligible,
             "claim_card": card,

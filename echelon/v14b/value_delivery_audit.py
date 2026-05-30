@@ -1302,6 +1302,8 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             c.get("claim_scope")
             and c.get("evidence_grade")
             and isinstance(c.get("uncertainty_reasons"), list)
+            and c.get("required_evidence")
+            and c.get("evidence_objects")
             for c in claim_cards
         ),
         "candidate_edges_carry_evidence_contract": bool(candidate_edges)
@@ -1341,6 +1343,8 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             and "function renderDossierRadar" in app_text
             and "item.evidence_grade" in app_text
             and "item.uncertainty_reasons" in app_text
+            and "item.required_evidence" in app_text
+            and "renderEvidenceObjects(item.evidence_objects" in app_text
             and "Claim Card uncertainty" in app_text,
         }
     checks.update(source_checks)

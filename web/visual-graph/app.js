@@ -1368,18 +1368,21 @@ function renderDossierRadar(radar = {}) {
             <span class="score"><small>High confidence</small><strong>${item.eligible ? "yes" : "no"}</strong></span>
           </div>
           <div class="pill-row">
+            <span class="pill">${esc(item.claim_scope || "radar_claim_card")}</span>
             <span class="pill">${esc(item.evidence_grade || "claim-card evidence unknown")}</span>
           </div>
           <p>${esc(item.plain_language || "")}</p>
           ${item.claim_card ? renderClaimCard({ claim_card: item.claim_card }) : ""}
           ${(item.missing_gates || []).length ? `<p class="mini">五问缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
           ${(item.missing_high_confidence_gates || []).length ? `<p class="mini">高置信缺口：${item.missing_high_confidence_gates.map(esc).join(" / ")}</p>` : ""}
+          ${(item.required_evidence || []).length ? `<p class="mini"><strong>保持/提升 Radar 可信度还需要：</strong>${(item.required_evidence || []).slice(0, 5).map(esc).join(" / ")}</p>` : ""}
           ${(item.uncertainty_reasons || []).length ? `
             <details>
               <summary>Claim Card uncertainty (${fmt((item.uncertainty_reasons || []).length)})</summary>
               ${(item.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
             </details>
           ` : ""}
+          ${renderEvidenceObjects(item.evidence_objects || [], 6)}
         </div>
       `).join("") : `
         <div class="branch-card warning-card">

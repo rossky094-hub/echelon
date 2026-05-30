@@ -159,7 +159,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
-        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
+        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
@@ -499,6 +499,7 @@ def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_pa
     assert result["checks"]["incomplete_cards_are_candidate_pool_only"] is True
     assert result["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
     assert result["checks"]["claim_cards_carry_evidence_contract"] is True
+    assert result["checks"]["candidate_edges_carry_evidence_contract"] is True
     assert result["checks"]["ui_radar_main_avoids_raw_edge_cards"] is True
     assert result["checks"]["ui_renders_radar_claim_card_evidence_contract"] is True
     assert result["candidate_edges"] == 1
