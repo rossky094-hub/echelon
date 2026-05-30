@@ -133,7 +133,7 @@ candidate-pool-only or exploratory.
   main-path/keystone/citation signals, and section evidence.
 - Step13: first-principles/history is not a report appendix. It is the gate
   that determines whether a direction becomes actionable.
-- Topic regression: do not tune for Metalens only. Required gold topics include
+- Topic regression: do not tune for Metalens only. Required benchmark topics include
   metalens, metasurface holography, photonic crystal cavity, and quantum light
   source.
 - Quarterly/multi-corpus: optics, CS, and materials must be independently
@@ -147,7 +147,7 @@ scoped as exploratory:
 - Linked references at least 30% for decision-grade citation evolution claims.
 - High-value primary section evidence at least 70% for main path nodes, branch
   drivers, future endpoints, top keystone papers, limitation/resolution papers,
-  and gold-topic papers.
+  and benchmark-topic papers.
 - OpenAlex W/topic/field coverage high enough for cross-field explanations, or
   all cross-field claims carry uncertainty.
 - Every Radar item has a complete Claim Card.
@@ -189,4 +189,3 @@ On every continuation:
 The final delivery is not "all scripts ran." The final delivery is a system that
 can produce evidence-backed, falsifiable, interactive scientific and R&D
 decision dossiers from a growing multi-corpus literature graph.
-

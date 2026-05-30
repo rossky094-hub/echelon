@@ -12,7 +12,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -264,6 +264,17 @@ section-evidence-delta:
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_SECTION_DELTA_TOP_N:-12000} \
 		--candidate-file $${V14B_SECTION_DELTA_QUEUE:-data/v14b/section_delta_queue.csv} \
+		$(CORPUS_ARG) \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Step 5s-topic-gaps: 从 multi-topic regression 缺口精准补 section
+section-evidence-topic-gaps:
+	@echo ">>> Step 5s: Topic evidence-gap section ingestion..."
+	$(PYTHON) -m echelon.v14b.step5s_section_ingest \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--top-n $${V14B_TOPIC_GAP_SECTION_TOP_N:-1000} \
+		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 

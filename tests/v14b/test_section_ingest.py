@@ -4,10 +4,12 @@ import sqlite3
 from echelon.v14b.step5s_section_ingest import (
     _arxiv_pdf_url,
     _checkpoint_step_name,
+    _has_primary_sections,
     _select_candidate_ids,
     ensure_sections_table,
     extract_sections_from_blocks,
     extract_sections_with_metadata,
+    load_candidates,
     record_ingest_attempt,
     read_candidate_file,
 )
@@ -57,6 +59,74 @@ def test_extract_sections_with_metadata_includes_page_numbers():
     assert sections["limitations"]["pages"] == [4]
     assert sections["discussion"]["pages"] == [5]
     assert len(sections["limitations"]["text"]) >= 160
+
+
+def test_extract_sections_handles_inline_headings_from_pdf_blocks():
+    long_tail = " This paragraph carries concrete claim evidence." * 10
+    blocks = [
+        _Block("1. Results and Discussion. We compare the failed baseline." + long_tail, page_no=6),
+        _Block("Summary and Outlook: The next validation should test scale-up." + long_tail, page_no=7),
+        _Block("Methods and experiments - Devices were fabricated and tested." + long_tail, page_no=8),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "discussion" in sections or "results" in sections
+    assert "future_work" in sections
+    assert "method" in sections
+    assert "inline_heading" in sections["future_work"]["extraction_strategies"]
+    assert sections["future_work"]["pages"] == [7]
+
+
+def test_extract_sections_handles_numbered_headings_embedded_in_flat_pdf_blocks():
+    long_tail = " This paragraph carries concrete evidence about the remaining constraint." * 10
+    flat_page = (
+        "The introduction text is flattened on this page. "
+        "4. Results and Discussion The prototype improves throughput but still fails under scale-up."
+        f"{long_tail} "
+        "5. Conclusions The remaining bottleneck is manufacturing repeatability and validation cost."
+        f"{long_tail} "
+        "6. References [1] bibliography text should be excluded."
+    )
+
+    sections = extract_sections_with_metadata([_Block(flat_page, page_no=11)])
+
+    assert "discussion" in sections or "results" in sections
+    assert "conclusion" in sections
+    assert "embedded_heading" in sections["conclusion"]["extraction_strategies"]
+    assert "References" not in sections["conclusion"]["text"]
+    assert sections["conclusion"]["pages"] == [11]
+
+
+def test_extract_sections_handles_loose_single_word_heading_without_promoting_result_sentences():
+    long_tail = " This paragraph carries concrete evidence about the remaining constraint." * 10
+    blocks = [
+        _Block("Conclusions We find that manufacturing repeatability remains unresolved." + long_tail, page_no=12),
+        _Block("Results show that this ordinary sentence is not a section heading." + long_tail, page_no=13),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "conclusion" in sections
+    assert "loose_inline_heading" in sections["conclusion"]["extraction_strategies"]
+    assert "results" not in sections
+    assert sections["conclusion"]["pages"] == [12]
+
+
+def test_extract_sections_stops_at_references_heading():
+    long_tail = " This paragraph carries concrete claim evidence." * 10
+    reference_tail = " [1] unrelated bibliography text should not become evidence." * 20
+    blocks = [
+        _Block("Conclusion\nThe device still has a scale-up bottleneck." + long_tail, page_no=9),
+        _Block("References", page_no=10),
+        _Block(reference_tail, page_no=10),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "conclusion" in sections
+    assert "bibliography" not in sections["conclusion"]["text"].lower()
+    assert "[1]" not in sections["conclusion"]["text"]
 
 
 def test_select_candidate_ids_fills_beyond_keystone_rows():
@@ -184,6 +254,68 @@ def test_read_candidate_file_accepts_delta_queue_csv(tmp_path):
 
     assert read_candidate_file(queue) == ["p1", "p2"]
     assert read_candidate_file(queue, limit=1) == ["p1"]
+
+
+def test_load_candidates_preserves_evidence_budget_order():
+    conn_main = sqlite3.connect(":memory:")
+    conn_main.row_factory = sqlite3.Row
+    conn_main.executescript(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            arxiv_id TEXT,
+            doi TEXT,
+            s2_paper_id TEXT,
+            publication_date TEXT
+        );
+        """
+    )
+    conn_main.executemany(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            ("high_value_gap", "High value topic gap", "2401.00001", "", "", "2001-01-01"),
+            ("newer_low_value", "Newer but lower value", "2401.00002", "", "", "2025-01-01"),
+            ("branch_driver", "Branch driver", "2401.00003", "", "", "2010-01-01"),
+        ],
+    )
+    conn_v14 = sqlite3.connect(":memory:")
+
+    papers = load_candidates(
+        conn_main,
+        conn_v14,
+        top_n=3,
+        candidate_ids=["high_value_gap", "branch_driver", "newer_low_value"],
+    )
+
+    assert [p["id"] for p in papers] == [
+        "high_value_gap",
+        "branch_driver",
+        "newer_low_value",
+    ]
+
+
+def test_method_results_sections_count_as_claim_supporting_primary_evidence():
+    conn = sqlite3.connect(":memory:")
+    ensure_sections_table(conn)
+    conn.execute(
+        """
+        INSERT INTO paper_sections
+            (paper_id, section_name, section_text, source_type, parser_name, source_url)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p_method",
+            "method",
+            "This method section contains enough experimental mechanism evidence. " * 4,
+            "pdf",
+            "test",
+            "https://arxiv.org/pdf/2401.00001.pdf",
+        ),
+    )
+    conn.commit()
+
+    assert _has_primary_sections(conn, "p_method")
 
 
 def test_delta_queue_uses_content_addressed_checkpoint(tmp_path):

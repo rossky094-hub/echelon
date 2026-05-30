@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-29T18:27:35Z`
+- Audit: `2026-05-30T13:00:19Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -13,7 +13,11 @@
 | expected bottlenecks evidenced | 4 | 5 | fail |
 | key turning papers | 11 | 4 | pass |
 | turning papers with access links | 11 | 3 | pass |
-| turning papers with primary sections | 0 | 2 | fail |
+| turning papers with primary sections | 6 | 2 | pass |
+| turning papers with strong/moderate section provenance | 5 | 2 | pass |
+| five-question evidence contracts | 5 | 5 | pass |
+| bottleneck lineage typed contracts | 5 | 1 | pass |
+| auditable reading path | 5 | 4 | pass |
 | Claim Cards for Radar | 0 | 1 | warn |
 
 ## Expected Branches
@@ -37,13 +41,15 @@
 
 ## Interpretation
 
-- Key turning papers: 11 total, 11 with access links, 0 with primary local sections.
+- Key turning papers: 11 total, 11 with access links, 6 with primary local sections, 5 with strong/moderate parser provenance.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
+- Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
+- Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
+- Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.
 
 ## Quality Gaps
 
-- key turning papers lack primary local section evidence
 - future candidates exist but no complete Claim Cards are promoted
 
 ## Evidence Gap Queue
@@ -56,10 +62,5 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| future_candidates_missing_claim_card |  | 85 | 0 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card for this topic |
+| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
+| future_candidates_missing_claim_card |  | 85 | 12 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence |

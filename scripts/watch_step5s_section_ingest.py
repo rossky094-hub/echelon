@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import json
 import pathlib
 import re
@@ -31,12 +32,19 @@ def utc_now() -> str:
 
 
 def run(cmd: list[str], cwd: Optional[pathlib.Path] = None) -> str:
-    p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=False, text=True, capture_output=True)
+    try:
+        p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=False, text=True, capture_output=True)
+    except OSError as exc:
+        if exc.errno == errno.EPERM:
+            return "__permission_denied__"
+        raise
     return (p.stdout or "").strip()
 
 
 def find_step5s_pid(pattern: str) -> str:
     out = run(["ps", "-axo", "pid=,command="])
+    if out == "__permission_denied__":
+        return "unknown"
     if not out:
         return ""
     for line in out.splitlines():
@@ -44,7 +52,7 @@ def find_step5s_pid(pattern: str) -> str:
             continue
         if "SCREEN -dmS" in line or "login -pflq" in line:
             continue
-        if "step5s_section_ingest" not in line:
+        if "echelon.v14b.step5s_section_ingest" not in line and "step5s_section_ingest.py" not in line:
             continue
         if pattern not in line:
             continue
@@ -186,6 +194,12 @@ def append_log(log_file: pathlib.Path, message: str) -> None:
         f.write(message.rstrip() + "\n")
 
 
+def handoff_reason(primary_section_papers: int, threshold: int) -> str:
+    if primary_section_papers >= threshold:
+        return "frontfill_threshold_met"
+    return "frontfill_threshold_not_met_downstream_gate_will_hold"
+
+
 def _kill_pid(pid: str) -> None:
     if not pid:
         return
@@ -248,7 +262,10 @@ def main() -> None:
         "--handoff-min-primary-section-papers",
         type=int,
         default=8000,
-        help="Primary-section paper count required before skipping delta evidence handoff.",
+        help=(
+            "Primary-section paper count used in the handoff log. The downstream "
+            "post-frontfill chain owns the real evidence gates."
+        ),
     )
     args = parser.parse_args()
 
@@ -321,6 +338,7 @@ def main() -> None:
         evidence_soft_stall = low_yield and low_yield_intervals >= int(args.soft_stall_intervals)
         hard_stall = (
             pid
+            and pid != "unknown"
             and stale_intervals >= int(args.stale_intervals)
             and now - last_change_ts >= int(args.stall_min_sec)
             and (not log_mtime or now - log_mtime >= int(args.stall_min_sec))
@@ -374,12 +392,13 @@ def main() -> None:
 
         step_done = is_step5s_done(status, progress_data)
         if step_done:
-            if args.handoff_cmd and primary_section_papers < int(args.handoff_min_primary_section_papers):
+            if args.handoff_cmd:
                 if not state.get("handoff_started_at"):
                     append_log(
                         log_file,
                         (
-                            f"[{ts}] HANDOFF_START primary_section_papers={primary_section_papers} "
+                            f"[{ts}] HANDOFF_START reason={handoff_reason(primary_section_papers, int(args.handoff_min_primary_section_papers))} "
+                            f"primary_section_papers={primary_section_papers} "
                             f"threshold={args.handoff_min_primary_section_papers}: {args.handoff_cmd}"
                         ),
                     )
@@ -394,14 +413,6 @@ def main() -> None:
                             f"primary_section_papers={primary_section_papers}"
                         ),
                     )
-            elif args.handoff_cmd:
-                append_log(
-                    log_file,
-                    (
-                        f"[{ts}] HANDOFF_SKIP primary_section_papers={primary_section_papers} "
-                        f"threshold={args.handoff_min_primary_section_papers}"
-                    ),
-                )
             _write_state(
                 state_file,
                 {

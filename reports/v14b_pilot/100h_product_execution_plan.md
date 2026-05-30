@@ -46,7 +46,7 @@ Deliverables:
 ## 12-24 Hours: Section Evidence Quality Lift
 
 1. Monitor top12000 completion and watchdog stalling.
-2. Rebuild delta queue from main path, future endpoints, branch drivers, top keystone, and Metalens gold topic.
+2. Rebuild delta queue from main path, future endpoints, branch drivers, top keystone, and benchmark topics.
 3. Run delta section ingest if primary section evidence remains weak.
 4. Audit local evidence coverage for key turning papers and branch drivers.
 5. Keep PDF temp-only; do not persist full PDF cache.

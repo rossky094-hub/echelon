@@ -26,6 +26,7 @@ const state = {
     future: true,
     bottleneck: true,
     uncertainty: true,
+    fusion_value: true,
   },
   time: {
     min: 1995,
@@ -38,7 +39,7 @@ const state = {
   },
 };
 
-const LAYER_ORDER = ["main_path", "topic", "citation", "semantic", "future", "bottleneck", "uncertainty"];
+const LAYER_ORDER = ["main_path", "topic", "citation", "semantic", "future", "bottleneck", "uncertainty", "fusion_value"];
 
 const els = {
   apiBase: document.getElementById("apiBase"),
@@ -168,6 +169,17 @@ function pct(value) {
   return `${Math.round(Number(value) * 100)}%`;
 }
 
+function futureCalibrationCopy(edge) {
+  const evidence = edge?.evidence || edge?.model_evidence || {};
+  const status = evidence.calibration_status || evidence.lifecycle_calibration_status || "run_audit_unknown";
+  const score = edge?.confidence ?? edge?.weight ?? edge?.technical_probability ?? evidence.calibrated_prob ?? 0;
+  const raw = evidence.raw_predicted_prob ?? score;
+  if (status === "calibrated_with_run_audit") {
+    return `run-calibrated ${pct(evidence.calibrated_prob ?? score)} / raw ${pct(raw)} / ${evidence.calibration_label || evidence.calibration_method || "calibrated"}`;
+  }
+  return `not run-calibrated / status ${status} / edge score ${pct(score)}`;
+}
+
 function clamp(value, lo, hi) {
   return Math.max(lo, Math.min(hi, value));
 }
@@ -200,15 +212,47 @@ function renderAccessLinks(links = []) {
   }).join("");
 }
 
+function sectionEvidenceMeta(section = {}) {
+  const meta = section.meta && typeof section.meta === "object" ? section.meta : {};
+  const strategies = asArray(section.extraction_strategies || meta.extraction_strategies);
+  const pages = asArray(section.pages);
+  return [
+    section.claim_scope || null,
+    section.evidence_grade || null,
+    strategies.length ? `strategy: ${strategies.join("+")}` : "strategy: unknown",
+    pages.length ? `pages: ${pages.join(", ")}` : "pages: unknown",
+    section.parser_name ? `parser: ${section.parser_name}` : null,
+  ].filter(Boolean).join(" / ");
+}
+
+function renderSectionEvidence(section = {}) {
+  const label = section.section_type || section.section_name || section.title || "section";
+  const text = section.text || section.section_text || section.content || section.snippet || "";
+  const reasons = asArray(section.uncertainty_reasons);
+  return `
+    <div class="section-evidence">
+      <p><strong>${esc(label)}</strong> ${esc(truncate(text, 260))}</p>
+      <small>${esc(sectionEvidenceMeta(section))}</small>
+      ${section.source_url ? `<p class="mini"><a href="${esc(section.source_url)}" target="_blank" rel="noreferrer">打开证据来源</a></p>` : ""}
+      ${reasons.length ? `<p class="mini">不确定性：${reasons.slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+    </div>
+  `;
+}
+
 function renderLocalContent(content = {}, availability = {}) {
   const sections = Array.isArray(content.sections) ? content.sections : [];
   const decisionSections = Array.isArray(content.decision_evidence_sections)
     ? content.decision_evidence_sections
     : [];
+  const provenance = availability.primary_section_provenance || content.primary_section_provenance || {};
+  const provenanceText = provenance.total
+    ? `primary provenance ${fmt(provenance.strong || 0)}/${fmt(provenance.moderate || 0)}/${fmt(provenance.weak || 0)} strong/moderate/weak`
+    : null;
   const badges = [
     availability.has_local_abstract ? "abstract" : null,
     sections.length ? `${sections.length} sections` : null,
     decisionSections.length ? `${decisionSections.length} evidence sections` : null,
+    provenanceText,
     content.limitation_atoms ? `${content.limitation_atoms} limitations` : null,
     content.claim_cards ? `${content.claim_cards} claim cards` : null,
   ].filter(Boolean);
@@ -238,7 +282,14 @@ function renderEvidenceObjects(objects = [], limit = 8) {
       <summary>查看证据对象 (${fmt(items.length)})</summary>
       ${items.map((obj) => {
         const label = obj.label || obj.title || obj.paper_id || obj.edge_id || obj.type || "evidence";
-        const meta = [obj.type, obj.role, obj.source, obj.evidence_quality].filter(Boolean).join(" / ");
+        const meta = [
+          obj.type,
+          obj.role,
+          obj.source,
+          obj.evidence_quality,
+          obj.evidence_grade,
+          obj.claim_scope,
+        ].filter(Boolean).join(" / ");
         if (obj.paper_id) {
           return `
             <button class="evidence-paper" data-paper="${esc(obj.paper_id)}">
@@ -709,12 +760,13 @@ function renderExplainDock(model = null) {
         <summary>Useful layer combinations</summary>
         <div class="layer-explain-list">
           ${combos.map((combo) => `
-            <div class="layer-explain combo">
-              <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>
-              <span>${esc((combo.layers || []).join(" + "))}</span>
-              <small>${esc(combo.question || "")} ${esc(combo.decision_use || "")}</small>
-            </div>
-          `).join("")}
+          <div class="layer-explain combo">
+            <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>
+            <span>${esc((combo.layers || []).join(" + "))}</span>
+            <small>${esc(combo.question || "")} ${esc(combo.decision_use || "")}</small>
+            ${renderComboContract(combo)}
+          </div>
+        `).join("")}
         </div>
       </details>
       <p class="mini">Fusion status: ${esc(valueModel.fusion_status || "unknown")} / Step6 adequacy ${esc(counts.fusion_adequacy || "unknown")} / claim cards ${fmt(counts.claim_cards || 0)}</p>
@@ -764,12 +816,32 @@ function activeLayerInterpretation(keys, valueModel = null) {
     return "Future 单独看只能说明 GNN/VGAE 预测了可能连接，不能说明为什么值得下注；应同时打开 Bottleneck 或 Radar。";
   }
   if (set.has("future") && set.has("bottleneck") && set.has("uncertainty")) {
-    return "Future + Bottleneck + Uncertainty：这是投资/立项视角，重点看未来候选是否被未解卡点支持，以及证据哪里薄。";
+    return "Future + Bottleneck + Uncertainty：这是投资/立项视角，重点看未来候选是否被未解卡点支持，以及证据哪里薄；打开 Fusion value 可区分完整 Claim Card 和候选池。";
+  }
+  if (set.has("fusion_value")) {
+    return "Fusion value：这是 Step6/Step13 合成后的 Claim Card/Radar 价值层，用来区分可审计方向和仍需补证据的候选。";
   }
   if (set.has("semantic") && !set.has("citation") && !set.has("main_path")) {
     return "只看 Semantic：这是相似论文地图，适合找相关工作，不等于历史演化或因果链。";
   }
-  return "组合视图：点距给语义/时间位置，边层给证据。Main 是历史骨架，Co-cite 是主题团，Cite 是真实引用，Semantic 是相似，Future 是候选，Bottleneck/Uncertainty 决定可信度。";
+  return "组合视图：点距给语义/时间位置，边层给证据。Main 是历史骨架，Co-cite 是主题团，Cite 是真实引用，Semantic 是相似，Future 是候选，Bottleneck/Uncertainty/Fusion value 决定可信度和能否进入 Radar。";
+}
+
+function renderComboContract(combo = {}) {
+  const can = combo.can_explain || [];
+  const cannot = combo.cannot_explain || [];
+  const required = combo.required_evidence || [];
+  const uncertainty = combo.uncertainty_reasons || [];
+  return `
+    <div class="pill-row">
+      <span class="pill">${esc(combo.claim_scope || "claim scope unknown")}</span>
+      <span class="pill">${esc(combo.evidence_grade || "evidence unknown")}</span>
+    </div>
+    ${can.length ? `<p class="mini"><strong>能说明：</strong>${can.slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+    ${cannot.length ? `<p class="mini"><strong>不能说明：</strong>${cannot.slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+    ${required.length ? `<p class="mini"><strong>需要证据：</strong>${required.slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+    ${uncertainty.length ? `<details><summary>不确定性 (${fmt(uncertainty.length)})</summary>${uncertainty.slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}</details>` : ""}
+  `;
 }
 
 function renderLayerMeaning(model = null) {
@@ -785,6 +857,7 @@ function renderLayerMeaning(model = null) {
     future: "Future",
     bottleneck: "Bottleneck",
     uncertainty: "Uncertainty",
+    fusion_value: "Fusion value",
   };
   const activeRows = keys.map((key) => {
     const item = layers[key] || {};
@@ -798,6 +871,7 @@ function renderLayerMeaning(model = null) {
         <strong>${esc(combo.label || "Layer combination")}</strong>
         <p>${esc(combo.question || "")}</p>
         <small>${esc(combo.display || "")}</small>
+        ${renderComboContract(combo)}
       </div>
     ` : ""}
     ${activeRows}
@@ -902,9 +976,7 @@ function renderPaper(paper, edges = []) {
     </div>
     <div class="item">
       <div class="paper-meta">Evidence sections</div>
-      ${sections.map((section) => `
-        <p><strong>${esc(section.section_type || section.title || "section")}</strong> ${esc(truncate(section.text || section.content || section.snippet || "", 260))}</p>
-      `).join("") || "<p>No local section evidence yet. 当前只能用 abstract/metadata，不能作为强证据。</p>"}
+      ${sections.map((section) => renderSectionEvidence(section)).join("") || "<p>No local section evidence yet. 当前只能用 abstract/metadata，不能作为强证据。</p>"}
     </div>
     <div class="item">
       <div class="paper-meta">Limitations</div>
@@ -941,7 +1013,14 @@ function renderPaperList(papers, limit = 12) {
         <strong>${esc(paper.title || paper.paper_id)}</strong><br>
         <small>${esc(paper.paper_id)} / ${esc(paper.year || "?")} / ${esc(paper.cluster_label || paper.cluster_id || "")}</small>
       </button>
+      ${(paper.claim_scope || paper.evidence_grade) ? `
+        <div class="pill-row">
+          <span class="pill">${esc(paper.claim_scope || "claim scope unknown")}</span>
+          <span class="pill">${esc(paper.evidence_grade || "evidence unknown")}</span>
+        </div>
+      ` : ""}
       ${paper.reason ? `<p class="mini">为什么关键：${esc(paper.reason.why || "")} ${esc(paper.reason.role || "")} / scope ${esc(paper.reason.relationship_scope || "graph")}</p>` : ""}
+      ${(paper.uncertainty_reasons || []).length ? `<p class="mini">不确定性：${(paper.uncertainty_reasons || []).slice(0, 2).map(esc).join(" / ")}</p>` : ""}
       ${Array.isArray(paper.access_links) && paper.access_links.length ? `<p class="mini">可访问：${paper.access_links.slice(0, 3).map((link) => `<a href="${esc(link.url)}" target="_blank" rel="noreferrer">${esc(link.label)}</a>`).join(" / ")}</p>` : ""}
     </div>
   `).join("");
@@ -959,6 +1038,7 @@ function renderTopicDossier(dossier = {}) {
   const splits = dossier.branch_splits || [];
   const bottlenecks = dossier.hard_bottlenecks || [];
   const directions = dossier.validation_directions || [];
+  const readingPath = dossier.reading_path || [];
   const solved = dossier.solved_vs_open || {};
   const insufficient = dossier.insufficient_evidence || [];
   return `
@@ -966,6 +1046,16 @@ function renderTopicDossier(dossier = {}) {
       <strong>${esc(dossier.headline || "Topic dossier is being assembled.")}</strong>
       ${dossier.value_claim ? `<p class="value-claim">${esc(dossier.value_claim)}</p>` : ""}
       <p>${esc(dossier.decision_summary || "")}</p>
+      <div class="pill-row">
+        <span class="pill">${esc(dossier.claim_scope || "claim_scope unknown")}</span>
+        <span class="pill">${esc(dossier.evidence_grade || "evidence unknown")}</span>
+      </div>
+      ${dossier.uncertainty_reasons?.length ? `
+        <details class="insufficient-evidence" open>
+          <summary>不确定性 / 为什么不能过度解读 (${fmt(dossier.uncertainty_reasons.length)})</summary>
+          ${dossier.uncertainty_reasons.map((reason) => `<p><small>${esc(reason)}</small></p>`).join("")}
+        </details>
+      ` : ""}
       <div class="score-row">
         <span class="score"><small>主路径证据</small><strong>${fmt(strength.main_path_context_edges || 0)}</strong></span>
         <span class="score"><small>未来候选</small><strong>${fmt(strength.future_candidate_edges || 0)}</strong></span>
@@ -989,6 +1079,30 @@ function renderTopicDossier(dossier = {}) {
       ` : ""}
     </div>
     <div class="item important">
+      <div class="paper-meta">推荐阅读路径</div>
+      <p class="mini">不是通用论文推荐，而是按“先建立上下文、再读转折、再审分支和卡点、最后看未来候选”的证据路径。每一步都说明为什么推荐，以及它不能说明什么。</p>
+      ${readingPath.slice(0, 6).map((item) => `
+        <div class="branch-card">
+          <strong>${esc(item.title || item.mode || "reading step")}</strong>
+          <div class="pill-row">
+            <span class="pill">${esc(item.mode || "reading")}</span>
+            <span class="pill">${esc(item.claim_scope || "claim scope unknown")}</span>
+            <span class="pill">${esc(item.evidence_grade || "evidence unknown")}</span>
+          </div>
+          <p>${esc(item.why || "")}</p>
+          ${(item.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(item.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+          ${(item.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>阅读路径不确定性 (${fmt((item.uncertainty_reasons || []).length)})</summary>
+              ${(item.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
+          ${evidencePaperButtons(item.papers || [], 5)}
+          ${renderEvidenceObjects(item.evidence_objects || [], 6)}
+        </div>
+      `).join("") || "<p>No evidence-backed reading path yet.</p>"}
+    </div>
+    <div class="item important">
       <div class="paper-meta">当前真实分支</div>
       ${splits.slice(0, 7).map((split) => `
         <div class="branch-card">
@@ -1010,8 +1124,18 @@ function renderTopicDossier(dossier = {}) {
       ${bottlenecks.slice(0, 6).map((b) => `
         <div class="branch-card bottleneck-card">
           <strong>${esc(b.name)}</strong>
-          <small>${fmt(b.evidence_count || 0)} evidence atoms / ${esc(b.evidence_quality || "unknown")}</small>
+          <small>${fmt(b.evidence_count || 0)} evidence atoms / ${esc(b.evidence_grade || b.evidence_quality || "unknown")}</small>
+          <div class="pill-row">
+            <span class="pill">${esc(b.claim_scope || "weak_bottleneck_hypothesis")}</span>
+            <span class="pill">${esc(b.evidence_grade || "evidence unknown")}</span>
+          </div>
           <p>${esc(b.why_it_matters || "")}</p>
+          ${(b.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>证据不确定性 (${fmt((b.uncertainty_reasons || []).length)})</summary>
+              ${(b.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
           ${evidencePaperButtons(b.evidence_papers || [], 4)}
           ${renderEvidenceObjects(b.evidence_objects || [], 6)}
         </div>
@@ -1022,10 +1146,20 @@ function renderTopicDossier(dossier = {}) {
       ${directions.slice(0, 5).map((d) => `
         <div class="branch-card direction-card">
           <strong>${esc(d.name)}</strong>
-          <small>${esc(d.claim_scope || "exploratory")} / evidence ${esc(d.evidence_strength || "unknown")} / ${esc(d.source || "")}</small>
+          <small>${esc(d.claim_scope || "exploratory")} / evidence ${esc(d.evidence_grade || d.evidence_strength || "unknown")} / ${esc(d.source || "")}</small>
+          <div class="pill-row">
+            <span class="pill">${esc(d.claim_scope || "exploratory")}</span>
+            <span class="pill">${esc(d.evidence_grade || "evidence unknown")}</span>
+          </div>
           <p><strong>为什么值得试：</strong>${esc(d.why_worth_testing || "")}</p>
           ${d.why_not_ready ? `<p><strong>为什么还不能下注：</strong>${esc(d.why_not_ready)}</p>` : ""}
           ${d.minimal_validation_experiment ? `<p><strong>最小验证实验：</strong>${esc(d.minimal_validation_experiment)}</p>` : ""}
+          ${(d.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>为什么仍需谨慎 (${fmt((d.uncertainty_reasons || []).length)})</summary>
+              ${(d.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
           ${evidencePaperButtons(d.evidence_papers || [], 5)}
           ${renderEvidenceObjects(d.evidence_objects || [], 6)}
         </div>
@@ -1046,10 +1180,18 @@ function renderBranchDossiers(branches = []) {
           <div class="pill-row">
             <span class="pill ${branch.lineage_status === "evidence_backed_split" ? "good" : "warn"}">${esc(branch.lineage_status || "weak_branch_hypothesis")}</span>
             <span class="pill">${esc(branch.claim_scope || "weak_branch_hypothesis")}</span>
+            <span class="pill">${esc(branch.evidence_grade || "branch evidence unknown")}</span>
           </div>
           <p>${esc(branch.interpretation || "")}</p>
           ${branch.split_reason ? `<p><strong>分叉证据：</strong>${esc(branch.split_reason)}</p>` : ""}
           ${branch.constraint_shift ? `<p class="mini"><strong>约束变化：</strong>${esc(branch.constraint_shift.status || "")} ${esc(branch.constraint_shift.note || "")}</p>` : ""}
+          ${(branch.required_evidence || []).length ? `<p class="mini"><strong>成为真实分叉还需要：</strong>${(branch.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+          ${(branch.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>分支证据不确定性 (${fmt((branch.uncertainty_reasons || []).length)})</summary>
+              ${(branch.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
           <div class="pill-row">
             ${(branch.top_terms || []).slice(0, 6).map((term) => `<span class="pill">${esc(term)}</span>`).join("")}
           </div>
@@ -1078,7 +1220,31 @@ function renderBottleneckLineage(lineage = {}) {
           <strong>${esc(c.name || c.principle_id)}</strong>
           <p>${esc(c.root_cause || "")}</p>
           <small>risk ${esc(c.risk_label || "unknown")} / unresolved ${fmt(c.unresolved_atoms || 0)} / resolved ${fmt(c.resolved_atoms || 0)} / peak ${esc(c.peak_backlog_year || "-")}</small>
+          <div class="pill-row">
+            <span class="pill">${esc(c.claim_scope || "lineage scope unknown")}</span>
+            <span class="pill">${esc(c.evidence_grade || "lineage evidence unknown")}</span>
+          </div>
           <div class="pill-row">${(c.top_keywords || []).slice(0, 5).map((kw) => `<span class="pill">${esc(kw)}</span>`).join("")}</div>
+          ${(c.typed_chain || []).length ? `
+            <details>
+              <summary>Typed lineage chain (${fmt((c.typed_chain || []).length)})</summary>
+              ${(c.typed_chain || []).slice(0, 4).map((t) => `
+                <p class="mini">
+                  <strong>${esc(t.source_stage || "constraint")} → ${esc(t.target_stage || "next")}</strong>
+                  ${esc(t.target_text || t.source_text || "")}
+                  <br><small>${esc(t.event_year || "-")} / ${esc(t.evidence_section || "section unknown")} / ${esc(t.evidence_quality || "evidence unknown")}</small>
+                </p>
+              `).join("")}
+            </details>
+          ` : ""}
+          ${(c.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(c.required_evidence || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(c.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>证据不确定性 (${fmt((c.uncertainty_reasons || []).length)})</summary>
+              ${(c.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
+          ${renderEvidenceObjects(c.evidence_objects || [], 5)}
         </div>
       `).join("") || "<p>No bottleneck lineage matched.</p>"}
     </div>
@@ -1119,9 +1285,8 @@ function renderDossierRadar(radar = {}) {
             <small>technical ${pct(item.technical_probability || 0)} / scope ${esc(item.claim_scope || "candidate")}</small>
             ${item.model_evidence ? `
               <p class="mini">模型证据：${esc(item.model_evidence.generator || "future candidate generator")}
-              / calibrated ${pct(item.model_evidence.calibrated_prob || item.technical_probability || 0)}
-              / raw ${pct(item.model_evidence.raw_predicted_prob || 0)}
-              / ${esc(item.model_evidence.calibration_label || item.model_evidence.calibration_method || "uncalibrated")}</p>
+              / ${esc(futureCalibrationCopy(item))}
+              / ${esc(item.model_evidence.candidate_pool_reason || "candidate pool only")}</p>
             ` : ""}
             <p>${esc(item.plain_language || "")}</p>
             <p class="mini">缺口：${(item.missing_gates || []).map(esc).join(" / ")}</p>
@@ -1144,8 +1309,41 @@ function renderEvidenceMapSummary(evidence = {}) {
           <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>
           <p>${esc(combo.question || "")}</p>
           <small>${esc((combo.layers || []).join(" + "))} / ${esc(combo.use || "")}</small>
+          ${renderComboContract(combo)}
         </div>
       `).join("")}
+    </div>
+  `;
+}
+
+function renderTopicReadiness(readiness = {}) {
+  if (!readiness || !readiness.readiness_level) return "";
+  const metrics = readiness.metrics || {};
+  const gates = readiness.gates || [];
+  const problemGates = gates.filter((gate) => gate.status !== "pass");
+  return `
+    <div class="item important">
+      <div class="paper-meta">Topic readiness</div>
+      <div class="pill-row">
+        <span class="pill ${readiness.overall_status === "pass" ? "good" : "warn"}">${esc(readiness.readiness_level)}</span>
+        <span class="pill">${esc(readiness.overall_status || "unknown")}</span>
+        <span class="pill">no LLM preflight</span>
+      </div>
+      <p class="mini">${esc(readiness.llm_policy || "")}</p>
+      <div class="score-row">
+        <span class="score"><small>branches</small><strong>${fmt(metrics.branch_splits || 0)}</strong></span>
+        <span class="score"><small>bottlenecks</small><strong>${fmt(metrics.bottleneck_candidates || 0)}</strong></span>
+        <span class="score"><small>traced turning</small><strong>${fmt(metrics.turning_with_strong_or_moderate_section_provenance || 0)}</strong></span>
+        <span class="score"><small>complete cards</small><strong>${fmt(metrics.complete_claim_cards || 0)}</strong></span>
+      </div>
+      ${problemGates.length ? `
+        <details open>
+          <summary>Blocking / warning gates (${fmt(problemGates.length)})</summary>
+          ${problemGates.map((gate) => `
+            <p class="mini">${esc(gate.name)}: ${esc(gate.status)} (${fmt(gate.actual || 0)} / ${fmt(gate.required || 0)})</p>
+          `).join("")}
+        </details>
+      ` : ""}
     </div>
   `;
 }
@@ -1167,11 +1365,13 @@ function renderTopicLens(lens) {
   const questions = lens.first_principles?.five_questions || [];
   const limitations = lens.unresolved_limitations || [];
   const futureEdges = lens.future_growth?.predicted_edges || [];
+  const history = lens.history_main_path || {};
   const valueModel = lens.value_model || DEFAULT_VALUE_MODEL;
   const fusionCounts = valueModel.counts || {};
   const frontfill = valueModel.frontfill_status || {};
   els.topicPane.innerHTML = `
     ${renderTopicDossier(lens.topic_dossier || {})}
+    ${renderTopicReadiness(lens.topic_readiness || {})}
     <div class="item">
       <strong>${esc(lens.topic)}</strong>
       <div class="paper-meta">Evidence scope: ${fmt(lens.total_related)} related papers / ${fmt(futureEdges.length)} GNN candidates / ${fmt(lens.history_main_path?.edges?.length || 0)} main-path context edges</div>
@@ -1197,14 +1397,39 @@ function renderTopicLens(lens) {
           <div class="claim">
             <strong>${esc(qa.question || "")}</strong>
             <p>${esc(qa.answer || "")}</p>
+            <div class="pill-row">
+              <span class="pill">${esc(qa.claim_scope || "claim scope unknown")}</span>
+              <span class="pill">${esc(qa.evidence_grade || "evidence unknown")}</span>
+            </div>
+            ${(qa.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(qa.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+            ${(qa.uncertainty_reasons || []).length ? `
+              <details>
+                <summary>不确定性 (${fmt((qa.uncertainty_reasons || []).length)})</summary>
+                ${(qa.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+              </details>
+            ` : ""}
+            ${renderEvidenceObjects(qa.evidence_objects || [], 5)}
           </div>
         `).join("") || "<p>No claim card evidence yet.</p>"}
       </div>
     </div>
     <div class="item">
       <div class="paper-meta">Key turning papers</div>
+      <div class="pill-row">
+        <span class="pill">${esc(history.claim_scope || "main path scope unknown")}</span>
+        <span class="pill">${esc(history.evidence_grade || "main path evidence unknown")}</span>
+      </div>
       <p class="mini">判定逻辑：这些论文位于该 topic 所属 cluster/branch 的 Main Path 高权重边上；优先按 main_path_weight 累计贡献排序。</p>
-      ${renderPaperList(lens.history_main_path?.key_turning_papers || [], 8) || "<p>No main-path match.</p>"}
+      <p class="mini">每篇都带 claim_scope/evidence_grade。broader field context 不能被当作该 topic 的关键转折论文。</p>
+      ${(history.uncertainty_reasons || []).length ? `
+        <details>
+          <summary>Main-path uncertainty (${fmt((history.uncertainty_reasons || []).length)})</summary>
+          ${(history.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+        </details>
+      ` : ""}
+      ${(history.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(history.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+      ${renderEvidenceObjects(history.evidence_objects || [], 6)}
+      ${renderPaperList(history.key_turning_papers || [], 8) || "<p>No main-path match.</p>"}
     </div>
     <div class="item">
       <div class="paper-meta">Future candidate generator pool</div>
@@ -1214,7 +1439,7 @@ function renderTopicLens(lens) {
         <span class="mini">可能连接到</span><br>
         <strong>${esc(paperLabel(edge.target_paper, edge.target_paper_id))}</strong><br>
         <small>GNN/VGAE confidence ${pct(edge.confidence || edge.weight)} / ${esc(edge.evidence?.relationship_scope || "graph")}</small><br>
-        <small>calibrated ${pct(edge.evidence?.calibrated_prob || edge.confidence || 0)} / raw ${pct(edge.evidence?.raw_predicted_prob || 0)} / ${esc(edge.evidence?.calibration_label || edge.evidence?.calibration_method || "calibration unknown")}</small><br>
+        <small>${esc(futureCalibrationCopy(edge))}</small><br>
         <small>${esc(edge.plain_language || "")}</small></p>
         ${evidencePaperButtons([edge.source_paper, edge.target_paper].filter(Boolean), 2)}
       `).join("") || "<p>No future edge matched this topic context yet.</p>"}

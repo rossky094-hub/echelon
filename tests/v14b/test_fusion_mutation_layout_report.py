@@ -64,11 +64,15 @@ def create_full_test_db(tmp_path):
 
     # predicted_future_edges
     conn.executemany("""
-        INSERT INTO predicted_future_edges (src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO predicted_future_edges (
+            src_paper_id, dst_paper_id, predicted_prob, raw_predicted_prob,
+            calibrated_prob, prediction_confidence, calibration_label,
+            src_year, dst_year, is_cross_field
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, [
-        (4, 5, 0.85, 2024, 2022, 1),
-        (3, 1, 0.75, 2024, 2018, 0),
+        (4, 5, 0.85, 0.9, 0.82, 0.78, "calibrated_temporal_holdout", 2024, 2022, 1),
+        (3, 1, 0.75, 0.8, 0.72, 0.68, "calibrated_temporal_holdout", 2024, 2018, 0),
     ])
 
     # limitation_atoms
@@ -162,7 +166,13 @@ class TestFusion:
         vgae_preds = load_vgae_predictions(conn_v14)
         unresolved = load_unresolved_limitations(conn_v14)
 
-        candidates = compute_direction_clusters(terminals, vgae_preds, unresolved, conn_main)
+        candidates = compute_direction_clusters(
+            terminals,
+            vgae_preds,
+            unresolved,
+            conn_main,
+            calibration_context={"has_run_audit": True, "avg_calibrated_auc": 0.84},
+        )
         conn_v14.close()
         conn_main.close()
 
@@ -171,6 +181,29 @@ class TestFusion:
         for c in candidates:
             assert "evidence_paths" in c
             assert c["evidence_paths"] >= 2  # At least 2 evidence paths
+
+    def test_direction_clusters_without_run_audit_are_candidate_pool_only(self, tmp_path):
+        from echelon.v14b.step6_fusion import compute_direction_clusters, load_vgae_predictions, load_unresolved_limitations
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        _, conn_main = create_main_db(tmp_path)
+        conn_main.execute("UPDATE papers SET abstract=? WHERE id=5", ("scalability remains the bottleneck",))
+        conn_main.commit()
+
+        candidates = compute_direction_clusters(
+            [{"paper_id": 4, "publication_year": 2024}],
+            load_vgae_predictions(conn_v14),
+            load_unresolved_limitations(conn_v14),
+            conn_main,
+            calibration_context={"has_run_audit": False},
+        )
+        conn_v14.close()
+        conn_main.close()
+
+        assert candidates
+        assert candidates[0]["evidence_tier"] == "exploratory_uncalibrated_candidate"
+        assert candidates[0]["claim_scope"] == "candidate_pool_only"
+        assert "rolling held-out-year calibration audit" in candidates[0]["missing_gates"]
 
     def test_write_future_directions(self, tmp_path):
         from echelon.v14b.step6_fusion import write_future_directions
@@ -225,6 +258,20 @@ class TestFusion:
 
         assert tier == "exploratory_weak_limitation"
         assert claim_scope_for_tier(tier) == "exploratory_hypothesis"
+
+    def test_direction_tier_keeps_uncalibrated_future_candidate_in_pool(self):
+        from echelon.v14b.step6_fusion import claim_scope_for_tier, direction_evidence_tier
+
+        tier = direction_evidence_tier(
+            evidence_paths=2,
+            limitation_quality=["section_level"],
+            prediction_confidence=0.82,
+            has_main_path=True,
+            calibrated_for_fusion=False,
+        )
+
+        assert tier == "exploratory_uncalibrated_candidate"
+        assert claim_scope_for_tier(tier) == "candidate_pool_only"
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +382,12 @@ class TestUMAPLayout:
         from echelon.v14b.step8_layout import compute_umap_layout
         features = np.random.randn(20, 64).astype(np.float32)
         xy = compute_umap_layout(features, n_neighbors=5)
+        assert xy.shape == (20, 2)
+
+    def test_pca_fallback_output_shape(self):
+        from echelon.v14b.step8_layout import compute_pca_fallback_layout
+        features = np.random.randn(20, 64).astype(np.float32)
+        xy = compute_pca_fallback_layout(features)
         assert xy.shape == (20, 2)
 
     def test_umap_normalize_xy(self):

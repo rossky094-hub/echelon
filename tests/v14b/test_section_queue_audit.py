@@ -34,6 +34,28 @@ def test_watchdog_parses_top12000_progress(tmp_path):
     assert "done=920/12000" in mod.get_progress(log)
 
 
+def test_watchdog_pid_probe_degrades_safely_when_ps_is_blocked(monkeypatch):
+    mod = _load_watchdog_module()
+
+    monkeypatch.setattr(mod, "run", lambda _cmd: "__permission_denied__")
+
+    assert mod.find_step5s_pid("step5s_section_ingest") == "unknown"
+
+
+def test_watchdog_pid_probe_ignores_unrelated_processes_with_pattern_arg(monkeypatch):
+    mod = _load_watchdog_module()
+    ps_output = "\n".join(
+        [
+            "41978 /Applications/SkyComputerUseClient --note step5s_section_ingest",
+            "42000 python3 scripts/watch_step5s_section_ingest.py --pid-pattern step5s_section_ingest",
+            "46618 python3 -m echelon.v14b.step5s_section_ingest --db db/echelon_library.sqlite3 --top-n 12000",
+        ]
+    )
+    monkeypatch.setattr(mod, "run", lambda _cmd: ps_output)
+
+    assert mod.find_step5s_pid("step5s_section_ingest") == "46618"
+
+
 def test_watchdog_done_and_primary_section_gate(tmp_path):
     mod = _load_watchdog_module()
     db_main = tmp_path / "main.sqlite3"
@@ -72,6 +94,8 @@ def test_watchdog_done_and_primary_section_gate(tmp_path):
     assert mod.is_step5s_done("running", {"done": 12000, "total": 12000})
     assert mod.is_step5s_done("done", {"done": None, "total": None})
     assert mod.get_primary_section_papers(db_main) == 2
+    assert mod.handoff_reason(8000, 8000) == "frontfill_threshold_met"
+    assert mod.handoff_reason(2, 8000) == "frontfill_threshold_not_met_downstream_gate_will_hold"
 
 
 def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
@@ -140,6 +164,7 @@ def _make_main_db(path: Path) -> None:
             ("p_future", "Future metalens", "metalens future", "2024-01-01", 2024, "2401.00002", None, None, "W2", 50),
             ("p_branch", "Branch driver", "split evidence", "2022-01-01", 2022, "2201.00003", None, None, "W3", 20),
             ("p_done", "Already sectioned", "metalens limitation", "2021-01-01", 2021, "2101.00004", None, None, "W4", 10),
+            ("p_gap", "Topic gap turning paper", "metalens field of view evidence gap", "2023-01-01", 2023, "2301.00005", None, None, "W5", 15),
         ],
     )
     conn.execute(
@@ -241,6 +266,7 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
         out_dir=tmp_path / "reports",
         data_dir=tmp_path / "data",
         topic_terms=["metalens"],
+        topic_evidence_gap_queue=None,
     )
 
     assert result["delta_queue"] >= 2
@@ -259,3 +285,55 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
     assert "branch_split_driver" in reasons["p_branch"]
     assert retries["p_main"] == "retryable_pdf_failure"
     assert retries["p_branch"] == "no_target_sections"
+
+
+def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = tmp_path / "v14.sqlite3"
+    _make_main_db(db_main)
+    _make_v14_db(db_v14)
+    gap_csv = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    gap_csv.write_text(
+        "\n".join(
+            [
+                "topic,gap_type,bottleneck,priority,candidate_paper_ids,frontfill_query,required_sections,why",
+                "metalens,missing_bottleneck_section_evidence,field of view,100,p_gap,metalens field of view,limitation;discussion,missing field-of-view section evidence",
+                "metalens,key_turning_paper_missing_primary_section,,90,p_branch,metalens branch driver,limitation;discussion,key turning paper parsed but no target sections",
+                "quantum light source,future_candidates_missing_claim_card,,85,,quantum light source,limitation;discussion,claim card input gap",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = run_section_queue_audit(
+        db_main=db_main,
+        db_v14=db_v14,
+        top_n=10,
+        out_dir=tmp_path / "reports",
+        data_dir=tmp_path / "data",
+        topic_terms=["metalens"],
+        topic_evidence_gap_queue=gap_csv,
+    )
+
+    assert result["topic_evidence_gap_summary"]["gap_rows"] == 3
+    assert result["topic_evidence_gap_summary"]["gap_paper_ids"] == 2
+    assert result["topic_evidence_gap_summary"]["gap_rows_without_candidate_papers"] == 1
+    assert result["topic_gap_delta_queue"] == 2
+    topic_gap_queue = tmp_path / "data" / "topic_evidence_gap_delta_queue.csv"
+    assert topic_gap_queue.exists()
+    assert "p_branch" in topic_gap_queue.read_text(encoding="utf-8")
+
+    conn = sqlite3.connect(str(db_v14))
+    try:
+        row = conn.execute(
+            "SELECT priority_score, reasons_json FROM section_priority_papers WHERE paper_id='p_gap'"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    reasons = json.loads(row[1])
+    assert "topic_gap_bottleneck_evidence" in reasons
+    assert "topic:metalens" in reasons
+    assert row[0] >= 200

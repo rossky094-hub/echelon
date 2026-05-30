@@ -1,6 +1,6 @@
 """End-to-end value-delivery gates for the V14B research decision system.
 
-This audit maps the eight current product risks to executable checks.  It does
+This audit maps current product risks to executable checks.  It does
 not pretend weak data is solved; it enforces where conclusions must be
 demoted, where algorithms are present, and which frontfill or rerun is still
 blocking decision-grade output.
@@ -29,7 +29,11 @@ from echelon.v14b.evidence_grade import (
     uncertainty_reasons,
 )
 from echelon.v14b.future_candidate_lifecycle import future_edge_calibration_context
-from echelon.v14b.topic_regression import GOLD_TOPICS
+from echelon.v14b.topic_readiness import (
+    NO_LLM_PREFLIGHT_POLICY,
+    build_topic_readiness_preflight,
+)
+from echelon.v14b.topic_regression import BENCHMARK_TOPICS
 
 
 EXPECTED_LINEAGE_STAGES = {
@@ -45,6 +49,36 @@ QUARTERLY_REQUIRED_TARGETS = (
     "quarterly-run-cs",
     "quarterly-run-materials",
 )
+
+REQUIRED_TOPIC_READINESS_GATES = {
+    "topic dossier evidence contract",
+    "turning papers with strong/moderate section provenance",
+    "five-question evidence contracts",
+    "bottleneck lineage typed contracts",
+    "auditable reading path",
+    "complete Claim Cards",
+}
+
+REQUIRED_EVIDENCE_MAP_LAYERS = {
+    "main_path",
+    "citation",
+    "topic",
+    "semantic",
+    "future",
+    "bottleneck",
+    "uncertainty",
+    "fusion_value",
+}
+
+REQUIRED_EVIDENCE_MAP_COMBOS = {
+    ("main_path",),
+    ("main_path", "citation"),
+    ("topic", "semantic"),
+    ("main_path", "topic", "bottleneck"),
+    ("future", "bottleneck"),
+    ("future", "bottleneck", "uncertainty"),
+    ("future", "bottleneck", "uncertainty", "fusion_value"),
+}
 
 
 def utc_now() -> str:
@@ -105,10 +139,23 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
         reasons.append(
             f"section frontfill {frontfill.get('status')}; process progress is not translating into new primary evidence"
         )
+    section_quality = metrics.get("section_evidence_quality") or {}
+    weak_only_rate = float(section_quality.get("weak_only_rate") or 0.0)
+    strong_or_moderate = int(section_quality.get("strong_or_moderate_papers") or 0)
+    provenance_ok = (
+        int(metrics.get("primary_section_papers") or 0) == 0
+        or (weak_only_rate <= 0.25 and strong_or_moderate >= 1000)
+    )
+    if not provenance_ok:
+        reasons.append(
+            "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
+        )
     return {
         "issue": "Evidence Bone",
         "status": _gate_status(
-            metrics["linked_ref_rate"] >= 0.30 and metrics["primary_section_papers"] >= 8000,
+            metrics["linked_ref_rate"] >= 0.30
+            and metrics["primary_section_papers"] >= 8000
+            and provenance_ok,
             warn=True,
         ),
         "evidence_grade": grade,
@@ -118,6 +165,7 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "openalex_w_rate": metrics["openalex_w_rate"],
             "section_frontfill_status": frontfill.get("status"),
             "section_frontfill_no_evidence_delta": frontfill.get("no_evidence_done_delta"),
+            "section_provenance": section_quality,
         },
         "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
         "uncertainty_reasons": reasons,
@@ -194,6 +242,10 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
     edge_calibration = future_edge_calibration_context(conn_v14)
     lifecycle_counts: dict[str, int] = {}
+    future_direction_count = 0
+    future_direction_scope_counts: dict[str, int] = {}
+    future_direction_calibration_status_counts: dict[str, int] = {}
+    uncalibrated_promoted_directions: list[dict[str, Any]] = []
     radar_eligible = 0
     if table_exists(conn_v14, "future_candidate_lifecycle"):
         lifecycle_counts = {
@@ -206,6 +258,47 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
             scalar(conn_v14, "SELECT COUNT(*) FROM future_candidate_lifecycle WHERE radar_eligible=1")
             or 0
         )
+    if table_exists(conn_v14, "future_directions"):
+        direction_cols = columns(conn_v14, "future_directions")
+        select_cols = [
+            "direction_id" if "direction_id" in direction_cols else "NULL AS direction_id",
+            "direction_name" if "direction_name" in direction_cols else "NULL AS direction_name",
+            "claim_scope" if "claim_scope" in direction_cols else "NULL AS claim_scope",
+            "evidence_tier" if "evidence_tier" in direction_cols else "NULL AS evidence_tier",
+            "calibration_label" if "calibration_label" in direction_cols else "NULL AS calibration_label",
+            "evidence_json" if "evidence_json" in direction_cols else "NULL AS evidence_json",
+        ]
+        rows = conn_v14.execute(f"SELECT {', '.join(select_cols)} FROM future_directions").fetchall()
+        future_direction_count = len(rows)
+        for row in rows:
+            direction_id, direction_name, claim_scope, evidence_tier, calibration_label, evidence_json = row
+            evidence = _loads(evidence_json, {}) if evidence_json else {}
+            status = str(evidence.get("calibration_status") or "")
+            if not status:
+                if calibration > 0 and calibration_label:
+                    status = "calibrated_with_run_audit"
+                elif calibration_label:
+                    status = "edge_has_calibration_label_but_run_audit_missing"
+                else:
+                    status = "not_calibrated"
+            scope = str(claim_scope or "candidate_pool_only")
+            tier = str(evidence_tier or evidence.get("evidence_tier") or "")
+            future_direction_scope_counts[scope] = future_direction_scope_counts.get(scope, 0) + 1
+            future_direction_calibration_status_counts[status] = (
+                future_direction_calibration_status_counts.get(status, 0) + 1
+            )
+            run_calibrated = status == "calibrated_with_run_audit"
+            candidate_only = scope in {"candidate_pool_only", "not_for_user_claim"} or tier == "exploratory_uncalibrated_candidate"
+            if not run_calibrated and not candidate_only:
+                uncalibrated_promoted_directions.append(
+                    {
+                        "direction_id": direction_id,
+                        "direction_name": direction_name,
+                        "claim_scope": scope,
+                        "evidence_tier": tier,
+                        "calibration_status": status,
+                    }
+                )
     high_conf_bad = 0
     if table_exists(conn_v14, "direction_claim_cards"):
         high_conf_bad = int(
@@ -218,7 +311,9 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
             )
             or 0
         )
-    if calibration > 0 and high_conf_bad == 0:
+    if uncalibrated_promoted_directions or radar_eligible > 0:
+        status = "fail"
+    elif calibration > 0 and high_conf_bad == 0:
         status = "pass"
     elif predicted > 0 and edge_calibration.get("edge_calibrated_candidates", 0) > 0:
         status = "warn"
@@ -239,9 +334,25 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
             else None
         ),
         "future_candidate_lifecycle": lifecycle_counts,
+        "future_directions": future_direction_count,
+        "future_direction_claim_scope_counts": future_direction_scope_counts,
+        "future_direction_calibration_status_counts": future_direction_calibration_status_counts,
+        "uncalibrated_promoted_direction_claims": len(uncalibrated_promoted_directions),
+        "uncalibrated_promoted_examples": uncalibrated_promoted_directions[:5],
         "radar_eligible_candidates": radar_eligible,
         "bad_high_confidence_cards": high_conf_bad,
-        "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
+        "checks": {
+            "run_level_calibration_required_for_direction_claims": not uncalibrated_promoted_directions,
+            "raw_future_edges_not_radar_eligible": radar_eligible == 0,
+            "edge_level_calibration_not_confused_with_run_audit": not (
+                predicted > 0
+                and edge_calibration.get("edge_calibrated_candidates", 0) > 0
+                and calibration == 0
+                and future_direction_count > 0
+                and not future_direction_calibration_status_counts
+            ),
+        },
+        "policy": "VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card.",
     }
 
 
@@ -292,28 +403,715 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
-def audit_topic_dossier(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+def audit_claim_card_high_confidence_evidence_contract(
+    conn_v14: sqlite3.Connection,
+    repo_root: Path | None = None,
+) -> dict[str, Any]:
+    """Verify high-confidence Claim Cards cannot bypass section evidence."""
+    if not table_exists(conn_v14, "direction_claim_cards"):
+        return {
+            "issue": "Claim Card High-Confidence Evidence Contract",
+            "status": "warn",
+            "why": "direction_claim_cards table is not materialized yet",
+            "policy": "High-confidence Claim Cards require strong section evidence and strong/moderate parser provenance.",
+        }
+    cols = columns(conn_v14, "direction_claim_cards")
+    required = {"claim_card_id", "high_confidence_eligible", "quality_gate_json"}
+    missing_cols = sorted(required - cols)
+    if missing_cols:
+        return {
+            "issue": "Claim Card High-Confidence Evidence Contract",
+            "status": "fail",
+            "missing_columns": missing_cols,
+            "policy": "High-confidence Claim Cards require auditable quality_gate_json with section evidence gates.",
+        }
+    rows = conn_v14.execute(
+        """
+        SELECT claim_card_id, high_confidence_eligible, quality_gate_json
+        FROM direction_claim_cards
+        WHERE COALESCE(high_confidence_eligible, 0) = 1
+        """
+    ).fetchall()
+    invalid: list[dict[str, Any]] = []
+    for row in rows:
+        gate = _loads(row["quality_gate_json"], {})
+        high_gates = gate.get("high_confidence_gates") if isinstance(gate, dict) else {}
+        provenance = gate.get("section_provenance") if isinstance(gate, dict) else {}
+        strong_or_moderate = 0
+        if isinstance(provenance, dict):
+            strong_or_moderate = int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0)
+        section_strong = bool((high_gates or {}).get("section_evidence_strong"))
+        provenance_ready = bool((high_gates or {}).get("section_provenance_ready"))
+        json_high = bool(gate.get("high_confidence_eligible")) if isinstance(gate, dict) else False
+        missing = []
+        if not section_strong:
+            missing.append("section_evidence_strong")
+        if not provenance_ready:
+            missing.append("section_provenance_ready")
+        if strong_or_moderate < 1:
+            missing.append("strong_or_moderate_section_provenance")
+        if not json_high:
+            missing.append("quality_gate_high_confidence_flag")
+        if missing:
+            invalid.append(
+                {
+                    "claim_card_id": row["claim_card_id"],
+                    "missing": missing,
+                    "section_evidence_strength": gate.get("section_evidence_strength") if isinstance(gate, dict) else None,
+                    "section_provenance": provenance if isinstance(provenance, dict) else {},
+                }
+            )
+    source_checks = {
+        "step13_has_section_evidence_gate": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "step13_has_section_evidence_gate": _source_contains(
+                repo_root / "echelon/v14b/step13_first_principles_history.py",
+                ("section_evidence_strong", "section_provenance_ready", "missing_high_confidence_gates"),
+            ),
+        }
+    checks = {
+        "no_high_confidence_card_without_section_evidence": not invalid,
+        **source_checks,
+    }
+    return {
+        "issue": "Claim Card High-Confidence Evidence Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "high_confidence_cards": len(rows),
+        "invalid_high_confidence_cards": len(invalid),
+        "invalid_examples": invalid[:5],
+        "policy": (
+            "A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence "
+            "and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory."
+        ),
+    }
+
+
+def _source_contains(path: Path, needles: tuple[str, ...]) -> bool:
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    return all(needle in text for needle in needles)
+
+
+def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify LLM outputs remain bounded to audit/naming/weak labels, not evidence conclusions."""
+    llm_atoms = 0
+    invalid_llm_atoms: list[dict[str, Any]] = []
+    limitation_cols = columns(conn_v14, "limitation_atoms")
+    limitation_required = {"extractor_method", "evidence_source", "evidence_quality", "evidence_weight"}
+    if table_exists(conn_v14, "limitation_atoms") and limitation_required <= limitation_cols:
+        llm_atoms = int(
+            scalar(
+                conn_v14,
+                """
+                SELECT COUNT(*) FROM limitation_atoms
+                WHERE lower(COALESCE(extractor_method, '')) LIKE 'llm%'
+                """,
+            )
+            or 0
+        )
+        rows = conn_v14.execute(
+            """
+            SELECT atom_id, paper_id, evidence_source, evidence_quality,
+                   evidence_weight, extractor_method
+            FROM limitation_atoms
+            WHERE lower(COALESCE(extractor_method, '')) LIKE 'llm%'
+              AND COALESCE(evidence_source, 'abstract') <> 'structured_sections'
+              AND (
+                COALESCE(evidence_quality, 'weak_abstract') NOT IN ('weak_abstract', 'metadata_only', 'unknown')
+                OR COALESCE(evidence_weight, 0) > 0.350001
+              )
+            LIMIT 5
+            """
+        ).fetchall()
+        invalid_llm_atoms = [dict(row) for row in rows]
+
+    llm_citation_edges = 0
+    invalid_llm_citation_edges: list[dict[str, Any]] = []
+    subgraph_cols = columns(conn_v14, "subgraph_edges")
+    subgraph_required = {
+        "citation_function_method",
+        "citation_context_available",
+        "citation_function_evidence_level",
+        "citation_function_weight",
+    }
+    if table_exists(conn_v14, "subgraph_edges") and subgraph_required <= subgraph_cols:
+        llm_citation_edges = int(
+            scalar(
+                conn_v14,
+                """
+                SELECT COUNT(*) FROM subgraph_edges
+                WHERE lower(COALESCE(citation_function_method, '')) LIKE 'llm%'
+                """,
+            )
+            or 0
+        )
+        rows = conn_v14.execute(
+            """
+            SELECT citing_id, cited_id, citation_function_method,
+                   citation_function_evidence_level, citation_context_available,
+                   citation_function_weight
+            FROM subgraph_edges
+            WHERE lower(COALESCE(citation_function_method, '')) LIKE 'llm%'
+              AND COALESCE(citation_context_available, 0) = 0
+              AND (
+                COALESCE(citation_function_evidence_level, '') <> 'weak_paper_metadata'
+                OR COALESCE(citation_function_weight, 0) > 0.250001
+              )
+            LIMIT 5
+            """
+        ).fetchall()
+        invalid_llm_citation_edges = [dict(row) for row in rows]
+
+    source_checks = {
+        "llm_defaults_off": False,
+        "limitation_llm_traced_and_optional": False,
+        "citation_llm_fallback_explicit_and_weak": False,
+        "fusion_llm_naming_opt_in": False,
+        "step13_non_llm_engine": False,
+        "llm_edge_audit_is_capped_audit": False,
+        "topic_preflight_no_llm": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "llm_defaults_off": _source_contains(
+                repo_root / "echelon/v14b/config.py",
+                (
+                    'V14B_LIMITATION_USE_LLM", "false"',
+                    'V14B_SCIBERT_LLM_FALLBACK", "false"',
+                    'V14B_FUSION_USE_LLM_NAMING", "false"',
+                ),
+            ),
+            "limitation_llm_traced_and_optional": _source_contains(
+                repo_root / "echelon/v14b/step5c_limitation.py",
+                ("extractor_method", "LIMITATION_USE_LLM else None", "_limitation_evidence_common"),
+            ),
+            "citation_llm_fallback_explicit_and_weak": _source_contains(
+                repo_root / "echelon/v14b/step5a_scibert.py",
+                ("--use-llm", "SCIBERT_LLM_FALLBACK", "citation_function_evidence_level"),
+            ),
+            "fusion_llm_naming_opt_in": _source_contains(
+                repo_root / "echelon/v14b/step6_fusion.py",
+                ("FUSION_USE_LLM_NAMING", "Optional LLM naming"),
+            ),
+            "step13_non_llm_engine": _source_contains(
+                repo_root / "echelon/v14b/step13_first_principles_history.py",
+                ("默认不调用外部 LLM", "已入库证据可重跑"),
+            ),
+            "llm_edge_audit_is_capped_audit": _source_contains(
+                repo_root / "echelon/v14b/step11_llm_edge_audit.py",
+                ("Stratified LLM edge audit", "Default execution is capped"),
+            ),
+            "topic_preflight_no_llm": _source_contains(
+                repo_root / "echelon/v14b/topic_readiness.py",
+                ("NO_LLM_PREFLIGHT_POLICY", "LLM may audit/name/explain only after evidence exists"),
+            ),
+        }
+
+    missing_data_contracts = []
+    if table_exists(conn_v14, "limitation_atoms") and not limitation_required <= limitation_cols:
+        missing_data_contracts.append("limitation_atoms extractor/evidence columns")
+    if table_exists(conn_v14, "subgraph_edges") and not subgraph_required <= subgraph_cols:
+        missing_data_contracts.append("subgraph_edges citation evidence columns")
+    checks = {
+        "abstract_llm_atoms_remain_weak": not invalid_llm_atoms,
+        "llm_citation_without_context_remains_weak": not invalid_llm_citation_edges,
+        "llm_data_contract_columns_present": not missing_data_contracts,
+        **source_checks,
+    }
+    return {
+        "issue": "LLM Evidence Boundary Contract",
+        "status": _gate_status(all(checks.values()), warn=bool(missing_data_contracts)),
+        "checks": checks,
+        "llm_limitation_atoms": llm_atoms,
+        "invalid_llm_atoms": len(invalid_llm_atoms),
+        "invalid_llm_atom_examples": invalid_llm_atoms,
+        "llm_citation_edges": llm_citation_edges,
+        "invalid_llm_citation_edges": len(invalid_llm_citation_edges),
+        "invalid_llm_citation_examples": invalid_llm_citation_edges,
+        "missing_data_contracts": missing_data_contracts,
+        "policy": (
+            "LLM may audit, name, classify weak labels, or explain existing evidence; it must not create "
+            "decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty."
+        ),
+    }
+
+
+def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify arbitrary-topic readiness stays deterministic and surfaced online."""
+    readiness = build_topic_readiness_preflight(
+        topic="arbitrary photonics audit topic",
+        topic_dossier={
+            "claim_scope": "candidate_pool_only",
+            "evidence_grade": "metadata_only",
+            "uncertainty_reasons": ["audit fixture"],
+            "branch_splits": [{"name": "Audit branch"}],
+            "hard_bottlenecks": [{"name": "integration"}],
+            "reading_path": [
+                {
+                    "claim_scope": "candidate_pool_only",
+                    "evidence_grade": "section_backed",
+                    "uncertainty_reasons": ["audit fixture"],
+                    "evidence_objects": [{"type": "paper", "paper_id": f"r{i}"}],
+                }
+                for i in range(4)
+            ],
+        },
+        turning_hits=[
+            {
+                "paper_id": "p1",
+                "access_links": [{"url": "https://example.test"}],
+                "content_availability": {
+                    "has_primary_evidence_sections": True,
+                    "has_strong_or_moderate_primary_evidence_sections": False,
+                },
+            }
+        ],
+        future_growth=[{"edge_id": "future:p1:p2"}],
+        rd_radar={
+            "claim_cards": [
+                {
+                    "eligible": False,
+                    "claim_card": {"five_question_complete": True},
+                }
+            ]
+        },
+        first_principles_questions=[
+            {
+                "claim_scope": "candidate_pool_only",
+                "evidence_grade": "section_backed",
+                "uncertainty_reasons": ["audit fixture"],
+                "evidence_objects": [{"type": "paper", "paper_id": f"q{i}"}],
+            }
+            for i in range(5)
+        ],
+        bottleneck_lineage={
+            "constraints": [
+                {
+                    "claim_scope": "bottleneck_lineage_evidence",
+                    "evidence_grade": "typed_section_lineage",
+                    "uncertainty_reasons": ["audit fixture"],
+                    "typed_chain": [{"source_stage": "constraint", "target_stage": "failure_mechanism"}],
+                    "evidence_objects": [{"type": "bottleneck_lineage_triple", "paper_id": "p1"}],
+                }
+            ]
+        },
+    )
+    gate_names = {str(g.get("name")) for g in readiness.get("gates") or []}
+    required_gates_present = REQUIRED_TOPIC_READINESS_GATES <= gate_names
+    no_llm = readiness.get("llm_policy") == NO_LLM_PREFLIGHT_POLICY
+    arbitrary_topic_ready = (
+        readiness.get("audit_type") == "deterministic_topic_readiness_preflight"
+        and readiness.get("readiness_level") == "claim_card_available_with_gaps"
+        and readiness.get("overall_status") == "warn"
+    )
+    source_checks = {
+        "api_exposes_topic_readiness": False,
+        "ui_renders_topic_readiness": False,
+        "topic_regression_uses_shared_contract": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_exposes_topic_readiness": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ("topic_readiness", "build_topic_readiness_preflight"),
+            ),
+            "ui_renders_topic_readiness": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("renderTopicReadiness", "topic_readiness"),
+            ),
+            "topic_regression_uses_shared_contract": _source_contains(
+                repo_root / "echelon/v14b/topic_regression.py",
+                ("run_topic_readiness_preflight", "build_topic_readiness_preflight"),
+            ),
+        }
+    checks = {
+        "no_llm_preflight": no_llm,
+        "arbitrary_topic_not_benchmark_gated": arbitrary_topic_ready,
+        "required_readiness_gates_present": required_gates_present,
+        **source_checks,
+    }
+    return {
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "readiness_level": readiness.get("readiness_level"),
+        "overall_status": readiness.get("overall_status"),
+        "required_gates": sorted(REQUIRED_TOPIC_READINESS_GATES),
+        "observed_gates": sorted(gate_names),
+        "policy": (
+            "Any topic must receive a deterministic, no-LLM readiness state; "
+            "benchmark topics are regression fixtures, not a product allowlist."
+        ),
+    }
+
+
+def audit_topic_dossier(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     visual_nodes = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_nodes") or 0) if table_exists(conn_v14, "visual_nodes") else 0
     visual_edges = int(scalar(conn_v14, "SELECT COUNT(*) FROM visual_edges") or 0) if table_exists(conn_v14, "visual_edges") else 0
     has_search = table_exists(conn_v14, "visual_search_fts")
+    graph_ready = visual_nodes > 0 and visual_edges > 0 and has_search
+    readiness_contract = audit_online_topic_readiness_contract(repo_root)
+    if graph_ready and readiness_contract["status"] == "pass":
+        status = "pass"
+    elif readiness_contract["status"] != "pass":
+        status = "fail"
+    else:
+        status = "warn"
     return {
         "issue": "Topic Dossier Product Value",
-        "status": _gate_status(visual_nodes > 0 and visual_edges > 0 and has_search, warn=visual_nodes > 0),
+        "status": status,
         "visual_nodes": visual_nodes,
         "visual_edges": visual_edges,
         "has_visual_search_fts": has_search,
+        "online_readiness_contract": readiness_contract,
         "policy": "Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration.",
     }
 
 
-def audit_multi_topic_regression(report_dir: Path) -> dict[str, Any]:
+def _sample_visual_value_model() -> dict[str, Any]:
+    from echelon.api import graph_visual_backend as graph_backend
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        CREATE TABLE visual_edges (edge_type TEXT, layer TEXT, is_main_path INTEGER);
+        CREATE TABLE future_directions (direction_id INTEGER);
+        CREATE TABLE direction_claim_cards (claim_card_id TEXT);
+        CREATE TABLE fusion_evidence_audit (created_at TEXT, adequacy_label TEXT);
+        """
+    )
+    conn.executemany(
+        "INSERT INTO visual_edges VALUES (?, ?, ?)",
+        [
+            ("main_path", "citation", 1),
+            ("citation", "citation", 0),
+            ("topic", "topic", 0),
+            ("semantic", "semantic", 0),
+            ("future_growth", "future", 0),
+        ],
+    )
+    conn.execute("INSERT INTO future_directions VALUES (1)")
+    conn.execute("INSERT INTO direction_claim_cards VALUES ('cc1')")
+    conn.execute("INSERT INTO fusion_evidence_audit VALUES ('2026-01-01T00:00:00Z', 'adequate_for_candidate_pool')")
+    original_frontfill = graph_backend._frontfill_status
+    graph_backend._frontfill_status = lambda _conn=None: {
+        "available": True,
+        "linked_ref_rate": 0.12,
+        "primary_section_rate": 0.02,
+        "openalex_w_rate": 0.55,
+    }
+    try:
+        return graph_backend._visual_value_model(conn)
+    finally:
+        graph_backend._frontfill_status = original_frontfill
+        conn.close()
+
+
+def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify Evolution Evidence Map layers explain use, limits, and evidence needs."""
+    try:
+        model = _sample_visual_value_model()
+    except Exception as exc:
+        return {
+            "issue": "Evolution Evidence Map Contract",
+            "status": "fail",
+            "error": str(exc),
+            "policy": "Evolution Evidence Map must expose layer meanings and combination limits as data, not only UI prose.",
+        }
+    layers = model.get("layers") or {}
+    combos = [
+        combo for combo in (model.get("layer_combinations") or [])
+        if isinstance(combo, dict)
+    ]
+    layer_names = set(layers)
+    combo_sets = {tuple(combo.get("layers") or []) for combo in combos}
+    missing_layers = sorted(REQUIRED_EVIDENCE_MAP_LAYERS - layer_names)
+    missing_combos = [
+        list(combo)
+        for combo in sorted(REQUIRED_EVIDENCE_MAP_COMBOS)
+        if combo not in combo_sets
+    ]
+    layer_contracts_ok = all(
+        isinstance(layers.get(name), dict)
+        and layers[name].get("algorithm")
+        and layers[name].get("relationship")
+        and layers[name].get("display")
+        for name in REQUIRED_EVIDENCE_MAP_LAYERS
+    )
+    combo_contracts_ok = bool(combos) and all(
+        combo.get("layers")
+        and combo.get("label")
+        and combo.get("question")
+        and combo.get("decision_use")
+        and combo.get("relationship")
+        and combo.get("display")
+        and combo.get("can_explain")
+        and combo.get("cannot_explain")
+        and combo.get("required_evidence")
+        and combo.get("claim_scope")
+        and combo.get("evidence_grade")
+        and isinstance(combo.get("uncertainty_reasons"), list)
+        for combo in combos
+    )
+    fusion_combo_ok = any("fusion_value" in (combo.get("layers") or []) for combo in combos)
+    source_checks = {
+        "api_returns_evidence_map": False,
+        "ui_renders_evidence_map_contract": False,
+        "ui_has_fusion_value_layer_control": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_returns_evidence_map": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ("_build_evidence_map", "recommended_layer_combinations", '"evidence_map": evidence_map'),
+            ),
+            "ui_renders_evidence_map_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("renderEvidenceMapSummary", "renderComboContract", "Fusion value"),
+            ),
+            "ui_has_fusion_value_layer_control": _source_contains(
+                repo_root / "web/visual-graph/index.html",
+                ('data-layer="fusion_value"', "Fusion value"),
+            ),
+        }
+    checks = {
+        "required_layers_present": not missing_layers,
+        "layer_contracts_present": layer_contracts_ok,
+        "required_layer_combinations_present": not missing_combos,
+        "combination_contracts_present": combo_contracts_ok,
+        "fusion_value_is_auditable_layer": fusion_combo_ok,
+        **source_checks,
+    }
+    return {
+        "issue": "Evolution Evidence Map Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "missing_layers": missing_layers,
+        "missing_required_combinations": missing_combos,
+        "layer_count": len(layer_names),
+        "combination_count": len(combos),
+        "fusion_status": model.get("fusion_status"),
+        "policy": (
+            "Each Evidence Map layer and recommended layer combination must say what it shows, "
+            "what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty."
+        ),
+    }
+
+
+def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify Radar promotion is Claim-Card-gated, not raw future-edge display."""
+    try:
+        from echelon.api.graph_visual_backend import _build_rd_radar
+
+        radar = _build_rd_radar(
+            future_directions=[
+                {
+                    "direction_id": 1,
+                    "direction_name": "Incomplete sample direction",
+                    "confidence": 0.9,
+                    "claim_scope": "exploratory_incomplete_card",
+                    "claim_card": {
+                        "five_question_complete": False,
+                        "high_confidence_eligible": False,
+                        "quality_gate": {"missing_gates": ["root constraint"]},
+                    },
+                },
+                {
+                    "direction_id": 2,
+                    "direction_name": "Complete sample direction",
+                    "confidence": 0.72,
+                    "claim_scope": "exploratory_with_claim_card",
+                    "claim_card": {
+                        "five_question_complete": True,
+                        "high_confidence_eligible": False,
+                        "quality_gate": {
+                            "missing_high_confidence_gates": ["strong section-level evidence"]
+                        },
+                    },
+                },
+            ],
+            future_growth=[
+                {
+                    "source_paper_id": "p1",
+                    "target_paper_id": "p2",
+                    "confidence": 0.8,
+                    "evidence": {
+                        "calibrated_prob": 0.75,
+                        "raw_predicted_prob": 0.91,
+                        "calibration_label": "calibrated_temporal_holdout",
+                    },
+                }
+            ],
+        )
+    except Exception as exc:
+        return {
+            "issue": "R&D Radar Promotion Contract",
+            "status": "fail",
+            "error": str(exc),
+            "policy": "Radar must be produced from complete Step13 Claim Cards; raw GNN edges stay in candidate pool.",
+        }
+
+    claim_cards = [
+        c for c in (radar.get("claim_cards") or [])
+        if isinstance(c, dict)
+    ]
+    candidate_pool = [
+        c for c in (radar.get("candidate_pool") or [])
+        if isinstance(c, dict)
+    ]
+    incomplete_cards = [
+        c for c in (radar.get("incomplete_claim_cards") or [])
+        if isinstance(c, dict)
+    ]
+    candidate_edges = [c for c in candidate_pool if c.get("kind") == "candidate_edge"]
+    candidate_pool_incomplete = [c for c in candidate_pool if c.get("kind") == "incomplete_claim_card"]
+    checks = {
+        "complete_cards_only_in_main_radar": bool(claim_cards) and all(
+            (c.get("claim_card") or {}).get("five_question_complete") is True
+            and c.get("kind") == "claim_card"
+            for c in claim_cards
+        ),
+        "incomplete_cards_are_candidate_pool_only": bool(incomplete_cards)
+        and bool(candidate_pool_incomplete)
+        and all(c.get("kind") != "incomplete_claim_card" for c in claim_cards),
+        "raw_gnn_edges_are_candidate_pool_only": bool(candidate_edges)
+        and all(c.get("kind") != "candidate_edge" for c in claim_cards)
+        and all(edge.get("claim_scope") == "exploratory_candidate_pool" for edge in candidate_edges),
+        "candidate_edges_carry_evidence_contract": bool(candidate_edges)
+        and all(edge.get("evidence_grade") and edge.get("uncertainty_reasons") for edge in candidate_edges),
+        "candidate_pool_items_not_eligible": all(not bool(c.get("eligible")) for c in candidate_pool),
+        "empty_radar_policy_present": "only promotes complete Step13 Claim Cards" in str(radar.get("summary") or ""),
+    }
+    source_checks = {
+        "api_exposes_candidate_pool": False,
+        "ui_separates_radar_from_candidate_pool": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_exposes_candidate_pool": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ("claim_cards", "incomplete_claim_cards", "candidate_pool", "GNN future edges"),
+            ),
+            "ui_separates_radar_from_candidate_pool": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("renderDossierRadar", "No complete Claim Cards yet", "Future candidate generator pool"),
+            ),
+        }
+    checks.update(source_checks)
+    return {
+        "issue": "R&D Radar Promotion Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "main_radar_cards": len(claim_cards),
+        "candidate_pool_items": len(candidate_pool),
+        "incomplete_claim_cards": len(incomplete_cards),
+        "candidate_edges": len(candidate_edges),
+        "policy": (
+            "R&D Radar main view may contain only complete Step13 Claim Cards. "
+            "Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets."
+        ),
+    }
+
+
+def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify low linked-ref coverage demotes main-path/citation claims visibly."""
+    try:
+        from echelon.api.graph_visual_backend import (
+            _apply_history_main_path_contract,
+            _build_history_main_path_contract,
+        )
+
+        main_path_edges = [
+            {
+                "edge_id": "main:p1:p2",
+                "source_paper_id": "p1",
+                "target_paper_id": "p2",
+                "weight": 0.8,
+                "plain_language": "sample main-path edge",
+            }
+        ]
+        contract = _build_history_main_path_contract(
+            main_path_edges=main_path_edges,
+            key_turning_papers=[
+                {
+                    "paper_id": "p1",
+                    "claim_scope": "topic_specific_turning_candidate",
+                    "evidence_grade": "metadata_turning_candidate",
+                    "uncertainty_reasons": ["linked refs below target"],
+                }
+            ],
+            broader_context_papers=[{"paper_id": "p3"}],
+            value_model={
+                "frontfill_status": {
+                    "linked_ref_rate": 0.12,
+                    "primary_section_rate": 0.02,
+                    "openalex_w_rate": 0.55,
+                }
+            },
+        )
+        _apply_history_main_path_contract(main_path_edges, contract)
+    except Exception as exc:
+        return {
+            "issue": "Main Path Uncertainty Contract",
+            "status": "fail",
+            "error": str(exc),
+            "policy": "When linked refs are below 30%, main-path/citation evolution must be visibly demoted.",
+        }
+
+    low_ref_reason = any("linked refs below 30%" in str(r) for r in contract.get("uncertainty_reasons") or [])
+    checks = {
+        "history_main_path_has_claim_scope": bool(contract.get("claim_scope")),
+        "history_main_path_has_evidence_grade": bool(contract.get("evidence_grade")),
+        "low_linked_refs_add_uncertainty": low_ref_reason,
+        "history_main_path_has_required_evidence": bool(contract.get("required_evidence")),
+        "history_main_path_has_evidence_objects": bool(contract.get("evidence_objects")),
+        "main_path_edges_inherit_uncertainty": all(
+            edge.get("claim_scope")
+            and edge.get("evidence_grade")
+            and any("linked refs below 30%" in str(r) for r in edge.get("uncertainty_reasons") or [])
+            for edge in main_path_edges
+        ),
+    }
+    source_checks = {
+        "api_returns_history_contract": False,
+        "ui_renders_main_path_uncertainty": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_returns_history_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ("_build_history_main_path_contract", "history_main_path_contract", '"history_main_path": {'),
+            ),
+            "ui_renders_main_path_uncertainty": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("Main-path uncertainty", "history.claim_scope", "history.evidence_grade"),
+            ),
+        }
+    checks.update(source_checks)
+    return {
+        "issue": "Main Path Uncertainty Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "claim_scope": contract.get("claim_scope"),
+        "evidence_grade": contract.get("evidence_grade"),
+        "uncertainty_reasons": contract.get("uncertainty_reasons"),
+        "policy": "When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons.",
+    }
+
+
+def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
+    metrics = metrics or {}
     expected = {
         "metalens",
         "metasurface holography",
         "photonic crystal cavity",
         "quantum light source",
     }
-    defined = set(GOLD_TOPICS)
+    defined = set(BENCHMARK_TOPICS)
     missing = sorted(expected - defined)
     suite_path = report_dir / "multi_topic_regression.json"
     live_results: list[dict[str, Any]] = []
@@ -330,17 +1128,24 @@ def audit_multi_topic_regression(report_dir: Path) -> dict[str, Any]:
     live_status = "not_run"
     if live_results:
         live_status = "fail" if failed_topics else "pass"
+    topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
+    topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
+    topic_gap_blocking = topic_gap_queue_papers > 0 and topic_gap_primary_rate < 0.70
     return {
         "issue": "Multi-topic Regression",
         "status": (
             "fail"
-            if missing or failed_topics
+            if missing or failed_topics or topic_gap_blocking
             else ("pass" if live_results else "warn")
         ),
-        "gold_topics": sorted(defined),
+        "benchmark_topics": sorted(defined),
         "missing_topics": missing,
         "live_regression_status": live_status,
         "failed_topics": failed_topics,
+        "topic_gap_queue_papers": topic_gap_queue_papers,
+        "topic_gap_primary_section_papers": int(metrics.get("topic_gap_primary_section_papers") or 0),
+        "topic_gap_primary_section_rate": topic_gap_primary_rate,
+        "topic_gap_blocking": topic_gap_blocking,
         "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens.",
     }
 
@@ -367,7 +1172,11 @@ def audit_quarterly_multi_corpus(db_main: Path, repo_root: Path) -> dict[str, An
 
 
 def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir: Path | None = None) -> dict[str, Any]:
-    metrics = collect_metrics(db_main, db_v14)
+    metrics = collect_metrics(
+        db_main,
+        db_v14,
+        topic_gap_queue=repo_root / "data/v14b/topic_evidence_gap_delta_queue.csv",
+    )
     metrics["section_frontfill_state"] = select_section_frontfill_state(repo_root)
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
@@ -383,8 +1192,13 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_branch_lineage(conn_v14),
             audit_future_growth(conn_v14),
             audit_claim_card_engine(conn_v14),
-            audit_topic_dossier(conn_v14),
-            audit_multi_topic_regression(report_dir),
+            audit_claim_card_high_confidence_evidence_contract(conn_v14, repo_root),
+            audit_llm_evidence_boundary(conn_v14, repo_root),
+            audit_topic_dossier(conn_v14, repo_root),
+            audit_evolution_evidence_map_contract(repo_root),
+            audit_rd_radar_promotion_contract(repo_root),
+            audit_main_path_uncertainty_contract(repo_root),
+            audit_multi_topic_regression(report_dir, metrics),
             audit_quarterly_multi_corpus(db_main, repo_root),
         ]
     statuses = Counter(g["status"] for g in gates)
@@ -411,7 +1225,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- evidence_policy: `{result['evidence_policy']}`",
         f"- gate_summary: `{json.dumps(result['summary'], ensure_ascii=False, sort_keys=True)}`",
         "",
-        "## Eight Product Gates",
+        "## Product Gates",
         "",
         "| # | Gate | Status | What This Enforces |",
         "| ---: | --- | --- | --- |",

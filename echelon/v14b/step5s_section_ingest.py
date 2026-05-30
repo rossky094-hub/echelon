@@ -44,17 +44,22 @@ from echelon.v14b.utils import Checkpoint, add_common_args, make_progress, setup
 logger = logging.getLogger("echelon.v14b.step5s_section_ingest")
 
 SECTION_PARSE_TIMEOUT_SEC = int(os.getenv("V14B_SECTION_PARSE_TIMEOUT_SEC", "180"))
+SECTION_INGEST_TRUST_ENV = os.getenv("V14B_SECTION_INGEST_TRUST_ENV", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
+# Claim-supporting evidence sections.  Limitation/discussion/conclusion/future
+# work are strongest for bottleneck claims; method/results/error analysis/
+# ablation/experiments are still evidence-bearing for mechanisms, failed
+# attempts, enablers, and minimal validation experiments.
 PRIMARY_SECTION_NAMES = (
     "limitations",
     "discussion",
     "conclusion",
     "future_work",
-)
-
-# Beyond the four core section types, these sections provide additional
-# interpretable constraints/mechanism evidence for branch diagnostics.
-SECONDARY_SECTION_NAMES = (
     "results",
     "error_analysis",
     "ablation",
@@ -63,15 +68,81 @@ SECONDARY_SECTION_NAMES = (
 )
 
 SECTION_PATTERNS: list[tuple[str, re.Pattern]] = [
-    ("limitations", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(limitation|limitations|open challenges?)\s*$", re.I)),
-    ("discussion", re.compile(r"^\s*(\d+(\.\d+)?)?\s*discussion\s*$", re.I)),
-    ("conclusion", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(conclusion|conclusions|concluding remarks?)\s*$", re.I)),
-    ("future_work", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(future work|outlook|perspective|perspectives)\s*$", re.I)),
-    ("results", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(results?|evaluation)\s*$", re.I)),
-    ("error_analysis", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(error analysis|failure analysis|limitations and discussion)\s*$", re.I)),
-    ("ablation", re.compile(r"^\s*(\d+(\.\d+)?)?\s*ablation( study)?\s*$", re.I)),
-    ("method", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(method|methods|methodology|approach)\s*$", re.I)),
-    ("experiments", re.compile(r"^\s*(\d+(\.\d+)?)?\s*(experiment|experiments|experimental setup)\s*$", re.I)),
+    ("limitations", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(limitation|limitations|open challenges?|challenges and limitations|limitations and future work)\s*[:.\-–—]*\s*$", re.I)),
+    ("discussion", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(discussion|discussion and outlook|discussion and conclusions?|results and discussion)\s*[:.\-–—]*\s*$", re.I)),
+    ("conclusion", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(conclusion|conclusions|concluding remarks?|summary|summary and conclusions?)\s*[:.\-–—]*\s*$", re.I)),
+    ("future_work", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(future work|outlook|perspective|perspectives|summary and outlook|conclusions? and outlook)\s*[:.\-–—]*\s*$", re.I)),
+    ("results", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(results?|evaluation|experimental results|results and discussion)\s*[:.\-–—]*\s*$", re.I)),
+    ("error_analysis", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(error analysis|failure analysis|limitations and discussion|failure cases?)\s*[:.\-–—]*\s*$", re.I)),
+    ("ablation", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*ablation( study| analysis)?\s*[:.\-–—]*\s*$", re.I)),
+    ("method", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(method|methods|methodology|approach|materials and methods|theoretical model|model and methods|device fabrication|fabrication and characterization)\s*[:.\-–—]*\s*$", re.I)),
+    ("experiments", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(experiment|experiments|experimental setup|experimental methods|experiment setup|validation experiment)\s*[:.\-–—]*\s*$", re.I)),
+]
+
+INLINE_SECTION_PREFIXES: list[tuple[str, tuple[str, ...]]] = [
+    ("limitations", ("challenges and limitations", "limitations and future work", "open challenges", "limitations", "limitation")),
+    ("error_analysis", ("limitations and discussion", "failure analysis", "failure cases", "error analysis")),
+    ("future_work", ("summary and outlook", "conclusions and outlook", "conclusion and outlook", "future work", "outlook", "perspectives", "perspective")),
+    ("discussion", ("results and discussion", "discussion and conclusions", "discussion and conclusion", "discussion and outlook", "discussion")),
+    ("conclusion", ("summary and conclusions", "summary and conclusion", "concluding remarks", "conclusions", "conclusion", "summary")),
+    ("results", ("experimental results", "results and discussion", "evaluation", "results", "result")),
+    ("ablation", ("ablation analysis", "ablation study", "ablation")),
+    ("method", ("fabrication and characterization", "materials and methods", "methods and experiments", "model and methods", "theoretical model", "device fabrication", "methodology", "methods", "method", "approach")),
+    ("experiments", ("methods and experiments", "experimental methods", "experimental setup", "experiment setup", "validation experiment", "experiments", "experiment")),
+]
+
+LOOSE_INLINE_HEADINGS = {
+    "limitation",
+    "limitations",
+    "discussion",
+    "conclusion",
+    "conclusions",
+    "concluding remarks",
+    "summary",
+    "method",
+    "methods",
+    "experiments",
+    "experiment",
+    "outlook",
+}
+
+FALSE_INLINE_BODY_STARTS = {
+    "show",
+    "shows",
+    "showed",
+    "indicate",
+    "indicates",
+    "indicated",
+    "suggest",
+    "suggests",
+    "suggested",
+    "demonstrate",
+    "demonstrates",
+    "demonstrated",
+    "reveal",
+    "reveals",
+    "revealed",
+}
+
+EMBEDDED_BOUNDARY_PHRASES: tuple[str, ...] = (
+    "abstract",
+    "introduction",
+    "background",
+    "related work",
+    "theory",
+    "design",
+    "simulation",
+    "references",
+    "bibliography",
+    "acknowledgements",
+    "acknowledgments",
+    "appendix",
+    "supplementary",
+    "supporting information",
+)
+
+STOP_SECTION_PATTERNS: list[re.Pattern] = [
+    re.compile(r"^\s*(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(references|bibliography|acknowledg(e)?ments?|appendix|supplementary|supporting information|data availability|code availability|author contributions?|conflicts? of interest)\s*[:.\-–—]*\s*$", re.I),
 ]
 
 SECTION_INGEST_OUTCOMES = {
@@ -413,11 +484,14 @@ def load_candidates(
         FROM papers
         WHERE id IN ({placeholders})
           {"AND id IN (SELECT paper_id FROM temp.v14b_corpus_papers)" if corpus_id else ""}
-        ORDER BY publication_date DESC, id
         """,
         ids,
     ).fetchall()
-    papers = [dict(r) for r in rows]
+    row_by_id = {str(r["id"]): dict(r) for r in rows}
+    # `ids` is already an evidence-budget ordering: future endpoints,
+    # branch drivers, main-path nodes, topic-gap papers, and keystones.
+    # Re-sorting by year silently starves the highest-value evidence gaps.
+    papers = [row_by_id[pid] for pid in ids if pid in row_by_id]
 
     if SECTION_INGEST_REQUIRE_ARXIV:
         papers = [
@@ -463,11 +537,131 @@ def _heading_to_section(line: str) -> Optional[str]:
     return None
 
 
+def _is_stop_heading(line: str) -> bool:
+    normalized = re.sub(r"\s+", " ", line.strip())[:160]
+    return any(pattern.match(normalized) for pattern in STOP_SECTION_PATTERNS)
+
+
+def _inline_heading_to_section(line: str) -> tuple[Optional[str], str, str]:
+    """Detect heading+content lines without using loose keyword extraction.
+
+    Many PDFs expose "1. Results and Discussion. ..." as one text line.  This
+    is still section evidence because the section title is explicit.  We avoid
+    plain keyword windows here: single-word titles need numbering or a separator
+    before the body, so a sentence like "Results show ..." is not promoted to a
+    section claim.
+    """
+    clean = re.sub(r"\s+", " ", line.strip())
+    if not clean:
+        return None, "", ""
+    prefix = r"(?P<prefix>\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*)"
+    for sec_name, phrases in INLINE_SECTION_PREFIXES:
+        for phrase in phrases:
+            pattern = re.compile(
+                rf"^{prefix}(?P<title>{re.escape(phrase)})\b(?P<sep>\s*[:.\-–—]\s*|\s+)(?P<rest>.*)$",
+                re.I,
+            )
+            match = pattern.match(clean)
+            if not match:
+                continue
+            numbered = bool(re.search(r"(\d+(\.\d+)*|[ivx]+|[a-z])", match.group("prefix") or "", re.I))
+            sep = match.group("sep") or ""
+            rest = (match.group("rest") or "").strip()
+            title_is_specific = len(phrase.split()) > 1
+            has_strong_separator = bool(re.search(r"[:.\-–—]", sep))
+            strategy = "inline_heading"
+            if rest and not (numbered or title_is_specific or has_strong_separator):
+                first = re.match(r"([A-Za-z][A-Za-z-]*)", rest)
+                first_word = first.group(1).lower() if first else ""
+                looks_like_heading_body = (
+                    phrase.lower() in LOOSE_INLINE_HEADINGS
+                    and bool(rest[:1])
+                    and (rest[:1].isupper() or rest[:1].isdigit())
+                    and first_word not in FALSE_INLINE_BODY_STARTS
+                )
+                if not looks_like_heading_body:
+                    continue
+                strategy = "loose_inline_heading"
+            return sec_name, rest, strategy
+    return None, "", ""
+
+
+def _embedded_heading_sections(text: str) -> list[tuple[str, str]]:
+    """Extract explicit numbered headings embedded inside a long PDF text block.
+
+    This is intentionally stricter than keyword-window extraction.  It only
+    accepts numbered/roman section headings such as "5. Conclusions ..." that
+    PDF parsers sometimes flatten into the middle of a page block.  The output
+    remains section evidence, but the strategy is exposed downstream so the UI
+    can mark it as weaker than clean heading-continuation extraction.
+    """
+    clean = re.sub(r"\s+", " ", text.replace("\x00", " ").strip())
+    if len(clean) < SECTION_INGEST_MIN_CHARS:
+        return []
+    phrase_pairs: list[tuple[str, str]] = []
+    for sec_name, phrases in INLINE_SECTION_PREFIXES:
+        for phrase in phrases:
+            phrase_pairs.append((sec_name, phrase))
+    # Longer phrases first so "results and discussion" wins over "results".
+    phrase_pairs.sort(key=lambda item: len(item[1]), reverse=True)
+
+    def heading_re(phrases: list[str]) -> re.Pattern:
+        phrase_alt = "|".join(re.escape(p) for p in phrases)
+        return re.compile(
+            rf"(?:^|[.;!?]\s+)"
+            rf"(?P<num>(?:section\s+)?(?:\d+(?:\.\d+)*|[ivx]+)\s*[\).:\-–—]?\s+)"
+            rf"(?P<title>{phrase_alt})\b"
+            rf"(?P<sep>\s*[:.\-–—]\s*|\s+)",
+            re.I,
+        )
+
+    target_patterns = [
+        (sec_name, heading_re([phrase]))
+        for sec_name, phrase in phrase_pairs
+    ]
+    boundary_pattern = heading_re(
+        [phrase for _, phrase in phrase_pairs]
+        + list(EMBEDDED_BOUNDARY_PHRASES)
+    )
+    boundaries = sorted({m.start() for m in boundary_pattern.finditer(clean)} | {len(clean)})
+    found: list[tuple[int, int, str, str]] = []
+    for sec_name, pattern in target_patterns:
+        for match in pattern.finditer(clean):
+            next_boundary = next((b for b in boundaries if b > match.start()), len(clean))
+            body = clean[match.end():next_boundary].strip(" .;:-–—")
+            if len(body) >= SECTION_INGEST_MIN_CHARS:
+                found.append((match.start(), next_boundary, sec_name, body))
+    found.sort(key=lambda item: item[0])
+
+    out: list[tuple[str, str]] = []
+    occupied: set[tuple[int, int]] = set()
+    for start, end, sec_name, body in found:
+        if (start, end) in occupied:
+            continue
+        occupied.add((start, end))
+        out.append((sec_name, body))
+    return out
+
+
 def extract_sections_with_metadata(blocks) -> dict[str, dict[str, Any]]:
     sections: dict[str, list[str]] = {name: [] for name, _ in SECTION_PATTERNS}
     section_pages: dict[str, set[int]] = {name: set() for name, _ in SECTION_PATTERNS}
     section_blocks: dict[str, int] = {name: 0 for name, _ in SECTION_PATTERNS}
+    section_strategies: dict[str, set[str]] = {name: set() for name, _ in SECTION_PATTERNS}
     current: Optional[str] = None
+
+    def append_section(sec_name: str, sec_text: str, page_no: Any, strategy: str) -> None:
+        clean_text = re.sub(r"\s+", " ", sec_text.strip())
+        if not clean_text:
+            return
+        if clean_text in sections[sec_name]:
+            section_strategies[sec_name].add(strategy)
+            return
+        sections[sec_name].append(clean_text[:1200])
+        section_blocks[sec_name] += 1
+        section_strategies[sec_name].add(strategy)
+        if page_no:
+            section_pages[sec_name].add(int(page_no))
 
     for block in blocks:
         text = (block.text or "").replace("\x00", " ").strip()
@@ -478,29 +672,37 @@ def extract_sections_with_metadata(blocks) -> dict[str, dict[str, Any]]:
         # Keep parser-level section hints as a weak backup.
         hint = (block.section_hint or "").lower()
         if hint == "limitations":
-            sections["limitations"].append(text[:1200])
-            section_blocks["limitations"] += 1
-            if page_no:
-                section_pages["limitations"].add(int(page_no))
+            append_section("limitations", text, page_no, "parser_hint")
         elif hint == "conclusion":
-            sections["conclusion"].append(text[:1200])
-            section_blocks["conclusion"] += 1
-            if page_no:
-                section_pages["conclusion"].add(int(page_no))
+            append_section("conclusion", text, page_no, "parser_hint")
 
+        block_had_section_signal = False
         for line in text.splitlines():
             clean = line.strip()
             if not clean:
                 continue
+            if _is_stop_heading(clean):
+                current = None
+                continue
             heading = _heading_to_section(clean)
             if heading:
                 current = heading
+                section_strategies[current].add("explicit_heading")
+                block_had_section_signal = True
+                continue
+            inline_heading, inline_rest, inline_strategy = _inline_heading_to_section(clean)
+            if inline_heading:
+                block_had_section_signal = True
+                if inline_rest:
+                    append_section(inline_heading, inline_rest, page_no, inline_strategy or "inline_heading")
+                current = None if inline_strategy == "loose_inline_heading" else inline_heading
                 continue
             if current:
-                sections[current].append(clean)
-                section_blocks[current] += 1
-                if page_no:
-                    section_pages[current].add(int(page_no))
+                append_section(current, clean, page_no, "heading_continuation")
+                block_had_section_signal = True
+        if not block_had_section_signal:
+            for embedded_section, embedded_text in _embedded_heading_sections(text):
+                append_section(embedded_section, embedded_text, page_no, "embedded_heading")
 
     merged: dict[str, dict[str, Any]] = {}
     for sec_name, lines in sections.items():
@@ -514,6 +716,7 @@ def extract_sections_with_metadata(blocks) -> dict[str, dict[str, Any]]:
             "text": blob[:SECTION_INGEST_MAX_CHARS],
             "pages": pages,
             "n_blocks": int(section_blocks.get(sec_name, 0)),
+            "extraction_strategies": sorted(section_strategies.get(sec_name, set())),
         }
     return merged
 
@@ -587,6 +790,7 @@ def upsert_sections(
             {
                 "n_pages": len(set(pages)),
                 "n_blocks": int((payload or {}).get("n_blocks") or 0),
+                "extraction_strategies": list((payload or {}).get("extraction_strategies") or []),
             },
             ensure_ascii=False,
         )
@@ -747,7 +951,7 @@ def run_section_ingest(
 
     # Keep concurrency intentionally low to avoid memory pressure on local Macs.
     limits = httpx.Limits(max_connections=max(1, SECTION_INGEST_CONCURRENCY))
-    with httpx.Client(limits=limits, follow_redirects=True) as client:
+    with httpx.Client(limits=limits, follow_redirects=True, trust_env=SECTION_INGEST_TRUST_ENV) as client:
         with make_progress(papers, desc="Step5s sections") as pbar:
             for paper in pbar:
                 pid = paper["id"]
@@ -759,6 +963,7 @@ def run_section_ingest(
                         paper_id=pid,
                         outcome="already_has_primary",
                         run_id=run_id,
+                        primary_sections=1,
                         candidate_file=candidate_file,
                     )
                     conn_main.commit()
@@ -898,7 +1103,7 @@ def run_section_ingest(
         "skipped_no_pdf": skipped_no_pdf,
         "failed_parse": failed_parse,
         "section_counter": section_counter,
-        "extra_sections_enabled": list(SECONDARY_SECTION_NAMES),
+        "claim_supporting_sections_enabled": list(PRIMARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,
         "candidate_digest": candidate_digest,
         "run_kind": "delta_queue" if candidate_file else "topn_scan",

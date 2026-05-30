@@ -178,6 +178,16 @@ COST_TERMS = re.compile(
     re.I,
 )
 
+STRONG_SECTION_STRATEGIES = {
+    "explicit_heading",
+    "heading_continuation",
+    "embedded_heading",
+}
+
+MODERATE_SECTION_STRATEGIES = {
+    "inline_heading",
+}
+
 
 def jdumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -303,6 +313,76 @@ def classify_principle(text: str) -> PrincipleDef:
     return best if best and best_hits > 0 else FALLBACK_PRINCIPLE
 
 
+def _json_obj(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        loaded = json.loads(str(value))
+    except Exception:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _strategy_strength(strategies: set[str]) -> str:
+    if strategies & STRONG_SECTION_STRATEGIES:
+        return "strong"
+    if strategies & MODERATE_SECTION_STRATEGIES:
+        return "moderate"
+    return "weak"
+
+
+def load_section_provenance_index(
+    conn_main: sqlite3.Connection,
+    paper_ids: list[str],
+    *,
+    corpus_id: str | None = None,
+) -> dict[tuple[str, str], dict[str, Any]]:
+    table_names = {
+        row[0] for row in conn_main.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    if "paper_sections" not in table_names or not paper_ids:
+        return {}
+    cols = {
+        row[1] for row in conn_main.execute("PRAGMA table_info(paper_sections)").fetchall()
+    }
+    meta_expr = "COALESCE(section_meta_json, '{}')" if "section_meta_json" in cols else "'{}'"
+    placeholders = ",".join("?" * len(paper_ids))
+    scope_sql = (
+        "AND paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    rows = conn_main.execute(
+        f"""
+        SELECT paper_id, section_name, {meta_expr} AS section_meta_json
+        FROM paper_sections
+        WHERE paper_id IN ({placeholders})
+          {scope_sql}
+        """,
+        paper_ids,
+    ).fetchall()
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        meta = _json_obj(row["section_meta_json"])
+        raw_strategies = meta.get("extraction_strategies") or []
+        strategies = {
+            str(item).strip()
+            for item in raw_strategies
+            if str(item).strip()
+        }
+        if not strategies:
+            strategies = {"legacy_unknown_strategy"}
+        strength = _strategy_strength(strategies)
+        out[(str(row["paper_id"]), _normalize_section_name(str(row["section_name"] or "")))] = {
+            "section_provenance_strength": strength,
+            "section_extraction_strategies": sorted(strategies),
+            "section_meta": meta,
+        }
+    return out
+
+
 def load_atoms(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
@@ -365,6 +445,11 @@ def load_atoms(
             paper_ids,
         ).fetchall()
         paper_meta = {str(r["id"]): dict(r) for r in p_rows}
+    section_provenance = load_section_provenance_index(
+        conn_main,
+        paper_ids,
+        corpus_id=corpus_id,
+    )
 
     resolved_map: dict[int, tuple[int, int]] = {}
     if table_exists(conn_v14, "limitation_resolutions"):
@@ -390,6 +475,15 @@ def load_atoms(
         atom["paper_title"] = meta.get("title") or ""
         atom["publication_year"] = meta.get("publication_year")
         atom["primary_field_id"] = meta.get("primary_field_id") or ""
+        section_key = (
+            str(atom.get("paper_id") or ""),
+            _normalize_section_name(str(atom.get("source_section_name") or "")),
+        )
+        provenance = section_provenance.get(section_key, {})
+        atom["section_provenance_strength"] = provenance.get("section_provenance_strength") or (
+            "weak" if atom.get("evidence_quality") == "section_level" else "none"
+        )
+        atom["section_extraction_strategies"] = provenance.get("section_extraction_strategies") or []
         atom_id = int(atom.get("atom_id") or 0)
         resolved = resolved_map.get(atom_id)
         if resolved:
@@ -610,19 +704,43 @@ def evidence_strength_level_from_atoms(atoms: list[dict]) -> str:
     if not atoms:
         return "weak"
     grade = grade_from_qualities(a.get("evidence_quality") for a in atoms)
-    if grade == "strong_section":
+    provenance = section_provenance_summary_from_atoms(atoms)
+    strong_or_moderate = int(provenance.get("strong", 0)) + int(provenance.get("moderate", 0))
+    strong = int(provenance.get("strong", 0))
+    provenance_ratio = strong_or_moderate / max(1, len(atoms))
+    strong_ratio = strong / max(1, len(atoms))
+    if grade == "strong_section" and strong_ratio >= 0.70:
         return "strong"
-    if grade == "moderate_section":
+    if grade in {"strong_section", "moderate_section"} and provenance_ratio >= 0.35:
         return "moderate"
     qualities = Counter((a.get("evidence_quality") or "unknown") for a in atoms)
     section = int(qualities.get("section_level", 0) + qualities.get("structured_sections", 0))
     weak = int(qualities.get("weak_abstract", 0))
     ratio = section / max(1, len(atoms))
-    if ratio >= 0.70:
+    if ratio >= 0.70 and strong_ratio >= 0.70:
         return "strong"
-    if ratio >= 0.35 and weak < len(atoms):
+    if ratio >= 0.35 and provenance_ratio >= 0.35 and weak < len(atoms):
         return "moderate"
     return "weak"
+
+
+def section_provenance_summary_from_atoms(atoms: list[dict]) -> dict[str, Any]:
+    strengths = Counter()
+    strategies = Counter()
+    for atom in atoms:
+        strength = str(atom.get("section_provenance_strength") or "").strip()
+        if not strength:
+            strength = "none" if atom.get("evidence_quality") != "section_level" else "weak"
+        strengths[strength] += 1
+        for strategy in atom.get("section_extraction_strategies") or []:
+            strategies[str(strategy)] += 1
+    return {
+        "strong": int(strengths.get("strong", 0)),
+        "moderate": int(strengths.get("moderate", 0)),
+        "weak": int(strengths.get("weak", 0)),
+        "none": int(strengths.get("none", 0)),
+        "strategies": dict(sorted(strategies.items())),
+    }
 
 
 def minimal_experiment_template(
@@ -687,6 +805,7 @@ def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
     labels = {
         "five_question_complete": "complete five-question Claim Card",
         "section_evidence_strong": "strong section-level evidence",
+        "section_provenance_ready": "strong or moderate section parser provenance",
         "calibration_ready": "future-growth calibration available",
         "rolling_auc_ready": "rolling held-out-year AUC >= 0.65",
         "direction_confidence_ready": "direction confidence >= 0.70",
@@ -818,6 +937,8 @@ def build_principle_summary(
                 "description": atom.get("description") or "",
                 "branch_id": atom.get("branch_id"),
                 "evidence_quality": quality,
+                "section_provenance_strength": atom.get("section_provenance_strength"),
+                "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                 "is_resolved": int(atom.get("is_resolved") or 0),
             }
         )
@@ -1089,6 +1210,8 @@ def build_bottleneck_lineage_triples(
                                 "new_constraint",
                             ],
                             "evidence_grade": grade_from_qualities([atom.get("evidence_quality")]),
+                            "section_provenance_strength": atom.get("section_provenance_strength"),
+                            "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                             "claim_policy": "lineage evidence only; not a standalone prediction",
                         }
                     ),
@@ -1225,6 +1348,8 @@ def build_direction_claim_cards(
                     "keyword": atom.get("keyword"),
                     "severity": atom.get("severity"),
                     "evidence_quality": atom.get("evidence_quality"),
+                    "section_provenance_strength": atom.get("section_provenance_strength"),
+                    "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                 }
             )
             if len(attempts) >= 8:
@@ -1233,6 +1358,14 @@ def build_direction_claim_cards(
         calibration_ready = bool(calibration_audit.get("method"))
         rolling_avg_auc = float(calibration_audit.get("avg_calibrated_auc") or 0.0)
         section_strength = evidence_strength_level_from_atoms(direction_atoms)
+        section_provenance = section_provenance_summary_from_atoms(direction_atoms)
+        strong_or_moderate_provenance = int(section_provenance.get("strong", 0)) + int(
+            section_provenance.get("moderate", 0)
+        )
+        section_provenance_ready = strong_or_moderate_provenance >= max(
+            1,
+            int(0.35 * max(1, len(direction_atoms))),
+        )
         new_enablers = []
         missing_enablers = []
         if calibration_ready and rolling_avg_auc >= 0.65:
@@ -1240,9 +1373,11 @@ def build_direction_claim_cards(
         else:
             missing_enablers.append("rolling held-out-year calibration is missing or below threshold")
         if section_strength in {"moderate", "strong"}:
-            new_enablers.append(f"{section_strength} section-level bottleneck evidence is available")
+            new_enablers.append(
+                f"{section_strength} section-level bottleneck evidence with parser provenance is available"
+            )
         else:
-            missing_enablers.append("section-level bottleneck evidence is weak")
+            missing_enablers.append("section-level bottleneck evidence is weak or parser provenance is weak")
         if float(d.get("confidence") or 0.0) >= 0.70:
             new_enablers.append("future-growth graph confidence is above the candidate threshold")
         else:
@@ -1258,6 +1393,7 @@ def build_direction_claim_cards(
             "calibration_label": d.get("calibration_label"),
             "rolling_avg_calibrated_auc": rolling_avg_auc,
             "evidence_tier": d.get("evidence_tier"),
+            "section_provenance": section_provenance,
         }
 
         unresolved = [
@@ -1267,6 +1403,8 @@ def build_direction_claim_cards(
                 "keyword": atom.get("keyword"),
                 "severity": atom.get("severity"),
                 "evidence_quality": atom.get("evidence_quality"),
+                "section_provenance_strength": atom.get("section_provenance_strength"),
+                "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                 "evidence_weight": float(atom.get("evidence_weight") or 0.35),
             }
             for atom in sorted(
@@ -1305,6 +1443,7 @@ def build_direction_claim_cards(
         high_confidence_gates = {
             "five_question_complete": bool(five_complete),
             "section_evidence_strong": section_strength == "strong",
+            "section_provenance_ready": section_provenance_ready,
             "calibration_ready": calibration_ready,
             "rolling_auc_ready": rolling_avg_auc >= 0.65,
             "direction_confidence_ready": float(d.get("confidence") or 0.0) >= 0.70,
@@ -1324,6 +1463,7 @@ def build_direction_claim_cards(
             "five_question_complete": bool(five_complete),
             "missing_gates": missing_gates,
             "section_evidence_strength": section_strength,
+            "section_provenance": section_provenance,
             "calibration_ready": calibration_ready,
             "rolling_avg_calibrated_auc": rolling_avg_auc,
             "direction_confidence": float(d.get("confidence") or 0.0),
@@ -1354,6 +1494,7 @@ def build_direction_claim_cards(
                     {
                         "items": unresolved,
                         "evidence_strength_level": section_strength,
+                        "section_provenance": section_provenance,
                     }
                 ),
                 "minimal_validation_experiment_json": jdumps(minimal_experiment),

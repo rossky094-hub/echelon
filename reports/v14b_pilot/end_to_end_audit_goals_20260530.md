@@ -39,7 +39,7 @@ must improve one of three properties:
    - Acceptance: top 5 relink blockers are quantified, not guessed.
 
 3. **High-Value Section Coverage Audit**
-   - Goal: verify section coverage for main-path nodes, branch drivers, future endpoints, top keystone papers, limitation atoms, and the 4 gold topics.
+   - Goal: verify section coverage for main-path nodes, branch drivers, future endpoints, top keystone papers, limitation atoms, and the 4 benchmark topics.
    - Acceptance: a table shows coverage per evidence-critical class.
 
 4. **Section Parser Error Audit**
@@ -124,4 +124,3 @@ must improve one of three properties:
 2. Strengthen multi-topic gold regression fixtures and evidence-object checks.
 3. Prepare post-frontfill checkpoint logic and Claim Card missing-gate matrix.
 4. When section/OpenAlex finishes or watchdog hands off delta queue, rerun Step5c -> Step6 -> Step13 -> visual graph -> value audit.
-

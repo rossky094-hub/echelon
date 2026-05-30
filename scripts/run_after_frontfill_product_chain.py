@@ -9,9 +9,11 @@ configurable, and `--force` is available for partial-data smoke tests.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import pathlib
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -48,6 +50,23 @@ EVIDENCE_SENSITIVE_STEPS = {
     "report",
 }
 
+PRIMARY_SECTION_NAMES = (
+    "limitation",
+    "limitations",
+    "discussion",
+    "conclusion",
+    "conclusions",
+    "future_work",
+    "future work",
+    "future directions",
+    "results",
+    "error_analysis",
+    "ablation",
+    "method",
+    "methods",
+    "experiments",
+)
+
 
 def utc_now() -> str:
     return datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -81,6 +100,37 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
     conn = sqlite3.connect(str(db_main))
     try:
         papers = int(scalar(conn, "SELECT COUNT(*) FROM papers") or 0)
+        refs = 0
+        linked_refs = 0
+        if table_exists(conn, "paper_references"):
+            refs = int(scalar(conn, "SELECT COUNT(*) FROM paper_references") or 0)
+            ref_cols = {row[1] for row in conn.execute("PRAGMA table_info(paper_references)").fetchall()}
+            if "cited_paper_id_internal" in ref_cols:
+                linked_refs = int(
+                    scalar(
+                        conn,
+                        """
+                        SELECT COUNT(*)
+                        FROM paper_references
+                        WHERE cited_paper_id_internal IS NOT NULL
+                          AND cited_paper_id_internal <> ''
+                        """,
+                    )
+                    or 0
+                )
+            elif "cited_paper_id" in ref_cols:
+                linked_refs = int(
+                    scalar(
+                        conn,
+                        """
+                        SELECT COUNT(*)
+                        FROM paper_references
+                        WHERE cited_paper_id IS NOT NULL
+                          AND cited_paper_id <> ''
+                        """,
+                    )
+                    or 0
+                )
         openalex_w = int(
             scalar(
                 conn,
@@ -98,22 +148,16 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
         if table_exists(conn, "paper_sections"):
             section_rows = int(scalar(conn, "SELECT COUNT(*) FROM paper_sections") or 0)
             section_papers = int(scalar(conn, "SELECT COUNT(DISTINCT paper_id) FROM paper_sections") or 0)
-            primary_section_papers = int(
-                scalar(
-                    conn,
-                    """
-                    SELECT COUNT(DISTINCT paper_id)
-                    FROM paper_sections
-                    WHERE section_name IN (
-                        'limitation','limitations','discussion','conclusion','conclusions',
-                        'future_work','future directions','results','error_analysis',
-                        'ablation','method','methods','experiments'
-                    )
-                      AND length(trim(section_text)) >= 80
-                    """,
-                )
-                or 0
-            )
+            row = conn.execute(
+                f"""
+                SELECT COUNT(DISTINCT paper_id)
+                FROM paper_sections
+                WHERE lower(section_name) IN ({",".join("?" for _ in PRIMARY_SECTION_NAMES)})
+                  AND length(trim(section_text)) >= 80
+                """,
+                PRIMARY_SECTION_NAMES,
+            ).fetchone()
+            primary_section_papers = int(row[0] if row else 0)
     finally:
         conn.close()
 
@@ -134,6 +178,9 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
             conn_v14.close()
     return {
         "papers": papers,
+        "refs": refs,
+        "linked_refs": linked_refs,
+        "linked_ref_rate": linked_refs / max(1, refs),
         "openalex_w": openalex_w,
         "openalex_w_rate": openalex_w / max(1, papers),
         "primary_field": primary_field,
@@ -144,6 +191,70 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
         "primary_section_rate": primary_section_papers / max(1, papers),
         "v14": v14_counts,
     }
+
+
+def read_queue_paper_ids(queue_path: pathlib.Path) -> list[str]:
+    if not queue_path.exists():
+        return []
+    seen: set[str] = set()
+    ids: list[str] = []
+    with queue_path.open("r", encoding="utf-8") as f:
+        first = f.readline()
+        f.seek(0)
+        if "paper_id" in first:
+            reader = csv.DictReader(f)
+            values = (row.get("paper_id", "") for row in reader)
+        else:
+            values = (line.strip().split(",")[0] for line in f)
+        for raw in values:
+            pid = (raw or "").strip()
+            if not pid or pid == "paper_id" or pid in seen:
+                continue
+            seen.add(pid)
+            ids.append(pid)
+    return ids
+
+
+def collect_topic_gap_queue_metrics(db_main: pathlib.Path, queue_path: pathlib.Path) -> dict:
+    ids = read_queue_paper_ids(queue_path)
+    metrics = {
+        "queue_path": str(queue_path),
+        "exists": queue_path.exists(),
+        "paper_ids": len(ids),
+        "primary_section_papers": 0,
+        "missing_primary_section_papers": len(ids),
+        "primary_section_rate": 1.0 if not ids else 0.0,
+    }
+    if not ids:
+        return metrics
+
+    covered_ids: set[str] = set()
+    conn = sqlite3.connect(str(db_main))
+    try:
+        if table_exists(conn, "paper_sections"):
+            section_placeholders = ",".join("?" for _ in PRIMARY_SECTION_NAMES)
+            for start in range(0, len(ids), 800):
+                chunk = ids[start : start + 800]
+                placeholders = ",".join("?" for _ in chunk)
+                rows = conn.execute(
+                    f"""
+                    SELECT DISTINCT paper_id
+                    FROM paper_sections
+                    WHERE paper_id IN ({placeholders})
+                      AND lower(section_name) IN ({section_placeholders})
+                      AND length(trim(section_text)) >= 80
+                    """,
+                    (*chunk, *PRIMARY_SECTION_NAMES),
+                ).fetchall()
+                covered_ids.update(str(row[0]) for row in rows)
+    finally:
+        conn.close()
+
+    covered = len(covered_ids)
+    metrics["primary_section_papers"] = covered
+    metrics["missing_primary_section_papers"] = max(0, len(ids) - covered)
+    metrics["primary_section_rate"] = covered / max(1, len(ids))
+    return metrics
 
 
 def frontfill_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool, list[str]]:
@@ -161,6 +272,117 @@ def frontfill_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool, list
             f"primary_field_rate {metrics['primary_field_rate']:.3f} < {args.min_primary_field_rate:.3f}"
         )
     return not failures, failures
+
+
+def topic_gap_queue_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool, list[str]]:
+    if args.skip_topic_gap_gate:
+        return True, []
+    if not metrics.get("exists") or not metrics.get("paper_ids"):
+        return True, []
+    rate = float(metrics.get("primary_section_rate") or 0.0)
+    if rate >= args.min_topic_gap_primary_rate:
+        return True, []
+    return False, [
+        (
+            "topic_gap_primary_section_rate "
+            f"{rate:.3f} < {args.min_topic_gap_primary_rate:.3f} "
+            f"({metrics.get('primary_section_papers', 0)}/{metrics.get('paper_ids', 0)})"
+        )
+    ]
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _is_active_section_ingest_line(line: str, pattern: str = "step5s_section_ingest") -> bool:
+    if pattern not in line:
+        return False
+    if "watch_step5s_section_ingest.py" in line:
+        return False
+    if "SCREEN -dmS" in line or "login -pflq" in line:
+        return False
+    if "run_after_frontfill_product_chain.py" in line:
+        return False
+    return True
+
+
+def active_section_ingest(pattern: str = "step5s_section_ingest") -> bool:
+    proc = subprocess.run(
+        ["ps", "-axo", "command="],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    return any(
+        _is_active_section_ingest_line(line, pattern)
+        for line in (proc.stdout or "").splitlines()
+    )
+
+
+def run_topic_gap_frontfill(
+    *,
+    repo_root: pathlib.Path,
+    env: dict,
+    log_file: pathlib.Path,
+    args: argparse.Namespace,
+) -> bool:
+    """Run the targeted topic-gap section frontfill before downstream claims.
+
+    The normal top12000 section ingest may finish with benchmark-topic gaps still
+    open.  Those papers are exactly where Topic Dossier and Claim Card quality
+    is most fragile, so the product chain should repair them before generating
+    new user-facing conclusions.  We only run when no section ingest process is
+    already alive, so this never competes with the current PDF parser.
+    """
+    if not args.run_topic_gap_frontfill:
+        return False
+    if active_section_ingest(args.active_section_pattern):
+        log(
+            log_file,
+            "TOPIC_GAP_FRONTFILL_WAIT active section ingest is still running; not starting a competing PDF pass",
+        )
+        return False
+    cmd = shlex.split(args.topic_gap_frontfill_cmd)
+    log(log_file, f"RUN_TOPIC_GAP_FRONTFILL {' '.join(cmd)}")
+    frontfill_env = env.copy()
+    frontfill_env.setdefault("V14B_SECTION_INGEST_CONCURRENCY", "1")
+    frontfill_env.setdefault("V14B_SECTION_PARSE_TIMEOUT_SEC", "180")
+    with log_file.open("a", encoding="utf-8") as f:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(repo_root),
+            env=frontfill_env,
+            text=True,
+            stdout=f,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    if proc.returncode != 0:
+        raise RuntimeError(f"topic-gap frontfill failed with exit={proc.returncode}; see {log_file}")
+    log(log_file, "DONE_TOPIC_GAP_FRONTFILL")
+    return True
+
+
+def should_run_topic_gap_frontfill(args: argparse.Namespace, topic_gap_ready: bool) -> bool:
+    """Benchmark-topic evidence repair is allowed before broad section gates pass.
+
+    The broad 8k primary-section target protects full-corpus claims, but the
+    Topic Dossier acceptance tests depend on a much smaller set of key turning
+    papers, future endpoints, branch drivers, and bottleneck evidence.  If the
+    wide topN pass finishes with low yield, blocking this targeted queue behind
+    the same wide gate would keep the product waiting while the most valuable
+    papers remain unevidenced.
+    """
+    return (
+        bool(args.run_topic_gap_frontfill)
+        and not bool(args.force)
+        and not bool(args.skip_topic_gap_gate)
+        and not bool(topic_gap_ready)
+    )
 
 
 def build_step_command(
@@ -238,6 +460,25 @@ def main(argv=None) -> int:
     parser.add_argument("--min-primary-section-papers", type=int, default=int(os.getenv("V14B_MIN_PRIMARY_SECTION_PAPERS", "8000")))
     parser.add_argument("--min-openalex-w-rate", type=float, default=float(os.getenv("V14B_MIN_OPENALEX_W_RATE", "0.70")))
     parser.add_argument("--min-primary-field-rate", type=float, default=float(os.getenv("V14B_MIN_PRIMARY_FIELD_RATE", "0.95")))
+    parser.add_argument("--topic-gap-queue", default=os.getenv("V14B_TOPIC_GAP_SECTION_QUEUE", "data/v14b/topic_evidence_gap_delta_queue.csv"))
+    parser.add_argument("--min-topic-gap-primary-rate", type=float, default=float(os.getenv("V14B_MIN_TOPIC_GAP_PRIMARY_RATE", "0.70")))
+    parser.add_argument("--skip-topic-gap-gate", action="store_true")
+    parser.add_argument(
+        "--run-topic-gap-frontfill",
+        action="store_true",
+        default=_bool_env("V14B_RUN_TOPIC_GAP_FRONTFILL", True),
+        help="When base frontfill gates pass but benchmark-topic gaps remain, run the targeted topic-gap section pass.",
+    )
+    parser.add_argument(
+        "--no-run-topic-gap-frontfill",
+        action="store_false",
+        dest="run_topic_gap_frontfill",
+    )
+    parser.add_argument(
+        "--topic-gap-frontfill-cmd",
+        default=os.getenv("V14B_TOPIC_GAP_FRONTFILL_CMD", "make section-evidence-topic-gaps"),
+    )
+    parser.add_argument("--active-section-pattern", default="step5s_section_ingest")
     parser.add_argument("--step", action="append", default=None)
     parser.add_argument("--force", action="store_true", help="Run even if evidence gates are not ready; use only for smoke tests.")
     parser.add_argument("--corpus-id", default=os.getenv("V14B_CORPUS_ID") or None)
@@ -256,14 +497,6 @@ def main(argv=None) -> int:
     db_main = (repo_root / args.db_main).resolve()
     db_v14 = (repo_root / args.db_v14).resolve()
     log_file = (repo_root / args.log_file).resolve()
-    metrics = collect_metrics(db_main, db_v14)
-    ready, failures = frontfill_ready(metrics, args)
-    log(log_file, "FRONTFILL_METRICS " + json.dumps(metrics, ensure_ascii=False, sort_keys=True))
-    if failures:
-        log(log_file, "FRONTFILL_WAIT " + "; ".join(failures))
-    if not ready and not args.force:
-        return 0
-
     env = os.environ.copy()
     env.setdefault("OMP_NUM_THREADS", "4")
     env.setdefault("VECLIB_MAXIMUM_THREADS", "4")
@@ -271,6 +504,32 @@ def main(argv=None) -> int:
     env.setdefault("NUMEXPR_NUM_THREADS", "4")
     env.setdefault("V14B_EMBEDDING_BATCH_SIZE", "16")
     env.setdefault("V14B_AUDIT_FAIL_ON", "none")
+
+    metrics = collect_metrics(db_main, db_v14)
+    topic_gap_metrics = collect_topic_gap_queue_metrics(db_main, (repo_root / args.topic_gap_queue).resolve())
+    metrics["topic_gap_queue"] = topic_gap_metrics
+    base_ready, base_failures = frontfill_ready(metrics, args)
+    topic_gap_ready, topic_gap_failures = topic_gap_queue_ready(topic_gap_metrics, args)
+    log(log_file, "FRONTFILL_METRICS " + json.dumps(metrics, ensure_ascii=False, sort_keys=True))
+
+    if should_run_topic_gap_frontfill(args, topic_gap_ready):
+        if run_topic_gap_frontfill(repo_root=repo_root, env=env, log_file=log_file, args=args):
+            metrics = collect_metrics(db_main, db_v14)
+            topic_gap_metrics = collect_topic_gap_queue_metrics(db_main, (repo_root / args.topic_gap_queue).resolve())
+            metrics["topic_gap_queue"] = topic_gap_metrics
+            base_ready, base_failures = frontfill_ready(metrics, args)
+            topic_gap_ready, topic_gap_failures = topic_gap_queue_ready(topic_gap_metrics, args)
+            log(log_file, "FRONTFILL_METRICS_AFTER_TOPIC_GAP " + json.dumps(metrics, ensure_ascii=False, sort_keys=True))
+
+    failures = list(base_failures)
+    if topic_gap_failures:
+        failures.extend(topic_gap_failures)
+    ready = base_ready and topic_gap_ready
+    if failures:
+        log(log_file, "FRONTFILL_WAIT " + "; ".join(failures))
+    if not ready and not args.force:
+        return 0
+
     force_rerun = not args.resume_downstream
     for step in (args.step or list(DEFAULT_STEPS)):
         run_step(

@@ -415,7 +415,7 @@ def frontfill_health(
         ),
         "low_yield": (
             "Treat the current candidate segment as low-yield evidence acquisition; prioritize "
-            "main path, future endpoints, branch drivers, top keystone, and gold-topic papers."
+            "main path, future endpoints, branch drivers, top keystone, and benchmark-topic papers."
         ),
         "insufficient_but_running": (
             "Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped "

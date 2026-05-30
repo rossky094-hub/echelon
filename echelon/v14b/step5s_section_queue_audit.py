@@ -125,6 +125,92 @@ def _add(
     categories[category].add(pid)
 
 
+def _split_paper_ids(raw: Any) -> list[str]:
+    if raw in (None, ""):
+        return []
+    if isinstance(raw, list):
+        vals = raw
+    else:
+        vals = str(raw).replace("|", ";").replace(",", ";").split(";")
+    out: list[str] = []
+    seen: set[str] = set()
+    for val in vals:
+        pid = str(val).strip()
+        if not pid or pid in seen:
+            continue
+        seen.add(pid)
+        out.append(pid)
+    return out
+
+
+def _load_topic_evidence_gap_rows(path: Path | None) -> list[dict[str, Any]]:
+    if not path or not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if not row:
+                continue
+            rows.append(dict(row))
+    return rows
+
+
+def _gap_category(gap_type: str) -> str:
+    if "bottleneck" in gap_type:
+        return "topic_gap_bottleneck_evidence"
+    if "turning" in gap_type:
+        return "topic_gap_key_turning_section"
+    if "claim_card" in gap_type:
+        return "topic_gap_claim_card_inputs"
+    return "topic_evidence_gap"
+
+
+def apply_topic_evidence_gap_queue(
+    reasons: dict[str, set[str]],
+    scores: Counter[str],
+    categories: dict[str, set[str]],
+    *,
+    gap_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Merge multi-topic regression gaps into the section evidence budget.
+
+    The regression gate should not merely fail; it should feed the next section
+    ingest batch with the exact papers whose missing sections block useful
+    Topic Dossiers and Claim Cards.
+    """
+    paper_ids: set[str] = set()
+    rows_without_ids = 0
+    category_counts: Counter[str] = Counter()
+    for row in gap_rows:
+        gap_type = str(row.get("gap_type") or "topic_evidence_gap")
+        category = _gap_category(gap_type)
+        pids = _split_paper_ids(row.get("candidate_paper_ids"))
+        if not pids:
+            rows_without_ids += 1
+            continue
+        try:
+            priority = float(row.get("priority") or 80.0)
+        except (TypeError, ValueError):
+            priority = 80.0
+        topic = str(row.get("topic") or "topic").strip()
+        bottleneck = str(row.get("bottleneck") or "").strip()
+        for pid in pids:
+            paper_ids.add(pid)
+            category_counts[category] += 1
+            reason = f"topic_gap:{topic}:{gap_type}"
+            if bottleneck:
+                reason += f":{bottleneck}"
+            _add(reasons, scores, categories, pid, category, max(priority, 80.0) + 120.0, reason)
+            _add(reasons, scores, categories, pid, f"topic:{topic}", 25.0, reason)
+    return {
+        "gap_rows": len(gap_rows),
+        "gap_rows_without_candidate_papers": rows_without_ids,
+        "gap_paper_ids": len(paper_ids),
+        "gap_category_counts": dict(category_counts),
+    }
+
+
 def collect_priority_sets(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
@@ -389,6 +475,7 @@ def run_section_queue_audit(
     data_dir: Path = Path("data/v14b"),
     topic_terms: list[str] | None = None,
     topic_limit: int = 500,
+    topic_evidence_gap_queue: Path | None = Path("reports/v14b_pilot/multi_topic_evidence_gap_queue.csv"),
 ) -> dict[str, Any]:
     topic_terms = topic_terms or ["metalens"]
     conn_main = sqlite3.connect(str(db_main))
@@ -403,6 +490,13 @@ def run_section_queue_audit(
         topic_terms=topic_terms,
         topic_limit=topic_limit,
         top_n=top_n,
+    )
+    gap_rows = _load_topic_evidence_gap_rows(topic_evidence_gap_queue)
+    gap_summary = apply_topic_evidence_gap_queue(
+        reasons,
+        scores,
+        categories,
+        gap_rows=gap_rows,
     )
     candidate_set = set(candidate_ids)
     any_section, primary_section = _section_status(conn_main)
@@ -522,51 +616,80 @@ def run_section_queue_audit(
         )
     conn_v14.commit()
 
+    def is_topic_gap_row(row: dict[str, Any]) -> bool:
+        return any(str(reason).startswith("topic_gap") for reason in (row.get("reasons") or []))
+
     delta_rows = [
         r for r in rows
         if not r["has_primary_section"]
-        and r["retry_class"] not in {"covered", "no_target_sections"}
-        and (r["eligible_pdf"] or r["retry_class"] in {"needs_access_link", "retryable_pdf_failure", "parser_failure"})
+        and r["retry_class"] != "covered"
+        and (
+            r["retry_class"] != "no_target_sections"
+            or is_topic_gap_row(r)
+        )
+        and (
+            r["eligible_pdf"]
+            or r["retry_class"] in {
+                "needs_access_link",
+                "retryable_pdf_failure",
+                "parser_failure",
+                "no_target_sections",
+            }
+        )
     ]
     delta_rows = sorted(delta_rows, key=lambda r: (-float(r["priority_score"]), r["retry_class"], r["paper_id"]))
+    topic_gap_rows = [r for r in delta_rows if is_topic_gap_row(r)]
     out_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "section_high_value_queue_audit.json"
     md_path = out_dir / "section_high_value_queue_audit.md"
     csv_path = data_dir / "section_delta_queue.csv"
+    topic_gap_csv_path = data_dir / "topic_evidence_gap_delta_queue.csv"
 
     result = {
         "audit_ts": audit_ts,
         "top_n": top_n,
         "topic_terms": topic_terms,
+        "topic_evidence_gap_queue": str(topic_evidence_gap_queue) if topic_evidence_gap_queue else "",
+        "topic_evidence_gap_summary": gap_summary,
         "high_value_papers": len(rows),
         "candidate_top_n": len(candidate_set),
         "delta_queue": len(delta_rows),
+        "topic_gap_delta_queue": len(topic_gap_rows),
         "retry_class_counts": dict(Counter(str(r["retry_class"]) for r in rows)),
         "summary": summary_rows,
         "top_delta": delta_rows[:200],
+        "top_topic_gap_delta": topic_gap_rows[:200],
         "outputs": {
             "json": str(json_path),
             "markdown": str(md_path),
             "csv": str(csv_path),
+            "topic_gap_csv": str(topic_gap_csv_path),
         },
     }
     json_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "paper_id", "priority_score", "reasons", "in_top_n", "has_any_section",
-                "has_primary_section", "eligible_pdf", "last_attempt_outcome", "last_attempt_ts",
-                "retry_class", "retry_priority", "access_strategy", "publication_year", "title",
-                "source_url", "doi", "arxiv_id", "openalex_id", "s2_paper_id",
-            ],
-        )
-        writer.writeheader()
-        for r in delta_rows:
-            row = dict(r)
-            row["reasons"] = "|".join(row["reasons"])
-            writer.writerow(row)
+    fieldnames = [
+        "paper_id", "priority_score", "reasons", "in_top_n", "has_any_section",
+        "has_primary_section", "eligible_pdf", "last_attempt_outcome", "last_attempt_ts",
+        "retry_class", "retry_priority", "access_strategy", "publication_year", "title",
+        "source_url", "doi", "arxiv_id", "openalex_id", "s2_paper_id",
+    ]
+
+    def write_delta_csv(path: Path, selected_rows: list[dict[str, Any]]) -> None:
+        with path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in selected_rows:
+                row = dict(r)
+                row["reasons"] = "|".join(row["reasons"])
+                writer.writerow(row)
+
+    write_delta_csv(csv_path, delta_rows)
+    write_delta_csv(topic_gap_csv_path, topic_gap_rows)
+    with csv_path.open("r", newline="", encoding="utf-8") as f:
+        # Keep a small readback so tests and operators fail early on broken CSV
+        # serialization instead of discovering it inside the long-running ingest.
+        next(csv.DictReader(f), None)
 
     lines = [
         "# V14B Section High-Value Queue Audit",
@@ -575,6 +698,9 @@ def run_section_queue_audit(
         f"- current top_n budget: `{top_n}`",
         f"- high-value papers considered: `{len(rows):,}`",
         f"- next delta queue needing primary section/action: `{len(delta_rows):,}`",
+        f"- multi-topic evidence-gap rows merged: `{gap_summary['gap_rows']:,}` "
+        f"({gap_summary['gap_paper_ids']:,} papers)",
+        f"- topic evidence-gap delta queue: `{len(topic_gap_rows):,}` papers",
         "",
         "## Failure / Retry Classes",
         "",
@@ -605,7 +731,11 @@ def run_section_queue_audit(
             "Claim Cards, Topic Lens, and the R&D Radar. Papers missing primary section "
             "evidence cannot support high-confidence claims even if they are important graph nodes.",
             "",
+            "Multi-topic regression gaps are merged into this budget so failed Topic Dossiers "
+            "become targeted section evidence work instead of passive report failures.",
+            "",
             f"Delta queue CSV: `{csv_path}`",
+            f"Topic evidence-gap delta CSV: `{topic_gap_csv_path}`",
         ]
     )
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -627,6 +757,11 @@ def main(argv=None) -> None:
     parser.add_argument("--data-dir", default="data/v14b")
     parser.add_argument("--topic", action="append", default=None)
     parser.add_argument("--topic-limit", type=int, default=500)
+    parser.add_argument(
+        "--topic-evidence-gap-queue",
+        default="reports/v14b_pilot/multi_topic_evidence_gap_queue.csv",
+        help="CSV emitted by topic_regression; merged into section delta priorities when present.",
+    )
     args = parser.parse_args(argv)
     setup_logging("step5s_section_queue_audit", level=getattr(logging, args.log_level))
     run_section_queue_audit(
@@ -637,6 +772,7 @@ def main(argv=None) -> None:
         data_dir=Path(args.data_dir),
         topic_terms=args.topic or ["metalens"],
         topic_limit=args.topic_limit,
+        topic_evidence_gap_queue=Path(args.topic_evidence_gap_queue) if args.topic_evidence_gap_queue else None,
     )
 
 

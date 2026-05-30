@@ -7,6 +7,7 @@ from echelon.v14b.direction_readiness_audit import (
     classify_blockers,
     collect_metrics,
     load_section_frontfill_state,
+    primary_section_strategy_quality,
     readiness_level,
     run_audit,
     select_section_frontfill_state,
@@ -67,6 +68,67 @@ def test_direction_readiness_blocks_raw_gnn_promotion(tmp_path):
     assert metrics["predicted_future_edges"] == 1
     assert readiness_level(metrics, blockers) == "candidate_generator_only"
     assert any(b["gate"] == "fusion_materialization" for b in blockers)
+
+
+def test_direction_readiness_flags_multi_topic_evidence_gap_queue(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    queue = tmp_path / "topic_evidence_gap_delta_queue.csv"
+    _make_main(main)
+    _make_v14(v14)
+    queue.write_text(
+        "paper_id,priority_score,reasons\n"
+        "p1,100,topic_gap_key_turning_section\n"
+        "p2,90,topic_gap_claim_card_inputs\n",
+        encoding="utf-8",
+    )
+
+    metrics = collect_metrics(main, v14, topic_gap_queue=queue)
+    blockers = classify_blockers(metrics)
+
+    assert metrics["topic_gap_queue_papers"] == 2
+    assert metrics["topic_gap_primary_section_papers"] == 1
+    assert any(b["gate"] == "multi_topic_evidence_gap" for b in blockers)
+
+
+def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    conn = sqlite3.connect(str(main))
+    conn.executescript(
+        """
+        CREATE TABLE papers (id TEXT PRIMARY KEY, openalex_id TEXT);
+        CREATE TABLE paper_references (cited_paper_id_internal TEXT);
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.executemany("INSERT INTO papers VALUES (?, ?)", [("p1", "W1"), ("p2", "W2")])
+    conn.executemany("INSERT INTO paper_references VALUES (?)", [("p1",), ("p2",)])
+    conn.execute(
+        "INSERT INTO paper_sections VALUES ('p1', 'discussion', ?, ?)",
+        ("strong evidence " * 20, '{"extraction_strategies":["explicit_heading"]}'),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES ('p2', 'conclusion', ?, ?)",
+        ("weak evidence " * 20, '{"extraction_strategies":["loose_inline_heading"]}'),
+    )
+    conn.commit()
+    conn.close()
+    _make_v14(v14)
+
+    quality = primary_section_strategy_quality(sqlite3.connect(str(main)))
+    metrics = collect_metrics(main, v14)
+    blockers = classify_blockers(metrics)
+
+    assert quality["paper_quality_counts"]["strong"] == 1
+    assert quality["paper_quality_counts"]["weak"] == 1
+    assert metrics["section_evidence_quality"]["weak_only_rate"] == 0.5
+    assert any(b["gate"] == "section_evidence_provenance" for b in blockers)
 
 
 def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):

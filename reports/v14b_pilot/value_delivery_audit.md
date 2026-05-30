@@ -1,21 +1,26 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-29T18:27:58Z`
+- generated_at: `2026-05-30T13:00:12Z`
 - evidence_policy: `insufficient_evidence`
-- gate_summary: `{"fail": 1, "pass": 6, "warn": 1}`
+- gate_summary: `{"fail": 1, "pass": 11, "warn": 1}`
 
-## Eight Product Gates
+## Product Gates
 
 | # | Gate | Status | What This Enforces |
 | ---: | --- | --- | --- |
 | 1 | Evidence Bone | warn | All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes. |
 | 2 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
 | 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such. |
-| 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card. |
+| 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
 | 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. |
-| 6 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
-| 7 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
-| 8 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
+| 6 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
+| 7 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
+| 8 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
+| 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty. |
+| 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
+| 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons. |
+| 12 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
+| 13 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
 ## Gate Details
 
@@ -26,18 +31,40 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "linked_ref_rate": 0.13851765678546094,
-    "openalex_w_rate": 0.6258597967178784,
-    "primary_section_papers": 754,
-    "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_status": "running_or_unknown"
+    "linked_ref_rate": 0.13870574440224812,
+    "openalex_w_rate": 0.6438410572114603,
+    "primary_section_papers": 2585,
+    "section_frontfill_no_evidence_delta": -259,
+    "section_frontfill_status": "running_or_unknown",
+    "section_provenance": {
+      "paper_quality_counts": {
+        "moderate": 0,
+        "strong": 348,
+        "weak": 2237
+      },
+      "primary_section_papers": 2585,
+      "primary_section_rows": 4509,
+      "strategy_counts": {
+        "embedded_heading": 19,
+        "explicit_heading": 417,
+        "heading_continuation": 604,
+        "inline_heading": 219,
+        "legacy_unknown_strategy": 3886,
+        "loose_inline_heading": 10,
+        "parser_hint": 7
+      },
+      "strong_or_moderate_papers": 348,
+      "weak_only_papers": 2237,
+      "weak_only_rate": 0.8653771760154739
+    }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
   "status": "warn",
   "uncertainty_reasons": [
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
-    "OpenAlex topic/field coverage below cross-field target"
+    "OpenAlex topic/field coverage below cross-field target",
+    "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
 }
 ```
@@ -58,7 +85,7 @@
   ],
   "status": "pass",
   "triples": 2920,
-  "triples_with_page": 164
+  "triples_with_page": 540
 }
 ```
 
@@ -86,6 +113,11 @@
   "bad_high_confidence_cards": 0,
   "calibration_audits": 1,
   "calibration_gap": null,
+  "checks": {
+    "edge_level_calibration_not_confused_with_run_audit": true,
+    "raw_future_edges_not_radar_eligible": true,
+    "run_level_calibration_required_for_direction_claims": true
+  },
   "edge_calibrated_candidates": 1000,
   "edge_calibration_labels": {
     "calibrated_temporal_holdout": 1000
@@ -99,11 +131,21 @@
     "exploratory_claim_card": 421,
     "future_candidate_unfused": 558
   },
+  "future_direction_calibration_status_counts": {
+    "calibrated_with_run_audit": 5
+  },
+  "future_direction_claim_scope_counts": {
+    "exploratory_incomplete_card": 4,
+    "exploratory_with_claim_card": 1
+  },
+  "future_directions": 5,
   "issue": "Future Growth Calibration",
-  "policy": "VGAE/GNN is a future candidate generator only. Radar promotion requires Step6 fusion plus Step13 complete Claim Card.",
+  "policy": "VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card.",
   "predicted_future_edges": 1000,
   "radar_eligible_candidates": 0,
-  "status": "pass"
+  "status": "pass",
+  "uncalibrated_promoted_direction_claims": 0,
+  "uncalibrated_promoted_examples": []
 }
 ```
 
@@ -122,12 +164,91 @@
 }
 ```
 
+### Claim Card High-Confidence Evidence Contract
+
+```json
+{
+  "checks": {
+    "no_high_confidence_card_without_section_evidence": true,
+    "step13_has_section_evidence_gate": true
+  },
+  "high_confidence_cards": 0,
+  "invalid_examples": [],
+  "invalid_high_confidence_cards": 0,
+  "issue": "Claim Card High-Confidence Evidence Contract",
+  "policy": "A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory.",
+  "status": "pass"
+}
+```
+
+### LLM Evidence Boundary Contract
+
+```json
+{
+  "checks": {
+    "abstract_llm_atoms_remain_weak": true,
+    "citation_llm_fallback_explicit_and_weak": true,
+    "fusion_llm_naming_opt_in": true,
+    "limitation_llm_traced_and_optional": true,
+    "llm_citation_without_context_remains_weak": true,
+    "llm_data_contract_columns_present": true,
+    "llm_defaults_off": true,
+    "llm_edge_audit_is_capped_audit": true,
+    "step13_non_llm_engine": true,
+    "topic_preflight_no_llm": true
+  },
+  "invalid_llm_atom_examples": [],
+  "invalid_llm_atoms": 0,
+  "invalid_llm_citation_edges": 0,
+  "invalid_llm_citation_examples": [],
+  "issue": "LLM Evidence Boundary Contract",
+  "llm_citation_edges": 0,
+  "llm_limitation_atoms": 0,
+  "missing_data_contracts": [],
+  "policy": "LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty.",
+  "status": "pass"
+}
+```
+
 ### Topic Dossier Product Value
 
 ```json
 {
   "has_visual_search_fts": true,
   "issue": "Topic Dossier Product Value",
+  "online_readiness_contract": {
+    "checks": {
+      "api_exposes_topic_readiness": true,
+      "arbitrary_topic_not_benchmark_gated": true,
+      "no_llm_preflight": true,
+      "required_readiness_gates_present": true,
+      "topic_regression_uses_shared_contract": true,
+      "ui_renders_topic_readiness": true
+    },
+    "observed_gates": [
+      "auditable reading path",
+      "bottleneck evidence candidates",
+      "bottleneck lineage typed contracts",
+      "branch split candidates",
+      "complete Claim Cards",
+      "five-question evidence contracts",
+      "topic dossier evidence contract",
+      "turning papers with access",
+      "turning papers with strong/moderate section provenance"
+    ],
+    "overall_status": "warn",
+    "policy": "Any topic must receive a deterministic, no-LLM readiness state; benchmark topics are regression fixtures, not a product allowlist.",
+    "readiness_level": "claim_card_available_with_gaps",
+    "required_gates": [
+      "auditable reading path",
+      "bottleneck lineage typed contracts",
+      "complete Claim Cards",
+      "five-question evidence contracts",
+      "topic dossier evidence contract",
+      "turning papers with strong/moderate section provenance"
+    ],
+    "status": "pass"
+  },
   "policy": "Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration.",
   "status": "pass",
   "visual_edges": 772947,
@@ -135,17 +256,92 @@
 }
 ```
 
+### Evolution Evidence Map Contract
+
+```json
+{
+  "checks": {
+    "api_returns_evidence_map": true,
+    "combination_contracts_present": true,
+    "fusion_value_is_auditable_layer": true,
+    "layer_contracts_present": true,
+    "required_layer_combinations_present": true,
+    "required_layers_present": true,
+    "ui_has_fusion_value_layer_control": true,
+    "ui_renders_evidence_map_contract": true
+  },
+  "combination_count": 9,
+  "fusion_status": "materialized",
+  "issue": "Evolution Evidence Map Contract",
+  "layer_count": 8,
+  "missing_layers": [],
+  "missing_required_combinations": [],
+  "policy": "Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty.",
+  "status": "pass"
+}
+```
+
+### R&D Radar Promotion Contract
+
+```json
+{
+  "candidate_edges": 1,
+  "candidate_pool_items": 2,
+  "checks": {
+    "api_exposes_candidate_pool": true,
+    "candidate_edges_carry_evidence_contract": true,
+    "candidate_pool_items_not_eligible": true,
+    "complete_cards_only_in_main_radar": true,
+    "empty_radar_policy_present": true,
+    "incomplete_cards_are_candidate_pool_only": true,
+    "raw_gnn_edges_are_candidate_pool_only": true,
+    "ui_separates_radar_from_candidate_pool": true
+  },
+  "incomplete_claim_cards": 1,
+  "issue": "R&D Radar Promotion Contract",
+  "main_radar_cards": 1,
+  "policy": "R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets.",
+  "status": "pass"
+}
+```
+
+### Main Path Uncertainty Contract
+
+```json
+{
+  "checks": {
+    "api_returns_history_contract": true,
+    "history_main_path_has_claim_scope": true,
+    "history_main_path_has_evidence_grade": true,
+    "history_main_path_has_evidence_objects": true,
+    "history_main_path_has_required_evidence": true,
+    "low_linked_refs_add_uncertainty": true,
+    "main_path_edges_inherit_uncertainty": true,
+    "ui_renders_main_path_uncertainty": true
+  },
+  "claim_scope": "main_path_context_low_linked_refs",
+  "evidence_grade": "citation_backbone_partial_low_linked_refs",
+  "issue": "Main Path Uncertainty Contract",
+  "policy": "When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons.",
+  "status": "pass",
+  "uncertainty_reasons": [
+    "broader field main-path anchors are separated from topic-specific turning papers",
+    "linked refs below 30%; citation backbone is incomplete"
+  ]
+}
+```
+
 ### Multi-topic Regression
 
 ```json
 {
-  "failed_topics": [
+  "benchmark_topics": [
     "metalens",
     "metasurface holography",
     "photonic crystal cavity",
     "quantum light source"
   ],
-  "gold_topics": [
+  "failed_topics": [
     "metalens",
     "metasurface holography",
     "photonic crystal cavity",
@@ -155,7 +351,11 @@
   "live_regression_status": "fail",
   "missing_topics": [],
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens.",
-  "status": "fail"
+  "status": "fail",
+  "topic_gap_blocking": true,
+  "topic_gap_primary_section_papers": 0,
+  "topic_gap_primary_section_rate": 0.0,
+  "topic_gap_queue_papers": 20
 }
 ```
 

@@ -46,8 +46,8 @@ def test_step13_builds_first_principles_outputs(tmp_path):
         INSERT INTO paper_sections
             (paper_id, section_name, section_text, section_pages_json, section_meta_json)
         VALUES
-            ('p1', 'limitations', 'fabrication tolerance and thermal loss remain unresolved', '[4,5]', '{"n_pages":2}'),
-            ('p2', 'discussion', 'domain shift failures remain under distribution shift', '[6]', '{"n_pages":1}');
+            ('p1', 'limitations', 'fabrication tolerance and thermal loss remain unresolved', '[4,5]', '{"n_pages":2,"extraction_strategies":["explicit_heading"]}'),
+            ('p2', 'discussion', 'domain shift failures remain under distribution shift', '[6]', '{"n_pages":1,"extraction_strategies":["embedded_heading"]}');
         """
     )
     conn_main.close()
@@ -165,4 +165,61 @@ def test_step13_complete_exploratory_card_is_not_high_confidence():
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
     assert "triangulated Step6 fusion evidence" in gate["missing_high_confidence_gates"]
+    assert updates[0]["high_confidence_eligible"] == 0
+
+
+def test_step13_weak_section_provenance_blocks_high_confidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    atoms = [
+        {
+            "paper_id": "p1",
+            "paper_title": "Weakly parsed metalens bottleneck",
+            "publication_year": 2024,
+            "description": "Fabrication tolerance still limits broadband imaging quality.",
+            "keyword": "fabrication",
+            "severity": "high",
+            "evidence_quality": "section_level",
+            "section_provenance_strength": "weak",
+            "section_extraction_strategies": ["loose_inline_heading"],
+            "evidence_weight": 0.9,
+            "is_resolved": 0,
+        }
+    ]
+    future_directions = [
+        {
+            "direction_id": 1,
+            "direction_name": "Wafer-scale broadband metalens manufacturing",
+            "paper_ids_json": '["p1"]',
+            "confidence": 0.86,
+            "evidence_tier": "triangulated_strong",
+            "calibration_label": "calibrated_temporal_holdout",
+        }
+    ]
+    principles = [
+        {
+            "principle_id": "FP_PHYSICAL_CONSTRAINT",
+            "principle_name": "物理实现与制造约束",
+            "root_cause": "fabrication tolerance and material loss",
+        }
+    ]
+    calibration = {"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84}
+
+    cards, updates = build_direction_claim_cards(
+        atoms=atoms,
+        future_directions=future_directions,
+        principle_rows=principles,
+        calibration_audit=calibration,
+    )
+
+    gate = json.loads(cards[0]["quality_gate_json"])
+    unresolved = json.loads(cards[0]["unresolved_bottleneck_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["high_confidence_eligible"] == 0
+    assert cards[0]["evidence_strength_level"] == "weak"
+    assert gate["section_provenance"]["weak"] == 1
+    assert gate["high_confidence_gates"]["section_provenance_ready"] is False
+    assert "strong section-level evidence" in gate["missing_high_confidence_gates"]
+    assert "strong or moderate section parser provenance" in gate["missing_high_confidence_gates"]
+    assert unresolved["section_provenance"]["strategies"]["loose_inline_heading"] == 1
     assert updates[0]["high_confidence_eligible"] == 0

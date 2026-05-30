@@ -64,7 +64,7 @@ TASK_BACKLOG: tuple[dict[str, Any], ...] = (
     {
         "id": "P1-04",
         "window": "3-8h",
-        "title": "做 Metalens gold topic fixture",
+        "title": "做 Metalens benchmark topic fixture",
         "output": "tests/v14b Metalens regression fixture",
         "gate": "fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation",
     },

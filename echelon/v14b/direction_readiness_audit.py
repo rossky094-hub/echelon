@@ -7,6 +7,7 @@ research directions.  This audit reports which step is blocking that promotion.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
 import sqlite3
@@ -24,14 +25,32 @@ PRIMARY_SECTION_NAMES = (
     "conclusion",
     "conclusions",
     "future_work",
+    "future work",
     "future directions",
     "results",
     "error_analysis",
+    "error analysis",
     "ablation",
     "method",
     "methods",
     "experiments",
 )
+
+STRONG_SECTION_STRATEGIES = {
+    "explicit_heading",
+    "heading_continuation",
+    "embedded_heading",
+}
+
+MODERATE_SECTION_STRATEGIES = {
+    "inline_heading",
+}
+
+WEAK_SECTION_STRATEGIES = {
+    "loose_inline_heading",
+    "parser_hint",
+    "legacy_unknown_strategy",
+}
 
 
 def table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -48,6 +67,151 @@ def scalar(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> 
     except sqlite3.Error:
         return 0
     return row[0] if row else 0
+
+
+def load_queue_paper_ids(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    try:
+        with path.open(newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                paper_id = (row.get("paper_id") or "").strip()
+                if paper_id and paper_id not in seen:
+                    seen.add(paper_id)
+                    out.append(paper_id)
+    except Exception:
+        return []
+    return out
+
+
+def _chunks(values: list[str], size: int = 500) -> list[list[str]]:
+    return [values[i : i + size] for i in range(0, len(values), size)]
+
+
+def _json_obj(value: Any) -> dict[str, Any]:
+    if not value:
+        return {}
+    try:
+        loaded = json.loads(str(value))
+    except Exception:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _section_quality_from_strategies(strategies: set[str]) -> str:
+    if strategies & STRONG_SECTION_STRATEGIES:
+        return "strong"
+    if strategies & MODERATE_SECTION_STRATEGIES:
+        return "moderate"
+    return "weak"
+
+
+def primary_section_paper_count(conn: sqlite3.Connection, paper_ids: list[str] | None = None) -> int:
+    section_names = tuple(name.lower() for name in PRIMARY_SECTION_NAMES)
+    ph_names = ",".join("?" for _ in section_names)
+    base = f"""
+        SELECT COUNT(DISTINCT paper_id)
+        FROM paper_sections
+        WHERE lower(section_name) IN ({ph_names})
+          AND length(trim(section_text)) >= 80
+    """
+    if paper_ids is None:
+        return int(scalar(conn, base, section_names) or 0)
+    if not paper_ids:
+        return 0
+    total = 0
+    for chunk in _chunks(paper_ids):
+        ph_ids = ",".join("?" for _ in chunk)
+        total += int(
+            scalar(
+                conn,
+                base + f" AND paper_id IN ({ph_ids})",
+                section_names + tuple(chunk),
+            )
+            or 0
+        )
+    return total
+
+
+def primary_section_strategy_quality(
+    conn: sqlite3.Connection,
+    paper_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    """Summarize whether primary section evidence is strongly traceable.
+
+    Section quantity alone is not enough for decision-grade claims.  A paper
+    parsed from explicit/embedded headings has different provenance than a
+    paper found only by loose inline heuristics or legacy rows without parser
+    metadata.  This audit keeps those sources separate so downstream Claim
+    Cards can remain honest about evidence strength.
+    """
+    if not table_exists(conn, "paper_sections"):
+        return {
+            "primary_section_rows": 0,
+            "primary_section_papers": 0,
+            "strategy_counts": {},
+            "paper_quality_counts": {},
+            "strong_or_moderate_papers": 0,
+            "weak_only_papers": 0,
+            "weak_only_rate": 0.0,
+        }
+
+    cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(paper_sections)").fetchall()}
+    has_meta = "section_meta_json" in cols
+    section_names = tuple(name.lower() for name in PRIMARY_SECTION_NAMES)
+    ph_names = ",".join("?" for _ in section_names)
+    select_meta = "section_meta_json" if has_meta else "NULL AS section_meta_json"
+    base = f"""
+        SELECT paper_id, lower(section_name) AS section_name, {select_meta}
+        FROM paper_sections
+        WHERE lower(section_name) IN ({ph_names})
+          AND length(trim(section_text)) >= 80
+    """
+    params: tuple[Any, ...] = section_names
+    if paper_ids:
+        ph_ids = ",".join("?" for _ in paper_ids)
+        base += f" AND paper_id IN ({ph_ids})"
+        params = section_names + tuple(paper_ids)
+
+    strategy_counts: dict[str, int] = {}
+    paper_best_quality: dict[str, str] = {}
+    quality_rank = {"weak": 0, "moderate": 1, "strong": 2}
+    rows = conn.execute(base, params).fetchall()
+    for paper_id, _section_name, raw_meta in rows:
+        meta = _json_obj(raw_meta)
+        raw_strategies = meta.get("extraction_strategies") or []
+        strategies = {
+            str(item).strip()
+            for item in raw_strategies
+            if str(item).strip()
+        }
+        if not strategies:
+            strategies = {"legacy_unknown_strategy"}
+        for strategy in sorted(strategies):
+            strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
+        quality = _section_quality_from_strategies(strategies)
+        pid = str(paper_id)
+        if pid not in paper_best_quality or quality_rank[quality] > quality_rank.get(paper_best_quality[pid], 0):
+            paper_best_quality[pid] = quality
+
+    paper_quality_counts = {
+        quality: sum(1 for q in paper_best_quality.values() if q == quality)
+        for quality in ("strong", "moderate", "weak")
+    }
+    primary_papers = len(paper_best_quality)
+    strong_or_moderate = paper_quality_counts["strong"] + paper_quality_counts["moderate"]
+    weak_only = paper_quality_counts["weak"]
+    return {
+        "primary_section_rows": len(rows),
+        "primary_section_papers": primary_papers,
+        "strategy_counts": dict(sorted(strategy_counts.items())),
+        "paper_quality_counts": paper_quality_counts,
+        "strong_or_moderate_papers": strong_or_moderate,
+        "weak_only_papers": weak_only,
+        "weak_only_rate": weak_only / max(1, primary_papers),
+    }
 
 
 def pct(value: float) -> str:
@@ -160,7 +324,12 @@ def select_section_frontfill_state(repo_root: Path = Path(".")) -> dict[str, Any
     return load_section_frontfill_state(latest)
 
 
-def collect_metrics(db_main: Path, db_v14: Path) -> dict[str, Any]:
+def collect_metrics(
+    db_main: Path,
+    db_v14: Path,
+    topic_gap_queue: Path | None = None,
+) -> dict[str, Any]:
+    topic_gap_queue = topic_gap_queue or Path("data/v14b/topic_evidence_gap_delta_queue.csv")
     main = sqlite3.connect(str(db_main))
     try:
         papers = int(scalar(main, "SELECT COUNT(*) FROM papers") or 0)
@@ -187,20 +356,11 @@ def collect_metrics(db_main: Path, db_v14: Path) -> dict[str, Any]:
         )
         section_rows = int(scalar(main, "SELECT COUNT(*) FROM paper_sections") or 0)
         section_papers = int(scalar(main, "SELECT COUNT(DISTINCT paper_id) FROM paper_sections") or 0)
-        ph = ",".join("?" for _ in PRIMARY_SECTION_NAMES)
-        primary_section_papers = int(
-            scalar(
-                main,
-                f"""
-                SELECT COUNT(DISTINCT paper_id)
-                FROM paper_sections
-                WHERE section_name IN ({ph})
-                  AND length(trim(section_text)) >= 80
-                """,
-                tuple(PRIMARY_SECTION_NAMES),
-            )
-            or 0
-        )
+        primary_section_papers = primary_section_paper_count(main)
+        section_quality = primary_section_strategy_quality(main)
+        topic_gap_ids = load_queue_paper_ids(topic_gap_queue)
+        topic_gap_primary_section_papers = primary_section_paper_count(main, topic_gap_ids)
+        topic_gap_section_quality = primary_section_strategy_quality(main, topic_gap_ids)
     finally:
         main.close()
 
@@ -252,6 +412,12 @@ def collect_metrics(db_main: Path, db_v14: Path) -> dict[str, Any]:
         "section_papers": section_papers,
         "primary_section_papers": primary_section_papers,
         "primary_section_rate": primary_section_papers / max(1, papers),
+        "section_evidence_quality": section_quality,
+        "topic_gap_queue_path": str(topic_gap_queue),
+        "topic_gap_queue_papers": len(topic_gap_ids),
+        "topic_gap_primary_section_papers": topic_gap_primary_section_papers,
+        "topic_gap_primary_section_rate": topic_gap_primary_section_papers / max(1, len(topic_gap_ids)),
+        "topic_gap_section_evidence_quality": topic_gap_section_quality,
         **counts,
         "complete_claim_cards": complete_cards,
         "high_confidence_claim_cards": high_conf_cards,
@@ -278,6 +444,61 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 "severity": "high",
                 "why": f"primary section evidence covers only {m['primary_section_papers']:,} papers.",
                 "next_action": "Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.",
+            }
+        )
+    section_quality = m.get("section_evidence_quality") or {}
+    weak_only_rate = float(section_quality.get("weak_only_rate") or 0.0)
+    strong_or_moderate = int(section_quality.get("strong_or_moderate_papers") or 0)
+    if m.get("primary_section_papers", 0) and (weak_only_rate > 0.25 or strong_or_moderate < 1000):
+        blockers.append(
+            {
+                "gate": "section_evidence_provenance",
+                "severity": "medium",
+                "why": (
+                    "primary section evidence quality is still fragile: "
+                    f"{strong_or_moderate:,} papers have strong/moderate parser provenance; "
+                    f"weak-only rate is {pct(weak_only_rate)}."
+                ),
+                "next_action": (
+                    "Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; "
+                    "keep loose/legacy section matches as weak evidence until manually audited or re-parsed."
+                ),
+            }
+        )
+    if m.get("topic_gap_queue_papers", 0) and m.get("topic_gap_primary_section_rate", 0.0) < 0.70:
+        blockers.append(
+            {
+                "gate": "multi_topic_evidence_gap",
+                "severity": "high",
+                "why": (
+                    "multi-topic regression still has primary section evidence for "
+                    f"{int(m.get('topic_gap_primary_section_papers') or 0):,}/"
+                    f"{int(m.get('topic_gap_queue_papers') or 0):,} queued benchmark-topic papers "
+                    f"({pct(float(m.get('topic_gap_primary_section_rate') or 0.0))})."
+                ),
+                "next_action": (
+                    "After the active top12000 ingest finishes, run section-evidence-topic-gaps "
+                    "before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions."
+                ),
+            }
+        )
+    topic_gap_quality = m.get("topic_gap_section_evidence_quality") or {}
+    if (
+        m.get("topic_gap_primary_section_papers", 0)
+        and float(topic_gap_quality.get("weak_only_rate") or 0.0) > 0.25
+    ):
+        blockers.append(
+            {
+                "gate": "multi_topic_section_provenance",
+                "severity": "medium",
+                "why": (
+                    "benchmark-topic gap papers have primary sections, but too many are weak parser matches "
+                    f"({pct(float(topic_gap_quality.get('weak_only_rate') or 0.0))} weak-only)."
+                ),
+                "next_action": (
+                    "Do not pass multi-topic Dossier claims on loose parser evidence alone; "
+                    "re-parse or audit those topic papers before promotion."
+                ),
             }
         )
     frontfill = m.get("section_frontfill_state") or {}
@@ -371,6 +592,13 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
         f"- primary section evidence: {metrics['primary_section_papers']:,} papers ({pct(metrics['primary_section_rate'])})",
+        f"- primary section provenance: "
+        f"{int((metrics.get('section_evidence_quality') or {}).get('strong_or_moderate_papers') or 0):,} "
+        f"strong/moderate papers; weak-only="
+        f"{pct(float((metrics.get('section_evidence_quality') or {}).get('weak_only_rate') or 0.0))}",
+        f"- multi-topic evidence-gap queue: {int(metrics.get('topic_gap_primary_section_papers') or 0):,} / "
+        f"{int(metrics.get('topic_gap_queue_papers') or 0):,} primary-section covered "
+        f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
         *frontfill_line,
         f"- predicted future edges: {metrics['predicted_future_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
@@ -422,9 +650,14 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     return "\n".join(lines) + "\n"
 
 
-def run_audit(db_main: Path, db_v14: Path, out_dir: Path) -> dict[str, Any]:
+def run_audit(
+    db_main: Path,
+    db_v14: Path,
+    out_dir: Path,
+    topic_gap_queue: Path | None = None,
+) -> dict[str, Any]:
     lifecycle = run_lifecycle_audit(db_main, db_v14, out_dir, write_table=True)
-    metrics = collect_metrics(db_main, db_v14)
+    metrics = collect_metrics(db_main, db_v14, topic_gap_queue=topic_gap_queue)
     metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
     metrics["section_frontfill_state"] = select_section_frontfill_state(Path("."))
     blockers = classify_blockers(metrics)
@@ -446,8 +679,9 @@ def main() -> None:
     parser.add_argument("--db", default="db/echelon_library.sqlite3")
     parser.add_argument("--db-v14", default="db/v14_pilot.sqlite3")
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
+    parser.add_argument("--topic-gap-queue", default="data/v14b/topic_evidence_gap_delta_queue.csv")
     args = parser.parse_args()
-    result = run_audit(Path(args.db), Path(args.db_v14), Path(args.out_dir))
+    result = run_audit(Path(args.db), Path(args.db_v14), Path(args.out_dir), topic_gap_queue=Path(args.topic_gap_queue))
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

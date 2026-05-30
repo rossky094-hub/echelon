@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-29T18:27:35Z`
+- Audit: `2026-05-30T13:00:18Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -13,7 +13,11 @@
 | expected bottlenecks evidenced | 4 | 5 | fail |
 | key turning papers | 8 | 4 | pass |
 | turning papers with access links | 8 | 3 | pass |
-| turning papers with primary sections | 0 | 2 | fail |
+| turning papers with primary sections | 4 | 2 | pass |
+| turning papers with strong/moderate section provenance | 4 | 2 | pass |
+| five-question evidence contracts | 5 | 5 | pass |
+| bottleneck lineage typed contracts | 5 | 1 | pass |
+| auditable reading path | 4 | 4 | pass |
 | Claim Cards for Radar | 1 | 1 | pass |
 
 ## Expected Branches
@@ -37,23 +41,18 @@
 
 ## Interpretation
 
-- Key turning papers: 8 total, 8 with access links, 0 with primary local sections.
+- Key turning papers: 8 total, 8 with access links, 4 with primary local sections, 4 with strong/moderate parser provenance.
 - Future candidates: 320 graph candidates, 1 Radar cards, 1 complete cards.
+- Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
+- Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
+- Reading path contracts: 4/4 steps are auditable; modes=bottleneck, branch_driver, starter, turning.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.
-
-## Quality Gaps
-
-- key turning papers lack primary local section evidence
 
 ## Evidence Gap Queue
 
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | mode volume | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

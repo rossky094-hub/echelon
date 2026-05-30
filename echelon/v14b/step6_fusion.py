@@ -152,6 +152,56 @@ def load_vgae_predictions(conn_v14: sqlite3.Connection) -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def load_vgae_calibration_context(conn_v14: sqlite3.Connection) -> dict:
+    """Load the run-level calibration audit that makes edge probabilities decision-usable."""
+    try:
+        cols = table_columns(conn_v14, "vgae_calibration_audit")
+        count = int(conn_v14.execute("SELECT COUNT(*) FROM vgae_calibration_audit").fetchone()[0])
+    except sqlite3.Error:
+        return {"has_run_audit": False, "method": None, "avg_calibrated_auc": 0.0}
+    if count <= 0:
+        return {"has_run_audit": False, "method": None, "avg_calibrated_auc": 0.0}
+    method_expr = "method" if "method" in cols else "NULL AS method"
+    auc_expr = "avg_calibrated_auc" if "avg_calibrated_auc" in cols else "NULL AS avg_calibrated_auc"
+    label_expr = "label" if "label" in cols else "NULL AS label"
+    order_expr = "created_at DESC" if "created_at" in cols else "rowid DESC"
+    try:
+        row = conn_v14.execute(
+            f"""
+            SELECT {method_expr}, {auc_expr}, {label_expr}
+            FROM vgae_calibration_audit
+            ORDER BY {order_expr}
+            LIMIT 1
+            """
+        ).fetchone()
+    except sqlite3.Error:
+        row = None
+    if row is None:
+        return {"has_run_audit": False, "method": None, "avg_calibrated_auc": 0.0}
+    return {
+        "has_run_audit": True,
+        "method": row[0],
+        "avg_calibrated_auc": float(row[1] or 0.0),
+        "label": row[2],
+    }
+
+
+def _candidate_calibration_status(pred: dict, calibration_context: dict | None) -> str:
+    context = calibration_context or {}
+    edge_has_calibration_marker = (
+        pred.get("calibration_label") is not None
+        or pred.get("calibration_method") is not None
+        or pred.get("calibrated_prob") is not None
+    )
+    if context.get("has_run_audit") and edge_has_calibration_marker:
+        return "calibrated_with_run_audit"
+    if context.get("has_run_audit"):
+        return "run_audit_available_candidate_unlabeled"
+    if edge_has_calibration_marker:
+        return "edge_has_calibration_label_but_run_audit_missing"
+    return "not_calibrated"
+
+
 def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
     """加载未解决的 limitation atoms"""
     rows = conn_v14.execute("""
@@ -179,6 +229,7 @@ def compute_direction_clusters(
     vgae_preds: List[dict],
     unresolved: List[dict],
     conn_main: sqlite3.Connection,
+    calibration_context: dict | None = None,
 ) -> List[dict]:
     """
     三路融合:将不同信号聚合为 future direction clusters。
@@ -191,7 +242,7 @@ def compute_direction_clusters(
       3. 合并同 field 的相邻方向
     """
     # 主干道末端 paper_ids
-    terminal_ids: Set[str] = {t["paper_id"] for t in terminals}
+    terminal_ids: Set[str] = {str(t["paper_id"]) for t in terminals}
 
     # 未解决 limitation keywords
     limit_keywords: List[str] = list(dict.fromkeys(
@@ -213,15 +264,15 @@ def compute_direction_clusters(
         SELECT id, title, abstract, publication_year, primary_field_id
         FROM papers WHERE id IN ({placeholders})
     """, dst_ids).fetchall()
-    dst_meta = {row[0]: dict(row) for row in rows}
+    dst_meta = {str(row[0]): dict(row) for row in rows}
 
     # 对每个 VGAE 预测边,计算证据分层。Step6 now keeps exploratory
     # candidates when evidence is useful, but labels them explicitly instead of
     # promoting them into strong claims.
     direction_candidates = []
     for pred in vgae_preds:
-        dst_id = pred["dst_paper_id"]
-        src_id = pred["src_paper_id"]
+        dst_id = str(pred["dst_paper_id"])
+        src_id = str(pred["src_paper_id"])
         dst_paper = dst_meta.get(dst_id, {})
         dst_title = dst_paper.get("title", "")
         dst_abstract = dst_paper.get("abstract", "") or ""
@@ -235,11 +286,21 @@ def compute_direction_clusters(
             if pred.get("prediction_confidence") is not None
             else calibrated_prob
         )
-        calibration_label = pred.get("calibration_label") or "legacy_raw"
+        calibration_status = _candidate_calibration_status(pred, calibration_context)
+        calibrated_for_fusion = calibration_status == "calibrated_with_run_audit"
+        calibration_label = (
+            pred.get("calibration_label")
+            or pred.get("calibration_method")
+            or (
+                "run_audit_unlabeled"
+                if calibration_status == "run_audit_available_candidate_unlabeled"
+                else "uncalibrated_no_run_audit"
+            )
+        )
         vgae_evidence = (
             f"VGAE pred: calibrated={calibrated_prob:.3f}, "
             f"raw={raw_prob:.3f}, confidence={prediction_confidence:.3f}, "
-            f"calibration={calibration_label}"
+            f"calibration={calibration_label}, status={calibration_status}"
         )
         limitation_evidence = ""
 
@@ -253,7 +314,8 @@ def compute_direction_clusters(
         # Low-confidence edges stay available to Step10 as visual uncertainty,
         # but should not manufacture a future direction by themselves.
         vgae_supported = (
-            prediction_confidence >= FUSION_MIN_VGAE_CONFIDENCE
+            calibrated_for_fusion
+            and prediction_confidence >= FUSION_MIN_VGAE_CONFIDENCE
             and calibrated_prob >= min(VGAE_PREDICT_THRESHOLD, FUSION_MIN_VGAE_CONFIDENCE)
         )
         if vgae_supported:
@@ -292,6 +354,7 @@ def compute_direction_clusters(
                 limitation_quality=qualities,
                 prediction_confidence=prediction_confidence,
                 has_main_path=bool(main_path_evidence),
+                calibrated_for_fusion=calibrated_for_fusion,
             )
             direction_candidates.append({
                 "anchor_paper_id": dst_id,
@@ -305,6 +368,18 @@ def compute_direction_clusters(
                 "calibrated_prob": calibrated_prob,
                 "prediction_confidence": prediction_confidence,
                 "calibration_label": calibration_label,
+                "calibration_status": calibration_status,
+                "calibrated_for_fusion": calibrated_for_fusion,
+                "missing_gates": (
+                    []
+                    if calibrated_for_fusion
+                    else ["rolling held-out-year calibration audit"]
+                ),
+                "uncertainty_reasons": (
+                    []
+                    if calibrated_for_fusion
+                    else [calibration_status.replace("_", " ")]
+                ),
                 "is_cross_field": pred["is_cross_field"],
                 "main_path_evidence": main_path_evidence,
                 "vgae_evidence": vgae_evidence,
@@ -352,6 +427,12 @@ def compute_direction_clusters(
             )
             existing["evidence_tier"] = max_evidence_tier(existing["evidence_tier"], cand["evidence_tier"])
             existing["claim_scope"] = claim_scope_for_tier(existing["evidence_tier"])
+            if cand.get("calibrated_for_fusion") and not existing.get("calibrated_for_fusion"):
+                existing["calibrated_for_fusion"] = True
+                existing["calibration_status"] = cand.get("calibration_status")
+                existing["calibration_label"] = cand.get("calibration_label")
+                existing["missing_gates"] = cand.get("missing_gates") or []
+                existing["uncertainty_reasons"] = cand.get("uncertainty_reasons") or []
 
     return merged_candidates[:FUSION_TOP_DIRECTIONS]
 
@@ -362,10 +443,13 @@ def direction_evidence_tier(
     limitation_quality: list[str],
     prediction_confidence: float,
     has_main_path: bool,
+    calibrated_for_fusion: bool = True,
 ) -> str:
     qualities = set(limitation_quality or [])
     has_section = bool(qualities & {"section_level", "structured_sections"})
     has_weak_limitation = "weak_abstract" in qualities or not qualities
+    if not calibrated_for_fusion:
+        return "exploratory_uncalibrated_candidate" if evidence_paths >= 2 else "insufficient"
     if evidence_paths >= 3 and prediction_confidence >= 0.70 and has_section and has_main_path:
         return "triangulated_strong"
     if evidence_paths >= 3 and prediction_confidence >= 0.60:
@@ -380,6 +464,7 @@ def direction_evidence_tier(
 def max_evidence_tier(left: str, right: str) -> str:
     rank = {
         "insufficient": 0,
+        "exploratory_uncalibrated_candidate": 1,
         "exploratory_weak_limitation": 1,
         "exploratory": 2,
         "triangulated_limited": 3,
@@ -389,6 +474,8 @@ def max_evidence_tier(left: str, right: str) -> str:
 
 
 def claim_scope_for_tier(tier: str) -> str:
+    if tier == "exploratory_uncalibrated_candidate":
+        return "candidate_pool_only"
     if tier == "triangulated_strong":
         return "candidate_direction"
     if tier == "triangulated_limited":
@@ -449,6 +536,8 @@ def name_directions(
         ) * limitation_factor
         if cand.get("evidence_tier") == "exploratory_weak_limitation":
             confidence = min(confidence, 0.62)
+        elif cand.get("evidence_tier") == "exploratory_uncalibrated_candidate":
+            confidence = min(confidence, 0.52)
         elif cand.get("evidence_tier") == "triangulated_limited":
             confidence = min(confidence, 0.74)
         else:
@@ -491,6 +580,10 @@ def name_directions(
                     "raw_predicted_prob": cand.get("raw_predicted_prob"),
                     "calibrated_prob": cand.get("calibrated_prob"),
                     "prediction_confidence": cand.get("prediction_confidence"),
+                    "calibration_status": cand.get("calibration_status"),
+                    "calibrated_for_fusion": bool(cand.get("calibrated_for_fusion")),
+                    "missing_gates": cand.get("missing_gates") or [],
+                    "uncertainty_reasons": cand.get("uncertainty_reasons") or [],
                     "limitation_evidence_quality": cand.get("limitation_evidence_quality"),
                     "limitation_evidence_weight": cand.get("limitation_evidence_weight"),
                     "claim_scope": cand.get("claim_scope"),
@@ -552,6 +645,7 @@ def write_fusion_evidence_audit(
     path_counts = Counter(int(c.get("evidence_paths") or 0) for c in candidates)
     tier_counts = Counter(c.get("evidence_tier") or "unknown" for c in candidates)
     calibration_counts = Counter(c.get("calibration_label") or "legacy_raw" for c in candidates)
+    calibration_status_counts = Counter(c.get("calibration_status") or "unknown" for c in candidates)
     confidence_values = [
         float(c.get("prediction_confidence") or 0.0)
         for c in candidates
@@ -585,6 +679,7 @@ def write_fusion_evidence_audit(
         "calibration_json": json.dumps(
             {
                 "labels": dict(calibration_counts),
+                "status": dict(calibration_status_counts),
                 "prediction_confidence_avg": (
                     sum(confidence_values) / max(1, len(confidence_values))
                 ),
@@ -684,12 +779,21 @@ def run_fusion(
 
     vgae_preds = load_vgae_predictions(conn_v14)
     logger.info("VGAE 预测边: %d", len(vgae_preds))
+    calibration_context = load_vgae_calibration_context(conn_v14)
+    if not calibration_context.get("has_run_audit"):
+        logger.warning("VGAE run-level calibration audit missing; Step6 will keep VGAE-only evidence as candidate-pool evidence")
 
     unresolved = load_unresolved_limitations(conn_v14)
     logger.info("未解决 limitations: %d", len(unresolved))
 
     # 三路融合
-    candidates = compute_direction_clusters(terminals, vgae_preds, unresolved, conn_main)
+    candidates = compute_direction_clusters(
+        terminals,
+        vgae_preds,
+        unresolved,
+        conn_main,
+        calibration_context=calibration_context,
+    )
     logger.info("融合候选方向: %d", len(candidates))
 
     # Direction naming.  LLM naming is opt-in; deterministic naming keeps the

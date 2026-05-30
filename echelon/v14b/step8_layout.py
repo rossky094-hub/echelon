@@ -74,6 +74,32 @@ def field_to_color(field_id: Optional[int]) -> str:
 # UMAP 降维
 # ---------------------------------------------------------------------------
 
+def compute_pca_fallback_layout(features: np.ndarray) -> np.ndarray:
+    """Deterministic 2D fallback when UMAP/numba is unavailable.
+
+    UMAP is still the preferred layout because it preserves local semantic
+    neighborhoods better.  The fallback keeps the product chain runnable in
+    restricted environments where numba cannot create its cache, and it is
+    acceptable because Step8 coordinates are a visual projection, not evidence.
+    """
+    n = int(len(features))
+    if n == 0:
+        return np.zeros((0, 2), dtype=np.float32)
+    if n == 1:
+        return np.zeros((1, 2), dtype=np.float32)
+
+    x = np.asarray(features, dtype=np.float32)
+    x = np.nan_to_num(x, copy=False)
+    x = x - x.mean(axis=0, keepdims=True)
+    try:
+        _u, _s, vt = np.linalg.svd(x, full_matrices=False)
+        coords = x @ vt[:2].T
+    except Exception:
+        coords = x[:, :2] if x.shape[1] >= 2 else np.column_stack([x[:, 0], np.zeros(n)])
+    if coords.shape[1] == 1:
+        coords = np.column_stack([coords[:, 0], np.zeros(n)])
+    return coords[:, :2].astype(np.float32, copy=False)
+
 def load_subgraph_features(
     conn_main: sqlite3.Connection,
     conn_v14: sqlite3.Connection,
@@ -166,10 +192,9 @@ def compute_umap_layout(
         embedding = reducer.fit_transform(features)
         logger.info("UMAP 降维完成: output=%s", embedding.shape)
         return embedding
-    except ImportError:
-        logger.warning("umap-learn 未安装,使用随机布局")
-        rng = np.random.default_rng(random_state)
-        return rng.uniform(-1, 1, (len(features), 2))
+    except Exception as exc:
+        logger.warning("UMAP 不可用,使用 PCA fallback 布局: %s", exc)
+        return compute_pca_fallback_layout(features)
 
 
 def normalize_xy(coords: np.ndarray) -> np.ndarray:

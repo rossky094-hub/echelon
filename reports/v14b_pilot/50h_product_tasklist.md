@@ -7,7 +7,7 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | P0-01 | 0-3h | 固定当前指标快照 | product_baseline_snapshot.{json,md} | papers/OpenAlex/section/linked refs/Claim Cards/visual graph counts are recorded | completed |
 | P0-02 | 0-3h | 建立 Metalens 验收基准 | metalens expected branches and quality gaps in baseline snapshot | Metalens branches, bottlenecks, turning-paper evidence, future evidence are scored | completed |
 | P0-03 | 0-3h | 写 Topic Dossier 质量 rubric | Topic Dossier rubric in baseline snapshot | generic statements are demoted unless backed by clickable evidence | completed |
-| P1-04 | 3-8h | 做 Metalens gold topic fixture | tests/v14b Metalens regression fixture | fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation | completed |
+| P1-04 | 3-8h | 做 Metalens benchmark topic fixture | tests/v14b Metalens regression fixture | fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation | completed |
 | P1-05 | 3-8h | Metalens 分支识别自动测试 | automated topic-lens regression | each expected branch returns driver papers, bottleneck, enabler, evidence gap | completed |
 | P1-06 | 3-8h | Metalens 审计报告 | reports/v14b_pilot/metalens_topic_regression.md | report shows what improved, what is still generic, and which evidence is missing | completed |
 | P2-07 | 8-14h | Topic Lens 结论 evidence_objects 化 | API returns evidence_objects for every branch/bottleneck/turning/future statement | evidence types include paper, section, limitation_atom, main_path_edge, branch_lineage, future_candidate | completed |

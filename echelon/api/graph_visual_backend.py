@@ -25,6 +25,8 @@ from echelon.v14b.id_normalization import (
     normalize_openalex_work_id,
     normalize_s2_paper_id,
 )
+from echelon.v14b.evidence_grade import claim_scope_policy, uncertainty_reasons
+from echelon.v14b.topic_readiness import build_topic_readiness_preflight
 
 SCHEMA_VERSION = "V14B.visual.1"
 REQUIRED_VISUAL_TABLES = (
@@ -296,16 +298,136 @@ def _candidate_ids_from_fts(
 
 
 DECISION_SECTION_NAMES = {
+    "limitation",
     "limitations",
     "discussion",
     "conclusion",
+    "conclusions",
     "future_work",
+    "future_directions",
     "results",
     "error_analysis",
     "ablation",
     "method",
+    "methods",
     "experiments",
 }
+
+STRONG_SECTION_STRATEGIES = {
+    "explicit_heading",
+    "heading_continuation",
+    "embedded_heading",
+}
+
+MODERATE_SECTION_STRATEGIES = {
+    "inline_heading",
+}
+
+
+def _normalize_section_key(raw: Any) -> str:
+    return re.sub(r"[\s\-]+", "_", str(raw or "").strip().lower())
+
+
+def _is_decision_section(raw: Any) -> bool:
+    return _normalize_section_key(raw) in DECISION_SECTION_NAMES
+
+
+def _section_provenance_strength(section: dict[str, Any]) -> str:
+    strategies = {
+        str(v).strip()
+        for v in (section.get("extraction_strategies") or [])
+        if str(v or "").strip()
+    }
+    if strategies & STRONG_SECTION_STRATEGIES:
+        return "strong"
+    if strategies & MODERATE_SECTION_STRATEGIES:
+        return "moderate"
+    grade = str(section.get("evidence_grade") or "")
+    if grade in {"section_explicit_heading", "section_embedded_heading"}:
+        return "strong"
+    if grade == "section_inline_heading":
+        return "moderate"
+    return "weak"
+
+
+def _paper_has_primary_evidence(paper: dict[str, Any]) -> bool:
+    return bool((paper.get("content_availability") or {}).get("has_primary_evidence_sections"))
+
+
+def _paper_has_traced_primary_evidence(paper: dict[str, Any]) -> bool:
+    availability = paper.get("content_availability") or {}
+    if "has_strong_or_moderate_primary_evidence_sections" in availability:
+        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
+    provenance = availability.get("primary_section_provenance")
+    if isinstance(provenance, dict):
+        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
+    return bool(availability.get("has_primary_evidence_sections"))
+
+
+def _paper_has_access(paper: dict[str, Any]) -> bool:
+    return bool(paper.get("access_links") or [])
+
+
+def _section_evidence_contract(
+    section_name: Any,
+    meta: dict[str, Any] | None,
+    pages: list[Any] | None = None,
+) -> dict[str, Any]:
+    """Expose section extraction provenance as a user-facing evidence contract."""
+    meta = meta if isinstance(meta, dict) else {}
+    raw_strategies = meta.get("extraction_strategies") or []
+    if isinstance(raw_strategies, str):
+        strategies = [raw_strategies]
+    else:
+        strategies = [str(v) for v in raw_strategies if str(v or "").strip()]
+    strategy_set = set(strategies)
+    is_decision_section = _is_decision_section(section_name)
+
+    if "explicit_heading" in strategy_set or "heading_continuation" in strategy_set:
+        evidence_grade = "section_explicit_heading"
+        claim_scope = "section_level_evidence"
+    elif "embedded_heading" in strategy_set:
+        evidence_grade = "section_embedded_heading"
+        claim_scope = "section_level_evidence_with_block_boundary_uncertainty"
+    elif "loose_inline_heading" in strategy_set:
+        evidence_grade = "section_loose_inline_heading"
+        claim_scope = "supporting_section_evidence_with_heading_uncertainty"
+    elif "inline_heading" in strategy_set:
+        evidence_grade = "section_inline_heading"
+        claim_scope = "section_level_evidence_with_layout_uncertainty"
+    elif "parser_hint" in strategy_set:
+        evidence_grade = "section_parser_hint"
+        claim_scope = "supporting_section_evidence"
+    else:
+        evidence_grade = "section_legacy_unknown_strategy"
+        claim_scope = "supporting_context_only"
+
+    reasons: list[str] = []
+    if not is_decision_section:
+        reasons.append("section is not one of the primary decision-evidence sections")
+    if not strategies:
+        reasons.append("section extraction strategy unavailable; treat as weak provenance")
+    if not pages:
+        reasons.append("page-level provenance unavailable")
+    if evidence_grade in {
+        "section_embedded_heading",
+        "section_loose_inline_heading",
+        "section_inline_heading",
+        "section_parser_hint",
+    }:
+        reasons.append("section boundary may be less reliable than an explicit heading")
+
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": reasons,
+        "extraction_strategies": strategies,
+        "required_evidence": [
+            "explicit section heading",
+            "page-level provenance",
+            "paper-level access link",
+        ],
+    }
 
 
 def _load_live_sections(paper_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
@@ -348,6 +470,9 @@ def _load_live_sections(paper_ids: list[str]) -> dict[str, list[dict[str, Any]]]
         text = str(row["section_text"] or "").strip()
         if not text:
             continue
+        pages = _loads(row["section_pages_json"], [])
+        meta = _loads(row["section_meta_json"], {})
+        evidence_contract = _section_evidence_contract(row["section_name"], meta, pages)
         section = {
             "section_name": row["section_name"],
             "section_type": row["section_name"],
@@ -356,8 +481,9 @@ def _load_live_sections(paper_ids: list[str]) -> dict[str, list[dict[str, Any]]]
             "source_type": row["source_type"],
             "parser_name": row["parser_name"],
             "source_url": row["source_url"],
-            "pages": _loads(row["section_pages_json"], []),
-            "meta": _loads(row["section_meta_json"], {}),
+            "pages": pages,
+            "meta": meta,
+            **evidence_contract,
         }
         out.setdefault(str(row["paper_id"]), []).append(section)
     return out
@@ -569,15 +695,31 @@ def _content_access_payload(
 ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]], str]:
     access = access if isinstance(access, dict) else {}
     section_names = {
-        str(s.get("section_name") or s.get("section_type") or "").strip()
+        _normalize_section_key(s.get("section_name") or s.get("section_type"))
         for s in sections
-        if str(s.get("section_name") or s.get("section_type") or "").strip()
+        if _normalize_section_key(s.get("section_name") or s.get("section_type"))
     }
     decision_sections = [
         s
         for s in sections
-        if str(s.get("section_name") or s.get("section_type") or "") in DECISION_SECTION_NAMES
+        if _is_decision_section(s.get("section_name") or s.get("section_type"))
     ]
+    provenance_counts = Counter(_section_provenance_strength(s) for s in decision_sections)
+    primary_section_provenance = {
+        "strong": int(provenance_counts.get("strong", 0)),
+        "moderate": int(provenance_counts.get("moderate", 0)),
+        "weak": int(provenance_counts.get("weak", 0)),
+        "total": len(decision_sections),
+        "section_names": sorted(
+            {
+                _normalize_section_key(s.get("section_name") or s.get("section_type"))
+                for s in decision_sections
+            }
+        ),
+    }
+    strong_or_moderate_sections = (
+        primary_section_provenance["strong"] + primary_section_provenance["moderate"]
+    )
     links = access.get("external_links") or _external_links_from_ids(ids, sections)
     local_content = dict(access.get("local_content") or {})
     local_content.update(
@@ -585,6 +727,7 @@ def _content_access_payload(
             "sections": sections[:10],
             "decision_evidence_sections": decision_sections[:10],
             "section_names": sorted(section_names),
+            "primary_section_provenance": primary_section_provenance,
             "limitation_atoms": len(limitations or []),
             "claim_cards": len(claim_cards or []),
         }
@@ -593,7 +736,14 @@ def _content_access_payload(
     availability.update(
         {
             "has_local_sections": bool(sections),
-            "has_primary_evidence_sections": bool(section_names.intersection(DECISION_SECTION_NAMES)),
+            "has_primary_evidence_sections": bool(decision_sections),
+            "has_strong_or_moderate_primary_evidence_sections": bool(strong_or_moderate_sections),
+            "primary_section_evidence_grade": (
+                "strong_or_moderate"
+                if strong_or_moderate_sections
+                else ("weak" if decision_sections else "none")
+            ),
+            "primary_section_provenance": primary_section_provenance,
             "has_limitation_atoms": bool(limitations),
             "has_claim_cards": bool(claim_cards),
             "full_text_cached": False,
@@ -974,6 +1124,46 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
         ).fetchone()
         if row:
             fusion_adequacy = str(row["adequacy_label"] or "unknown")
+    frontfill = _frontfill_status(conn)
+    combo_uncertainty = []
+    if float(frontfill.get("linked_ref_rate") or 0.0) < 0.30:
+        combo_uncertainty.append("linked refs below 30%; main/citation lineage is incomplete")
+    if float(frontfill.get("primary_section_rate") or 0.0) < 0.10:
+        combo_uncertainty.append("section evidence below decision-grade target; bottleneck claims must remain exploratory")
+    if float(frontfill.get("openalex_w_rate") or 0.0) < 0.70:
+        combo_uncertainty.append("OpenAlex coverage below cross-field target; field/topic interpretation needs uncertainty")
+    if not (future_directions and claim_cards):
+        combo_uncertainty.append("Step6/Step13 fused Claim Cards are not fully materialized for decision-grade Radar")
+
+    def layer_combo(
+        *,
+        layers: list[str],
+        label: str,
+        question: str,
+        relationship: str,
+        display: str,
+        decision_use: str,
+        can_explain: list[str],
+        cannot_explain: list[str],
+        required_evidence: list[str],
+        claim_scope: str,
+        evidence_grade: str,
+        uncertainty_reasons: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "layers": layers,
+            "label": label,
+            "question": question,
+            "relationship": relationship,
+            "display": display,
+            "decision_use": decision_use,
+            "can_explain": can_explain,
+            "cannot_explain": cannot_explain,
+            "required_evidence": required_evidence,
+            "claim_scope": claim_scope,
+            "evidence_grade": evidence_grade,
+            "uncertainty_reasons": sorted(set([*(uncertainty_reasons or []), *combo_uncertainty])),
+        }
 
     return {
         "layout_distance": {
@@ -1035,7 +1225,7 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
             "claim_cards": claim_cards,
             "fusion_adequacy": fusion_adequacy,
         },
-        "frontfill_status": _frontfill_status(conn),
+        "frontfill_status": frontfill,
         "model_components": {
             "gnn_future_growth": {
                 "name": "Step5b VGAE / GCN link-prediction model",
@@ -1048,70 +1238,123 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
             }
         },
         "layer_combinations": [
-            {
-                "layers": ["main_path"],
-                "label": "Historical trunk",
-                "question": "哪些论文真正承接了最多演化流量？",
-                "relationship": "Main Path isolates the high-throughput citation backbone.",
-                "display": "Only black trunk edges are emphasized; this is the cleanest view of lineage, not topic breadth.",
-                "decision_use": "Use for key turning papers and historical dependency, not for future prediction.",
-            },
-            {
-                "layers": ["main_path", "topic"],
-                "label": "Trunk plus branch communities",
-                "question": "主干周围为什么形成这些主题团？",
-                "relationship": "Main gives temporal flow; co-citation reveals intellectual neighborhoods around the trunk.",
-                "display": "Black trunk plus blue-green community edges; best default for explaining why the field branched.",
-                "decision_use": "Use for Topic Dossier branch naming and driver-paper review.",
-            },
-            {
-                "layers": ["main_path", "citation"],
-                "label": "Trunk plus real citation support",
-                "question": "主干链条有哪些真实局部引用支撑？",
-                "relationship": "SPC trunk is checked against ID-relinked local citation edges.",
-                "display": "Black trunk with thin grey supporting citations.",
-                "decision_use": "Use to audit whether a claimed turning paper is structurally supported.",
-            },
-            {
-                "layers": ["topic", "semantic"],
-                "label": "Topic neighborhood search",
-                "question": "这个 topic 附近还有哪些相似论文和主题块？",
-                "relationship": "Co-citation captures shared citation context; semantic kNN captures text/section similarity.",
-                "display": "Community edges plus similarity edges; good for related-work discovery.",
-                "decision_use": "Use for Sci-Bot style retrieval, not as causal evolution evidence.",
-            },
-            {
-                "layers": ["main_path", "topic", "bottleneck"],
-                "label": "Why branches split",
-                "question": "哪个卡点或使能条件导致分支裂变？",
-                "relationship": "Main path and co-citation identify lineage/branch; bottleneck markers explain the constraint pressure.",
-                "display": "Trunk and branches with red/orange bottleneck nodes.",
-                "decision_use": "Use for Branch Dossier and Bottleneck Lineage review.",
-            },
-            {
-                "layers": ["future", "bottleneck"],
-                "label": "Bottleneck-driven future candidates",
-                "question": "哪些未来候选是由未解卡点驱动的？",
-                "relationship": "GNN/VGAE proposes future links; bottleneck evidence tests whether they address real constraints.",
-                "display": "Purple dashed candidates with red/orange bottleneck evidence.",
-                "decision_use": "Use as candidate pool only; it cannot become Radar without Claim Cards.",
-            },
-            {
-                "layers": ["future", "bottleneck", "uncertainty"],
-                "label": "R&D hypothesis audit",
-                "question": "哪些方向值得验证，哪些证据太薄？",
-                "relationship": "Future candidates are filtered by unresolved bottlenecks and penalized by coverage/calibration uncertainty.",
-                "display": "Purple future arcs, bottleneck markers, and amber uncertainty warnings.",
-                "decision_use": "Use before writing a validation experiment or investment memo.",
-            },
-            {
-                "layers": ["main_path", "topic", "future", "bottleneck", "uncertainty"],
-                "label": "Full decision context",
-                "question": "这个 topic 为什么长成这样，未来哪里可能长，可信度如何？",
-                "relationship": "Combines lineage, branch neighborhood, candidate generation, constraints, and evidence risk.",
-                "display": "Dense decision overlay; zoom/filter before reading individual edges.",
-                "decision_use": "Use for executive review after reading the Topic Dossier.",
-            },
+            layer_combo(
+                layers=["main_path"],
+                label="Historical trunk",
+                question="哪些论文真正承接了最多演化流量？",
+                relationship="Main Path isolates the high-throughput citation backbone.",
+                display="Only black trunk edges are emphasized; this is the cleanest view of lineage, not topic breadth.",
+                decision_use="Use for key turning papers and historical dependency, not for future prediction.",
+                can_explain=["historical dependency backbone", "candidate key turning papers", "where to audit local citation support"],
+                cannot_explain=["topic community breadth", "unresolved bottlenecks", "future R&D direction value"],
+                required_evidence=["linked citation refs", "SCC-condensed DAG audit", "main_path edge weights"],
+                claim_scope="lineage_candidate_until_linked_refs_target",
+                evidence_grade="citation_backbone_partial",
+            ),
+            layer_combo(
+                layers=["main_path", "topic"],
+                label="Trunk plus branch communities",
+                question="主干周围为什么形成这些主题团？",
+                relationship="Main gives temporal flow; co-citation reveals intellectual neighborhoods around the trunk.",
+                display="Black trunk plus blue-green community edges; best default for explaining why the field branched.",
+                decision_use="Use for Topic Dossier branch naming and driver-paper review.",
+                can_explain=["which communities orbit the historical trunk", "candidate branch neighborhoods", "where branch labels should be audited"],
+                cannot_explain=["causal split reason without section bottlenecks", "investment-ready future direction"],
+                required_evidence=["main_path edges", "co-citation/topic edges", "branch driver papers"],
+                claim_scope="branch_context_candidate",
+                evidence_grade="graph_structure_plus_topic_affinity",
+            ),
+            layer_combo(
+                layers=["main_path", "citation"],
+                label="Trunk plus real citation support",
+                question="主干链条有哪些真实局部引用支撑？",
+                relationship="SPC trunk is checked against ID-relinked local citation edges.",
+                display="Black trunk with thin grey supporting citations.",
+                decision_use="Use to audit whether a claimed turning paper is structurally supported.",
+                can_explain=["local support around trunk edges", "whether a turning paper is connected inside the corpus"],
+                cannot_explain=["semantic similarity", "whether a cited limitation is solved"],
+                required_evidence=["provider ID repair", "reference relinking", "main_path_edge_audit"],
+                claim_scope="citation_support_audit",
+                evidence_grade="linked_refs_dependent",
+            ),
+            layer_combo(
+                layers=["topic", "semantic"],
+                label="Topic neighborhood search",
+                question="这个 topic 附近还有哪些相似论文和主题块？",
+                relationship="Co-citation captures shared citation context; semantic kNN captures text/section similarity.",
+                display="Community edges plus similarity edges; good for related-work discovery.",
+                decision_use="Use for Sci-Bot style retrieval, not as causal evolution evidence.",
+                can_explain=["nearby papers to read", "retrieval expansion", "topic neighborhood boundaries"],
+                cannot_explain=["historical causality", "branch parentage", "future direction validity"],
+                required_evidence=["paper embeddings", "co-citation/reference neighborhoods", "search index"],
+                claim_scope="retrieval_context_only",
+                evidence_grade="semantic_topic_context",
+            ),
+            layer_combo(
+                layers=["main_path", "topic", "bottleneck"],
+                label="Why branches split",
+                question="哪个卡点或使能条件导致分支裂变？",
+                relationship="Main path and co-citation identify lineage/branch; bottleneck markers explain the constraint pressure.",
+                display="Trunk and branches with red/orange bottleneck nodes.",
+                decision_use="Use for Branch Dossier and Bottleneck Lineage review.",
+                can_explain=["candidate split pressure", "branch driver papers tied to constraints", "which bottlenecks recur around a branch"],
+                cannot_explain=["validated parent-child branch split without branch_lineage evidence", "resolved bottleneck status without resolution evidence"],
+                required_evidence=["branch_lineages", "section-level limitation atoms", "driver papers", "bottleneck lineage triples"],
+                claim_scope="branch_split_hypothesis_until_lineage_verified",
+                evidence_grade="section_bottleneck_when_available",
+            ),
+            layer_combo(
+                layers=["future", "bottleneck"],
+                label="Bottleneck-driven future candidates",
+                question="哪些未来候选是由未解卡点驱动的？",
+                relationship="GNN/VGAE proposes future links; bottleneck evidence tests whether they address real constraints.",
+                display="Purple dashed candidates with red/orange bottleneck evidence.",
+                decision_use="Use as candidate pool only; it cannot become Radar without Claim Cards.",
+                can_explain=["which predicted links overlap unresolved constraints", "where to build a Claim Card next"],
+                cannot_explain=["that a direction is investable", "that a bottleneck will be solved"],
+                required_evidence=["calibrated future candidates", "unresolved limitation atoms", "Step6 fusion evidence"],
+                claim_scope="candidate_pool_only",
+                evidence_grade="calibrated_graph_plus_bottleneck_candidate",
+            ),
+            layer_combo(
+                layers=["future", "bottleneck", "uncertainty"],
+                label="R&D hypothesis audit",
+                question="哪些方向值得验证，哪些证据太薄？",
+                relationship="Future candidates are filtered by unresolved bottlenecks and penalized by coverage/calibration uncertainty.",
+                display="Purple future arcs, bottleneck markers, and amber uncertainty warnings.",
+                decision_use="Use before writing a validation experiment or investment memo.",
+                can_explain=["which hypotheses deserve evidence gathering", "where uncertainty blocks promotion", "what to prioritize for section/OpenAlex frontfill"],
+                cannot_explain=["decision-grade direction value without a complete Claim Card", "commercial relevance without explicit scoring"],
+                required_evidence=["VGAE calibration", "section-level bottlenecks", "uncertainty audit", "Claim Card gates"],
+                claim_scope="hypothesis_audit_only",
+                evidence_grade="uncertainty_aware_candidate",
+            ),
+            layer_combo(
+                layers=["future", "bottleneck", "uncertainty", "fusion_value"],
+                label="Claim Card decision overlay",
+                question="哪些候选已经形成可审计 Claim Card，哪些仍只能待验证？",
+                relationship="Fusion value is Step6/Step13 evidence synthesis over future candidates, unresolved bottlenecks, uncertainty, and Claim Card completeness.",
+                display="Radar/Claim Card overlay plus future/bottleneck/uncertainty context.",
+                decision_use="Use to separate Radar-promoted Claim Cards from candidate-pool hypotheses.",
+                can_explain=["which candidates have complete Claim Cards", "why incomplete candidates stay out of Radar", "which evidence gate blocks promotion"],
+                cannot_explain=["raw GNN edges as conclusions", "high-confidence priority when Claim Card gates fail"],
+                required_evidence=["Step6 fusion", "Step13 Claim Cards", "VGAE calibration", "section-level bottlenecks", "uncertainty audit"],
+                claim_scope="radar_promotion_audit",
+                evidence_grade="claim_card_fusion_contract",
+            ),
+            layer_combo(
+                layers=["main_path", "topic", "future", "bottleneck", "uncertainty", "fusion_value"],
+                label="Full decision context",
+                question="这个 topic 为什么长成这样，未来哪里可能长，可信度如何？",
+                relationship="Combines lineage, branch neighborhood, candidate generation, constraints, evidence risk, and Step6/Step13 fusion value.",
+                display="Dense decision overlay; zoom/filter before reading individual edges.",
+                decision_use="Use for executive review after reading the Topic Dossier.",
+                can_explain=["full evidence context behind a Topic Dossier", "why a candidate is still exploratory", "which evidence gaps block Radar"],
+                cannot_explain=["a final scientific claim by itself", "high-confidence R&D priority without complete Claim Cards"],
+                required_evidence=["all graph layers", "Step6 fusion", "Step13 Claim Cards", "value-delivery audit"],
+                claim_scope="decision_context_not_decision",
+                evidence_grade="multi_layer_evidence_context",
+            ),
         ],
         "fusion_status": (
             "materialized"
@@ -1126,6 +1369,9 @@ def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, A
     status: dict[str, Any] = {
         "available": False,
         "papers": 0,
+        "refs": 0,
+        "linked_refs": 0,
+        "linked_ref_rate": 0.0,
         "openalex_w": 0,
         "openalex_w_rate": 0.0,
         "primary_field": 0,
@@ -1160,6 +1406,34 @@ def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, A
             ).fetchone()[0] or 0
         )
         section_rows = section_papers = primary_section_papers = 0
+        refs = linked_refs = 0
+        if _table_exists(conn_main, "paper_references"):
+            refs = int(conn_main.execute("SELECT COUNT(*) FROM paper_references").fetchone()[0] or 0)
+            ref_cols = {row[1] for row in conn_main.execute("PRAGMA table_info(paper_references)").fetchall()}
+            if "cited_paper_id_internal" in ref_cols:
+                linked_refs = int(
+                    conn_main.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM paper_references
+                        WHERE cited_paper_id_internal IS NOT NULL
+                          AND cited_paper_id_internal <> ''
+                        """
+                    ).fetchone()[0]
+                    or 0
+                )
+            elif "cited_paper_id" in ref_cols:
+                linked_refs = int(
+                    conn_main.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM paper_references
+                        WHERE cited_paper_id IS NOT NULL
+                          AND cited_paper_id <> ''
+                        """
+                    ).fetchone()[0]
+                    or 0
+                )
         if _table_exists(conn_main, "paper_sections"):
             section_rows = int(conn_main.execute("SELECT COUNT(*) FROM paper_sections").fetchone()[0] or 0)
             section_papers = int(
@@ -1170,9 +1444,9 @@ def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, A
                     """
                     SELECT COUNT(DISTINCT paper_id)
                     FROM paper_sections
-                    WHERE section_name IN (
+                    WHERE lower(section_name) IN (
                         'limitation','limitations','discussion','conclusion','conclusions',
-                        'future_work','future directions','results','error_analysis',
+                        'future_work','future work','future directions','results','error_analysis',
                         'ablation','method','methods','experiments'
                     )
                       AND length(trim(section_text)) >= 80
@@ -1183,6 +1457,9 @@ def _frontfill_status(conn_v14: sqlite3.Connection | None = None) -> dict[str, A
             {
                 "available": True,
                 "papers": papers,
+                "refs": refs,
+                "linked_refs": linked_refs,
+                "linked_ref_rate": linked_refs / max(1, refs),
                 "openalex_w": openalex_w,
                 "openalex_w_rate": openalex_w / max(1, papers),
                 "primary_field": primary_field,
@@ -1551,9 +1828,29 @@ def _split_topic_turning_papers(
         reason = dict(item.get("reason") or {})
         reason["topic_relevance_score"] = score
         reason["topic_relevance_terms"] = matched[:8]
+        has_primary_section = _paper_has_primary_evidence(item)
+        has_traced_section = _paper_has_traced_primary_evidence(item)
         if score >= 2:
             reason["topic_relevance_scope"] = "topic_specific"
             item["reason"] = reason
+            item["claim_scope"] = "topic_specific_turning_candidate"
+            item["evidence_grade"] = (
+                "section_backed_turning_candidate"
+                if has_traced_section
+                else "weak_section_turning_candidate"
+                if has_primary_section
+                else "metadata_turning_candidate"
+            )
+            item["uncertainty_reasons"] = [
+                *(
+                    []
+                    if has_traced_section
+                    else ["key turning paper has only weak section parser provenance"]
+                    if has_primary_section
+                    else ["key turning paper lacks local primary section evidence"]
+                ),
+                "main-path relevance is topic-filtered but remains uncertainty-labeled until linked refs reach target",
+            ]
             topic_specific.append(item)
         else:
             reason["topic_relevance_scope"] = "broader_field_context"
@@ -1562,6 +1859,12 @@ def _split_topic_turning_papers(
                 "text evidence to be treated as a key turning paper for this query."
             )
             item["reason"] = reason
+            item["claim_scope"] = "broader_context_not_topic_turning_paper"
+            item["evidence_grade"] = "metadata_broader_context"
+            item["uncertainty_reasons"] = [
+                "topic relevance score is below the key-turning threshold",
+                "show as broader field context, not as this topic's turning paper",
+            ]
             broader_context.append(item)
     topic_specific.sort(
         key=lambda p: (
@@ -1614,6 +1917,26 @@ def _topic_driver_fallback_papers(
                 }
             )
             item["reason"] = reason
+            has_primary_section = _paper_has_primary_evidence(item)
+            has_traced_section = _paper_has_traced_primary_evidence(item)
+            item["claim_scope"] = "topic_branch_driver_turning_fallback"
+            item["evidence_grade"] = (
+                "section_backed_turning_candidate"
+                if has_traced_section
+                else "weak_section_turning_candidate"
+                if has_primary_section
+                else "metadata_turning_candidate"
+            )
+            item["uncertainty_reasons"] = [
+                "used as topic-specific fallback because global main path is broader than the query",
+                *(
+                    []
+                    if has_traced_section
+                    else ["fallback driver has only weak section parser provenance"]
+                    if has_primary_section
+                    else ["fallback driver lacks local primary section evidence"]
+                ),
+            ]
             out.append(item)
             seen.add(str(item.get("paper_id")))
             if len(out) >= limit:
@@ -1630,6 +1953,10 @@ def _paper_ref(paper: dict[str, Any], why: str | None = None) -> dict[str, Any]:
         "branch_id": paper.get("branch_id"),
         "cluster_label": paper.get("cluster_label"),
         "access_links": paper.get("access_links") or [],
+        "claim_scope": paper.get("claim_scope"),
+        "evidence_grade": paper.get("evidence_grade"),
+        "uncertainty_reasons": paper.get("uncertainty_reasons") or [],
+        "content_availability": paper.get("content_availability") or {},
         "why": why,
     }
 
@@ -1678,6 +2005,38 @@ def _limitation_evidence_object(limitation: dict[str, Any] | None, *, source: st
     }
 
 
+def _lineage_triple_evidence_object(triple: dict[str, Any] | None, *, source: str) -> dict[str, Any] | None:
+    if not triple:
+        return None
+    paper_id = triple.get("paper_id")
+    source_stage = triple.get("source_stage") or "constraint"
+    target_stage = triple.get("target_stage") or "failure_mechanism"
+    label = f"{source_stage} -> {target_stage}"
+    return {
+        "type": "bottleneck_lineage_triple",
+        "role": "typed_bottleneck_lineage",
+        "source": source,
+        "id": triple.get("triple_id"),
+        "paper_id": paper_id,
+        "resolver_paper_id": triple.get("resolver_paper_id"),
+        "label": label,
+        "description": triple.get("target_text") or triple.get("source_text"),
+        "relation_type": triple.get("relation_type"),
+        "event_year": triple.get("event_year"),
+        "evidence_section": triple.get("evidence_section"),
+        "evidence_page": triple.get("evidence_page"),
+        "evidence_quality": triple.get("evidence_quality"),
+        "evidence_weight": triple.get("evidence_weight"),
+        "lineage_chain": {
+            "source_stage": source_stage,
+            "target_stage": target_stage,
+            "source_text": triple.get("source_text"),
+            "target_text": triple.get("target_text"),
+        },
+        "click_target": {"kind": "paper", "id": paper_id} if paper_id else None,
+    }
+
+
 def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source: str) -> dict[str, Any] | None:
     if not edge:
         return None
@@ -1700,6 +2059,28 @@ def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source
     }
 
 
+def _future_edge_calibration_status(edge: dict[str, Any] | None) -> str:
+    evidence = (edge or {}).get("evidence") or {}
+    status = evidence.get("calibration_status") or evidence.get("lifecycle_calibration_status")
+    if status:
+        return str(status)
+    if evidence.get("calibration_label") or evidence.get("calibration_method") or evidence.get("calibrated_prob") is not None:
+        return "edge_calibrated_run_audit_unknown"
+    return "not_calibrated"
+
+
+def _future_edge_has_run_calibration(edge: dict[str, Any] | None) -> bool:
+    return _future_edge_calibration_status(edge) == "calibrated_with_run_audit"
+
+
+def _future_edge_evidence_grade(edge: dict[str, Any] | None) -> str:
+    if _future_edge_has_run_calibration(edge):
+        return "calibrated_candidate_generator"
+    if edge:
+        return "uncalibrated_candidate_generator"
+    return "future_candidate_generation_gap"
+
+
 def _compact_evidence_objects(objects: list[dict[str, Any] | None], *, limit: int = 12) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[tuple[Any, Any, Any]] = set()
@@ -1713,6 +2094,163 @@ def _compact_evidence_objects(objects: list[dict[str, Any] | None], *, limit: in
         out.append(obj)
         if len(out) >= limit:
             break
+    return out
+
+
+def _evidence_contract_for_five_questions(
+    questions: list[dict[str, Any]],
+    *,
+    topic_dossier: dict[str, Any],
+    turning_hits: list[dict[str, Any]],
+    unresolved_limitations: list[dict[str, Any]],
+    future_growth: list[dict[str, Any]],
+    top_claim_card: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Attach evidence contracts to each user-facing first-principles answer.
+
+    The five questions are the highest-level research brief shown in Topic Lens.
+    They must therefore inherit the same evidence discipline as Claim Cards:
+    explain what evidence supports the sentence, where it is weak, and why it
+    cannot be promoted to Radar without stronger section/Claim Card support.
+    """
+    dossier_scope = str(topic_dossier.get("claim_scope") or "candidate_pool_only")
+    dossier_grade = str(topic_dossier.get("evidence_grade") or "metadata_only")
+    base_uncertainty = list(topic_dossier.get("uncertainty_reasons") or [])
+    branch_evidence = [
+        obj
+        for split in topic_dossier.get("branch_splits", [])[:5]
+        for obj in (split.get("evidence_objects") or [])
+    ]
+    bottleneck_evidence = [
+        obj
+        for bottleneck in topic_dossier.get("hard_bottlenecks", [])[:5]
+        for obj in (bottleneck.get("evidence_objects") or [])
+    ]
+    turning_evidence = [
+        _paper_evidence_object(
+            paper,
+            role="key_turning_paper",
+            source="topic_main_path",
+            why=(paper.get("reason") or {}).get("why") if isinstance(paper, dict) else None,
+        )
+        for paper in turning_hits[:6]
+    ]
+    limitation_evidence = [
+        _limitation_evidence_object(lim, source="limitation_atoms")
+        for lim in unresolved_limitations[:8]
+    ]
+    future_evidence = [
+        _edge_evidence_object(edge, edge_type="future_candidate", source="Step5b VGAE candidate generator")
+        for edge in future_growth[:8]
+    ]
+    future_gap_evidence = _compact_evidence_objects(
+        [*bottleneck_evidence[:5], *branch_evidence[:5], *turning_evidence[:5]],
+        limit=8,
+    )
+
+    has_complete_card = bool(top_claim_card and top_claim_card.get("five_question_complete"))
+    card_strength = (
+        str(top_claim_card.get("evidence_strength_level") or "")
+        if isinstance(top_claim_card, dict)
+        else ""
+    )
+    has_calibrated_future = any(_future_edge_has_run_calibration(edge) for edge in future_growth)
+    future_calibration_gap = bool(future_growth) and not has_calibrated_future
+
+    specs = [
+        {
+            "claim_scope": dossier_scope,
+            "evidence_grade": "branch_evidence_context" if branch_evidence else dossier_grade,
+            "required_evidence": ["branch split evidence", "driver papers", "topic-matched paper sections"],
+            "objects": branch_evidence,
+            "extra_uncertainty": ["branch claims remain weak unless lineage_status is evidence_backed_split"],
+        },
+        {
+            "claim_scope": dossier_scope,
+            "evidence_grade": "section_bottleneck_context" if bottleneck_evidence else dossier_grade,
+            "required_evidence": ["section-level bottleneck atoms", "first-principles principle mapping"],
+            "objects": bottleneck_evidence or limitation_evidence,
+            "extra_uncertainty": ["root-constraint labels are evidence-linked hypotheses, not LLM-free causal proof"],
+        },
+        {
+            "claim_scope": "topic_specific_turning_candidate",
+            "evidence_grade": (
+                "section_backed_turning_context"
+                if any(_paper_has_traced_primary_evidence(p) for p in turning_hits)
+                else "weak_section_turning_context"
+                if any(_paper_has_primary_evidence(p) for p in turning_hits)
+                else "metadata_turning_candidate"
+            ),
+            "required_evidence": ["topic-specific turning papers", "main-path weights", "linked citation support"],
+            "objects": turning_evidence,
+            "extra_uncertainty": ["linked refs below target can distort main-path turning-paper rank"],
+        },
+        {
+            "claim_scope": "exploratory_bottleneck_claim",
+            "evidence_grade": (
+                "section_level_bottleneck_evidence"
+                if any(str(lim.get("evidence_quality") or "").lower() == "section_level" for lim in unresolved_limitations)
+                else "metadata_or_abstract_bottleneck"
+            ),
+            "required_evidence": ["limitation/discussion/conclusion/results/method/experiment sections", "resolution evidence"],
+            "objects": limitation_evidence,
+            "extra_uncertainty": ["unresolved does not mean impossible; it means no matching resolution evidence is linked yet"],
+        },
+        {
+            "claim_scope": (
+                "exploratory_with_claim_card"
+                if has_complete_card
+                else "candidate_pool_only"
+            ),
+            "evidence_grade": (
+                f"claim_card_{card_strength}" if has_complete_card and card_strength else
+                "calibrated_candidate_generator" if has_calibrated_future else
+                "uncalibrated_candidate_generator" if future_evidence else
+                "future_candidate_generation_gap"
+            ),
+            "required_evidence": [
+                "rolling held-out-year calibration",
+                "Step6 fusion",
+                "complete Step13 Claim Card",
+                "topic-matched future candidate endpoints",
+            ],
+            "objects": future_evidence or future_gap_evidence,
+            "extra_uncertainty": (
+                [] if has_complete_card else [
+                    "future candidates are not Radar directions until Step6/Step13 Claim Card gates pass",
+                    (
+                        "future candidate edges lack rolling held-out-year run-level calibration"
+                    ) if future_calibration_gap else "",
+                    (
+                        "no calibrated future candidate matched this topic; use branch/bottleneck evidence "
+                        "as the next frontfill and backtest target"
+                    ) if not future_evidence else "",
+                ]
+            ),
+        },
+    ]
+
+    out: list[dict[str, Any]] = []
+    for idx, question in enumerate(questions):
+        spec = specs[min(idx, len(specs) - 1)]
+        evidence_objects = _compact_evidence_objects(spec.get("objects") or [], limit=8)
+        uncertainty = sorted(
+            {
+                item for item in [*base_uncertainty, *list(spec.get("extra_uncertainty") or [])]
+                if item
+            }
+        )
+        item = dict(question)
+        item.update(
+            {
+                "claim_scope": spec["claim_scope"],
+                "evidence_grade": spec["evidence_grade"] if evidence_objects else "insufficient",
+                "uncertainty_reasons": uncertainty,
+                "required_evidence": spec["required_evidence"],
+                "evidence_objects": evidence_objects,
+            }
+        )
+        out.append(item)
     return out
 
 
@@ -1750,7 +2288,7 @@ def _build_topic_branch_splits(
         primary_section_evidence = sum(
             1
             for p in evidence
-            if (p.get("content_availability") or {}).get("has_primary_evidence_sections")
+            if _paper_has_traced_primary_evidence(p)
         )
         evidence_objects = _compact_evidence_objects(
             [
@@ -1861,6 +2399,37 @@ def _build_bottleneck_dossiers(
         buckets.setdefault(label, []).append(lim)
     dossiers = []
     for label, rows in sorted(buckets.items(), key=lambda x: len(x[1]), reverse=True)[:8]:
+        section_level_count = sum(
+            1 for r in rows
+            if str(r.get("evidence_quality") or "").lower() in {"section_level", "section"}
+        )
+        direct_count = sum(
+            1 for r in rows
+            if str(r.get("relationship_scope") or "direct_paper_match") == "direct_paper_match"
+        )
+        evidence_grade = (
+            "section_backed_bottleneck_candidate"
+            if section_level_count
+            else "metadata_or_abstract_bottleneck_candidate"
+        )
+        claim_scope = (
+            "topic_bottleneck_candidate"
+            if section_level_count
+            else "weak_bottleneck_hypothesis"
+        )
+        uncertainty = [
+            *(
+                []
+                if section_level_count
+                else ["bottleneck is not backed by local primary section evidence"]
+            ),
+            *(
+                []
+                if direct_count
+                else ["bottleneck evidence is cluster/branch context, not a direct topic-paper match"]
+            ),
+            "treat as unresolved until Step5c resolution evidence closes the atom",
+        ]
         papers = []
         seen: set[str] = set()
         for lim in rows:
@@ -1875,6 +2444,11 @@ def _build_bottleneck_dossiers(
                 "status": "unresolved_or_partially_resolved",
                 "evidence_count": len(rows),
                 "evidence_quality": rows[0].get("evidence_quality") or "unknown",
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "uncertainty_reasons": sorted(set(uncertainty)),
+                "direct_evidence_count": direct_count,
+                "section_level_evidence_count": section_level_count,
                 "why_it_matters": (
                     f"{label} recurs in the topic evidence. Treat as a hard constraint until section-level "
                     "resolution evidence proves it has been solved across branches."
@@ -1922,6 +2496,19 @@ def _build_validation_directions(
                 "name": item.get("title"),
                 "claim_scope": item.get("claim_scope"),
                 "evidence_strength": item.get("evidence_tier") or item.get("claim_card", {}).get("evidence_strength_level"),
+                "evidence_grade": (
+                    "complete_claim_card"
+                    if item.get("claim_card", {}).get("five_question_complete")
+                    else "incomplete_claim_card"
+                ),
+                "uncertainty_reasons": [
+                    *(
+                        []
+                        if item.get("eligible")
+                        else ["Claim Card exists but high-confidence gates are not fully passed"]
+                    ),
+                    *list(item.get("missing_high_confidence_gates") or []),
+                ],
                 "why_worth_testing": item.get("plain_language"),
                 "why_not_ready": None if item.get("eligible") else "Claim Card exists but high-confidence gates are not fully passed.",
                 "evidence_papers": [],
@@ -1940,6 +2527,22 @@ def _build_validation_directions(
                 "name": name,
                 "claim_scope": "exploratory_candidate_pool",
                 "evidence_strength": bottleneck.get("evidence_quality") or "weak_until_claim_card",
+                "evidence_grade": (
+                    "section_backed_validation_candidate"
+                    if str(bottleneck.get("evidence_grade") or "").startswith("section_backed")
+                    and str(branch.get("evidence_grade") or "").startswith("section_backed")
+                    else "weak_validation_candidate"
+                ),
+                "uncertainty_reasons": sorted(
+                    set(
+                        [
+                            "No complete Step13 five-question Claim Card yet",
+                            "validation direction is assembled from branch and bottleneck evidence, not promoted Radar evidence",
+                            *list(branch.get("uncertainty_reasons") or []),
+                            *list(bottleneck.get("uncertainty_reasons") or []),
+                        ]
+                    )
+                ),
                 "why_worth_testing": (
                     f"The topic evidence links the {branch.get('name')} branch to "
                     f"{bottleneck.get('name') or branch.get('historical_bottleneck')}. "
@@ -1980,11 +2583,24 @@ def _build_validation_directions(
         )
     if not directions and future_growth:
         for edge in future_growth[:5]:
+            calibration_status = _future_edge_calibration_status(edge)
+            evidence_grade = _future_edge_evidence_grade(edge)
             directions.append(
                 {
                     "name": f"Audit future candidate: {edge.get('source_paper_id')} -> {edge.get('target_paper_id')}",
-                    "claim_scope": "gnn_candidate_only",
-                    "evidence_strength": "calibrated_graph_only",
+                    "claim_scope": "candidate_pool_only",
+                    "evidence_strength": evidence_grade,
+                    "evidence_grade": evidence_grade,
+                    "uncertainty_reasons": [
+                        "GNN/VGAE is a candidate generator, not a conclusion generator",
+                        "missing Step6 fusion evidence",
+                        "missing Step13 five-question Claim Card",
+                        *(
+                            []
+                            if calibration_status == "calibrated_with_run_audit"
+                            else [calibration_status.replace("_", " ")]
+                        ),
+                    ],
                     "why_worth_testing": "Step5b/GNN suggests a possible growth link; use it for candidate generation only.",
                     "why_not_ready": "Missing Step6 fusion and Step13 Claim Card.",
                     "minimal_validation_experiment": "Read both endpoint papers, map the shared bottleneck, then design a falsifiable experiment.",
@@ -2182,6 +2798,12 @@ def _build_branch_dossiers(
         if isinstance(lineage_payload, dict):
             driver_ids = [str(x) for x in (lineage_payload.get("driver_papers") or []) if x]
         driver_papers = _hydrate_hits(conn, driver_ids[:5], scores={}) if driver_ids else []
+        representative_evidence = driver_papers or rep_papers
+        primary_driver_sections = sum(
+            1
+            for p in representative_evidence
+            if _paper_has_traced_primary_evidence(p)
+        )
         split_reason = _split_reason(str(branch_id or cid), row.get("parent_branch_id"), lineage_payload)
         constraint_shift = (
             lineage_payload.get("constraint_shift")
@@ -2191,16 +2813,69 @@ def _build_branch_dossiers(
             "status": "inferred_from_terms_pending_section_evidence",
             "note": "Use top terms, driver papers, and section-level bottleneck evidence before treating this as a causal split.",
         }
+        if lineage_status == "evidence_backed_split":
+            claim_scope = "evidence_backed_branch_split_candidate"
+            evidence_grade = (
+                "section_backed_branch_split"
+                if primary_driver_sections
+                else "graph_backed_branch_split"
+            )
+        elif lineage_status == "weak_split_candidate":
+            claim_scope = "weak_branch_split_candidate"
+            evidence_grade = (
+                "section_context_weak_branch_split"
+                if primary_driver_sections
+                else "graph_weak_branch_split"
+            )
+        else:
+            claim_scope = "layout_cluster_navigation_only"
+            evidence_grade = "layout_cluster_only"
+        uncertainty = [
+            *(
+                []
+                if lineage_status == "evidence_backed_split"
+                else ["branch split is not strongly backed by parent-child lineage evidence"]
+            ),
+            *(
+                []
+                if primary_driver_sections
+                else ["branch driver/representative papers lack local primary section evidence in this card"]
+            ),
+            *(
+                ["layout clusters are navigation aids and must not be narrated as causal scientific evolution"]
+                if lineage_status == "layout_cluster_only"
+                else []
+            ),
+        ]
+        required_evidence = [
+            "parent_branch_id with time-forward citation support",
+            "driver papers with local primary section evidence",
+            "constraint shift tied to limitation/discussion/conclusion/results sections",
+            "branch split confidence and audit trail",
+        ]
         branch_evidence_objects = [
             {
                 "type": "branch_lineage",
+                "role": "branch_split_evidence",
+                "source": "branch_lineages",
                 "id": f"branch_lineage:{branch_id or cid}",
+                "label": f"{row.get('parent_branch_id') or 'root'} -> {branch_id or cid}",
                 "relationship": "split_evidence",
                 "lineage_status": lineage_status,
                 "confidence": split_confidence,
                 "description": split_reason,
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
             }
-        ] + [_paper_ref(p, "branch split driver") for p in driver_papers[:3]]
+        ] + [
+            _paper_evidence_object(
+                p,
+                role="branch_split_driver" if driver_papers else "branch_representative",
+                source="branch_lineages" if driver_papers else "visual_cluster_representatives",
+                why="branch split driver" if driver_papers else "branch representative while driver evidence is missing",
+            )
+            for p in representative_evidence[:3]
+        ]
         dossiers.append(
             {
                 "cluster_id": cid,
@@ -2214,7 +2889,10 @@ def _build_branch_dossiers(
                 "split_year": row.get("split_year"),
                 "split_confidence": split_confidence,
                 "lineage_status": lineage_status,
-                "claim_scope": "evidence_backed_branch" if lineage_status == "evidence_backed_split" else "weak_branch_hypothesis",
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "uncertainty_reasons": sorted(set(uncertainty)),
+                "required_evidence": required_evidence,
                 "split_reason": split_reason,
                 "constraint_shift": constraint_shift,
                 "split_evidence": lineage_payload,
@@ -2240,10 +2918,14 @@ def _build_bottleneck_lineage(
     principles: list[dict[str, Any]],
     history_events: list[dict[str, Any]],
     unresolved_limitations: list[dict[str, Any]],
+    lineage_triples: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     event_by_principle: dict[str, list[dict[str, Any]]] = {}
     for event in history_events:
         event_by_principle.setdefault(str(event.get("principle_id")), []).append(event)
+    triples_by_principle: dict[str, list[dict[str, Any]]] = {}
+    for triple in lineage_triples or []:
+        triples_by_principle.setdefault(str(triple.get("principle_id")), []).append(triple)
     limitation_counter: Counter[str] = Counter(
         str(x.get("keyword") or "limitation") for x in unresolved_limitations if x
     )
@@ -2256,6 +2938,84 @@ def _build_bottleneck_lineage(
             for x in (keywords or [])[:6]
             if x
         ]
+        keyword_set = {x.lower() for x in keyword_list}
+        matched_limitations = [
+            x
+            for x in unresolved_limitations
+            if not keyword_set
+            or str(x.get("keyword") or "").lower() in keyword_set
+            or any(k and k in str(x.get("description") or "").lower() for k in keyword_set)
+        ][:6]
+        triples = sorted(
+            triples_by_principle.get(pid, []),
+            key=lambda x: (
+                -(int(x.get("event_year") or 0)),
+                int(x.get("edge_order") or 0),
+            ),
+        )[:10]
+        has_section_triple = any(
+            "section" in str(x.get("evidence_quality") or "").lower()
+            for x in triples
+        )
+        has_section_limitation = any(
+            "section" in str(x.get("evidence_quality") or "").lower()
+            for x in matched_limitations
+        )
+        if has_section_triple:
+            evidence_grade = "typed_section_lineage"
+            claim_scope = "bottleneck_lineage_evidence"
+        elif has_section_limitation:
+            evidence_grade = "section_bottleneck_context"
+            claim_scope = "exploratory_bottleneck_lineage"
+        elif triples:
+            evidence_grade = "typed_metadata_lineage"
+            claim_scope = "exploratory_bottleneck_lineage"
+        else:
+            evidence_grade = "aggregate_bottleneck_history"
+            claim_scope = "lineage_prior_until_typed_section_evidence"
+        uncertainty = []
+        if not triples:
+            uncertainty.append("no typed constraint->failure->attempt lineage triples matched this principle")
+        if not has_section_triple:
+            uncertainty.append("lineage lacks section-level typed triples for this topic")
+        if not matched_limitations:
+            uncertainty.append("no topic-matched limitation atoms attached to this root constraint")
+        required_evidence = [
+            "typed triples from limitation/discussion/conclusion/results/method sections",
+            "paper-level section evidence with page/section provenance",
+            "resolved and unresolved atoms separated over time",
+        ]
+        typed_chain = [
+            {
+                "triple_id": t.get("triple_id"),
+                "source_stage": t.get("source_stage"),
+                "target_stage": t.get("target_stage"),
+                "source_text": t.get("source_text"),
+                "target_text": t.get("target_text"),
+                "relation_type": t.get("relation_type"),
+                "paper_id": t.get("paper_id"),
+                "resolver_paper_id": t.get("resolver_paper_id"),
+                "event_year": t.get("event_year"),
+                "evidence_section": t.get("evidence_section"),
+                "evidence_page": t.get("evidence_page"),
+                "evidence_quality": t.get("evidence_quality"),
+                "evidence_weight": t.get("evidence_weight"),
+            }
+            for t in triples[:5]
+        ]
+        evidence_objects = _compact_evidence_objects(
+            [
+                *[
+                    _lineage_triple_evidence_object(t, source="bottleneck_lineage_graph")
+                    for t in triples[:6]
+                ],
+                *[
+                    _limitation_evidence_object(lim, source="topic_bottleneck_lineage")
+                    for lim in matched_limitations[:4]
+                ],
+            ],
+            limit=10,
+        )
         constraints.append(
             {
                 "principle_id": pid,
@@ -2269,9 +3029,16 @@ def _build_bottleneck_lineage(
                 "peak_backlog_year": p.get("peak_backlog_year"),
                 "top_keywords": keyword_list,
                 "recent_events": event_by_principle.get(pid, [])[:8],
+                "typed_chain": typed_chain,
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "uncertainty_reasons": sorted(set(uncertainty)),
+                "required_evidence": required_evidence,
+                "evidence_objects": evidence_objects,
                 "interpretation": (
                     "Root constraint lineage: opened/resolved backlog over time. "
-                    "High backlog with weak section evidence remains exploratory."
+                    "High backlog with weak section evidence remains exploratory; only typed section lineage "
+                    "can support strong bottleneck-history claims."
                 ),
             }
         )
@@ -2333,6 +3100,11 @@ def _build_rd_radar(
         evidence = e.get("evidence") or {}
         lifecycle_missing = evidence.get("missing_gates") or []
         lifecycle_reason = evidence.get("candidate_pool_reason")
+        calibration_status = _future_edge_calibration_status(e)
+        evidence_grade = _future_edge_evidence_grade(e)
+        calibration_uncertainty = [] if calibration_status == "calibrated_with_run_audit" else [
+            calibration_status.replace("_", " ")
+        ]
         candidate_pool.append(
             {
                 "kind": "candidate_edge",
@@ -2340,7 +3112,7 @@ def _build_rd_radar(
                 "priority": round(conf * 0.55, 4),
                 "technical_probability": conf,
                 "model_evidence": {
-                    "generator": "Step5b calibrated VGAE / temporal link prediction",
+                    "generator": "Step5b VGAE / temporal link prediction",
                     "calibrated_prob": evidence.get("calibrated_prob"),
                     "raw_predicted_prob": evidence.get("raw_predicted_prob"),
                     "calibration_method": evidence.get("calibration_method"),
@@ -2356,6 +3128,12 @@ def _build_rd_radar(
                 "commercial_relevance": None,
                 "validation_cost": None,
                 "claim_scope": "exploratory_candidate_pool",
+                "evidence_grade": evidence_grade,
+                "uncertainty_reasons": [
+                    "raw GNN/VGAE edge is not a Radar direction",
+                    *calibration_uncertainty,
+                    *list(evidence.get("uncertainty_reasons") or []),
+                ],
                 "eligible": False,
                 "source_paper": e.get("source_paper"),
                 "target_paper": e.get("target_paper"),
@@ -2363,13 +3141,24 @@ def _build_rd_radar(
                     _paper_ref(e.get("source_paper") or {"paper_id": e.get("source_paper_id")}, "GNN candidate source"),
                     _paper_ref(e.get("target_paper") or {"paper_id": e.get("target_paper_id")}, "GNN candidate target"),
                 ],
-                "missing_gates": lifecycle_missing or [
-                    "Step6 fusion evidence",
-                    "Step13 five-question Claim Card",
-                    "section-level bottleneck evidence",
-                    "commercial relevance",
-                    "minimal validation experiment",
-                ],
+                "missing_gates": sorted(
+                    set(
+                        [
+                            *(lifecycle_missing or [
+                                "Step6 fusion evidence",
+                                "Step13 five-question Claim Card",
+                                "section-level bottleneck evidence",
+                                "commercial relevance",
+                                "minimal validation experiment",
+                            ]),
+                            *(
+                                []
+                                if calibration_status == "calibrated_with_run_audit"
+                                else ["rolling held-out-year calibration audit"]
+                            ),
+                        ]
+                    )
+                ),
                 "plain_language": (
                     "This is a GNN/VGAE future-growth candidate. It is useful for discovery, "
                     "but not yet a decision-grade R&D direction."
@@ -2404,6 +3193,229 @@ def _build_rd_radar(
     }
 
 
+def _reading_path_item(
+    *,
+    mode: str,
+    title: str,
+    why: str,
+    papers: list[dict[str, Any]],
+    claim_scope: str,
+    evidence_grade: str,
+    uncertainty_reasons: list[str] | None = None,
+    evidence_objects: list[dict[str, Any] | None] | None = None,
+    required_evidence: list[str] | None = None,
+) -> dict[str, Any] | None:
+    papers = [p for p in papers if p and p.get("paper_id")]
+    objects = _compact_evidence_objects(
+        [
+            *[
+                _paper_evidence_object(
+                    p,
+                    role=f"reading_path_{mode}",
+                    source="topic_dossier_reading_path",
+                    why=why,
+                )
+                for p in papers
+            ],
+            *(evidence_objects or []),
+        ],
+        limit=10,
+    )
+    if not papers and not objects:
+        return None
+    has_primary = any(_paper_has_primary_evidence(p) for p in papers)
+    has_traced_primary = any(_paper_has_traced_primary_evidence(p) for p in papers)
+    uncertainty = list(uncertainty_reasons or [])
+    if not has_primary:
+        uncertainty.append("recommended papers lack local primary section evidence in this reading path item")
+    elif not has_traced_primary:
+        uncertainty.append("recommended papers have only weak section parser provenance in this reading path item")
+    return {
+        "mode": mode,
+        "title": title,
+        "why": why,
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade if objects else "insufficient",
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": required_evidence or [
+            "clickable paper record",
+            "local section evidence for strong interpretation",
+            "linked graph/lineage evidence for causal claims",
+        ],
+        "papers": [_paper_ref(p, why) for p in papers[:6]],
+        "evidence_objects": objects,
+    }
+
+
+def _build_reading_path(
+    *,
+    hits: list[dict[str, Any]],
+    turning_hits: list[dict[str, Any]],
+    branch_splits: list[dict[str, Any]],
+    bottleneck_dossiers: list[dict[str, Any]],
+    validation_directions: list[dict[str, Any]],
+    future_growth: list[dict[str, Any]],
+    rd_radar: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build an auditable reading path instead of a generic recommendation list.
+
+    A useful Topic Dossier should tell a researcher what to read first and why.
+    Each item is deliberately scoped: starter papers are not turning papers,
+    GNN endpoints are not Radar directions, and bottleneck papers remain weak
+    unless section evidence exists.
+    """
+    path: list[dict[str, Any]] = []
+    starter = sorted(
+        hits[:80],
+        key=lambda p: (
+            -float(p.get("score") or 0.0),
+            0 if _paper_has_traced_primary_evidence(p) else 1,
+            -(int(p.get("year") or 0)),
+        ),
+    )[:5]
+    item = _reading_path_item(
+        mode="starter",
+        title="Start here: topic anchors",
+        why="High topic match papers provide vocabulary and representative context before reading lineage claims.",
+        papers=starter,
+        claim_scope="retrieval_context_only",
+        evidence_grade=(
+            "section_backed_topic_anchor"
+            if any(_paper_has_traced_primary_evidence(p) for p in starter)
+            else "weak_section_topic_anchor"
+            if any(_paper_has_primary_evidence(p) for p in starter)
+            else "metadata_topic_anchor"
+        ),
+        uncertainty_reasons=[
+            "starter papers are selected by topic relevance, not by proof of future direction",
+        ],
+    )
+    if item:
+        path.append(item)
+
+    item = _reading_path_item(
+        mode="turning",
+        title="Then read: key turning papers",
+        why="These papers sit on topic-specific main-path context or validated turning fallback; read them to understand why the branch grew.",
+        papers=turning_hits[:6],
+        claim_scope="topic_specific_turning_candidate",
+        evidence_grade=(
+            "section_backed_turning_path"
+            if any(_paper_has_traced_primary_evidence(p) for p in turning_hits[:6])
+            else "weak_section_turning_path"
+            if any(_paper_has_primary_evidence(p) for p in turning_hits[:6])
+            else "metadata_turning_path"
+        ),
+        uncertainty_reasons=[
+            "linked refs below target can distort main-path rank",
+            "broader field context papers must not be narrated as topic-specific turning papers",
+        ],
+        required_evidence=["topic-specific text/facet match", "main-path context", "access link or local section evidence"],
+    )
+    if item:
+        path.append(item)
+
+    branch_driver_papers: list[dict[str, Any]] = []
+    branch_evidence: list[dict[str, Any] | None] = []
+    for branch in branch_splits[:5]:
+        branch_driver_papers.extend([p for p in (branch.get("driver_papers") or []) if isinstance(p, dict)])
+        branch_evidence.extend(branch.get("evidence_objects") or [])
+    item = _reading_path_item(
+        mode="branch_driver",
+        title="Map branches: driver papers",
+        why="Driver papers explain which branch/facet the topic is using and whether the split is evidence-backed or only weak.",
+        papers=branch_driver_papers[:8],
+        claim_scope="branch_context_candidate",
+        evidence_grade=(
+            "section_backed_branch_driver_path"
+            if any(_paper_has_traced_primary_evidence(p) for p in branch_driver_papers)
+            else "weak_section_branch_driver_path"
+            if any(_paper_has_primary_evidence(p) for p in branch_driver_papers)
+            else "metadata_branch_driver_path"
+        ),
+        uncertainty_reasons=[
+            "branch drivers do not prove parent-child lineage unless branch_lineages support is present",
+        ],
+        evidence_objects=branch_evidence[:8],
+        required_evidence=["driver papers", "branch lineage status", "section-level constraint shift evidence"],
+    )
+    if item:
+        path.append(item)
+
+    bottleneck_papers: list[dict[str, Any]] = []
+    bottleneck_evidence: list[dict[str, Any] | None] = []
+    for bottleneck in bottleneck_dossiers[:5]:
+        bottleneck_papers.extend([p for p in (bottleneck.get("evidence_papers") or []) if isinstance(p, dict)])
+        bottleneck_evidence.extend(bottleneck.get("evidence_objects") or [])
+    item = _reading_path_item(
+        mode="bottleneck",
+        title="Audit bottlenecks: section evidence",
+        why="These papers contain the limitation/discussion/results/method evidence that keeps the dossier from becoming generic trend prose.",
+        papers=bottleneck_papers[:8],
+        claim_scope="exploratory_bottleneck_claim",
+        evidence_grade=(
+            "section_backed_bottleneck_path"
+            if any(str((obj or {}).get("evidence_quality") or "").lower().startswith("section") for obj in bottleneck_evidence)
+            else "metadata_or_abstract_bottleneck_path"
+        ),
+        uncertainty_reasons=[
+            "unresolved bottleneck claims remain weak until resolution evidence is linked",
+        ],
+        evidence_objects=bottleneck_evidence[:10],
+        required_evidence=["limitation/discussion/conclusion/results sections", "resolution atoms", "paper access links"],
+    )
+    if item:
+        path.append(item)
+
+    if rd_radar.get("claim_cards"):
+        card_papers: list[dict[str, Any]] = []
+        card_evidence: list[dict[str, Any] | None] = []
+        for card in rd_radar.get("claim_cards", [])[:3]:
+            for paper in (card.get("evidence_papers") or []):
+                if isinstance(paper, dict):
+                    card_papers.append(paper)
+            card_evidence.extend(card.get("evidence_objects") or [])
+        item = _reading_path_item(
+            mode="claim_card",
+            title="Decision read: complete Claim Cards",
+            why="Read these after branch and bottleneck evidence; they are the only candidates allowed into the Radar main view.",
+            papers=card_papers,
+            claim_scope="exploratory_with_claim_card",
+            evidence_grade="complete_claim_card_path",
+            uncertainty_reasons=[
+                "complete Claim Card still needs high-confidence gates before being treated as validated",
+            ],
+            evidence_objects=card_evidence,
+            required_evidence=["complete five-question card", "calibrated future candidate", "section bottleneck evidence"],
+        )
+    else:
+        future_papers: list[dict[str, Any]] = []
+        future_evidence: list[dict[str, Any] | None] = []
+        for edge in future_growth[:5]:
+            for key in ("source_paper", "target_paper"):
+                paper = edge.get(key)
+                if isinstance(paper, dict) and paper.get("paper_id"):
+                    future_papers.append(paper)
+            future_evidence.append(_edge_evidence_object(edge, edge_type="future_candidate", source="Step5b VGAE"))
+        item = _reading_path_item(
+            mode="future_candidate",
+            title="Finally inspect: future candidate endpoints",
+            why="These are GNN/VGAE candidate endpoints. They help find hypotheses, but cannot be treated as directions until Step6/Step13 creates a complete Claim Card.",
+            papers=future_papers[:8],
+            claim_scope="candidate_pool_only",
+            evidence_grade="calibrated_candidate_endpoint_path",
+            uncertainty_reasons=[
+                "GNN/VGAE is a candidate generator, not a conclusion generator",
+                "future endpoints are excluded from Radar until Claim Card gates pass",
+            ],
+            evidence_objects=future_evidence,
+            required_evidence=["calibration audit", "Step6 fusion evidence", "complete Step13 Claim Card"],
+        )
+    if item:
+        path.append(item)
+    return path
+
+
 def _build_topic_dossier(
     *,
     topic: str,
@@ -2421,7 +3433,11 @@ def _build_topic_dossier(
     recent = sum(1 for y in years if y >= 2023)
     section_ready = sum(
         1 for h in hits
-        if (h.get("content_availability") or {}).get("has_primary_evidence_sections")
+        if _paper_has_primary_evidence(h)
+    )
+    traced_section_ready = sum(
+        1 for h in hits
+        if _paper_has_traced_primary_evidence(h)
     )
     limitation_ready = sum(
         1 for h in hits
@@ -2442,6 +3458,15 @@ def _build_topic_dossier(
         bottleneck_dossiers,
         future_growth,
         rd_radar,
+    )
+    reading_path = _build_reading_path(
+        hits=hits,
+        turning_hits=turning_hits,
+        branch_splits=branch_splits,
+        bottleneck_dossiers=bottleneck_dossiers,
+        validation_directions=validation_directions,
+        future_growth=future_growth,
+        rd_radar=rd_radar,
     )
     phase = (
         "frontier expansion"
@@ -2493,6 +3518,46 @@ def _build_topic_dossier(
         ],
         limit=40,
     )
+    frontfill = value_model.get("frontfill_status") or {}
+    local_section_rate = section_ready / max(1, len(hits))
+    traced_section_rate = traced_section_ready / max(1, len(hits))
+    has_calibration = any(_future_edge_has_run_calibration(edge) for edge in future_growth)
+    has_complete_claim_card = bool(rd_radar.get("claim_cards_ready"))
+    if (
+        branch_splits
+        and bottleneck_dossiers
+        and traced_section_ready >= 3
+        and traced_section_rate >= 0.35
+    ):
+        evidence_grade = "moderate_section"
+    elif evidence_objects and section_ready:
+        evidence_grade = "metadata_only"
+    elif evidence_objects:
+        evidence_grade = "metadata_only"
+    else:
+        evidence_grade = "insufficient"
+    dossier_claim_scope = claim_scope_policy(
+        evidence_grade=evidence_grade,
+        has_complete_claim_card=has_complete_claim_card,
+        has_calibration=has_calibration,
+        linked_ref_rate=float(frontfill.get("linked_ref_rate") or 0.0),
+    )
+    dossier_uncertainty = uncertainty_reasons(
+        linked_ref_rate=float(frontfill.get("linked_ref_rate") or 0.0),
+        primary_section_rate=float(frontfill.get("primary_section_rate") or 0.0),
+        openalex_rate=float(frontfill.get("openalex_w_rate") or 0.0),
+        has_calibration=has_calibration,
+    )
+    if local_section_rate < 0.35:
+        dossier_uncertainty.append("topic-local section evidence below dossier-grade target")
+    if section_ready and traced_section_ready < section_ready:
+        dossier_uncertainty.append("some topic-local primary sections have weak parser provenance")
+    if not branch_splits:
+        dossier_uncertainty.append("no evidence-backed branch split available for this topic")
+    if not bottleneck_dossiers:
+        dossier_uncertainty.append("no section-linked bottleneck dossier available for this topic")
+    if future_growth and not has_complete_claim_card:
+        dossier_uncertainty.append("future candidates exist but no complete five-question Claim Card is available")
     insufficient_evidence = []
     if not branch_splits:
         insufficient_evidence.append(
@@ -2526,22 +3591,57 @@ def _build_topic_dossier(
                 "needed": "paper_sections from limitations/discussion/conclusion/future_work/results/methods",
             }
         )
-    return {
-        "headline": (
-            f"{topic} is best read as a {phase} topic organized around {branch_text}."
-        ),
-        "value_claim": (
+    elif traced_section_ready == 0:
+        insufficient_evidence.append(
+            {
+                "claim": "strong local evidence",
+                "reason": "primary section evidence exists, but parser provenance is weak",
+                "needed": "explicit/embedded heading section evidence for key papers",
+            }
+        )
+    if evidence_grade == "insufficient":
+        headline = (
+            f"{topic} does not yet have enough evidence-backed branch/bottleneck structure; "
+            "treat this as a search dossier, not a scientific conclusion."
+        )
+        value_claim = (
+            "The next value-creating action is to frontfill primary sections for the listed evidence gaps, "
+            "then rerun Step5c/Step6/Step13 before making a direction claim."
+        )
+    elif dossier_claim_scope in {"candidate_pool_only", "insufficient_evidence"}:
+        headline = (
+            f"{topic} has a candidate evidence dossier around {branch_text}, but current evidence is not "
+            "strong enough for Radar promotion."
+        )
+        value_claim = (
+            f"The decision question is whether {topic} can keep verified performance under "
+            f"{bottleneck_text or 'the current hard constraints'}; current claim scope is {dossier_claim_scope}."
+        )
+    else:
+        headline = f"{topic} is best read as a {phase} topic organized around {branch_text}."
+        value_claim = (
             f"The decision question is not whether {topic} exists, but whether it can keep verified performance "
             f"under {bottleneck_text or 'the current hard constraints'}."
-        ),
+        )
+    return {
+        "headline": headline,
+        "value_claim": value_claim,
         "decision_summary": (
             "Start with the branch splits and hard bottlenecks below; every claim links back to papers or evidence objects. "
             f"Current radar status: {claim_status}."
         ),
         "stage": phase,
+        "claim_scope": dossier_claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(dossier_uncertainty)),
+        "claim_policy": (
+            "Topic Dossier text is capped by evidence_grade, Claim Card completeness, calibration, "
+            "linked-ref coverage, and local section coverage. Weak dossiers remain candidate_pool_only."
+        ),
         "branch_splits": branch_splits,
         "hard_bottlenecks": bottleneck_dossiers,
         "validation_directions": validation_directions,
+        "reading_path": reading_path,
         "evidence_objects": evidence_objects,
         "insufficient_evidence": insufficient_evidence,
         "solved_vs_open": {
@@ -2567,6 +3667,7 @@ def _build_topic_dossier(
             "main_path_context_edges": len(main_path_edges),
             "future_candidate_edges": len(future_growth),
             "primary_section_coverage_in_results": section_ready / max(1, len(hits)),
+            "strong_or_moderate_primary_section_coverage_in_results": traced_section_rate,
             "limitation_atom_coverage_in_results": limitation_ready / max(1, len(hits)),
             "fusion_status": value_model.get("fusion_status"),
         },
@@ -2619,10 +3720,132 @@ def _build_evidence_map(
                 "use": combo.get("decision_use"),
                 "relationship": combo.get("relationship"),
                 "display": combo.get("display"),
+                "can_explain": combo.get("can_explain") or [],
+                "cannot_explain": combo.get("cannot_explain") or [],
+                "required_evidence": combo.get("required_evidence") or [],
+                "claim_scope": combo.get("claim_scope"),
+                "evidence_grade": combo.get("evidence_grade"),
+                "uncertainty_reasons": combo.get("uncertainty_reasons") or [],
             }
             for combo in value_model.get("layer_combinations", [])
         ],
     }
+
+
+def _main_path_evidence_objects(
+    main_path_edges: list[dict[str, Any]],
+    *,
+    limit: int = 8,
+    claim_scope: str | None = None,
+    evidence_grade: str | None = None,
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for edge in main_path_edges[:limit]:
+        edge_id = str(edge.get("edge_id") or "").strip()
+        if not edge_id:
+            continue
+        objects.append(
+            {
+                "type": "main_path_edge",
+                "edge_id": edge_id,
+                "source_paper_id": edge.get("source_paper_id"),
+                "target_paper_id": edge.get("target_paper_id"),
+                "label": "main path citation edge",
+                "source": "topic_history_main_path",
+                "evidence_grade": edge.get("evidence_grade") or evidence_grade,
+                "claim_scope": edge.get("claim_scope") or claim_scope,
+                "description": edge.get("plain_language"),
+            }
+        )
+    return objects
+
+
+def _build_history_main_path_contract(
+    *,
+    main_path_edges: list[dict[str, Any]],
+    key_turning_papers: list[dict[str, Any]],
+    broader_context_papers: list[dict[str, Any]],
+    value_model: dict[str, Any],
+) -> dict[str, Any]:
+    frontfill = value_model.get("frontfill_status") or {}
+    linked_ref_rate = float(frontfill.get("linked_ref_rate") or 0.0)
+    reasons: list[str] = []
+    if linked_ref_rate < 0.30:
+        reasons.append("linked refs below 30%; citation backbone is incomplete")
+    if not main_path_edges:
+        reasons.append("no topic main-path citation edges matched")
+    if not key_turning_papers:
+        reasons.append("no topic-specific key turning papers after relevance filtering")
+    if broader_context_papers:
+        reasons.append("broader field main-path anchors are separated from topic-specific turning papers")
+    claim_scope = (
+        "main_path_context_low_linked_refs"
+        if linked_ref_rate < 0.30
+        else "topic_main_path_context"
+    )
+    evidence_grade = (
+        "citation_backbone_partial_low_linked_refs"
+        if linked_ref_rate < 0.30
+        else "linked_citation_backbone"
+    )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(reasons)),
+        "required_evidence": [
+            "linked citation references",
+            "main_path edge weights",
+            "topic-specific text or facet relevance for key turning papers",
+            "provider ID repair and reference relinking",
+        ],
+        "evidence_objects": _main_path_evidence_objects(
+            main_path_edges,
+            claim_scope=claim_scope,
+            evidence_grade=evidence_grade,
+        ),
+        "metrics": {
+            "main_path_edges": len(main_path_edges),
+            "key_turning_papers": len(key_turning_papers),
+            "broader_context_papers": len(broader_context_papers),
+            "linked_ref_rate": linked_ref_rate,
+        },
+        "relevance_policy": (
+            "key_turning_papers require topic-specific text/facet evidence; broader_context_papers "
+            "are field-level anchors and should not be narrated as topic turning papers."
+        ),
+    }
+
+
+def _apply_history_main_path_contract(
+    main_path_edges: list[dict[str, Any]],
+    contract: dict[str, Any],
+) -> None:
+    for edge in main_path_edges:
+        edge.setdefault("claim_scope", contract.get("claim_scope"))
+        edge.setdefault("evidence_grade", contract.get("evidence_grade"))
+        edge.setdefault("uncertainty_reasons", list(contract.get("uncertainty_reasons") or []))
+        edge.setdefault("required_evidence", list(contract.get("required_evidence") or []))
+
+
+def _build_topic_readiness_preflight(
+    *,
+    topic: str,
+    topic_dossier: dict[str, Any],
+    turning_hits: list[dict[str, Any]],
+    future_growth: list[dict[str, Any]],
+    rd_radar: dict[str, Any],
+    first_principles_questions: list[dict[str, Any]],
+    bottleneck_lineage: dict[str, Any],
+) -> dict[str, Any]:
+    return build_topic_readiness_preflight(
+        topic=topic,
+        topic_dossier=topic_dossier,
+        turning_hits=turning_hits,
+        future_growth=future_growth,
+        rd_radar=rd_radar,
+        first_principles_questions=first_principles_questions,
+        bottleneck_lineage=bottleneck_lineage,
+    )
 
 
 def get_topic_lens(
@@ -2865,9 +4088,15 @@ def get_topic_lens(
         for edge in future_growth:
             edge["source_paper"] = edge_paper_map.get(edge.get("source_paper_id"))
             edge["target_paper"] = edge_paper_map.get(edge.get("target_paper_id"))
+            calibration_status = _future_edge_calibration_status(edge)
+            calibration_phrase = (
+                "run-calibrated exploratory evidence"
+                if calibration_status == "calibrated_with_run_audit"
+                else f"uncalibrated candidate evidence ({calibration_status})"
+            )
             edge["plain_language"] = (
                 "Future-growth candidate: the model predicts that the source-side idea/bottleneck "
-                "may connect to the target-side direction; treat as calibrated exploratory evidence "
+                f"may connect to the target-side direction; treat as {calibration_phrase} "
                 "until Step6/Step13 Claim Cards are materialized."
             )
 
@@ -2996,12 +4225,14 @@ def get_topic_lens(
 
         principles = []
         history_events = []
+        lineage_triples = []
         if _table_exists(conn, "first_principles_principles"):
             rows = conn.execute(
                 """
                 SELECT principle_id, principle_name, root_cause, bottleneck_score,
                        unresolved_atoms, resolved_atoms, emergence_year, peak_backlog_year,
-                       current_backlog, top_keywords_json, top_branches_json,
+                       current_backlog, evidence_quality_json, top_keywords_json, top_branches_json,
+                       top_papers_json,
                        future_alignment_json, direction_tier_json, risk_label, notes_json
                 FROM first_principles_principles
                 ORDER BY bottleneck_score DESC
@@ -3047,6 +4278,26 @@ def get_topic_lens(
                     WHERE principle_id IN ({ph})
                     ORDER BY event_year DESC
                     LIMIT 120
+                    """,
+                    pids,
+                ).fetchall()
+            ]
+        if _table_exists(conn, "bottleneck_lineage_triples") and principles:
+            pids = [p.get("principle_id") for p in principles if p.get("principle_id")]
+            ph = ",".join("?" for _ in pids)
+            lineage_triples = [
+                dict(r)
+                for r in conn.execute(
+                    f"""
+                    SELECT triple_id, principle_id, direction_id, atom_id, edge_order,
+                           source_stage, target_stage, source_text, target_text,
+                           relation_type, paper_id, resolver_paper_id, event_year,
+                           evidence_section, evidence_page, evidence_quality,
+                           evidence_weight, metadata_json
+                    FROM bottleneck_lineage_triples
+                    WHERE principle_id IN ({ph})
+                    ORDER BY event_year DESC, edge_order ASC
+                    LIMIT 300
                     """,
                     pids,
                 ).fetchall()
@@ -3162,8 +4413,16 @@ def get_topic_lens(
         principles,
         history_events,
         unresolved_limitations,
+        lineage_triples,
     )
     rd_radar = _build_rd_radar(future_directions, future_growth)
+    history_main_path_contract = _build_history_main_path_contract(
+        main_path_edges=main_path_edges,
+        key_turning_papers=turning_hits,
+        broader_context_papers=broader_turning_context,
+        value_model=value_model,
+    )
+    _apply_history_main_path_contract(main_path_edges, history_main_path_contract)
     topic_dossier = _build_topic_dossier(
         topic=topic_text,
         hits=hits,
@@ -3183,12 +4442,30 @@ def get_topic_lens(
         branch_dossiers=branch_dossiers,
         value_model=value_model,
     )
+    first_principles_five_questions = _evidence_contract_for_five_questions(
+        first_principles_five_questions,
+        topic_dossier=topic_dossier,
+        turning_hits=turning_hits,
+        unresolved_limitations=unresolved_limitations,
+        future_growth=future_growth,
+        top_claim_card=top_claim_card,
+    )
+    topic_readiness = _build_topic_readiness_preflight(
+        topic=topic_text,
+        topic_dossier=topic_dossier,
+        turning_hits=turning_hits,
+        future_growth=future_growth,
+        rd_radar=rd_radar,
+        first_principles_questions=first_principles_five_questions,
+        bottleneck_lineage=bottleneck_lineage,
+    )
 
     return {
         "schema_version": SCHEMA_VERSION,
         "ready": True,
         "topic": topic_text,
         "corpus_id": corpus_id,
+        "topic_readiness": topic_readiness,
         "topic_dossier": topic_dossier,
         "branch_dossiers": branch_dossiers,
         "bottleneck_lineage": bottleneck_lineage,
@@ -3212,13 +4489,10 @@ def get_topic_lens(
         },
         "cluster_distribution": cluster_distribution,
         "history_main_path": {
+            **history_main_path_contract,
             "edges": main_path_edges,
             "key_turning_papers": turning_hits[: max(10, min(int(top_k), 80))],
             "broader_context_papers": broader_turning_context[: max(10, min(int(top_k), 40))],
-            "relevance_policy": (
-                "key_turning_papers require topic-specific text/facet evidence; broader_context_papers "
-                "are field-level anchors and should not be narrated as topic turning papers."
-            ),
         },
         "unresolved_limitations": unresolved_limitations,
         "future_growth": {
@@ -3391,8 +4665,10 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
         "branch_id": paper.get("branch_id"),
         "cluster_id": paper.get("cluster_id"),
         "evidence_gap": (
-            "section-level evidence available"
-            if (paper.get("content_availability") or {}).get("has_primary_evidence_sections")
+            "section-level evidence with strong/moderate parser provenance available"
+            if _paper_has_traced_primary_evidence(paper)
+            else "local section evidence available but parser provenance is weak"
+            if _paper_has_primary_evidence(paper)
             else "no local section evidence yet; use abstract/metadata only for weak evidence"
         ),
     }
