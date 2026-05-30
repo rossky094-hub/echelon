@@ -16,12 +16,28 @@ from echelon.api.graph_visual_backend import (
     _build_validation_directions,
     _content_access_payload,
     _evidence_contract_for_five_questions,
+    _future_candidate_evidence_text,
     _load_context_limitations,
     _lineage_status,
     _section_evidence_contract,
     _split_topic_turning_papers,
     _topic_branch_facets,
 )
+
+
+def test_future_candidate_evidence_text_uses_candidate_score_labels():
+    text = _future_candidate_evidence_text(
+        "VGAE pred: calibrated=0.995, raw=0.991, confidence=0.833"
+    )
+
+    assert "GNN/VGAE candidate edge:" in text
+    assert "calibrated_candidate_score=0.995" in text
+    assert "raw_candidate_score=0.991" in text
+    assert "candidate_score=0.833" in text
+    assert "VGAE pred:" not in text
+    assert "calibrated=0.995" not in text
+    assert "raw=0.991" not in text
+    assert "confidence=0.833" not in text
 
 
 def test_topic_dossier_returns_clickable_evidence_objects():

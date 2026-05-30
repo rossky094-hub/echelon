@@ -573,7 +573,16 @@ def audit_future_growth(
         ),
         "step6_future_evidence_avoids_prediction_copy": (
             _source_contains(step6_path, ("GNN/VGAE candidate edge", "Future candidate generator"))
-            and _source_contains(api_path, ("_future_candidate_evidence_text", "GNN/VGAE candidate edge", "candidate_score="))
+            and _source_contains(
+                api_path,
+                (
+                    "_future_candidate_evidence_text",
+                    "GNN/VGAE candidate edge",
+                    "candidate_score=",
+                    "calibrated_candidate_score=",
+                    "raw_candidate_score=",
+                ),
+            )
             and _source_contains(step9_path, ("_future_candidate_evidence_text", "candidate_score=", "候选排序分数"))
             and _source_absent(step6_path, ("VGAE pred:", "VGAE predicted future connections", "Link Prediction"))
             and _source_absent(step9_path, ("| 源论文 | 目标论文 | 候选概率 |",))

@@ -1,9 +1,9 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T20:22:13Z`
+- audit_ts: `2026-05-30T20:28:10Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,777`
-- next delta queue needing primary section/action: `5,991`
+- next delta queue needing primary section/action: `5,989`
 - multi-topic evidence-gap rows merged: `32` (46 papers)
 - topic evidence-gap delta queue: `20` papers
 
@@ -11,9 +11,9 @@
 
 | retry_class | count |
 |---|---:|
-| not_attempted_pdf_available | 5,925 |
-| no_target_sections | 4,204 |
-| covered | 2,602 |
+| not_attempted_pdf_available | 5,923 |
+| no_target_sections | 4,205 |
+| covered | 2,603 |
 | retryable_pdf_failure | 45 |
 | parser_failure | 1 |
 
@@ -28,7 +28,7 @@
 | limitation_evidence | 268 | 268 | 268 | 268 | 268 |
 | main_path_node | 1,101 | 1,101 | 230 | 230 | 1,101 |
 | resolution_evidence | 464 | 207 | 170 | 170 | 464 |
-| top_keystone | 1,000 | 1,000 | 379 | 379 | 1,000 |
+| top_keystone | 1,000 | 1,000 | 380 | 380 | 1,000 |
 | topic:metalens | 257 | 86 | 91 | 91 | 257 |
 | topic:metasurface holography | 18 | 5 | 4 | 4 | 18 |
 | topic:photonic crystal cavity | 135 | 33 | 10 | 10 | 135 |

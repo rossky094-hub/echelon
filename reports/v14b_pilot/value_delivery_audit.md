@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T20:22:16Z`
+- generated_at: `2026-05-30T20:28:14Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,37 +34,37 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 13063,
+    "openalex_frontfill_cooldown_remaining_s": 12705,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2943,
-    "section_frontfill_done": 885,
+    "primary_section_papers": 2944,
+    "section_frontfill_done": 887,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 885,
+    "section_frontfill_progress_done": 887,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 6603,
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 706,
+        "strong": 707,
         "weak": 2237
       },
-      "primary_section_papers": 2943,
-      "primary_section_rows": 5169,
+      "primary_section_papers": 2944,
+      "primary_section_rows": 5170,
       "strategy_counts": {
         "embedded_heading": 32,
-        "explicit_heading": 864,
-        "heading_continuation": 1253,
+        "explicit_heading": 865,
+        "heading_continuation": 1254,
         "inline_heading": 462,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 19,
         "parser_hint": 14
       },
-      "strong_or_moderate_papers": 706,
+      "strong_or_moderate_papers": 707,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.7601087325857968
+      "weak_only_rate": 0.7598505434782609
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",

@@ -76,6 +76,8 @@ def _future_candidate_evidence_text(value: Any) -> str:
     text = str(value or "")
     return (
         text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
+        .replace("calibrated=", "calibrated_candidate_score=")
+        .replace("raw=", "raw_candidate_score=")
         .replace("confidence=", "candidate_score=")
     )
 

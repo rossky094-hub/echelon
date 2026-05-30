@@ -150,7 +150,7 @@ def _write_product_sources(root: Path) -> None:
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         '"candidate_score": candidate_score "score_semantics": "candidate ranking score; not validation confidence or a conclusion probability" "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
-        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n"
+        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score= calibrated_candidate_score= raw_candidate_score='\n"
         'if edge_type == "future_candidate": obj.pop("confidence", None) "candidate_score": candidate_score "calibrated_candidate_score": evidence.get("calibrated_candidate_score")\n'
         "topic_readiness = build_topic_readiness_preflight\n",
         encoding="utf-8",
@@ -1203,6 +1203,26 @@ def test_future_growth_audit_rejects_future_report_legacy_score_labels(tmp_path)
 
     assert result["status"] == "fail"
     assert result["checks"]["future_direction_report_uses_candidate_score_labels"] is False
+
+
+def test_future_growth_audit_rejects_api_future_evidence_legacy_score_labels(tmp_path):
+    _write_product_sources(tmp_path)
+    api_path = tmp_path / "echelon/api/graph_visual_backend.py"
+    api_path.write_text(
+        "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n",
+        encoding="utf-8",
+    )
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step6_future_evidence_avoids_prediction_copy"] is False
 
 
 def test_future_growth_audit_rejects_prediction_report_filename(tmp_path):
