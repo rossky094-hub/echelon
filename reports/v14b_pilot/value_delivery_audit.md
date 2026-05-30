@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T19:35:38Z`
+- generated_at: `2026-05-30T19:42:23Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 15861,
+    "openalex_frontfill_cooldown_remaining_s": 15456,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2911,
+    "primary_section_papers": 2926,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 674,
+        "strong": 689,
         "weak": 2237
       },
-      "primary_section_papers": 2911,
-      "primary_section_rows": 5124,
+      "primary_section_papers": 2926,
+      "primary_section_rows": 5147,
       "strategy_counts": {
-        "embedded_heading": 30,
-        "explicit_heading": 841,
-        "heading_continuation": 1210,
-        "inline_heading": 442,
+        "embedded_heading": 31,
+        "explicit_heading": 854,
+        "heading_continuation": 1232,
+        "inline_heading": 451,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 19,
-        "parser_hint": 13
+        "parser_hint": 14
       },
-      "strong_or_moderate_papers": 674,
+      "strong_or_moderate_papers": 689,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.7684644452078324
+      "weak_only_rate": 0.764524948735475
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -225,6 +225,7 @@
   "checks": {
     "no_high_confidence_card_without_section_evidence": true,
     "step13_has_section_evidence_gate": true,
+    "step13_uses_candidate_score_gate": true,
     "step9_does_not_recommend_threshold_relaxation": true
   },
   "high_confidence_cards": 0,

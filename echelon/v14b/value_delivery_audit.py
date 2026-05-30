@@ -829,13 +829,30 @@ def audit_claim_card_high_confidence_evidence_contract(
             )
     source_checks = {
         "step13_has_section_evidence_gate": False,
+        "step13_uses_candidate_score_gate": False,
         "step9_does_not_recommend_threshold_relaxation": False,
     }
     if repo_root is not None:
+        step13_path = repo_root / "echelon/v14b/step13_first_principles_history.py"
         source_checks = {
             "step13_has_section_evidence_gate": _source_contains(
-                repo_root / "echelon/v14b/step13_first_principles_history.py",
+                step13_path,
                 ("section_evidence_strong", "section_provenance_ready", "missing_high_confidence_gates"),
+            ),
+            "step13_uses_candidate_score_gate": (
+                _source_contains(
+                    step13_path,
+                    ("candidate_score_ready", '"candidate_score": candidate_score', "future candidate score"),
+                )
+                and _source_absent(
+                    step13_path,
+                    (
+                        "direction_confidence_ready",
+                        '"direction_confidence":',
+                        '"prediction_confidence": float(d.get("confidence")',
+                        "future-growth graph confidence",
+                    ),
+                )
             ),
             "step9_does_not_recommend_threshold_relaxation": (
                 _source_contains(

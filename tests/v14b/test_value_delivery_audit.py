@@ -272,7 +272,10 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "step13_first_principles_history.py").write_text(
-        "默认不调用外部 LLM 已入库证据可重跑 section_evidence_strong section_provenance_ready missing_high_confidence_gates success_criteria falsification_conditions minimal validation experiment with success and falsification criteria\n",
+        "默认不调用外部 LLM 已入库证据可重跑 "
+        "section_evidence_strong section_provenance_ready missing_high_confidence_gates "
+        "candidate_score_ready \"candidate_score\": candidate_score future candidate score "
+        "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria\n",
         encoding="utf-8",
     )
     (v14 / "step9_report.py").write_text(
@@ -547,6 +550,10 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert claim_card_gate["checks"]["complete_cards_have_falsifiable_validation_experiment"] is True
     assert claim_card_gate["checks"]["step13_requires_success_and_falsification"] is True
     assert claim_card_gate["checks"]["ui_renders_success_and_falsification"] is True
+    high_conf_contract = next(
+        g for g in result["gates"] if g["issue"] == "Claim Card High-Confidence Evidence Contract"
+    )
+    assert high_conf_contract["checks"]["step13_uses_candidate_score_gate"] is True
     topic_gate = next(g for g in result["gates"] if g["issue"] == "Topic Dossier Product Value")
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
@@ -892,6 +899,33 @@ def test_claim_card_high_confidence_contract_rejects_threshold_relaxation_copy(t
 
     assert result["status"] == "fail"
     assert result["checks"]["step9_does_not_recommend_threshold_relaxation"] is False
+    conn.close()
+
+
+def test_claim_card_high_confidence_contract_rejects_direction_confidence_gate(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step13_first_principles_history.py").write_text(
+        "section_evidence_strong section_provenance_ready missing_high_confidence_gates "
+        'direction_confidence_ready "direction_confidence": "future-growth graph confidence"\n',
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE direction_claim_cards (
+            claim_card_id TEXT,
+            high_confidence_eligible INTEGER,
+            quality_gate_json TEXT
+        )
+        """
+    )
+
+    result = audit_claim_card_high_confidence_evidence_contract(conn, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step13_uses_candidate_score_gate"] is False
     conn.close()
 
 

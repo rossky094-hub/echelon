@@ -824,7 +824,7 @@ def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
         "section_provenance_ready": "strong or moderate section parser provenance",
         "calibration_ready": "future-growth calibration available",
         "rolling_auc_ready": "rolling held-out-year AUC >= 0.65",
-        "direction_confidence_ready": "direction confidence >= 0.70",
+        "candidate_score_ready": "future candidate score >= 0.70",
         "fusion_tier_ready": "triangulated Step6 fusion evidence",
     }
     return [labels.get(k, k) for k, ok in gates.items() if not ok]
@@ -1394,10 +1394,11 @@ def build_direction_claim_cards(
             )
         else:
             missing_enablers.append("section-level bottleneck evidence is weak or parser provenance is weak")
-        if float(d.get("confidence") or 0.0) >= 0.70:
-            new_enablers.append("future-growth graph confidence is above the candidate threshold")
+        candidate_score = float(d.get("candidate_score") or d.get("confidence") or 0.0)
+        if candidate_score >= 0.70:
+            new_enablers.append("future candidate score is above the candidate threshold")
         else:
-            missing_enablers.append("future-growth graph confidence is below candidate threshold")
+            missing_enablers.append("future candidate score is below candidate threshold")
         if (d.get("evidence_tier") or "").strip() and "weak" not in str(d.get("evidence_tier") or "").lower():
             new_enablers.append(f"Step6 fusion tier={d.get('evidence_tier')}")
         else:
@@ -1405,7 +1406,7 @@ def build_direction_claim_cards(
         enabling_conditions = {
             "new_enablers": new_enablers,
             "missing_enablers": missing_enablers,
-            "prediction_confidence": float(d.get("confidence") or 0.0),
+            "candidate_score": candidate_score,
             "calibration_label": d.get("calibration_label"),
             "rolling_avg_calibrated_auc": rolling_avg_auc,
             "evidence_tier": d.get("evidence_tier"),
@@ -1463,7 +1464,7 @@ def build_direction_claim_cards(
             "section_provenance_ready": section_provenance_ready,
             "calibration_ready": calibration_ready,
             "rolling_auc_ready": rolling_avg_auc >= 0.65,
-            "direction_confidence_ready": float(d.get("confidence") or 0.0) >= 0.70,
+            "candidate_score_ready": candidate_score >= 0.70,
             "fusion_tier_ready": fusion_tier_ready,
         }
         high_confidence_eligible = int(all(high_confidence_gates.values()))
@@ -1483,7 +1484,7 @@ def build_direction_claim_cards(
             "section_provenance": section_provenance,
             "calibration_ready": calibration_ready,
             "rolling_avg_calibrated_auc": rolling_avg_auc,
-            "direction_confidence": float(d.get("confidence") or 0.0),
+            "candidate_score": candidate_score,
             "high_confidence_gates": high_confidence_gates,
             "missing_high_confidence_gates": missing_high_confidence_gates,
             "high_confidence_eligible": bool(high_confidence_eligible),

@@ -161,12 +161,20 @@ def test_step13_complete_exploratory_card_is_not_high_confidence():
 
     assert len(cards) == 1
     gate = json.loads(cards[0]["quality_gate_json"])
+    enablers = json.loads(cards[0]["enabling_conditions_json"])
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
     experiment = json.loads(cards[0]["minimal_validation_experiment_json"])
     assert experiment["success_criteria"]
     assert experiment["falsification_conditions"]
+    assert gate["candidate_score"] == 0.82
+    assert "direction_confidence" not in gate
+    assert gate["high_confidence_gates"]["candidate_score_ready"] is True
+    assert "direction_confidence_ready" not in gate["high_confidence_gates"]
+    assert enablers["candidate_score"] == 0.82
+    assert "prediction_confidence" not in enablers
+    assert any("future candidate score" in s for s in enablers["new_enablers"])
     assert "triangulated Step6 fusion evidence" in gate["missing_high_confidence_gates"]
     assert updates[0]["high_confidence_eligible"] == 0
 
@@ -221,6 +229,9 @@ def test_step13_weak_section_provenance_blocks_high_confidence():
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["evidence_strength_level"] == "weak"
     assert gate["section_provenance"]["weak"] == 1
+    assert gate["candidate_score"] == 0.86
+    assert gate["high_confidence_gates"]["candidate_score_ready"] is True
+    assert "direction_confidence_ready" not in gate["high_confidence_gates"]
     assert gate["high_confidence_gates"]["section_provenance_ready"] is False
     assert "strong section-level evidence" in gate["missing_high_confidence_gates"]
     assert "strong or moderate section parser provenance" in gate["missing_high_confidence_gates"]

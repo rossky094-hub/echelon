@@ -1,9 +1,9 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T19:35:36Z`
+- audit_ts: `2026-05-30T19:42:20Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,777`
-- next delta queue needing primary section/action: `6,069`
+- next delta queue needing primary section/action: `6,042`
 - multi-topic evidence-gap rows merged: `32` (46 papers)
 - topic evidence-gap delta queue: `20` papers
 
@@ -11,9 +11,9 @@
 
 | retry_class | count |
 |---|---:|
-| not_attempted_pdf_available | 6,003 |
-| no_target_sections | 4,158 |
-| covered | 2,570 |
+| not_attempted_pdf_available | 5,976 |
+| no_target_sections | 4,170 |
+| covered | 2,585 |
 | retryable_pdf_failure | 45 |
 | parser_failure | 1 |
 
@@ -21,15 +21,15 @@
 
 | category | total | in topN | any section | primary section | eligible PDF |
 |---|---:|---:|---:|---:|---:|
-| active_learning_uncertainty_hotspot | 3,000 | 647 | 360 | 360 | 3,000 |
-| branch_split_driver | 1,970 | 1,970 | 960 | 960 | 1,970 |
+| active_learning_uncertainty_hotspot | 3,000 | 647 | 363 | 363 | 3,000 |
+| branch_split_driver | 1,970 | 1,970 | 964 | 964 | 1,970 |
 | cluster_representative | 5,958 | 5,331 | 699 | 699 | 5,958 |
-| future_endpoint | 291 | 291 | 108 | 108 | 291 |
+| future_endpoint | 291 | 291 | 109 | 109 | 291 |
 | limitation_evidence | 268 | 268 | 268 | 268 | 268 |
 | main_path_node | 1,101 | 1,101 | 230 | 230 | 1,101 |
 | resolution_evidence | 464 | 207 | 170 | 170 | 464 |
-| top_keystone | 1,000 | 1,000 | 355 | 355 | 1,000 |
-| topic:metalens | 257 | 86 | 88 | 88 | 257 |
+| top_keystone | 1,000 | 1,000 | 362 | 362 | 1,000 |
+| topic:metalens | 257 | 86 | 91 | 91 | 257 |
 | topic:metasurface holography | 18 | 5 | 4 | 4 | 18 |
 | topic:photonic crystal cavity | 135 | 33 | 10 | 10 | 135 |
 | topic:quantum light source | 226 | 73 | 41 | 41 | 226 |
