@@ -1713,6 +1713,7 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         "ui_radar_main_avoids_raw_edge_cards": False,
         "ui_renders_radar_claim_card_evidence_contract": False,
         "topic_lens_public_future_growth_uses_candidate_edges": False,
+        "radar_public_scores_avoid_probability_copy": False,
     }
     if repo_root is not None:
         app_path = repo_root / "web/visual-graph/app.js"
@@ -1753,6 +1754,19 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             and bool(app_text)
             and "future_growth?.candidate_edges" in app_text
             and "future_growth?.predicted_edges" not in app_text,
+            "radar_public_scores_avoid_probability_copy": (
+                _source_contains(
+                    repo_root / "echelon/api/graph_visual_backend.py",
+                    ('"technical_score": d.get("confidence")', '"candidate_score": conf'),
+                )
+                and bool(app_text)
+                and "item.technical_score" in app_text
+                and "technical_probability" not in app_text
+                and _source_absent(
+                    repo_root / "echelon/api/graph_visual_backend.py",
+                    ("technical_probability",),
+                )
+            ),
         }
     checks.update(source_checks)
     return {

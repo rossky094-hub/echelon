@@ -148,7 +148,7 @@ def _write_product_sources(root: Path) -> None:
         '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
-        "claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score\n"
+        '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge'\n"
         "topic_readiness = build_topic_readiness_preflight\n",
@@ -172,6 +172,7 @@ def _write_product_sources(root: Path) -> None:
         "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool future candidate generator candidate score'; }\n"
+        "function renderRadarScores() { return item.technical_score + item.candidate_score; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
@@ -545,6 +546,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     radar_gate = next(g for g in result["gates"] if g["issue"] == "R&D Radar Promotion Contract")
     assert radar_gate["status"] == "pass"
     assert radar_gate["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
+    assert radar_gate["checks"]["radar_public_scores_avoid_probability_copy"] is True
     main_path_gate = next(g for g in result["gates"] if g["issue"] == "Main Path Uncertainty Contract")
     assert main_path_gate["status"] == "pass"
     assert main_path_gate["checks"]["low_linked_refs_add_uncertainty"] is True

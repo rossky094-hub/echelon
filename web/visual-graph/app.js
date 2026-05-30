@@ -172,7 +172,7 @@ function pct(value) {
 function futureCalibrationCopy(edge) {
   const evidence = edge?.evidence || edge?.model_evidence || {};
   const status = evidence.calibration_status || evidence.lifecycle_calibration_status || "run_audit_unknown";
-  const score = edge?.candidate_score ?? evidence.candidate_score ?? edge?.confidence ?? edge?.weight ?? edge?.technical_probability ?? evidence.calibrated_prob ?? 0;
+  const score = edge?.candidate_score ?? evidence.candidate_score ?? edge?.technical_score ?? edge?.confidence ?? edge?.weight ?? evidence.calibrated_prob ?? 0;
   const raw = evidence.raw_candidate_score ?? evidence.raw_predicted_prob ?? score;
   if (status === "calibrated_with_run_audit") {
     return `run-calibrated ${pct(evidence.calibrated_prob ?? score)} / raw ${pct(raw)} / ${evidence.calibration_label || evidence.calibration_method || "calibrated"}`;
@@ -1372,7 +1372,7 @@ function renderDossierRadar(radar = {}) {
           <strong>${esc(item.title || "candidate")}</strong>
           <div class="score-row">
             <span class="score"><small>优先级</small><strong>${pct(item.priority || 0)}</strong></span>
-            <span class="score"><small>技术评分</small><strong>${pct(item.technical_probability || item.candidate_score || 0)}</strong></span>
+            <span class="score"><small>技术评分</small><strong>${pct(item.technical_score ?? item.candidate_score ?? 0)}</strong></span>
             <span class="score"><small>Claim scope</small><strong>${esc(item.claim_scope || "exploratory")}</strong></span>
             <span class="score"><small>High confidence</small><strong>${item.eligible ? "yes" : "no"}</strong></span>
           </div>
@@ -1404,7 +1404,7 @@ function renderDossierRadar(radar = {}) {
         ${candidatePool.slice(0, 8).map((item) => `
           <div class="candidate-card">
             <strong>${esc(item.title || "candidate edge")}</strong>
-            <small>candidate score ${pct(item.candidate_score ?? item.technical_probability ?? 0)} / scope ${esc(item.claim_scope || "candidate")} / evidence ${esc(item.evidence_grade || "unknown")}</small>
+            <small>candidate score ${pct(item.candidate_score ?? item.technical_score ?? 0)} / scope ${esc(item.claim_scope || "candidate")} / evidence ${esc(item.evidence_grade || "unknown")}</small>
             ${item.model_evidence ? `
               <p class="mini">模型证据：${esc(item.model_evidence.generator || "future candidate generator")}
               / ${esc(futureCalibrationCopy(item))}

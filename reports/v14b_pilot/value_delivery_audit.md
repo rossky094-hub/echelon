@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T18:40:24Z`
+- generated_at: `2026-05-30T18:44:57Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 19175,
+    "openalex_frontfill_cooldown_remaining_s": 18903,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2815,
+    "primary_section_papers": 2826,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 578,
+        "strong": 589,
         "weak": 2237
       },
-      "primary_section_papers": 2815,
-      "primary_section_rows": 4939,
+      "primary_section_papers": 2826,
+      "primary_section_rows": 4968,
       "strategy_counts": {
-        "embedded_heading": 23,
-        "explicit_heading": 711,
-        "heading_continuation": 1030,
-        "inline_heading": 373,
+        "embedded_heading": 25,
+        "explicit_heading": 731,
+        "heading_continuation": 1058,
+        "inline_heading": 385,
         "legacy_unknown_strategy": 3886,
-        "loose_inline_heading": 15,
+        "loose_inline_heading": 16,
         "parser_hint": 12
       },
-      "strong_or_moderate_papers": 578,
+      "strong_or_moderate_papers": 589,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.7946714031971581
+      "weak_only_rate": 0.7915782024062279
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -371,6 +371,7 @@
     "complete_cards_only_in_main_radar": true,
     "empty_radar_policy_present": true,
     "incomplete_cards_are_candidate_pool_only": true,
+    "radar_public_scores_avoid_probability_copy": true,
     "raw_gnn_edges_are_candidate_pool_only": true,
     "step9_future_report_has_evidence_contract": true,
     "topic_lens_public_future_growth_uses_candidate_edges": true,

@@ -4090,7 +4090,7 @@ def _build_rd_radar(
             "kind": "claim_card" if five_complete else "incomplete_claim_card",
             "title": d.get("direction_name") or d.get("direction_id"),
             "priority": d.get("confidence"),
-            "technical_probability": d.get("confidence"),
+            "technical_score": d.get("confidence"),
             "commercial_relevance": d.get("commercial_relevance"),
             "validation_cost": d.get("validation_cost"),
             "claim_scope": d.get("claim_scope") or ("radar_claim_card" if five_complete else "candidate_pool_only"),
@@ -4145,7 +4145,6 @@ def _build_rd_radar(
                 "kind": "candidate_edge",
                 "title": f"{src} -> {dst}",
                 "priority": round(conf * 0.55, 4),
-                "technical_probability": None,
                 "candidate_score": conf,
                 "model_evidence": {
                     "generator": "Step5b GNN/VGAE future candidate generator",
