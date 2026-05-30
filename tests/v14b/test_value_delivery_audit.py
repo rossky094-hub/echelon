@@ -1618,6 +1618,8 @@ def test_value_delivery_audit_fails_when_benchmark_topic_gap_sections_missing(tm
     assert multi["status"] == "fail"
     assert multi["topic_gap_blocking"] is True
     assert multi["topic_gap_primary_section_papers"] == 1
+    assert multi["topic_gap_decision_grade_section_papers"] == 0
+    assert multi["topic_gap_decision_grade_section_rate"] == 0.0
 
 
 def test_value_delivery_audit_writes_report(tmp_path):

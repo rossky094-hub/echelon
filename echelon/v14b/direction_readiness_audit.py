@@ -184,6 +184,8 @@ def primary_section_strategy_quality(
             "paper_quality_counts": {},
             "current_contract_papers": 0,
             "current_contract_rate": 0.0,
+            "decision_grade_papers": 0,
+            "decision_grade_rate": 0.0,
             "strong_or_moderate_papers": 0,
             "weak_only_papers": 0,
             "weak_only_rate": 0.0,
@@ -213,6 +215,7 @@ def primary_section_strategy_quality(
     parser_contract_version_counts: dict[str, int] = {}
     paper_best_quality: dict[str, str] = {}
     current_contract_papers: set[str] = set()
+    decision_grade_papers: set[str] = set()
     quality_rank = {"weak": 0, "moderate": 1, "strong": 2}
     rows = conn.execute(base, params).fetchall()
     for paper_id, _section_name, raw_meta, raw_parser_name in rows:
@@ -235,6 +238,8 @@ def primary_section_strategy_quality(
         for strategy in sorted(strategies):
             strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
         quality = _section_quality_from_strategies(strategies)
+        if contract_version == SECTION_PARSER_CONTRACT_VERSION and quality in {"strong", "moderate"}:
+            decision_grade_papers.add(pid)
         if pid not in paper_best_quality or quality_rank[quality] > quality_rank.get(paper_best_quality[pid], 0):
             paper_best_quality[pid] = quality
 
@@ -254,6 +259,8 @@ def primary_section_strategy_quality(
         "paper_quality_counts": paper_quality_counts,
         "current_contract_papers": len(current_contract_papers),
         "current_contract_rate": len(current_contract_papers) / max(1, primary_papers),
+        "decision_grade_papers": len(decision_grade_papers),
+        "decision_grade_rate": len(decision_grade_papers) / max(1, primary_papers),
         "strong_or_moderate_papers": strong_or_moderate,
         "weak_only_papers": weak_only,
         "weak_only_rate": weak_only / max(1, primary_papers),
@@ -666,6 +673,8 @@ def collect_metrics(
         "topic_gap_queue_papers": len(topic_gap_ids),
         "topic_gap_primary_section_papers": topic_gap_primary_section_papers,
         "topic_gap_primary_section_rate": topic_gap_primary_section_papers / max(1, len(topic_gap_ids)),
+        "topic_gap_decision_grade_section_papers": int(topic_gap_section_quality.get("decision_grade_papers") or 0),
+        "topic_gap_decision_grade_section_rate": int(topic_gap_section_quality.get("decision_grade_papers") or 0) / max(1, len(topic_gap_ids)),
         "topic_gap_section_evidence_quality": topic_gap_section_quality,
         "future_candidate_edges": future_candidate_edges,
         **counts,
@@ -738,15 +747,18 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 ),
             }
         )
-    if m.get("topic_gap_queue_papers", 0) and m.get("topic_gap_primary_section_rate", 0.0) < 0.70:
+    if m.get("topic_gap_queue_papers", 0) and m.get("topic_gap_decision_grade_section_rate", 0.0) < 0.70:
         blockers.append(
             {
                 "gate": "multi_topic_evidence_gap",
                 "severity": "high",
                 "why": (
-                    "multi-topic regression still has primary section evidence for "
-                    f"{int(m.get('topic_gap_primary_section_papers') or 0):,}/"
+                    "multi-topic regression still has decision-grade section evidence for only "
+                    f"{int(m.get('topic_gap_decision_grade_section_papers') or 0):,}/"
                     f"{int(m.get('topic_gap_queue_papers') or 0):,} queued benchmark-topic papers "
+                    f"({pct(float(m.get('topic_gap_decision_grade_section_rate') or 0.0))}); "
+                    f"raw primary-section coverage is {int(m.get('topic_gap_primary_section_papers') or 0):,}/"
+                    f"{int(m.get('topic_gap_queue_papers') or 0):,} "
                     f"({pct(float(m.get('topic_gap_primary_section_rate') or 0.0))})."
                 ),
                 "next_action": (
@@ -947,8 +959,11 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"papers ({pct(float((metrics.get('section_evidence_quality') or {}).get('current_contract_rate') or 0.0))})",
         f"- section parser contracts: "
         f"{_top_counts((metrics.get('section_evidence_quality') or {}).get('parser_contract_version_counts') or {})}",
-        f"- multi-topic evidence-gap queue: {int(metrics.get('topic_gap_primary_section_papers') or 0):,} / "
-        f"{int(metrics.get('topic_gap_queue_papers') or 0):,} primary-section covered "
+        f"- multi-topic evidence-gap queue: "
+        f"{int(metrics.get('topic_gap_decision_grade_section_papers') or 0):,} / "
+        f"{int(metrics.get('topic_gap_queue_papers') or 0):,} decision-grade section covered "
+        f"({pct(float(metrics.get('topic_gap_decision_grade_section_rate') or 0.0))}); "
+        f"raw primary={int(metrics.get('topic_gap_primary_section_papers') or 0):,} "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
         *frontfill_line,
         f"- future candidate edges: {metrics['future_candidate_edges']:,}",

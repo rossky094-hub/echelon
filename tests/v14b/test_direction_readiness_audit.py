@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 from echelon.v14b.direction_readiness_audit import (
     _public_latest_fusion_audit,
     classify_blockers,
@@ -93,7 +95,12 @@ def test_direction_readiness_flags_multi_topic_evidence_gap_queue(tmp_path):
 
     assert metrics["topic_gap_queue_papers"] == 2
     assert metrics["topic_gap_primary_section_papers"] == 1
-    assert any(b["gate"] == "multi_topic_evidence_gap" for b in blockers)
+    assert metrics["topic_gap_decision_grade_section_papers"] == 0
+    assert any(
+        b["gate"] == "multi_topic_evidence_gap"
+        and "decision-grade section evidence" in b["why"]
+        for b in blockers
+    )
 
 
 def test_direction_readiness_reads_regression_candidate_gap_queue(tmp_path):
@@ -112,6 +119,65 @@ def test_direction_readiness_reads_regression_candidate_gap_queue(tmp_path):
 
     assert metrics["topic_gap_queue_papers"] == 2
     assert metrics["topic_gap_primary_section_papers"] == 1
+    assert metrics["topic_gap_decision_grade_section_papers"] == 0
+
+
+def test_direction_readiness_counts_only_current_contract_gap_sections(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    queue = tmp_path / "topic_evidence_gap_delta_queue.csv"
+    conn = sqlite3.connect(str(main))
+    conn.executescript(
+        """
+        CREATE TABLE papers (id TEXT PRIMARY KEY, openalex_id TEXT);
+        CREATE TABLE paper_references (cited_paper_id_internal TEXT);
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            parser_name TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.executemany("INSERT INTO papers VALUES (?, ?)", [("p1", "W1"), ("p2", "W2")])
+    conn.executemany("INSERT INTO paper_references VALUES (?)", [("p1",), ("p2",)])
+    conn.execute(
+        "INSERT INTO paper_sections VALUES ('p1', 'discussion', ?, ?, ?)",
+        (
+            "current contract evidence " * 20,
+            "v14b_section_ingest_v3",
+            json.dumps(
+                {
+                    "extraction_strategies": ["explicit_heading"],
+                    "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                }
+            ),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES ('p2', 'discussion', ?, ?, ?)",
+        (
+            "legacy weak evidence " * 20,
+            "v14b_section_ingest_v2",
+            json.dumps({"extraction_strategies": ["loose_inline_heading"]}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    _make_v14(v14)
+    queue.write_text(
+        "paper_id,priority_score,reasons\n"
+        "p1,100,topic_gap_key_turning_section\n"
+        "p2,90,topic_gap_claim_card_inputs\n",
+        encoding="utf-8",
+    )
+
+    metrics = collect_metrics(main, v14, topic_gap_queue=queue)
+
+    assert metrics["topic_gap_primary_section_papers"] == 2
+    assert metrics["topic_gap_decision_grade_section_papers"] == 1
+    assert metrics["topic_gap_decision_grade_section_rate"] == 0.5
 
 
 def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
@@ -164,6 +230,8 @@ def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
     assert quality["parser_contract_version_counts"]["legacy_unknown_contract"] == 1
     assert quality["current_contract_papers"] == 1
     assert quality["current_contract_rate"] == 0.5
+    assert quality["decision_grade_papers"] == 1
+    assert quality["decision_grade_rate"] == 0.5
     assert metrics["section_evidence_quality"]["weak_only_rate"] == 0.5
     assert any(b["gate"] == "section_evidence_provenance" for b in blockers)
     assert any(b["gate"] == "section_parser_contract_coverage" for b in blockers)

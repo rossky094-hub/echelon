@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T22:16:22Z`
+- generated_at: `2026-05-30T22:26:16Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -21,7 +21,7 @@
 | 11 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 12 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
 | 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
-| 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite. |
+| 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. |
 | 15 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
 ## Gate Details
@@ -34,47 +34,49 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 6217,
+    "openalex_frontfill_cooldown_remaining_s": 5624,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 3020,
-    "section_frontfill_done": 0,
-    "section_frontfill_no_evidence_delta": -1000,
+    "section_frontfill_done": 170,
+    "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_progress_done": null,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 139,
-      "current_contract_rate": 0.04602649006622517,
+      "current_contract_papers": 153,
+      "current_contract_rate": 0.05066225165562914,
+      "decision_grade_papers": 153,
+      "decision_grade_rate": 0.05066225165562914,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 896,
-        "weak": 2124
+        "strong": 910,
+        "weak": 2110
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 5053,
-        "v14b_section_parser_contract_v3_toc_guard": 287
+        "legacy_unknown_contract": 5033,
+        "v14b_section_parser_contract_v3_toc_guard": 312
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 5053,
-        "v14b_section_ingest_v3": 287
+        "v14b_section_ingest_v2": 5033,
+        "v14b_section_ingest_v3": 312
       },
       "primary_section_papers": 3020,
-      "primary_section_rows": 5340,
+      "primary_section_rows": 5345,
       "strategy_counts": {
-        "embedded_heading": 41,
-        "explicit_heading": 1145,
-        "heading_continuation": 1606,
-        "inline_heading": 565,
-        "legacy_unknown_strategy": 3689,
+        "embedded_heading": 42,
+        "explicit_heading": 1167,
+        "heading_continuation": 1630,
+        "inline_heading": 570,
+        "legacy_unknown_strategy": 3669,
         "loose_inline_heading": 24,
-        "parser_hint": 23
+        "parser_hint": 24
       },
-      "strong_or_moderate_papers": 896,
-      "weak_only_papers": 2124,
-      "weak_only_rate": 0.7033112582781457
+      "strong_or_moderate_papers": 910,
+      "weak_only_papers": 2110,
+      "weak_only_rate": 0.6986754966887417
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -581,9 +583,11 @@
   "issue": "Multi-topic Regression",
   "live_regression_status": "fail",
   "missing_topics": [],
-  "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite.",
+  "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence.",
   "status": "fail",
   "topic_gap_blocking": true,
+  "topic_gap_decision_grade_section_papers": 0,
+  "topic_gap_decision_grade_section_rate": 0.0,
   "topic_gap_primary_section_papers": 4,
   "topic_gap_primary_section_rate": 0.14814814814814814,
   "topic_gap_queue_papers": 27

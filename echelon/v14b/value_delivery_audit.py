@@ -2573,7 +2573,8 @@ def audit_multi_topic_regression(
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
     topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
-    topic_gap_blocking = topic_gap_queue_papers > 0 and topic_gap_primary_rate < 0.70
+    topic_gap_decision_grade_rate = float(metrics.get("topic_gap_decision_grade_section_rate") or 0.0)
+    topic_gap_blocking = topic_gap_queue_papers > 0 and topic_gap_decision_grade_rate < 0.70
     return {
         "issue": "Multi-topic Regression",
         "status": (
@@ -2599,11 +2600,14 @@ def audit_multi_topic_regression(
         "topic_gap_queue_papers": topic_gap_queue_papers,
         "topic_gap_primary_section_papers": int(metrics.get("topic_gap_primary_section_papers") or 0),
         "topic_gap_primary_section_rate": topic_gap_primary_rate,
+        "topic_gap_decision_grade_section_papers": int(metrics.get("topic_gap_decision_grade_section_papers") or 0),
+        "topic_gap_decision_grade_section_rate": topic_gap_decision_grade_rate,
         "topic_gap_blocking": topic_gap_blocking,
         "policy": (
             "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
             "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; "
-            "the active regression and product-baseline entrypoints must default to the full benchmark suite."
+            "the active regression and product-baseline entrypoints must default to the full benchmark suite, "
+            "and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence."
         ),
     }
 
