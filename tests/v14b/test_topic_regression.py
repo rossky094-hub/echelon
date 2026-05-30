@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import echelon.v14b.topic_regression as topic_regression
+
 from echelon.v14b.topic_regression import (
     BENCHMARK_TOPICS,
     METALENS_BENCHMARK,
@@ -131,6 +133,12 @@ def test_metalens_regression_passes_on_decision_grade_fixture():
     assert "gold_branch_coverage" not in result
     assert all(row["status"] == "pass" for row in result["branch_results"])
     assert all(row["status"] == "pass" for row in result["bottleneck_results"])
+
+
+def test_topic_regression_exports_no_gold_topic_aliases():
+    assert not hasattr(topic_regression, "GoldTopic")
+    assert not hasattr(topic_regression, "GOLD_TOPICS")
+    assert not hasattr(topic_regression, "METALENS_GOLD")
 
 
 def test_metalens_regression_flags_missing_claim_cards_and_evidence():

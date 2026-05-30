@@ -121,16 +121,6 @@ BENCHMARK_TOPICS: dict[str, BenchmarkTopic] = {
     )
 }
 
-# Legacy compatibility aliases for older imports.  They are not a production
-# topic allowlist or an LLM cost-control mechanism; new code should use
-# BenchmarkTopic/BENCHMARK_TOPICS terminology.
-GoldTopic = BenchmarkTopic
-METALENS_GOLD = METALENS_BENCHMARK
-METASURFACE_HOLOGRAPHY_GOLD = METASURFACE_HOLOGRAPHY_BENCHMARK
-PHOTONIC_CRYSTAL_CAVITY_GOLD = PHOTONIC_CRYSTAL_CAVITY_BENCHMARK
-QUANTUM_LIGHT_SOURCE_GOLD = QUANTUM_LIGHT_SOURCE_BENCHMARK
-GOLD_TOPICS = BENCHMARK_TOPICS
-
 BOTTLENECK_SYNONYMS: dict[str, tuple[str, ...]] = {
     "brightness": (
         "brightness",
@@ -1106,7 +1096,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run a Topic Lens product regression.")
     parser.add_argument(
         "--topic",
-        default="metalens",
+        default="all",
         help=(
             "benchmark topic name, 'all' for the benchmark suite, or any topic "
             "for deterministic readiness preflight"

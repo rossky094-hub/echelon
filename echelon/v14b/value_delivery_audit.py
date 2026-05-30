@@ -569,6 +569,13 @@ def _source_contains(path: Path, needles: tuple[str, ...]) -> bool:
     return all(needle in text for needle in needles)
 
 
+def _source_absent(path: Path, needles: tuple[str, ...]) -> bool:
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    return all(needle not in text for needle in needles)
+
+
 def _make_target_deps(makefile: str, target: str) -> list[str]:
     match = re.search(rf"^{re.escape(target)}\s*:\s*(.*)$", makefile, flags=re.M)
     if not match:
@@ -1494,7 +1501,11 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     }
 
 
-def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
+def audit_multi_topic_regression(
+    report_dir: Path,
+    metrics: dict[str, Any] | None = None,
+    repo_root: Path | None = None,
+) -> dict[str, Any]:
     metrics = metrics or {}
     expected = {
         "metalens",
@@ -1529,8 +1540,29 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
     no_gold_topic_fields = bool(live_results) and all(
         "gold_branch_coverage" not in r for r in live_results
     )
+    topic_regression_avoids_gold_topic_aliases = True
+    topic_regression_cli_defaults_to_suite = True
+    if repo_root is not None:
+        topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
+        topic_regression_avoids_gold_topic_aliases = _source_absent(
+            topic_regression_source,
+            (
+                "GoldTopic",
+                "GOLD_TOPICS",
+                "METALENS_GOLD",
+                "METASURFACE_HOLOGRAPHY_GOLD",
+                "PHOTONIC_CRYSTAL_CAVITY_GOLD",
+                "QUANTUM_LIGHT_SOURCE_GOLD",
+            ),
+        )
+        topic_regression_cli_defaults_to_suite = _source_contains(
+            topic_regression_source,
+            ('default="all"', "BENCHMARK_TOPICS"),
+        )
     contract_fail = bool(live_results) and not (
         benchmark_fixture_contract_ok and no_gold_topic_fields
+        and topic_regression_avoids_gold_topic_aliases
+        and topic_regression_cli_defaults_to_suite
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
     topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
@@ -1546,6 +1578,8 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
             "benchmark_topics_defined": not missing,
             "live_results_have_fixture_contract": benchmark_fixture_contract_ok,
             "live_results_avoid_gold_topic_fields": no_gold_topic_fields,
+            "topic_regression_avoids_gold_topic_aliases": topic_regression_avoids_gold_topic_aliases,
+            "topic_regression_cli_defaults_to_suite": topic_regression_cli_defaults_to_suite,
         },
         "benchmark_topics": sorted(defined),
         "missing_topics": missing,
@@ -1557,7 +1591,8 @@ def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | Non
         "topic_gap_blocking": topic_gap_blocking,
         "policy": (
             "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
-            "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates."
+            "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; "
+            "the active regression entrypoint must default to the full benchmark suite."
         ),
     }
 
@@ -1611,7 +1646,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_rd_radar_promotion_contract(repo_root),
             audit_main_path_uncertainty_contract(repo_root),
             audit_legacy_flow_isolation_contract(repo_root),
-            audit_multi_topic_regression(report_dir, metrics),
+            audit_multi_topic_regression(report_dir, metrics, repo_root),
             audit_quarterly_multi_corpus(db_main, repo_root),
         ]
     statuses = Counter(g["status"] for g in gates)

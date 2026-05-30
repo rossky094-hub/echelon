@@ -154,6 +154,8 @@ def _write_product_sources(root: Path) -> None:
     v14 = root / "echelon/v14b"
     v14.mkdir(parents=True, exist_ok=True)
     (v14 / "topic_regression.py").write_text(
+        'BENCHMARK_TOPICS = {}\n'
+        'def configure_parser(parser): parser.add_argument("--topic", default="all")\n'
         "def run_topic_readiness_preflight():\n    return build_topic_readiness_preflight\n",
         encoding="utf-8",
     )
@@ -382,6 +384,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert len(result["gates"]) == 14
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
     assert any(g["issue"] == "Multi-topic Regression" and g["status"] == "pass" for g in result["gates"])
+    multi_gate = next(g for g in result["gates"] if g["issue"] == "Multi-topic Regression")
+    assert multi_gate["checks"]["topic_regression_avoids_gold_topic_aliases"] is True
+    assert multi_gate["checks"]["topic_regression_cli_defaults_to_suite"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"
     assert claim_card_gate["checks"]["complete_cards_have_falsifiable_validation_experiment"] is True
@@ -736,6 +741,44 @@ def test_multi_topic_audit_rejects_gold_topic_fixture_outputs(tmp_path):
     assert result["status"] == "fail"
     assert result["checks"]["live_results_avoid_gold_topic_fields"] is False
     assert result["checks"]["live_results_have_fixture_contract"] is True
+
+
+def test_multi_topic_audit_rejects_active_gold_topic_aliases(tmp_path):
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    (report_dir / "multi_topic_regression.json").write_text(
+        json.dumps(
+            [
+                {
+                    "topic": "metalens",
+                    "overall_status": "pass",
+                    "benchmark_topic": True,
+                    "benchmark_branch_coverage": 1.0,
+                    "benchmark_fixture_contract": {
+                        "role": "regression_fixture_not_product_allowlist",
+                        "llm_policy": "no_llm_required_for_topic_preflight",
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    source_dir = tmp_path / "echelon/v14b"
+    source_dir.mkdir(parents=True)
+    (source_dir / "topic_regression.py").write_text(
+        'BENCHMARK_TOPICS = {}\n'
+        'GoldTopic = BenchmarkTopic\n'
+        'GOLD_TOPICS = BENCHMARK_TOPICS\n'
+        'parser.add_argument("--topic", default="metalens")\n',
+        encoding="utf-8",
+    )
+
+    result = audit_multi_topic_regression(report_dir, repo_root=tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["live_results_have_fixture_contract"] is True
+    assert result["checks"]["topic_regression_avoids_gold_topic_aliases"] is False
+    assert result["checks"]["topic_regression_cli_defaults_to_suite"] is False
 
 
 def test_value_delivery_audit_fails_when_benchmark_topic_gap_sections_missing(tmp_path):
