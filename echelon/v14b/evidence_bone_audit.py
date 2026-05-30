@@ -362,6 +362,17 @@ def _load_json(path: Path) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def _max_int(*values: Any) -> int | None:
+    parsed: list[int] = []
+    for value in values:
+        try:
+            if value is not None:
+                parsed.append(int(value))
+        except Exception:
+            continue
+    return max(parsed) if parsed else None
+
+
 def frontfill_health(
     sections: dict[str, Any],
     logs: dict[str, Any],
@@ -376,8 +387,12 @@ def frontfill_health(
     """
     state = _load_json(state_file)
     progress = logs.get("progress") or {}
-    done = state.get("done", progress.get("done"))
-    total = state.get("total", progress.get("total"))
+    progress_done = progress.get("done")
+    progress_total = progress.get("total")
+    state_done = state.get("done")
+    state_total = state.get("total")
+    done = _max_int(state_done, progress_done)
+    total = _max_int(state_total, progress_total)
     rows = max(int(state.get("rows") or 0), int(sections.get("section_rows") or 0))
     papers = max(int(state.get("papers") or 0), int(sections.get("section_papers") or 0))
     primary = max(
@@ -392,8 +407,8 @@ def frontfill_health(
         no_evidence_delta = max(no_evidence_delta, int(history.get("no_evidence_done_delta") or 0))
         no_evidence_elapsed_s = max(no_evidence_elapsed_s, int(history.get("no_evidence_elapsed_s") or 0))
         latest = history.get("latest") or {}
-        done = done if done is not None else latest.get("done")
-        total = total if total is not None else latest.get("total")
+        done = _max_int(done, latest.get("done"))
+        total = _max_int(total, latest.get("total"))
     event_counts = logs.get("event_counts") or {}
     soft_stall_events = int(event_counts.get("section_evidence_soft_stall") or 0)
     low_yield_events = int(event_counts.get("low_yield_scan") or 0)
@@ -431,6 +446,10 @@ def frontfill_health(
         "status": status,
         "done": done,
         "total": total,
+        "state_done": state_done,
+        "state_total": state_total,
+        "progress_done": progress_done,
+        "progress_total": progress_total,
         "rows": rows,
         "papers": papers,
         "primary_section_papers": primary,

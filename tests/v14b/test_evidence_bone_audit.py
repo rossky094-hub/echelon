@@ -154,6 +154,41 @@ def test_watchdog_history_detects_elapsed_no_evidence_growth(tmp_path):
     assert history["no_evidence_elapsed_s"] > 6 * 3600
 
 
+def test_evidence_bone_health_uses_live_section_progress_log(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    _make_main(main)
+    _make_v14(v14)
+    section_log = tmp_path / "step5s_section_delta.log"
+    section_log.write_text(
+        "\rStep5s sections:  13%| | 877/6603 [7:42:25<7:04:04, parsed=357]\n",
+        encoding="utf-8",
+    )
+    watchdog_log = tmp_path / "section_delta_watchdog.log"
+    watchdog_log.write_text("", encoding="utf-8")
+    watchdog_state = tmp_path / "section_delta_watchdog_state.json"
+    watchdog_state.write_text(
+        '{"done": 790, "total": 6603, "rows": 2, "papers": 2, "primary_section_papers": 1}',
+        encoding="utf-8",
+    )
+    openalex_log = tmp_path / "openalex.log"
+    openalex_log.write_text("", encoding="utf-8")
+
+    result = collect_audit(
+        db_main=main,
+        db_v14=v14,
+        section_log=section_log,
+        watchdog_log=watchdog_log,
+        watchdog_state=watchdog_state,
+        openalex_log=openalex_log,
+    )
+
+    health = result["frontfill_health"]
+    assert health["state_done"] == 790
+    assert health["progress_done"] == 877
+    assert health["done"] == 877
+
+
 def test_evidence_bone_default_frontfill_paths_prefer_delta(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     log_dir = tmp_path / "logs" / "v14b"
