@@ -2344,11 +2344,14 @@ def _lineage_triple_evidence_object(triple: dict[str, Any] | None, *, source: st
 def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source: str) -> dict[str, Any] | None:
     if not edge:
         return None
+    evidence = edge.get("evidence") if isinstance(edge.get("evidence"), dict) else {}
+    if edge_type == "future_candidate":
+        evidence = _normalise_future_candidate_evidence(edge)
     source_id = edge.get("source_paper_id")
     target_id = edge.get("target_paper_id")
     if not source_id and not target_id:
         return None
-    return {
+    obj = {
         "type": edge_type,
         "role": edge_type,
         "source": source,
@@ -2358,9 +2361,26 @@ def _edge_evidence_object(edge: dict[str, Any] | None, *, edge_type: str, source
         "weight": edge.get("weight"),
         "confidence": edge.get("confidence"),
         "label": f"{source_id or '?'} -> {target_id or '?'}",
-        "relationship_scope": (edge.get("evidence") or {}).get("relationship_scope"),
+        "relationship_scope": evidence.get("relationship_scope"),
         "click_target": {"kind": "edge", "id": edge.get("edge_id") or f"{source_id}->{target_id}"},
     }
+    if edge_type == "future_candidate":
+        candidate_score = edge.get("candidate_score")
+        if candidate_score is None:
+            candidate_score = edge.get("confidence")
+        if candidate_score is None:
+            candidate_score = edge.get("weight")
+        obj.pop("confidence", None)
+        obj.pop("weight", None)
+        obj.update(
+            {
+                "candidate_score": candidate_score,
+                "calibrated_candidate_score": evidence.get("calibrated_candidate_score"),
+                "raw_candidate_score": evidence.get("raw_candidate_score"),
+                "calibration_status": _future_edge_calibration_status(edge),
+            }
+        )
+    return obj
 
 
 def _normalise_future_candidate_evidence(edge: dict[str, Any] | None) -> dict[str, Any]:

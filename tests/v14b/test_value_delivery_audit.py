@@ -151,6 +151,7 @@ def _write_product_sources(root: Path) -> None:
         '"technical_score": d.get("confidence") "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score='\n"
+        'if edge_type == "future_candidate": obj.pop("confidence", None) "candidate_score": candidate_score "calibrated_candidate_score": evidence.get("calibrated_candidate_score")\n'
         "topic_readiness = build_topic_readiness_preflight\n",
         encoding="utf-8",
     )

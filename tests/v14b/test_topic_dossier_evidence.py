@@ -437,6 +437,8 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     assert edge_items[0]["evidence_grade"] == "calibrated_candidate_generator"
     assert edge_items[0]["evidence_objects"]
     assert edge_items[0]["evidence_objects"][0]["type"] == "future_candidate"
+    assert edge_items[0]["evidence_objects"][0]["candidate_score"] == 0.8
+    assert "confidence" not in edge_items[0]["evidence_objects"][0]
 
 
 def test_validation_directions_from_claim_cards_carry_five_question_evidence():
@@ -841,6 +843,8 @@ def test_evidence_map_future_edges_and_branches_carry_contracts():
     assert "Step13 five-question Claim Card" in future_edge["required_evidence"]
     assert any("candidate generator" in reason for reason in future_edge["uncertainty_reasons"])
     assert future_edge["evidence_objects"][0]["type"] == "future_candidate"
+    assert future_edge["evidence_objects"][0]["candidate_score"] == 0.72
+    assert "confidence" not in future_edge["evidence_objects"][0]
 
     evidence_map = _build_evidence_map(
         main_path_edges=[],

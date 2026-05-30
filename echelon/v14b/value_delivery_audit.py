@@ -569,6 +569,15 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                 ),
             )
         ),
+        "public_future_evidence_objects_use_candidate_score_labels": _source_contains(
+            api_path,
+            (
+                'if edge_type == "future_candidate":',
+                '"candidate_score": candidate_score',
+                '"calibrated_candidate_score": evidence.get("calibrated_candidate_score")',
+                'obj.pop("confidence", None)',
+            ),
+        ),
         "topic_dossier_builders_use_candidate_edges_contract": (
             _source_contains(
                 step10_path,
