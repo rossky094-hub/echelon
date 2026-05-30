@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T22:32:52Z`
+- Snapshot: `2026-05-30T22:39:46Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,797
-- section_priority_summary: 1,517
+- section_priority_summary: 1,532
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,278

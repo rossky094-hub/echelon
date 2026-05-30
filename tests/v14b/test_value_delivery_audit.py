@@ -285,7 +285,8 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "step13_first_principles_history.py").write_text(
         "默认不调用外部 LLM 已入库证据可重跑 "
-        "section_evidence_strong section_provenance_ready missing_high_confidence_gates "
+        "section_evidence_strong section_provenance_ready section_decision_grade_ready "
+        "SECTION_PARSER_CONTRACT_VERSION missing_high_confidence_gates "
         "candidate_score_ready \"candidate_score\": candidate_score future candidate score "
         "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria\n",
         encoding="utf-8",
@@ -917,6 +918,7 @@ def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp
                     "high_confidence_gates": {
                         "section_evidence_strong": False,
                         "section_provenance_ready": False,
+                        "section_decision_grade_ready": False,
                     },
                     "high_confidence_eligible": True,
                 }
@@ -930,6 +932,8 @@ def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp
     assert result["invalid_high_confidence_cards"] == 1
     assert "section_evidence_strong" in result["invalid_examples"][0]["missing"]
     assert "section_provenance_ready" in result["invalid_examples"][0]["missing"]
+    assert "section_decision_grade_ready" in result["invalid_examples"][0]["missing"]
+    assert "decision_grade_current_contract_section_evidence" in result["invalid_examples"][0]["missing"]
     conn.close()
 
 

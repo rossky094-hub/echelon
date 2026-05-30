@@ -1,6 +1,8 @@
 import json
 import sqlite3
 
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
+
 
 def test_classify_principle_detects_physical_constraint():
     from echelon.v14b.step13_first_principles_history import classify_principle
@@ -233,7 +235,126 @@ def test_step13_weak_section_provenance_blocks_high_confidence():
     assert gate["high_confidence_gates"]["candidate_score_ready"] is True
     assert "direction_confidence_ready" not in gate["high_confidence_gates"]
     assert gate["high_confidence_gates"]["section_provenance_ready"] is False
+    assert gate["high_confidence_gates"]["section_decision_grade_ready"] is False
     assert "strong section-level evidence" in gate["missing_high_confidence_gates"]
     assert "strong or moderate section parser provenance" in gate["missing_high_confidence_gates"]
+    assert "current parser-contract decision-grade section evidence" in gate["missing_high_confidence_gates"]
     assert unresolved["section_provenance"]["strategies"]["loose_inline_heading"] == 1
     assert updates[0]["high_confidence_eligible"] == 0
+
+
+def test_step13_stale_strong_sections_block_high_confidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    atoms = [
+        {
+            "paper_id": f"p{i}",
+            "paper_title": f"Legacy parsed bottleneck {i}",
+            "publication_year": 2024,
+            "description": "Fabrication tolerance still limits broadband imaging quality.",
+            "keyword": "fabrication",
+            "severity": "high",
+            "evidence_quality": "section_level",
+            "section_provenance_strength": "strong",
+            "section_extraction_strategies": ["explicit_heading"],
+            "section_parser_contract_version": "legacy_unknown_contract",
+            "evidence_weight": 0.9,
+            "is_resolved": 0,
+        }
+        for i in range(1, 4)
+    ]
+    future_directions = [
+        {
+            "direction_id": 1,
+            "direction_name": "Wafer-scale broadband metalens manufacturing",
+            "paper_ids_json": '["p1","p2","p3"]',
+            "confidence": 0.86,
+            "evidence_tier": "triangulated_strong",
+            "calibration_label": "calibrated_temporal_holdout",
+        }
+    ]
+    principles = [
+        {
+            "principle_id": "FP_PHYSICAL_CONSTRAINT",
+            "principle_name": "物理实现与制造约束",
+            "root_cause": "fabrication tolerance and material loss",
+        }
+    ]
+
+    cards, updates = build_direction_claim_cards(
+        atoms=atoms,
+        future_directions=future_directions,
+        principle_rows=principles,
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    gate = json.loads(cards[0]["quality_gate_json"])
+    enablers = json.loads(cards[0]["enabling_conditions_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["evidence_strength_level"] == "strong"
+    assert cards[0]["high_confidence_eligible"] == 0
+    assert gate["high_confidence_gates"]["section_evidence_strong"] is True
+    assert gate["high_confidence_gates"]["section_provenance_ready"] is True
+    assert gate["high_confidence_gates"]["section_decision_grade_ready"] is False
+    assert gate["section_provenance"]["decision_grade"] == 0
+    assert gate["section_provenance"]["contract_versions"]["legacy_unknown_contract"] == 3
+    assert "current parser-contract decision-grade section evidence" in gate["missing_high_confidence_gates"]
+    assert any("current parser-contract decision-grade" in s for s in enablers["missing_enablers"])
+    assert updates[0]["high_confidence_eligible"] == 0
+
+
+def test_step13_current_contract_decision_grade_sections_can_be_high_confidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    atoms = [
+        {
+            "paper_id": f"p{i}",
+            "paper_title": f"Current parsed bottleneck {i}",
+            "publication_year": 2024,
+            "description": "Fabrication tolerance still limits broadband imaging quality.",
+            "keyword": "fabrication",
+            "severity": "high",
+            "evidence_quality": "section_level",
+            "section_provenance_strength": "strong",
+            "section_extraction_strategies": ["explicit_heading"],
+            "section_parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            "section_decision_grade": True,
+            "evidence_weight": 0.9,
+            "is_resolved": 0,
+        }
+        for i in range(1, 4)
+    ]
+    future_directions = [
+        {
+            "direction_id": 1,
+            "direction_name": "Wafer-scale broadband metalens manufacturing",
+            "paper_ids_json": '["p1","p2","p3"]',
+            "confidence": 0.86,
+            "evidence_tier": "triangulated_strong",
+            "calibration_label": "calibrated_temporal_holdout",
+        }
+    ]
+    principles = [
+        {
+            "principle_id": "FP_PHYSICAL_CONSTRAINT",
+            "principle_name": "物理实现与制造约束",
+            "root_cause": "fabrication tolerance and material loss",
+        }
+    ]
+
+    cards, updates = build_direction_claim_cards(
+        atoms=atoms,
+        future_directions=future_directions,
+        principle_rows=principles,
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    gate = json.loads(cards[0]["quality_gate_json"])
+    unresolved = json.loads(cards[0]["unresolved_bottleneck_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["high_confidence_eligible"] == 1
+    assert cards[0]["claim_scope"] == "validated_candidate"
+    assert gate["high_confidence_gates"]["section_decision_grade_ready"] is True
+    assert gate["section_provenance"]["decision_grade"] == 3
+    assert unresolved["section_provenance"]["current_contract"] == 3
+    assert updates[0]["high_confidence_eligible"] == 1

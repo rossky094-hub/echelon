@@ -23,6 +23,11 @@ from typing import Any, Optional
 from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import DB_MAIN, DB_V14, REPORT_DIR
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
+from echelon.v14b.evidence_contracts import (
+    MODERATE_SECTION_STRATEGIES,
+    SECTION_PARSER_CONTRACT_VERSION,
+    STRONG_SECTION_STRATEGIES,
+)
 from echelon.v14b.evidence_grade import grade_from_qualities
 from echelon.v14b.utils import add_common_args, setup_logging
 
@@ -177,17 +182,6 @@ COST_TERMS = re.compile(
     r"memory|time-consuming|slow|infrastructure)\b",
     re.I,
 )
-
-STRONG_SECTION_STRATEGIES = {
-    "explicit_heading",
-    "heading_continuation",
-    "embedded_heading",
-}
-
-MODERATE_SECTION_STRATEGIES = {
-    "inline_heading",
-}
-
 
 def jdumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -375,9 +369,15 @@ def load_section_provenance_index(
         if not strategies:
             strategies = {"legacy_unknown_strategy"}
         strength = _strategy_strength(strategies)
+        contract_version = str(meta.get("parser_contract_version") or "legacy_unknown_contract")
         out[(str(row["paper_id"]), _normalize_section_name(str(row["section_name"] or "")))] = {
             "section_provenance_strength": strength,
             "section_extraction_strategies": sorted(strategies),
+            "section_parser_contract_version": contract_version,
+            "section_decision_grade": (
+                contract_version == SECTION_PARSER_CONTRACT_VERSION
+                and strength in {"strong", "moderate"}
+            ),
             "section_meta": meta,
         }
     return out
@@ -484,6 +484,10 @@ def load_atoms(
             "weak" if atom.get("evidence_quality") == "section_level" else "none"
         )
         atom["section_extraction_strategies"] = provenance.get("section_extraction_strategies") or []
+        atom["section_parser_contract_version"] = provenance.get("section_parser_contract_version") or (
+            "legacy_unknown_contract" if atom["section_provenance_strength"] != "none" else "none"
+        )
+        atom["section_decision_grade"] = bool(provenance.get("section_decision_grade"))
         atom_id = int(atom.get("atom_id") or 0)
         resolved = resolved_map.get(atom_id)
         if resolved:
@@ -727,11 +731,25 @@ def evidence_strength_level_from_atoms(atoms: list[dict]) -> str:
 def section_provenance_summary_from_atoms(atoms: list[dict]) -> dict[str, Any]:
     strengths = Counter()
     strategies = Counter()
+    contract_versions = Counter()
+    current_contract = 0
+    decision_grade = 0
     for atom in atoms:
         strength = str(atom.get("section_provenance_strength") or "").strip()
         if not strength:
             strength = "none" if atom.get("evidence_quality") != "section_level" else "weak"
         strengths[strength] += 1
+        contract_version = str(atom.get("section_parser_contract_version") or "legacy_unknown_contract")
+        if strength != "none":
+            contract_versions[contract_version] += 1
+            if contract_version == SECTION_PARSER_CONTRACT_VERSION:
+                current_contract += 1
+        atom_decision_grade = bool(atom.get("section_decision_grade")) or (
+            contract_version == SECTION_PARSER_CONTRACT_VERSION
+            and strength in {"strong", "moderate"}
+        )
+        if atom_decision_grade:
+            decision_grade += 1
         for strategy in atom.get("section_extraction_strategies") or []:
             strategies[str(strategy)] += 1
     return {
@@ -739,6 +757,9 @@ def section_provenance_summary_from_atoms(atoms: list[dict]) -> dict[str, Any]:
         "moderate": int(strengths.get("moderate", 0)),
         "weak": int(strengths.get("weak", 0)),
         "none": int(strengths.get("none", 0)),
+        "current_contract": current_contract,
+        "decision_grade": decision_grade,
+        "contract_versions": dict(sorted(contract_versions.items())),
         "strategies": dict(sorted(strategies.items())),
     }
 
@@ -822,6 +843,7 @@ def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
         "five_question_complete": "complete five-question Claim Card",
         "section_evidence_strong": "strong section-level evidence",
         "section_provenance_ready": "strong or moderate section parser provenance",
+        "section_decision_grade_ready": "current parser-contract decision-grade section evidence",
         "calibration_ready": "future-growth calibration available",
         "rolling_auc_ready": "rolling held-out-year AUC >= 0.65",
         "candidate_score_ready": "future candidate score >= 0.70",
@@ -1366,6 +1388,8 @@ def build_direction_claim_cards(
                     "evidence_quality": atom.get("evidence_quality"),
                     "section_provenance_strength": atom.get("section_provenance_strength"),
                     "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
+                    "section_parser_contract_version": atom.get("section_parser_contract_version"),
+                    "section_decision_grade": bool(atom.get("section_decision_grade")),
                 }
             )
             if len(attempts) >= 8:
@@ -1382,6 +1406,11 @@ def build_direction_claim_cards(
             1,
             int(0.35 * max(1, len(direction_atoms))),
         )
+        decision_grade_sections = int(section_provenance.get("decision_grade") or 0)
+        section_decision_grade_ready = decision_grade_sections >= max(
+            1,
+            int(0.35 * max(1, len(direction_atoms))),
+        )
         new_enablers = []
         missing_enablers = []
         if calibration_ready and rolling_avg_auc >= 0.65:
@@ -1394,6 +1423,12 @@ def build_direction_claim_cards(
             )
         else:
             missing_enablers.append("section-level bottleneck evidence is weak or parser provenance is weak")
+        if section_decision_grade_ready:
+            new_enablers.append("current parser-contract decision-grade section evidence is available")
+        else:
+            missing_enablers.append(
+                "current parser-contract decision-grade section evidence is missing or below threshold"
+            )
         candidate_score = float(d.get("candidate_score") or d.get("confidence") or 0.0)
         if candidate_score >= 0.70:
             new_enablers.append("future candidate score is above the candidate threshold")
@@ -1422,6 +1457,8 @@ def build_direction_claim_cards(
                 "evidence_quality": atom.get("evidence_quality"),
                 "section_provenance_strength": atom.get("section_provenance_strength"),
                 "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
+                "section_parser_contract_version": atom.get("section_parser_contract_version"),
+                "section_decision_grade": bool(atom.get("section_decision_grade")),
                 "evidence_weight": float(atom.get("evidence_weight") or 0.35),
             }
             for atom in sorted(
@@ -1462,6 +1499,7 @@ def build_direction_claim_cards(
             "five_question_complete": bool(five_complete),
             "section_evidence_strong": section_strength == "strong",
             "section_provenance_ready": section_provenance_ready,
+            "section_decision_grade_ready": section_decision_grade_ready,
             "calibration_ready": calibration_ready,
             "rolling_auc_ready": rolling_avg_auc >= 0.65,
             "candidate_score_ready": candidate_score >= 0.70,

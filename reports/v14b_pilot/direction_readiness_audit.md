@@ -1,13 +1,13 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T22:32:46Z`
+- generated_at: `2026-05-30T22:39:38Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
 - linked refs: 445,957 / 3,215,130 (13.9%)
 - OpenAlex W IDs: 35,663 (64.4%)
-- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=1.5)
+- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=1.3)
 - section evidence: 5,345 rows / 3,020 papers
 - primary section evidence: 3,020 papers (5.5%)
 - primary section provenance: 911 strong/moderate papers; weak-only=69.8%
@@ -28,7 +28,7 @@
 - **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 154/3,020 papers (5.1%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
 - **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 0/27 queued benchmark-topic papers (0.0%); raw primary-section coverage is 4/27 (14.8%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
-- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=1.5. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
+- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=1.3. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
 
 ## Latest Fusion Audit
 

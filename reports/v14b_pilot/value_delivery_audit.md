@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T22:32:47Z`
+- generated_at: `2026-05-30T22:39:39Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -14,7 +14,7 @@
 | 4 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract. |
 | 5 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
 | 6 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions. |
-| 7 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
+| 7 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence strong/moderate parser provenance, and current parser-contract decision-grade section evidence; weak, stale-contract, or missing section evidence keeps it exploratory. |
 | 8 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
 | 9 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
 | 10 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
@@ -34,7 +34,7 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 5232,
+    "openalex_frontfill_cooldown_remaining_s": 4820,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
@@ -130,7 +130,7 @@
   ],
   "status": "pass",
   "triples": 2920,
-  "triples_with_page": 540
+  "triples_with_page": 1268
 }
 ```
 
@@ -251,7 +251,7 @@
   "invalid_examples": [],
   "invalid_high_confidence_cards": 0,
   "issue": "Claim Card High-Confidence Evidence Contract",
-  "policy": "A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory.",
+  "policy": "A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence strong/moderate parser provenance, and current parser-contract decision-grade section evidence; weak, stale-contract, or missing section evidence keeps it exploratory.",
   "status": "pass"
 }
 ```

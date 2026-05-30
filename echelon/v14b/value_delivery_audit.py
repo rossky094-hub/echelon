@@ -929,7 +929,10 @@ def audit_claim_card_high_confidence_evidence_contract(
             "issue": "Claim Card High-Confidence Evidence Contract",
             "status": "warn",
             "why": "direction_claim_cards table is not materialized yet",
-            "policy": "High-confidence Claim Cards require strong section evidence and strong/moderate parser provenance.",
+            "policy": (
+                "High-confidence Claim Cards require strong section evidence, strong/moderate parser provenance, "
+                "and current parser-contract decision-grade section evidence."
+            ),
         }
     cols = columns(conn_v14, "direction_claim_cards")
     required = {"claim_card_id", "high_confidence_eligible", "quality_gate_json"}
@@ -956,16 +959,22 @@ def audit_claim_card_high_confidence_evidence_contract(
         strong_or_moderate = 0
         if isinstance(provenance, dict):
             strong_or_moderate = int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0)
+        decision_grade = int(provenance.get("decision_grade") or 0) if isinstance(provenance, dict) else 0
         section_strong = bool((high_gates or {}).get("section_evidence_strong"))
         provenance_ready = bool((high_gates or {}).get("section_provenance_ready"))
+        decision_grade_ready = bool((high_gates or {}).get("section_decision_grade_ready"))
         json_high = bool(gate.get("high_confidence_eligible")) if isinstance(gate, dict) else False
         missing = []
         if not section_strong:
             missing.append("section_evidence_strong")
         if not provenance_ready:
             missing.append("section_provenance_ready")
+        if not decision_grade_ready:
+            missing.append("section_decision_grade_ready")
         if strong_or_moderate < 1:
             missing.append("strong_or_moderate_section_provenance")
+        if decision_grade < 1:
+            missing.append("decision_grade_current_contract_section_evidence")
         if not json_high:
             missing.append("quality_gate_high_confidence_flag")
         if missing:
@@ -987,7 +996,13 @@ def audit_claim_card_high_confidence_evidence_contract(
         source_checks = {
             "step13_has_section_evidence_gate": _source_contains(
                 step13_path,
-                ("section_evidence_strong", "section_provenance_ready", "missing_high_confidence_gates"),
+                (
+                    "section_evidence_strong",
+                    "section_provenance_ready",
+                    "section_decision_grade_ready",
+                    "SECTION_PARSER_CONTRACT_VERSION",
+                    "missing_high_confidence_gates",
+                ),
             ),
             "step13_uses_candidate_score_gate": (
                 _source_contains(
@@ -1038,7 +1053,8 @@ def audit_claim_card_high_confidence_evidence_contract(
         "invalid_examples": invalid[:5],
         "policy": (
             "A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence "
-            "and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory."
+            "strong/moderate parser provenance, and current parser-contract decision-grade section evidence; "
+            "weak, stale-contract, or missing section evidence keeps it exploratory."
         ),
     }
 
