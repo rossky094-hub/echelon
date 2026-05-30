@@ -1056,6 +1056,7 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "api_evidence_map_future_edges_carry_contract": False,
         "api_evidence_map_branches_carry_contract": False,
         "ui_renders_evidence_map_contract": False,
+        "ui_renders_future_edge_contracts": False,
         "ui_has_fusion_value_layer_control": False,
     }
     if repo_root is not None:
@@ -1088,6 +1089,17 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
             "ui_renders_evidence_map_contract": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderEvidenceMapSummary", "renderComboContract", "Fusion value"),
+            ),
+            "ui_renders_future_edge_contracts": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "Future edge uncertainty",
+                    "edge.claim_scope",
+                    "edge.evidence_grade",
+                    "edge.required_evidence",
+                    "edge.uncertainty_reasons",
+                    "renderEvidenceObjects(edge.evidence_objects",
+                ),
             ),
             "ui_has_fusion_value_layer_control": _source_contains(
                 repo_root / "web/visual-graph/index.html",

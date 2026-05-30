@@ -1318,6 +1318,7 @@ function renderDossierRadar(radar = {}) {
             <p class="mini">缺口：${(item.missing_gates || []).map(esc).join(" / ")}</p>
             ${(item.uncertainty_reasons || []).length ? `<p class="mini">不确定性：${(item.uncertainty_reasons || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
             ${evidencePaperButtons(item.evidence_papers || [], 2)}
+            ${renderEvidenceObjects(item.evidence_objects || [], 4)}
           </div>
         `).join("") || "<p>No future candidates matched.</p>"}
       </details>
@@ -1468,7 +1469,19 @@ function renderTopicLens(lens) {
         <small>GNN/VGAE confidence ${pct(edge.confidence || edge.weight)} / ${esc(edge.evidence?.relationship_scope || "graph")}</small><br>
         <small>${esc(futureCalibrationCopy(edge))}</small><br>
         <small>${esc(edge.plain_language || "")}</small></p>
+        <div class="pill-row">
+          <span class="pill">${esc(edge.claim_scope || "candidate_pool_only")}</span>
+          <span class="pill">${esc(edge.evidence_grade || "future candidate evidence unknown")}</span>
+        </div>
+        ${(edge.required_evidence || []).length ? `<p class="mini"><strong>进入 Radar 还需要：</strong>${(edge.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+        ${(edge.uncertainty_reasons || []).length ? `
+          <details>
+            <summary>Future edge uncertainty (${fmt((edge.uncertainty_reasons || []).length)})</summary>
+            ${(edge.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+          </details>
+        ` : ""}
         ${evidencePaperButtons([edge.source_paper, edge.target_paper].filter(Boolean), 2)}
+        ${renderEvidenceObjects(edge.evidence_objects || [], 4)}
       `).join("") || "<p>No future edge matched this topic context yet.</p>"}
     </div>
     <div class="item">

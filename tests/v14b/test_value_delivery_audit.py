@@ -141,6 +141,7 @@ def _write_product_sources(root: Path) -> None:
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
+        "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
@@ -401,6 +402,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_future_edges_carry_contract"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_branches_carry_contract"] is True
+    assert evidence_map_gate["checks"]["ui_renders_future_edge_contracts"] is True
     radar_gate = next(g for g in result["gates"] if g["issue"] == "R&D Radar Promotion Contract")
     assert radar_gate["status"] == "pass"
     assert radar_gate["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True

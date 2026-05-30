@@ -3567,6 +3567,9 @@ def _build_rd_radar(
                     _paper_ref(e.get("source_paper") or {"paper_id": e.get("source_paper_id")}, "GNN candidate source"),
                     _paper_ref(e.get("target_paper") or {"paper_id": e.get("target_paper_id")}, "GNN candidate target"),
                 ],
+                "evidence_objects": e.get("evidence_objects")
+                or _future_edge_claim_contract(e).get("evidence_objects")
+                or [],
                 "missing_gates": sorted(
                     set(
                         [
