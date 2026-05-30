@@ -306,6 +306,24 @@ def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
     assert bottleneck["hits"][0]["paper_id"] == "p1"
 
 
+def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get("/graph/visual/papers/p1", headers=VIEWER_HEADERS)
+
+    assert resp.status_code == 200
+    role = resp.json()["paper"]["paper_role"]
+    assert role["role"] == "limitation_bottleneck"
+    assert role["claim_scope"] == "bottleneck_context_only"
+    assert role["evidence_grade"] in {"metadata_bottleneck_context", "weak_bottleneck_context", "section_bottleneck_context"}
+    assert role["uncertainty_reasons"]
+    assert role["required_evidence"]
+    assert role["evidence_objects"]
+    assert role["evidence_objects"][0]["type"] == "paper"
+
+
 def test_visual_edit_roundtrip(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

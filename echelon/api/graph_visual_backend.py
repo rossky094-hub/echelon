@@ -3229,6 +3229,92 @@ def _story_step_contract(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _paper_role_contract(
+    paper: dict[str, Any],
+    edges: list[dict[str, Any]],
+    *,
+    visual_role: str,
+    why_parts: list[str],
+) -> dict[str, Any]:
+    layer_keys = {
+        "main_path" if edge.get("is_main_path") else str(edge.get("layer") or edge.get("edge_type") or "edge")
+        for edge in edges
+    }
+    has_traced_section = _paper_has_traced_primary_evidence(paper)
+    has_primary_section = _paper_has_primary_evidence(paper)
+    if "future" in layer_keys or visual_role == "future_anchor":
+        claim_scope = "candidate_pool_only"
+        evidence_grade = (
+            "section_context_future_endpoint"
+            if has_traced_section
+            else "graph_future_endpoint_context"
+        )
+    elif visual_role == "limitation_bottleneck" or (paper.get("limitations") or []):
+        claim_scope = "bottleneck_context_only"
+        evidence_grade = (
+            "section_bottleneck_context"
+            if has_traced_section
+            else "weak_bottleneck_context"
+            if has_primary_section
+            else "metadata_bottleneck_context"
+        )
+    elif "main_path" in layer_keys:
+        claim_scope = "main_path_context_only"
+        evidence_grade = (
+            "section_backed_main_path_context"
+            if has_traced_section
+            else "graph_main_path_context"
+        )
+    else:
+        claim_scope = "retrieval_context_only"
+        evidence_grade = "metadata_search_context"
+    uncertainty = [
+        "paper detail explains why the item is shown; it is not a standalone scientific conclusion",
+        *(
+            []
+            if has_traced_section
+            else ["paper lacks strong/moderate local primary section evidence in this detail view"]
+        ),
+        *(
+            ["future endpoint evidence cannot enter Radar without Step6 fusion and a complete Claim Card"]
+            if claim_scope == "candidate_pool_only"
+            else []
+        ),
+    ]
+    required_evidence = [
+        "local primary section evidence with strong/moderate parser provenance",
+        "linked citation context when used for main-path claims",
+        "branch/bottleneck lineage evidence before narrating causal evolution",
+        "complete Step13 Claim Card before promotion to Radar",
+    ]
+    evidence_objects = _compact_evidence_objects(
+        [
+            _paper_evidence_object(
+                paper,
+                role="selected_paper_detail",
+                source="visual_paper_detail",
+                why="; ".join(why_parts[:3]) if why_parts else "selected from visual graph",
+            ),
+            *[
+                _edge_evidence_object(
+                    edge,
+                    edge_type="main_path_edge" if edge.get("is_main_path") else str(edge.get("layer") or edge.get("edge_type") or "edge"),
+                    source="visual_paper_detail",
+                )
+                for edge in edges[:5]
+            ],
+        ],
+        limit=8,
+    )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": required_evidence,
+        "evidence_objects": evidence_objects,
+    }
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -5300,6 +5386,7 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
         "edge_counts_by_layer": dict(layer_counts),
         "branch_id": paper.get("branch_id"),
         "cluster_id": paper.get("cluster_id"),
+        **_paper_role_contract(paper, edges, visual_role=visual_role, why_parts=why_parts),
         "evidence_gap": (
             "section-level evidence with strong/moderate parser provenance available"
             if _paper_has_traced_primary_evidence(paper)

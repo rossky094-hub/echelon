@@ -975,9 +975,21 @@ function renderPaper(paper, edges = []) {
       <div class="paper-meta">为什么给你看这篇</div>
       ${(paperRole.why_selected || [paper.reason?.why]).filter(Boolean).map((why) => `<p>${esc(why)}</p>`).join("") || "<p>Topic Lens / graph neighborhood selected this paper.</p>"}
       <div class="pill-row">
+        <span class="pill">${esc(paperRole.claim_scope || "retrieval_context_only")}</span>
+        <span class="pill">${esc(paperRole.evidence_grade || "metadata_search_context")}</span>
+      </div>
+      <div class="pill-row">
         ${Object.entries(edgeCounts).map(([layer, n]) => `<span class="pill">${esc(layer)} ${fmt(n)}</span>`).join("")}
       </div>
       <p class="mini">${esc(paperRole.evidence_gap || "")}</p>
+      ${(paperRole.required_evidence || []).length ? `<p class="mini"><strong>作为结论还需要：</strong>${(paperRole.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+      ${(paperRole.uncertainty_reasons || []).length ? `
+        <details>
+          <summary>Paper role uncertainty (${fmt((paperRole.uncertainty_reasons || []).length)})</summary>
+          ${(paperRole.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+        </details>
+      ` : ""}
+      ${renderEvidenceObjects(paperRole.evidence_objects || [], 5)}
       ${paper.reason ? `<p class="mini">选择依据：${esc(paper.reason.why || "")} ${esc(paper.reason.role || "")} / ${esc(paper.reason.relationship_scope || "")}</p>` : ""}
     </div>
     <div class="item">
