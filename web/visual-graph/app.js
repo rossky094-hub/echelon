@@ -971,6 +971,30 @@ function renderLocalEdges(edges = []) {
   `;
 }
 
+function renderLimitations(limitations = []) {
+  const items = asArray(limitations).slice(0, 8);
+  if (!items.length) return "<p>No limitation atoms yet.</p>";
+  return `
+    <div class="evidence-list">
+      ${items.map((lim) => `
+        <div class="evidence-paper">
+          <strong>${esc(lim.keyword || "limitation")}</strong>
+          <p>${esc(lim.description || JSON.stringify(lim))}</p>
+          <div class="pill-row">
+            <span class="pill">${esc(lim.claim_scope || "weak_bottleneck_hypothesis")}</span>
+            <span class="pill">${esc(lim.evidence_grade || "metadata_or_abstract_limitation_context")}</span>
+            ${lim.is_resolved ? `<span class="pill good">partially resolved</span>` : `<span class="pill warn">unresolved context</span>`}
+          </div>
+          <small>${esc(lim.paper_id || "")} / section ${esc(lim.source_section_name || "-")} / evidence ${esc(lim.evidence_quality || "unknown")}</small>
+          ${(lim.uncertainty_reasons || []).length ? `<p class="mini">Limitation uncertainty: ${(lim.uncertainty_reasons || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(lim.required_evidence || []).length ? `<p class="mini"><strong>作为结论还需要：</strong>${(lim.required_evidence || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${renderEvidenceObjects(lim.evidence_objects || [], 3)}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderPaper(paper, edges = []) {
   if (!paper) {
     els.paperPane.innerHTML = '<div class="item">Select a paper from the graph or Topic Lens.</div>';
@@ -1039,7 +1063,7 @@ function renderPaper(paper, edges = []) {
     </div>
     <div class="item">
       <div class="paper-meta">Limitations</div>
-      ${(paper.limitations || []).slice(0, 6).map((lim) => `<p>${esc(lim.description || JSON.stringify(lim))}</p>`).join("") || "<p>No limitation atoms yet.</p>"}
+      ${renderLimitations(paper.limitations || [])}
     </div>
     <div class="item">
       <div class="paper-meta">Local edges</div>
@@ -1546,10 +1570,7 @@ function renderTopicLens(lens) {
     </div>
     <div class="item">
       <div class="paper-meta">Unresolved bottlenecks</div>
-      ${limitations.slice(0, 8).map((lim) => `
-        <p><strong>${esc(lim.keyword || "limitation")}</strong> ${esc(truncate(lim.description || "", 220))}<br>
-        <small>${esc(lim.paper_id || "")} / evidence ${esc(lim.evidence_quality || "unknown")}</small></p>
-      `).join("") || "<p>No limitation evidence matched.</p>"}
+      ${renderLimitations(limitations)}
     </div>
     <div class="item">
       <div class="paper-meta">Related papers</div>

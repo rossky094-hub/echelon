@@ -871,10 +871,12 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
         "api_exposes_topic_readiness": False,
         "api_topic_branch_splits_inherit_lineage": False,
         "api_topic_bottlenecks_use_resolution_evidence": False,
+        "api_limitation_atoms_carry_contract": False,
         "api_topic_validation_directions_inherit_claim_card_evidence": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_topic_dossier_branch_contracts": False,
+        "ui_renders_limitation_contracts": False,
         "ui_renders_topic_bottleneck_resolution_counts": False,
         "ui_renders_validation_direction_evidence_objects": False,
         "topic_regression_uses_shared_contract": False,
@@ -904,6 +906,17 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "resolved_evidence_count",
                     "unresolved_evidence_count",
                     "resolution_status",
+                ),
+            ),
+            "api_limitation_atoms_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _limitation_atom_contract",
+                    "weak_bottleneck_hypothesis",
+                    "section_limitation_context",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
                 ),
             ),
             "api_topic_validation_directions_inherit_claim_card_evidence": _source_contains(
@@ -938,6 +951,16 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "split.claim_scope",
                     "split.evidence_grade",
                     "split.uncertainty_reasons",
+                ),
+            ),
+            "ui_renders_limitation_contracts": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderLimitations",
+                    "lim.claim_scope",
+                    "lim.evidence_grade",
+                    "lim.uncertainty_reasons",
+                    "renderEvidenceObjects(lim.evidence_objects",
                 ),
             ),
             "ui_renders_topic_bottleneck_resolution_counts": _source_contains(

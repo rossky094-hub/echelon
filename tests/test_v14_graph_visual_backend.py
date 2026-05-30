@@ -322,6 +322,12 @@ def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monk
     assert role["required_evidence"]
     assert role["evidence_objects"]
     assert role["evidence_objects"][0]["type"] == "paper"
+    limitation = resp.json()["paper"]["limitations"][0]
+    assert limitation["claim_scope"] == "weak_bottleneck_hypothesis"
+    assert limitation["evidence_grade"] == "metadata_or_abstract_limitation_context"
+    assert limitation["uncertainty_reasons"]
+    assert limitation["required_evidence"]
+    assert limitation["evidence_objects"][0]["type"] == "limitation_atom"
     edge = resp.json()["edges"][0]
     assert edge["claim_scope"] == "main_path_context_only"
     assert edge["evidence_grade"]
@@ -421,6 +427,12 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert "rd_radar" in data
     assert "evidence_map" in data
     assert data["related_papers"][0]["access_links"]
+    limitation = data["unresolved_limitations"][0]
+    assert limitation["claim_scope"] in {"weak_bottleneck_hypothesis", "bottleneck_context_only", "partial_resolution_context_only"}
+    assert limitation["evidence_grade"]
+    assert limitation["uncertainty_reasons"]
+    assert limitation["required_evidence"]
+    assert limitation["evidence_objects"][0]["type"] == "limitation_atom"
 
 
 def test_visual_clusters_branch_lineages_carry_evidence_contract(tmp_path, monkeypatch):

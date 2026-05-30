@@ -901,6 +901,10 @@ def _hydrate_hits(
         limitations = _loads(row["limitations_json"], [])
         if not limitations:
             limitations = live_limitations_by_id.get(pid, [])
+        limitations = _attach_limitation_contracts(
+            limitations if isinstance(limitations, list) else [],
+            paper_id=pid,
+        )
         claim_cards = _loads(row["claim_cards_json"], [])
         access = _loads(row["access_json"], {})
         sections = live_sections_by_id.get(pid) or stored_sections
@@ -2136,6 +2140,94 @@ def _limitation_resolution_evidence_object(
         "n_resolutions": limitation.get("n_resolutions"),
         "click_target": {"kind": "paper", "id": resolver_id or paper_id} if (resolver_id or paper_id) else None,
     }
+
+
+def _limitation_atom_contract(limitation: dict[str, Any] | None) -> dict[str, Any]:
+    limitation = limitation if isinstance(limitation, dict) else {}
+    evidence_quality = str(limitation.get("evidence_quality") or "").strip().lower()
+    evidence_source = str(limitation.get("evidence_source") or "").strip().lower()
+    extractor_method = str(limitation.get("extractor_method") or "").strip().lower()
+    section_name = str(limitation.get("source_section_name") or limitation.get("section_name") or "").strip()
+    has_section_evidence = (
+        evidence_quality in {"section_level", "section_explicit_heading", "section_embedded_heading", "section_inline_heading"}
+        or evidence_source == "structured_sections"
+        or _is_decision_section(section_name)
+    )
+    is_llm = extractor_method.startswith("llm")
+    is_resolved = _limitation_is_resolved(limitation)
+
+    if is_resolved:
+        claim_scope = "partial_resolution_context_only"
+        evidence_grade = "section_resolution_context" if has_section_evidence else "weak_resolution_context"
+    elif has_section_evidence:
+        claim_scope = "bottleneck_context_only"
+        evidence_grade = "section_limitation_context"
+    elif is_llm:
+        claim_scope = "weak_bottleneck_hypothesis"
+        evidence_grade = "llm_weak_limitation_label"
+    else:
+        claim_scope = "weak_bottleneck_hypothesis"
+        evidence_grade = "metadata_or_abstract_limitation_context"
+
+    uncertainty = [
+        "limitation atom is bottleneck context, not a standalone high-confidence claim",
+    ]
+    if not has_section_evidence:
+        uncertainty.append("limitation lacks structured local section evidence in a decision section")
+    if is_llm:
+        uncertainty.append("LLM-extracted limitation labels remain weak unless anchored to structured section evidence")
+    if is_resolved:
+        uncertainty.append("resolution evidence suggests partial progress; current applicability still needs validation")
+    try:
+        evidence_weight = float(limitation.get("evidence_weight") or 0.0)
+    except (TypeError, ValueError):
+        evidence_weight = 0.0
+    if evidence_weight and evidence_weight < 0.6:
+        uncertainty.append("limitation evidence weight is below strong-evidence threshold")
+
+    evidence_object = _limitation_evidence_object(limitation, source="visual_paper_detail")
+    if evidence_object:
+        evidence_object.update(
+            {
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+            }
+        )
+    resolution_object = _limitation_resolution_evidence_object(limitation, source="visual_paper_detail")
+    if resolution_object:
+        resolution_object.update(
+            {
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+            }
+        )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "structured limitation/discussion/results/methods section evidence",
+            "typed bottleneck lineage chain: constraint -> failure mechanism -> attempted path -> local fix -> new constraint",
+            "resolution evidence from later papers before marking the bottleneck as solved",
+            "complete Step13 Claim Card before using this limitation for R&D Radar promotion",
+        ],
+        "evidence_objects": _compact_evidence_objects([evidence_object, resolution_object], limit=4),
+    }
+
+
+def _attach_limitation_contracts(
+    limitations: list[Any],
+    *,
+    paper_id: str | None = None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for raw in limitations:
+        item = dict(raw) if isinstance(raw, dict) else {"description": str(raw)}
+        if paper_id and not item.get("paper_id"):
+            item["paper_id"] = paper_id
+        item.update(_limitation_atom_contract(item))
+        out.append(item)
+    return out
 
 
 def _lineage_triple_evidence_object(triple: dict[str, Any] | None, *, source: str) -> dict[str, Any] | None:
@@ -4968,19 +5060,13 @@ def get_topic_lens(
             if not isinstance(lims, list):
                 continue
             for lim in lims[:3]:
-                unresolved_limitations.append(
-                    {
-                        "paper_id": h["paper_id"],
-                        "title": h.get("title"),
-                        "branch_id": h.get("branch_id"),
-                        "cluster_id": h.get("cluster_id"),
-                        "keyword": (lim or {}).get("keyword") if isinstance(lim, dict) else None,
-                        "description": (lim or {}).get("description") if isinstance(lim, dict) else str(lim),
-                        "severity": (lim or {}).get("severity") if isinstance(lim, dict) else None,
-                        "evidence_quality": (lim or {}).get("evidence_quality") if isinstance(lim, dict) else None,
-                        "relationship_scope": "direct_paper_match",
-                    }
-                )
+                item = dict(lim) if isinstance(lim, dict) else {"description": str(lim)}
+                item.setdefault("paper_id", h["paper_id"])
+                item.setdefault("title", h.get("title"))
+                item.setdefault("branch_id", h.get("branch_id"))
+                item.setdefault("cluster_id", h.get("cluster_id"))
+                item.setdefault("relationship_scope", "direct_paper_match")
+                unresolved_limitations.append(item)
         context_limitations = _load_context_limitations(
             conn,
             topic=topic_text,
@@ -5005,7 +5091,7 @@ def get_topic_lens(
             if key not in seen_limitations:
                 seen_limitations.add(key)
                 unresolved_limitations.append(lim)
-        unresolved_limitations = unresolved_limitations[: max(20, int(top_k))]
+        unresolved_limitations = _attach_limitation_contracts(unresolved_limitations[: max(20, int(top_k))])
 
         future_directions = []
         if _table_exists(conn, "future_directions"):

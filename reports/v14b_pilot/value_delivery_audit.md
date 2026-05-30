@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T15:53:42Z`
+- generated_at: `2026-05-30T16:00:27Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -234,6 +234,7 @@
   "online_readiness_contract": {
     "checks": {
       "api_exposes_topic_readiness": true,
+      "api_limitation_atoms_carry_contract": true,
       "api_topic_bottlenecks_use_resolution_evidence": true,
       "api_topic_branch_splits_inherit_lineage": true,
       "api_topic_validation_directions_inherit_claim_card_evidence": true,
@@ -241,6 +242,7 @@
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
       "topic_regression_uses_shared_contract": true,
+      "ui_renders_limitation_contracts": true,
       "ui_renders_topic_bottleneck_resolution_counts": true,
       "ui_renders_topic_dossier_branch_contracts": true,
       "ui_renders_topic_readiness": true,

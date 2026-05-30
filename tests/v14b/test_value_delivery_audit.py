@@ -132,6 +132,7 @@ def _write_product_sources(root: Path) -> None:
         "def _visual_node_role_contract(): return visual_node_role + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def get_visual_nodes(): return _visual_node_role_contract\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
+        "def _limitation_atom_contract(): return weak_bottleneck_hypothesis + section_limitation_context + claim_scope + evidence_grade + uncertainty_reasons\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
         "def _visual_edge_contract(): return visual_edge + claim_scope + evidence_grade + uncertainty_reasons\n"
@@ -148,6 +149,7 @@ def _write_product_sources(root: Path) -> None:
     web.mkdir(parents=True, exist_ok=True)
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
+        "function renderLimitations() { return lim.claim_scope + lim.evidence_grade + lim.uncertainty_reasons + renderEvidenceObjects(lim.evidence_objects); }\n"
         "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
@@ -415,9 +417,11 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_branch_splits_inherit_lineage"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_limitation_contracts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_validation_direction_evidence_objects"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
