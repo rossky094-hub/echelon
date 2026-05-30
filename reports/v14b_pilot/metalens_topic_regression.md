@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-30T20:28:06Z`
+- Audit: `2026-05-30T20:42:40Z`
 - Topic: `metalens`
 - Overall status: **fail**
 
@@ -13,8 +13,8 @@
 | expected bottlenecks evidenced | 6 | 6 | pass |
 | key turning papers | 13 | 5 | pass |
 | turning papers with access links | 13 | 5 | pass |
-| turning papers with primary sections | 9 | 3 | pass |
-| turning papers with strong/moderate section provenance | 2 | 3 | fail |
+| turning papers with primary sections | 3 | 3 | pass |
+| turning papers with strong/moderate section provenance | 1 | 3 | fail |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -28,8 +28,8 @@
 | Broadband achromatic correction | 3 | True | True | pass |
 | High-NA focusing performance | 3 | True | True | pass |
 | Tunable and multifunctional optics | 3 | True | True | pass |
-| Manufacturing scale-up | 3 | True | True | pass |
-| Computational compensation and inverse design | 3 | True | True | pass |
+| Manufacturing scale-up | 2 | True | True | pass |
+| Computational compensation and inverse design | 2 | True | True | pass |
 
 ## Expected Bottlenecks
 
@@ -38,13 +38,13 @@
 | efficiency | True | True | 4 | pass |
 | chromatic aberration | True | True | 3 | pass |
 | field of view | True | True | 5 | pass |
-| manufacturing consistency | True | True | 3 | pass |
-| system integration | True | True | 4 | pass |
-| cost | True | True | 3 | pass |
+| manufacturing consistency | True | True | 2 | pass |
+| system integration | True | True | 3 | pass |
+| cost | True | True | 2 | pass |
 
 ## Interpretation
 
-- Key turning papers: 13 total, 13 with access links, 9 with primary local sections, 2 with strong/moderate parser provenance.
+- Key turning papers: 13 total, 13 with access links, 3 with primary local sections, 1 with strong/moderate parser provenance.
 - Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
@@ -61,14 +61,15 @@
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | future_candidates_missing_claim_card |  | 85 | 4 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence |

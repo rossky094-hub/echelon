@@ -213,7 +213,15 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "step10_visual_graph_builder.py").write_text(
         '"candidate_edges": child_future\n'
         "Future candidate edges and unresolved limitation bottlenecks\n"
-        "future_candidate_edges + limitation_atoms\n",
+        "future_candidate_edges + limitation_atoms\n"
+        '"candidate_score" "raw_candidate_score" "calibrated_candidate_score" "candidate_score_semantics"\n',
+        encoding="utf-8",
+    )
+    (v14 / "future_candidate_lifecycle.py").write_text(
+        '"candidate_score": candidate_score\n'
+        '"raw_candidate_score": raw_candidate_score\n'
+        '"calibrated_candidate_score": calibrated_candidate_score\n'
+        "candidate_score={score:.3f}\n",
         encoding="utf-8",
     )
     (v14 / "topic_readiness.py").write_text(
@@ -533,6 +541,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert future_gate["checks"]["ui_future_calibration_copy_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["direction_readiness_report_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["step12_goal_alignment_report_uses_candidate_score_labels"] is True
+    assert future_gate["checks"]["future_lifecycle_uses_candidate_score_labels"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
     assert openalex_gate["status"] == "pass"
     assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
@@ -1223,6 +1232,25 @@ def test_future_growth_audit_rejects_api_future_evidence_legacy_score_labels(tmp
 
     assert result["status"] == "fail"
     assert result["checks"]["step6_future_evidence_avoids_prediction_copy"] is False
+
+
+def test_future_growth_audit_rejects_lifecycle_score_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "future_candidate_lifecycle_audit.md").write_text(
+        "- p1 -> p2: state=future_candidate_unfused, score=0.700, reason=Step5b candidate\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["future_lifecycle_uses_candidate_score_labels"] is False
 
 
 def test_future_growth_audit_rejects_prediction_report_filename(tmp_path):

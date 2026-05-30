@@ -1,13 +1,13 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-30T20:28:08Z`
+- Audit: `2026-05-30T20:42:42Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | metalens | fail | 1.00 | 13 | 5 | 5 | 5 | 0 |
-| metasurface holography | fail | 1.00 | 8 | 5 | 5 | 4 | 0 |
-| photonic crystal cavity | fail | 1.00 | 8 | 5 | 5 | 5 | 1 |
-| quantum light source | fail | 1.00 | 11 | 5 | 5 | 5 | 0 |
+| metasurface holography | warn | 1.00 | 8 | 5 | 5 | 5 | 0 |
+| photonic crystal cavity | fail | 1.00 | 9 | 5 | 5 | 5 | 0 |
+| quantum light source | fail | 1.00 | 10 | 5 | 5 | 5 | 0 |
 
 ## Product Gate
 
@@ -15,10 +15,9 @@ This suite prevents the Topic Dossier from being tuned only for Metalens. A topi
 
 ## Evidence Gap Summary
 
-- future_candidate_generation_missing: 1
-- future_candidates_missing_claim_card: 2
-- key_turning_paper_missing_primary_section: 18
-- key_turning_paper_weak_section_provenance: 9
+- future_candidates_missing_claim_card: 4
+- key_turning_paper_missing_primary_section: 33
+- key_turning_paper_weak_section_provenance: 3
 - missing_bottleneck_section_evidence: 2
 
 See `multi_topic_evidence_gap_queue.csv` for section/OpenAlex/frontfill targets.

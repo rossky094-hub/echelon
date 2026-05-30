@@ -1035,7 +1035,31 @@ def load_future_predictions(conn_v14: sqlite3.Connection) -> list[dict]:
             ORDER BY {order_expr}
             """
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for row in rows:
+            item = dict(row)
+            raw_candidate_score = item.pop("raw_predicted_prob", None)
+            if raw_candidate_score is None:
+                raw_candidate_score = item.pop("predicted_prob", None)
+            else:
+                item.pop("predicted_prob", None)
+            calibrated_candidate_score = item.pop("calibrated_prob", None)
+            candidate_score = item.pop("prediction_confidence", None)
+            if candidate_score is None:
+                candidate_score = calibrated_candidate_score
+            if candidate_score is None:
+                candidate_score = raw_candidate_score
+            item["candidate_score"] = float(candidate_score or 0.0)
+            item["raw_candidate_score"] = (
+                float(raw_candidate_score) if raw_candidate_score is not None else None
+            )
+            item["calibrated_candidate_score"] = (
+                float(calibrated_candidate_score)
+                if calibrated_candidate_score is not None
+                else None
+            )
+            out.append(item)
+        return out
     except sqlite3.OperationalError:
         return []
 
@@ -1419,8 +1443,13 @@ def write_visual_edges(
     for pred in future_predictions:
         src = pred["src_paper_id"]
         dst = pred["dst_paper_id"]
-        calibrated = float(pred.get("calibrated_prob") or pred.get("predicted_prob") or 0.0)
-        confidence = float(pred.get("prediction_confidence") or calibrated)
+        calibrated = float(
+            pred.get("calibrated_candidate_score")
+            or pred.get("candidate_score")
+            or pred.get("raw_candidate_score")
+            or 0.0
+        )
+        confidence = float(pred.get("candidate_score") or calibrated)
         lifecycle_state = pred.get("lifecycle_state") or "future_candidate_unassessed"
         radar_eligible = int(pred.get("radar_eligible") or 0)
         missing_gates = jloads(pred.get("missing_gates_json"), [])
@@ -1448,14 +1477,14 @@ def write_visual_edges(
                     "missing_gates": missing_gates,
                     "missing_high_confidence_gates": missing_high_confidence,
                     "uncertainty_reasons": uncertainty,
-                    "why": "Calibrated VGAE/temporal prediction candidate",
+                    "why": "Calibrated GNN/VGAE future candidate",
                     "product_rule": (
                         "Future edge is an inspection candidate until Step6 fusion and "
                         "Step13 Claim Card gates promote it."
                     ),
-                    "confidence_semantics": (
-                        "visual confidence is calibrated empirical product confidence, "
-                        "not a guaranteed future citation probability"
+                    "candidate_score_semantics": (
+                        "candidate_score is a calibrated ranking score when available, "
+                        "not validation confidence or a guaranteed future citation probability"
                     ),
                 }),
             )
@@ -1746,7 +1775,7 @@ def write_recommendations(
 ) -> None:
     future_score = Counter()
     for pred in future_predictions:
-        prob = float(pred.get("predicted_prob") or 0)
+        prob = float(pred.get("candidate_score") or pred.get("raw_candidate_score") or 0)
         future_score[pred["src_paper_id"]] += prob * 0.5
         future_score[pred["dst_paper_id"]] += prob
 

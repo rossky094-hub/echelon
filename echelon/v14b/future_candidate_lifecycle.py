@@ -235,9 +235,16 @@ def load_future_candidates(conn_v14: sqlite3.Connection) -> list[dict[str, Any]]
     if not table_exists(conn_v14, "predicted_future_edges"):
         return []
     cols = columns(conn_v14, "predicted_future_edges")
-    score_sql = "predicted_prob" if "predicted_prob" in cols else "1.0 AS predicted_prob"
-    calibrated_sql = "calibrated_prob" if "calibrated_prob" in cols else "NULL AS calibrated_prob"
-    confidence_sql = "prediction_confidence" if "prediction_confidence" in cols else "NULL AS prediction_confidence"
+    raw_score_expr = "predicted_prob" if "predicted_prob" in cols else "1.0"
+    calibrated_expr = "calibrated_prob" if "calibrated_prob" in cols else "NULL"
+    candidate_terms = []
+    if "prediction_confidence" in cols:
+        candidate_terms.append("prediction_confidence")
+    if "calibrated_prob" in cols:
+        candidate_terms.append("calibrated_prob")
+    if "predicted_prob" in cols:
+        candidate_terms.append("predicted_prob")
+    candidate_score_expr = f"COALESCE({', '.join(candidate_terms)}, 0)" if candidate_terms else "0"
     label_sql = "calibration_label" if "calibration_label" in cols else "NULL AS calibration_label"
     method_sql = "calibration_method" if "calibration_method" in cols else "NULL AS calibration_method"
     order_sql = (
@@ -247,8 +254,11 @@ def load_future_candidates(conn_v14: sqlite3.Connection) -> list[dict[str, Any]]
     )
     rows = conn_v14.execute(
         f"""
-        SELECT src_paper_id, dst_paper_id, {score_sql},
-               {calibrated_sql}, {confidence_sql}, {label_sql}, {method_sql}
+        SELECT src_paper_id, dst_paper_id,
+               {candidate_score_expr} AS candidate_score,
+               {raw_score_expr} AS raw_candidate_score,
+               {calibrated_expr} AS calibrated_candidate_score,
+               {label_sql}, {method_sql}
         FROM predicted_future_edges
         ORDER BY {order_sql}
         """
@@ -341,6 +351,21 @@ def build_lifecycle_rows(
     rows: list[dict[str, Any]] = []
     global_uncertainty = list(context.get("global_uncertainty_reasons") or [])
     for candidate in candidates:
+        raw_candidate_score = float(candidate.get("raw_candidate_score") or 0.0)
+        calibrated_candidate_score = (
+            float(candidate.get("calibrated_candidate_score"))
+            if candidate.get("calibrated_candidate_score") is not None
+            else None
+        )
+        candidate_score = float(
+            candidate.get("candidate_score")
+            if candidate.get("candidate_score") is not None
+            else (
+                calibrated_candidate_score
+                if calibrated_candidate_score is not None
+                else raw_candidate_score
+            )
+        )
         direction = _direction_for_candidate(candidate, directions_by_edge, directions_by_id)
         direction_id = int(direction.get("direction_id") or 0) if direction else None
         card = claim_cards.get(direction_id or -1) if direction_id else None
@@ -393,17 +418,9 @@ def build_lifecycle_rows(
                 "claim_card_id": card.get("claim_card_id") if card else None,
                 "radar_eligible": radar_eligible,
                 "candidate_pool_reason": candidate_reason,
-                "model_score": float(candidate.get("predicted_prob") or 0.0),
-                "calibrated_prob": (
-                    float(candidate.get("calibrated_prob"))
-                    if candidate.get("calibrated_prob") is not None
-                    else None
-                ),
-                "prediction_confidence": (
-                    float(candidate.get("prediction_confidence"))
-                    if candidate.get("prediction_confidence") is not None
-                    else None
-                ),
+                "candidate_score": candidate_score,
+                "raw_candidate_score": raw_candidate_score,
+                "calibrated_candidate_score": calibrated_candidate_score,
                 "calibration_label": candidate.get("calibration_label"),
                 "calibration_status": calibration_status,
                 "evidence_tier": direction.get("evidence_tier") if direction else None,
@@ -431,8 +448,8 @@ def write_lifecycle_rows(conn_v14: sqlite3.Connection, rows: list[dict[str, Any]
                 missing_high_confidence_gates_json, uncertainty_reasons_json
             ) VALUES (
                 :src_paper_id, :dst_paper_id, :lifecycle_state, :direction_id, :claim_card_id,
-                :radar_eligible, :candidate_pool_reason, :model_score, :calibrated_prob,
-                :prediction_confidence, :calibration_label, :calibration_status,
+                :radar_eligible, :candidate_pool_reason, :raw_candidate_score, :calibrated_candidate_score,
+                :candidate_score, :calibration_label, :calibration_status,
                 :evidence_tier, :claim_scope, :evidence_grade, :missing_gates_json,
                 :missing_high_confidence_gates_json, :uncertainty_reasons_json
             )
@@ -504,11 +521,11 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
     lines.extend(["", "## Top Candidate Pool Samples", ""])
     for row in rows[:12]:
         lines.append(
-            "- {src} -> {dst}: state={state}, score={score:.3f}, reason={reason}".format(
+            "- {src} -> {dst}: state={state}, candidate_score={score:.3f}, reason={reason}".format(
                 src=row.get("src_paper_id"),
                 dst=row.get("dst_paper_id"),
                 state=row.get("lifecycle_state"),
-                score=float(row.get("prediction_confidence") or row.get("model_score") or 0.0),
+                score=float(row.get("candidate_score") or 0.0),
                 reason=row.get("candidate_pool_reason"),
             )
         )
@@ -519,7 +536,8 @@ def render_markdown(summary: dict[str, Any], rows: list[dict[str, Any]]) -> str:
             "",
             "Future candidates are inspection targets.  Even when an edge is covered by a complete "
             "Step13 card, Radar must show the Claim Card/direction, not the raw edge row.  "
-            "The edge table feeds Future/Bottleneck evidence views and the candidate pool only.",
+            "The edge table feeds Future/Bottleneck evidence views and the candidate pool only.  "
+            "`candidate_score` is a ranking score, not validation confidence or a conclusion probability.",
         ]
     )
     return "\n".join(lines) + "\n"

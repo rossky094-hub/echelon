@@ -484,6 +484,7 @@ def audit_future_growth(
     config_path = root / "echelon/v14b/config.py"
     step6_path = root / "echelon/v14b/step6_fusion.py"
     step10_path = root / "echelon/v14b/step10_visual_graph_builder.py"
+    lifecycle_path = root / "echelon/v14b/future_candidate_lifecycle.py"
     topic_regression_path = root / "echelon/v14b/topic_regression.py"
     product_baseline_path = root / "echelon/v14b/product_baseline.py"
     direction_readiness_path = root / "echelon/v14b/direction_readiness_audit.py"
@@ -511,6 +512,12 @@ def audit_future_growth(
     future_report_text = (
         future_report_path.read_text(encoding="utf-8")
         if future_report_path.exists()
+        else ""
+    )
+    lifecycle_report_path = direction_report_base / "future_candidate_lifecycle_audit.md"
+    lifecycle_report_text = (
+        lifecycle_report_path.read_text(encoding="utf-8")
+        if lifecycle_report_path.exists()
         else ""
     )
     api_path = root / "echelon/api/graph_visual_backend.py"
@@ -743,6 +750,33 @@ def audit_future_growth(
             )
             and _source_absent(topic_regression_path, ('future_growth.get("predicted_edges")',))
             and _source_absent(product_baseline_path, ('future_growth.get("predicted_edges")',))
+        ),
+        "future_lifecycle_uses_candidate_score_labels": (
+            _source_contains(
+                lifecycle_path,
+                (
+                    '"candidate_score": candidate_score',
+                    '"raw_candidate_score": raw_candidate_score',
+                    '"calibrated_candidate_score": calibrated_candidate_score',
+                    "candidate_score={score:.3f}",
+                ),
+            )
+            and _source_contains(
+                step10_path,
+                (
+                    '"candidate_score"',
+                    '"raw_candidate_score"',
+                    '"calibrated_candidate_score"',
+                    '"candidate_score_semantics"',
+                ),
+            )
+            and (
+                not lifecycle_report_text
+                or (
+                    "candidate_score=" in lifecycle_report_text
+                    and ", score=" not in lifecycle_report_text
+                )
+            )
         ),
     }
     if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):

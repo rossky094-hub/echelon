@@ -149,6 +149,17 @@ def test_future_candidate_lifecycle_marks_unfused_candidates_candidate_pool_only
     assert result["summary"]["context"]["calibration_audits"] == 0
     assert result["summary"]["context"]["edge_calibrated_candidates"] == 1
     assert result["summary"]["context"]["edge_calibration_rate"] == 1.0
+    payload = json.loads((tmp_path / "reports" / "future_candidate_lifecycle_audit.json").read_text())
+    row_payload = payload["rows"][0]
+    assert row_payload["candidate_score"] == 0.7
+    assert row_payload["raw_candidate_score"] == 0.9
+    assert row_payload["calibrated_candidate_score"] == 0.8
+    assert "model_score" not in row_payload
+    assert "calibrated_prob" not in row_payload
+    assert "prediction_confidence" not in row_payload
+    report = (tmp_path / "reports" / "future_candidate_lifecycle_audit.md").read_text()
+    assert "candidate_score=0.700" in report
+    assert ", score=0.700" not in report
     conn = sqlite3.connect(str(v14))
     row = conn.execute("SELECT lifecycle_state, radar_eligible FROM future_candidate_lifecycle").fetchone()
     conn.close()
@@ -188,6 +199,12 @@ def test_visual_future_predictions_include_lifecycle_metadata(tmp_path):
 
     assert rows[0]["lifecycle_state"] == "future_candidate_unfused"
     assert rows[0]["radar_eligible"] == 0
+    assert rows[0]["candidate_score"] == 0.7
+    assert rows[0]["raw_candidate_score"] == 0.9
+    assert rows[0]["calibrated_candidate_score"] == 0.8
+    assert "predicted_prob" not in rows[0]
+    assert "calibrated_prob" not in rows[0]
+    assert "prediction_confidence" not in rows[0]
     assert "Step13 Claim Card" in json.loads(rows[0]["missing_gates_json"])
 
 

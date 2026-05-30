@@ -1,42 +1,41 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T20:28:10Z`
+- audit_ts: `2026-05-30T20:42:44Z`
 - current top_n budget: `12000`
-- high-value papers considered: `12,777`
-- next delta queue needing primary section/action: `5,989`
-- multi-topic evidence-gap rows merged: `32` (46 papers)
-- topic evidence-gap delta queue: `20` papers
+- high-value papers considered: `12,797`
+- next delta queue needing primary section/action: `6,057`
+- multi-topic evidence-gap rows merged: `42` (55 papers)
+- topic evidence-gap delta queue: `41` papers
 
 ## Failure / Retry Classes
 
 | retry_class | count |
 |---|---:|
-| not_attempted_pdf_available | 5,923 |
-| no_target_sections | 4,205 |
-| covered | 2,603 |
-| retryable_pdf_failure | 45 |
+| not_attempted_pdf_available | 5,990 |
+| no_target_sections | 4,182 |
+| covered | 2,582 |
+| retryable_pdf_failure | 42 |
 | parser_failure | 1 |
 
 ## Category Coverage
 
 | category | total | in topN | any section | primary section | eligible PDF |
 |---|---:|---:|---:|---:|---:|
-| active_learning_uncertainty_hotspot | 3,000 | 647 | 363 | 363 | 3,000 |
-| branch_split_driver | 1,970 | 1,970 | 964 | 964 | 1,970 |
-| cluster_representative | 5,958 | 5,331 | 699 | 699 | 5,958 |
+| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 3,000 |
+| branch_split_driver | 2,007 | 2,007 | 944 | 944 | 2,007 |
+| cluster_representative | 5,946 | 5,322 | 698 | 698 | 5,946 |
 | future_endpoint | 291 | 291 | 109 | 109 | 291 |
 | limitation_evidence | 268 | 268 | 268 | 268 | 268 |
 | main_path_node | 1,101 | 1,101 | 230 | 230 | 1,101 |
-| resolution_evidence | 464 | 207 | 170 | 170 | 464 |
-| top_keystone | 1,000 | 1,000 | 380 | 380 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 464 |
+| top_keystone | 1,000 | 1,000 | 388 | 388 | 1,000 |
 | topic:metalens | 257 | 86 | 91 | 91 | 257 |
-| topic:metasurface holography | 18 | 5 | 4 | 4 | 18 |
-| topic:photonic crystal cavity | 135 | 33 | 10 | 10 | 135 |
-| topic:quantum light source | 226 | 73 | 41 | 41 | 226 |
-| topic_evidence_gap | 8 | 2 | 3 | 3 | 8 |
-| topic_gap_bottleneck_evidence | 9 | 1 | 5 | 5 | 9 |
+| topic:metasurface holography | 20 | 9 | 5 | 5 | 20 |
+| topic:photonic crystal cavity | 151 | 46 | 19 | 19 | 151 |
+| topic:quantum light source | 234 | 80 | 40 | 40 | 234 |
+| topic_gap_bottleneck_evidence | 11 | 1 | 0 | 0 | 11 |
 | topic_gap_claim_card_inputs | 14 | 14 | 11 | 11 | 14 |
-| topic_gap_key_turning_section | 26 | 13 | 9 | 9 | 26 |
+| topic_gap_key_turning_section | 35 | 20 | 3 | 3 | 35 |
 
 ## Why This Matters
 
