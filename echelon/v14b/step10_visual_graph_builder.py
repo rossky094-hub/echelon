@@ -858,7 +858,7 @@ def build_branch_lineages(
     papers: list[dict],
     assignment: dict[str, str],
     citation_edges: list[tuple[str, str]],
-    predicted_future: list[dict],
+    future_candidates: list[dict],
 ) -> list[dict]:
     by_id = {p["id"]: p for p in papers}
     influence: Counter[tuple[str, str]] = Counter()
@@ -881,10 +881,10 @@ def build_branch_lineages(
         incoming_totals[child] += w
 
     child_future: dict[str, list[dict]] = defaultdict(list)
-    for pred in predicted_future:
-        cid = assignment.get(pred.get("dst_paper_id")) or assignment.get(pred.get("src_paper_id"))
+    for edge in future_candidates:
+        cid = assignment.get(edge.get("dst_paper_id")) or assignment.get(edge.get("src_paper_id"))
         if cid:
-            child_future[cid].append(pred)
+            child_future[cid].append(edge)
 
     all_clusters = set(assignment.values())
     records = []
@@ -970,10 +970,10 @@ def build_branch_lineages(
                 ),
                 "future_json": jdumps(
                     {
-                        "predicted_edges": child_future.get(cid, [])[:20],
+                        "candidate_edges": child_future.get(cid, [])[:20],
                         "interpretation": (
                             "Future growth candidates from calibrated VGAE and fusion evidence. "
-                            "Use prediction_confidence/evidence_tier before making claims."
+                            "Use candidate_score, calibration status, and evidence_tier before making claims."
                         ),
                     }
                 ),
@@ -1605,11 +1605,11 @@ def write_story_steps(
             year_max,
             year_max + 5,
             "Future growth candidates",
-            "Predicted growth arcs and unresolved limitation bottlenecks that may shape next branches.",
+            "Future candidate edges and unresolved limitation bottlenecks that may shape next branches.",
             None,
             "[]",
             jdumps({
-                "source": "predicted_future_edges + limitation_atoms + future_directions + direction_claim_cards",
+                "source": "future_candidate_edges + limitation_atoms + future_directions + direction_claim_cards",
                 "claim_cards_count": int(claim_cards_count),
             }),
         )

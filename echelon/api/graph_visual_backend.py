@@ -3387,7 +3387,13 @@ def _story_focus_paper_object(paper: Any) -> dict[str, Any] | None:
 def _story_step_contract(item: dict[str, Any]) -> dict[str, Any]:
     evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
     step_id = str(item.get("story_step_id") or "")
-    is_future = step_id.endswith(":future") or "future" in step_id or "predicted_future_edges" in str(evidence.get("source") or "")
+    evidence_source = str(evidence.get("source") or "")
+    is_future = (
+        step_id.endswith(":future")
+        or "future" in step_id
+        or "future_candidate_edges" in evidence_source
+        or "predicted_future_edges" in evidence_source
+    )
     if is_future:
         claim_scope = "candidate_pool_only"
         evidence_grade = "future_candidate_story_context"

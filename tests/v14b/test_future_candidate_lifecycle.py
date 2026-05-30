@@ -191,6 +191,35 @@ def test_visual_future_predictions_include_lifecycle_metadata(tmp_path):
     assert "Step13 Claim Card" in json.loads(rows[0]["missing_gates_json"])
 
 
+def test_branch_lineage_future_json_uses_candidate_edges_contract():
+    from echelon.v14b.step10_visual_graph_builder import build_branch_lineages
+
+    papers = [
+        {"id": "p0", "year": 2018},
+        {"id": "p1", "year": 2021},
+        {"id": "p2", "year": 2024},
+    ]
+    assignment = {"p0": "C0000", "p1": "C0001", "p2": "C0001"}
+    rows = build_branch_lineages(
+        papers,
+        assignment,
+        citation_edges=[("p0", "p1"), ("p0", "p2")],
+        future_candidates=[
+            {
+                "src_paper_id": "p1",
+                "dst_paper_id": "p2",
+                "candidate_score": 0.72,
+                "calibration_label": "calibrated_temporal_holdout",
+            }
+        ],
+    )
+
+    future_payloads = [json.loads(row["future_json"]) for row in rows]
+    assert any(payload.get("candidate_edges") for payload in future_payloads)
+    assert all("predicted_edges" not in payload for payload in future_payloads)
+    assert any("candidate_score" in payload.get("interpretation", "") for payload in future_payloads)
+
+
 def test_future_edge_calibration_context_distinguishes_edge_and_run_audit(tmp_path):
     v14 = tmp_path / "v14.sqlite3"
     _make_v14_unfused(v14)

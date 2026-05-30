@@ -296,10 +296,10 @@ def _make_visual_db(path):
             (story_step_id, order_idx, year_start, year_end, title, narrative,
              focus_cluster_id, focus_papers_json, evidence_json)
         VALUES ('story:future', 2, 2024, 2029, 'Future growth candidates',
-                'Predicted growth arcs and unresolved limitations.', NULL, '[]', ?)
+                'Future candidate edges and unresolved limitations.', NULL, '[]', ?)
         """,
         (
-            json.dumps({"source": "predicted_future_edges + limitation_atoms + direction_claim_cards"}),
+            json.dumps({"source": "future_candidate_edges + limitation_atoms + direction_claim_cards"}),
         ),
     )
     conn.execute(

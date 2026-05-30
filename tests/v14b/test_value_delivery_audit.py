@@ -186,7 +186,18 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "topic_regression.py").write_text(
         'BENCHMARK_TOPICS = {}\n'
         'def configure_parser(parser): parser.add_argument("--topic", default="all")\n'
+        'def _future_edges(lens): return lens.get("future_growth", {}).get("candidate_edges") or []\n'
         "def run_topic_readiness_preflight():\n    return build_topic_readiness_preflight\n",
+        encoding="utf-8",
+    )
+    (v14 / "product_baseline.py").write_text(
+        'def evaluate_topic_lens(topic, lens): return lens.get("future_growth", {}).get("candidate_edges") or []\n',
+        encoding="utf-8",
+    )
+    (v14 / "step10_visual_graph_builder.py").write_text(
+        '"candidate_edges": child_future\n'
+        "Future candidate edges and unresolved limitation bottlenecks\n"
+        "future_candidate_edges + limitation_atoms\n",
         encoding="utf-8",
     )
     (v14 / "topic_readiness.py").write_text(
@@ -1141,6 +1152,25 @@ def test_future_growth_audit_rejects_radar_probability_copy_in_current_docs(tmp_
 
     assert result["status"] == "fail"
     assert result["checks"]["current_docs_label_future_edges_as_candidates"] is False
+
+
+def test_future_growth_audit_rejects_builder_predicted_edges_contract(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    builder_path = tmp_path / "echelon/v14b/step10_visual_graph_builder.py"
+    builder_path.write_text(
+        '"predicted_edges": child_future\n'
+        "Predicted growth arcs and unresolved limitations\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["topic_dossier_builders_use_candidate_edges_contract"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):

@@ -476,6 +476,9 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
     step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
     config_path = root / "echelon/v14b/config.py"
     step6_path = root / "echelon/v14b/step6_fusion.py"
+    step10_path = root / "echelon/v14b/step10_visual_graph_builder.py"
+    topic_regression_path = root / "echelon/v14b/topic_regression.py"
+    product_baseline_path = root / "echelon/v14b/product_baseline.py"
     api_path = root / "echelon/api/graph_visual_backend.py"
     app_path = root / "web/visual-graph/app.js"
     current_future_docs = (
@@ -547,6 +550,25 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                     "GNN/VGAE 预测了可能连接",
                 ),
             )
+        ),
+        "topic_dossier_builders_use_candidate_edges_contract": (
+            _source_contains(
+                step10_path,
+                (
+                    '"candidate_edges": child_future',
+                    "Future candidate edges and unresolved limitation bottlenecks",
+                    "future_candidate_edges + limitation_atoms",
+                ),
+            )
+            and _source_absent(
+                step10_path,
+                (
+                    '"predicted_edges": child_future',
+                    "Predicted growth arcs",
+                ),
+            )
+            and _source_absent(topic_regression_path, ('future_growth.get("predicted_edges")',))
+            and _source_absent(product_baseline_path, ('future_growth.get("predicted_edges")',))
         ),
     }
     if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):

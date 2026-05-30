@@ -501,9 +501,7 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     history = lens.get("history_main_path") or {}
     turning = history.get("key_turning_papers") or []
     future_growth = lens.get("future_growth") or {}
-    future = future_growth.get("candidate_edges")
-    if future is None:
-        future = future_growth.get("predicted_edges") or []
+    future = future_growth.get("candidate_edges") or []
     radar = lens.get("rd_radar") or {}
     claim_cards = radar.get("claim_cards") or []
 

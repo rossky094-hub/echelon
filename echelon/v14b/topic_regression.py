@@ -332,9 +332,7 @@ def _turning_papers(lens: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _future_edges(lens: dict[str, Any]) -> list[dict[str, Any]]:
     future_growth = lens.get("future_growth") or {}
-    edges = future_growth.get("candidate_edges")
-    if edges is None:
-        edges = future_growth.get("predicted_edges") or []
+    edges = future_growth.get("candidate_edges") or []
     return [
         e for e in (edges or [])
         if isinstance(e, dict)
