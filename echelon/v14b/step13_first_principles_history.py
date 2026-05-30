@@ -758,6 +758,10 @@ def minimal_experiment_template(
                 "Measured constraint margin improves >=20% vs baseline",
                 "Performance gain remains stable across 3 repeated runs",
             ],
+            "falsification_conditions": [
+                "Improvement is below 10% vs baseline",
+                "Repeated runs show unstable or reversed gains",
+            ],
         }
     if root_type == "data":
         return {
@@ -767,6 +771,10 @@ def minimal_experiment_template(
             "success_criteria": [
                 "Out-of-distribution failure rate drops >=15%",
                 "No significant regression on in-distribution benchmark",
+            ],
+            "falsification_conditions": [
+                "Out-of-distribution failure rate drops <5%",
+                "In-distribution benchmark regresses by more than 5%",
             ],
         }
     if root_type == "cost":
@@ -778,6 +786,10 @@ def minimal_experiment_template(
                 "Cost/latency improves >=20%",
                 "Quality metrics stay within 5% of baseline",
             ],
+            "falsification_conditions": [
+                "Cost/latency improvement is below 10%",
+                "Quality metrics degrade by more than 5%",
+            ],
         }
     return {
         "experiment": f"Implement minimal system refactor targeting `{kw}` and benchmark integration overhead.",
@@ -786,6 +798,10 @@ def minimal_experiment_template(
         "success_criteria": [
             "Integration complexity (time or lines touched) reduced >=20%",
             "Core task performance no worse than baseline",
+        ],
+        "falsification_conditions": [
+            "Integration complexity is not measurably reduced",
+            "Core task performance drops below baseline",
         ],
     }
 
@@ -796,7 +812,7 @@ def _claim_gate_labels(gates: dict[str, bool]) -> list[str]:
         "past_attempts_10y": "historical attempts and failure evidence",
         "new_enablers": "new enabling condition",
         "unresolved_bottleneck": "unresolved bottleneck evidence",
-        "minimal_validation_experiment": "minimal validation experiment",
+        "minimal_validation_experiment": "minimal validation experiment with success and falsification criteria",
     }
     return [labels.get(k, k) for k, ok in gates.items() if not ok]
 
@@ -1428,6 +1444,7 @@ def build_direction_claim_cards(
             and minimal_experiment.get("cost_level")
             and minimal_experiment.get("cycle_weeks")
             and minimal_experiment.get("success_criteria")
+            and minimal_experiment.get("falsification_conditions")
         )
         five_question_gates = {
             "root_constraint": q1,

@@ -105,6 +105,14 @@ def _loads(raw: Any, default: Any) -> Any:
         return default
 
 
+def _text_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
 def _elapsed_ms(start: float) -> int:
     return max(0, int((time.perf_counter() - start) * 1000))
 
@@ -4400,7 +4408,9 @@ def get_topic_lens(
                 "answer": (
                     f"{experiment.get('experiment', 'N/A')} "
                     f"(cost={experiment.get('cost_level', 'N/A')}, "
-                    f"cycle_weeks={experiment.get('cycle_weeks', 'N/A')})"
+                    f"cycle_weeks={experiment.get('cycle_weeks', 'N/A')}; "
+                    f"success={'; '.join(_text_list(experiment.get('success_criteria'))) or 'N/A'}; "
+                    f"falsify={'; '.join(_text_list(experiment.get('falsification_conditions'))) or 'N/A'})"
                 ),
             },
         ]

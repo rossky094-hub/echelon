@@ -89,8 +89,17 @@ def _make_v14(path: Path) -> None:
     )
     conn.execute("INSERT INTO predicted_future_edges VALUES ('p1', 'p2')")
     conn.execute("INSERT INTO vgae_calibration_audit VALUES ('rolling')")
+    minimal_experiment = json.dumps(
+        {
+            "experiment": "Run an A/B validation experiment.",
+            "cost_level": "low",
+            "cycle_weeks": 2,
+            "success_criteria": ["metric improves"],
+            "falsification_conditions": ["metric does not improve"],
+        }
+    )
     conn.execute("INSERT INTO direction_claim_cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                 ("cc1", 1, "d", "{}", "[]", "{}", "{}", "{}", "moderate", "exploratory", 1, 0, "{}"))
+                 ("cc1", 1, "d", "{}", "[]", "{}", "{}", minimal_experiment, "moderate", "exploratory", 1, 0, "{}"))
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute("INSERT INTO visual_edges VALUES ('future')")
     conn.execute(
@@ -126,7 +135,7 @@ def _write_product_sources(root: Path) -> None:
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return split.claim_scope + split.evidence_grade + split.uncertainty_reasons; }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
-        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + 'Claim Card uncertainty No complete Claim Cards yet Future candidate generator pool'; }\n"
+        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
@@ -168,7 +177,7 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "step13_first_principles_history.py").write_text(
-        "默认不调用外部 LLM 已入库证据可重跑 section_evidence_strong section_provenance_ready missing_high_confidence_gates\n",
+        "默认不调用外部 LLM 已入库证据可重跑 section_evidence_strong section_provenance_ready missing_high_confidence_gates success_criteria falsification_conditions minimal validation experiment with success and falsification criteria\n",
         encoding="utf-8",
     )
     (v14 / "step9_report.py").write_text(
@@ -353,6 +362,11 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert len(result["gates"]) == 14
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
     assert any(g["issue"] == "Multi-topic Regression" and g["status"] == "pass" for g in result["gates"])
+    claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
+    assert claim_card_gate["status"] == "pass"
+    assert claim_card_gate["checks"]["complete_cards_have_falsifiable_validation_experiment"] is True
+    assert claim_card_gate["checks"]["step13_requires_success_and_falsification"] is True
+    assert claim_card_gate["checks"]["ui_renders_success_and_falsification"] is True
     topic_gate = next(g for g in result["gates"] if g["issue"] == "Topic Dossier Product Value")
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True

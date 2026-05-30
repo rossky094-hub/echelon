@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T14:17:08Z`
+- generated_at: `2026-05-30T14:25:29Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -12,7 +12,7 @@
 | 2 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
 | 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such. |
 | 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
-| 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. |
+| 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions. |
 | 6 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
 | 7 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
 | 8 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2588,
+    "primary_section_papers": 2591,
     "section_frontfill_no_evidence_delta": -31,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 351,
+        "strong": 354,
         "weak": 2237
       },
-      "primary_section_papers": 2588,
-      "primary_section_rows": 4513,
+      "primary_section_papers": 2591,
+      "primary_section_rows": 4517,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 421,
-        "heading_continuation": 608,
+        "explicit_heading": 425,
+        "heading_continuation": 612,
         "inline_heading": 219,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 10,
         "parser_hint": 7
       },
-      "strong_or_moderate_papers": 351,
+      "strong_or_moderate_papers": 354,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8643740340030912
+      "weak_only_rate": 0.8633732149749132
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -156,11 +156,19 @@
 {
   "bad_high_confidence_cards": 0,
   "cards": 5,
+  "checks": {
+    "complete_cards_have_falsifiable_validation_experiment": true,
+    "no_high_confidence_without_complete_card": true,
+    "required_columns_present": true,
+    "step13_requires_success_and_falsification": true,
+    "ui_renders_success_and_falsification": true
+  },
   "complete_cards": 1,
   "high_confidence_cards": 0,
+  "invalid_minimal_validation_experiments": [],
   "issue": "Claim Card Engine",
   "missing_columns": [],
-  "policy": "A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar.",
+  "policy": "A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions.",
   "status": "pass"
 }
 ```

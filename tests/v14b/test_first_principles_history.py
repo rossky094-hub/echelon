@@ -164,6 +164,9 @@ def test_step13_complete_exploratory_card_is_not_high_confidence():
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
+    experiment = json.loads(cards[0]["minimal_validation_experiment_json"])
+    assert experiment["success_criteria"]
+    assert experiment["falsification_conditions"]
     assert "triangulated Step6 fusion evidence" in gate["missing_high_confidence_gates"]
     assert updates[0]["high_confidence_eligible"] == 0
 

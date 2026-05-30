@@ -382,7 +382,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
-def audit_claim_card_engine(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     required_cols = {
         "root_constraint_json",
         "attempts_last_10y_json",
@@ -411,7 +411,49 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection) -> dict[str, Any]:
         )
         or 0
     )
-    if not required_cols.issubset(cols) or bad_high > 0:
+    invalid_experiments: list[str] = []
+    if required_cols.issubset(cols):
+        rows = conn_v14.execute(
+            """
+            SELECT claim_card_id, minimal_validation_experiment_json
+            FROM direction_claim_cards
+            WHERE five_question_complete=1
+            LIMIT 50
+            """
+        ).fetchall()
+        for row in rows:
+            experiment = _loads(row[1], {})
+            if not (
+                isinstance(experiment, dict)
+                and experiment.get("experiment")
+                and experiment.get("cost_level")
+                and experiment.get("cycle_weeks")
+                and experiment.get("success_criteria")
+                and experiment.get("falsification_conditions")
+            ):
+                invalid_experiments.append(str(row[0]))
+    source_checks = {
+        "step13_requires_success_and_falsification": False,
+        "ui_renders_success_and_falsification": False,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "step13_requires_success_and_falsification": _source_contains(
+                repo_root / "echelon/v14b/step13_first_principles_history.py",
+                ("success_criteria", "falsification_conditions", "minimal validation experiment with success and falsification criteria"),
+            ),
+            "ui_renders_success_and_falsification": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("Success criteria", "Falsification", "experiment.falsification_conditions"),
+            ),
+        }
+    checks = {
+        "required_columns_present": required_cols.issubset(cols),
+        "no_high_confidence_without_complete_card": bad_high == 0,
+        "complete_cards_have_falsifiable_validation_experiment": not invalid_experiments,
+        **source_checks,
+    }
+    if not all(checks.values()):
         status = "fail"
     elif total == 0:
         status = "warn"
@@ -424,8 +466,13 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection) -> dict[str, Any]:
         "complete_cards": complete,
         "high_confidence_cards": high,
         "bad_high_confidence_cards": bad_high,
+        "invalid_minimal_validation_experiments": invalid_experiments,
+        "checks": checks,
         "missing_columns": sorted(required_cols - cols),
-        "policy": "A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar.",
+        "policy": (
+            "A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. "
+            "The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions."
+        ),
     }
 
 
@@ -1441,7 +1488,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_bottleneck_lineage(conn_v14),
             audit_branch_lineage(conn_v14),
             audit_future_growth(conn_v14),
-            audit_claim_card_engine(conn_v14),
+            audit_claim_card_engine(conn_v14, repo_root),
             audit_claim_card_high_confidence_evidence_contract(conn_v14, repo_root),
             audit_llm_evidence_boundary(conn_v14, repo_root),
             audit_topic_dossier(conn_v14, repo_root),

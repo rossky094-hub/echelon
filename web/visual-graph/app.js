@@ -1281,6 +1281,7 @@ function renderDossierRadar(radar = {}) {
             <span class="pill">${esc(item.evidence_grade || "claim-card evidence unknown")}</span>
           </div>
           <p>${esc(item.plain_language || "")}</p>
+          ${item.claim_card ? renderClaimCard({ claim_card: item.claim_card }) : ""}
           ${(item.missing_gates || []).length ? `<p class="mini">五问缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
           ${(item.missing_high_confidence_gates || []).length ? `<p class="mini">高置信缺口：${item.missing_high_confidence_gates.map(esc).join(" / ")}</p>` : ""}
           ${(item.uncertainty_reasons || []).length ? `
@@ -1505,6 +1506,8 @@ function renderClaimCard(direction) {
   const experiment = card.minimal_validation_experiment || {};
   const attemptText = attempts.slice(0, 3).map((x) => `${x.year || "?"}: ${x.keyword || x.attempt || "attempt"}`).join("; ");
   const bottleneckItems = asArray(bottleneck.items).map((x) => x.keyword || x.description).filter(Boolean).slice(0, 3).join("; ");
+  const successCriteria = asArray(experiment.success_criteria).slice(0, 2).join("; ");
+  const falsification = asArray(experiment.falsification_conditions).slice(0, 2).join("; ");
   return `
     <div class="claim-grid">
       <div class="claim"><strong>Root constraint</strong><p>${esc(root.constraint || root.type || "N/A")}</p></div>
@@ -1512,6 +1515,8 @@ function renderClaimCard(direction) {
       <div class="claim"><strong>New enablers</strong><p>${esc(asArray(enabling.new_enablers).join("; ") || "N/A")}</p></div>
       <div class="claim"><strong>Open bottleneck</strong><p>${esc(bottleneckItems || bottleneck.keyword || "N/A")} <small>${esc(card.evidence_strength_level || "unknown")}</small></p></div>
       <div class="claim"><strong>Minimal validation</strong><p>${esc(experiment.experiment || "N/A")} <small>${esc(experiment.cost_level || "-")} / ${esc(experiment.cycle_weeks || "-")} weeks</small></p></div>
+      <div class="claim"><strong>Success criteria</strong><p>${esc(successCriteria || "N/A")}</p></div>
+      <div class="claim"><strong>Falsification</strong><p>${esc(falsification || "N/A")}</p></div>
     </div>
   `;
 }
