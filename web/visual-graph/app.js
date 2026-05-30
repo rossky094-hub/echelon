@@ -1496,70 +1496,17 @@ function renderClaimCard(direction) {
   `;
 }
 
-function renderFutureEdgeRadar(edge, score) {
-  return `
-    <div class="item">
-      <strong>探索候选：${esc(paperLabel(edge.source_paper, edge.source_paper_id))}</strong>
-      <p class="mini">可能连接到</p>
-      <strong>${esc(paperLabel(edge.target_paper, edge.target_paper_id))}</strong>
-      <div class="score-row">
-        <span class="score"><small>优先级</small><strong>${pct(score)}</strong></span>
-        <span class="score"><small>技术概率</small><strong>${pct(edge.confidence || edge.weight)}</strong></span>
-        <span class="score"><small>商业相关</small><strong>待评估</strong></span>
-        <span class="score"><small>验证成本</small><strong>待设计</strong></span>
-      </div>
-      <div class="pill-row">
-        <span class="pill">exploratory edge</span>
-        <span class="pill">GNN/VGAE</span>
-        <span class="pill">${esc(edge.evidence?.relationship_scope || "graph")}</span>
-      </div>
-      <p class="mini">模型证据：calibrated ${pct(edge.evidence?.calibrated_prob || edge.confidence || 0)} / raw ${pct(edge.evidence?.raw_predicted_prob || 0)} / ${esc(edge.evidence?.calibration_label || edge.evidence?.calibration_method || "calibration unknown")}</p>
-      <p class="mini">${esc(edge.plain_language || "这是未来生长候选边，不是高置信方向。")}</p>
-      <p class="mini">还不能下注：缺 Step6 融合证据、Step13 五问 Claim Card、商业相关和最小验证实验。</p>
-    </div>
-  `;
-}
-
 function renderRadar(lens = state.topicLens) {
-  if (lens?.rd_radar?.items?.length) {
+  if (lens?.rd_radar) {
     els.radarPane.innerHTML = renderDossierRadar(lens.rd_radar);
     return;
   }
-  const directions = lens?.future_growth?.future_directions || [];
-  const predicted = lens
-    ? (lens.future_growth?.predicted_edges || [])
-    : state.edges.filter((edge) => edgeKey(edge) === "future").slice(0, 40);
-  const cards = directions.length
-    ? directions.map((direction) => ({ type: "direction", direction, score: radarScore(direction) }))
-    : predicted.slice(0, 12).map((edge) => ({
-      type: "edge",
-      edge,
-      score: clamp(Number(edge.confidence || edge.weight || 0.45), 0, 1) * 0.55,
-    }));
-  cards.sort((a, b) => b.score - a.score);
   els.radarPane.innerHTML = `
     <div class="item">
-      <strong>${esc(lens?.topic || "All optics")}</strong>
-      <div class="paper-meta">${fmt(cards.length)} candidates / directions</div>
-      <p class="mini">Radar 只把“可行动方向”排给研究员/研发负责人。当前若只有 edge candidate，说明只是 GNN/VGAE 候选边，还没有完成 Step6/Step13 Claim Card，不能当高置信研发方向。</p>
+      <strong>Radar requires a Topic Dossier</strong>
+      <div class="paper-meta">Claim Card gated view</div>
+      <p class="mini">Radar 主视图只渲染完整 Step13 Claim Card。请选择 topic 生成 Dossier；裸 GNN/VGAE future edges 只能在 Future candidate generator pool 或 candidate pool 中审计。</p>
     </div>
-    ${cards.slice(0, 15).map(({ type, direction, edge, score }) => type === "edge" ? renderFutureEdgeRadar(edge, score) : `
-      <div class="item">
-        <strong>${esc(direction.direction_name || direction.direction_id || "future direction")}</strong>
-        <div class="score-row">
-          <span class="score"><small>优先级</small><strong>${pct(score)}</strong></span>
-          <span class="score"><small>技术概率</small><strong>${pct(direction.confidence || direction.weight)}</strong></span>
-          <span class="score"><small>商业相关</small><strong>${pct(direction.commercial_relevance || 0.5)}</strong></span>
-          <span class="score"><small>验证成本</small><strong>${pct(validationCost(direction))}</strong></span>
-        </div>
-        <div class="pill-row">
-          <span class="pill">${esc(direction.claim_scope || "exploratory")}</span>
-          <span class="pill">${esc(direction.evidence_tier || "graph")}</span>
-          <span class="pill">eligible ${direction.claim_card?.high_confidence_eligible ? "yes" : "no"}</span>
-        </div>
-        ${direction.claim_card ? renderClaimCard(direction) : "<p class=\"mini\">Claim Card awaits Step6/Step13 materialization for this candidate.</p>"}
-      </div>
-    `).join("") || '<div class="item">No radar candidates yet.</div>'}
   `;
 }
 

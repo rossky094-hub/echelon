@@ -1061,8 +1061,11 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         "api_exposes_candidate_pool": False,
         "ui_separates_radar_from_candidate_pool": False,
         "step9_future_report_has_evidence_contract": False,
+        "ui_radar_main_avoids_raw_edge_cards": False,
     }
     if repo_root is not None:
+        app_path = repo_root / "web/visual-graph/app.js"
+        app_text = app_path.read_text(encoding="utf-8") if app_path.exists() else ""
         source_checks = {
             "api_exposes_candidate_pool": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
@@ -1076,6 +1079,11 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
                 repo_root / "echelon/v14b/step9_report.py",
                 ("claim_scope", "evidence_grade", "uncertainty_reasons", "candidate_pool_only"),
             ),
+            "ui_radar_main_avoids_raw_edge_cards": bool(app_text)
+            and "function renderRadar" in app_text
+            and "els.radarPane.innerHTML = renderDossierRadar" in app_text
+            and "renderFutureEdgeRadar" not in app_text
+            and "type === \"edge\"" not in app_text,
         }
     checks.update(source_checks)
     return {

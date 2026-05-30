@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T13:56:20Z`
+- generated_at: `2026-05-30T14:03:18Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -35,7 +35,7 @@
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 2585,
-    "section_frontfill_no_evidence_delta": -89,
+    "section_frontfill_no_evidence_delta": -31,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
@@ -297,6 +297,7 @@
     "incomplete_cards_are_candidate_pool_only": true,
     "raw_gnn_edges_are_candidate_pool_only": true,
     "step9_future_report_has_evidence_contract": true,
+    "ui_radar_main_avoids_raw_edge_cards": true,
     "ui_separates_radar_from_candidate_pool": true
   },
   "incomplete_claim_cards": 1,

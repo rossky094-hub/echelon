@@ -125,6 +125,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderTopicReadiness() { return topic_readiness; }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
         "function renderDossierRadar() { return 'No complete Claim Cards yet Future candidate generator pool'; }\n"
+        "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
     )
@@ -410,6 +411,7 @@ def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_pa
     assert result["checks"]["complete_cards_only_in_main_radar"] is True
     assert result["checks"]["incomplete_cards_are_candidate_pool_only"] is True
     assert result["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
+    assert result["checks"]["ui_radar_main_avoids_raw_edge_cards"] is True
     assert result["candidate_edges"] == 1
 
 
