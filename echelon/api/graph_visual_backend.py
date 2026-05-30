@@ -2266,10 +2266,21 @@ def _build_topic_branch_splits(
     topic: str,
     hits: list[dict[str, Any]],
     turning_hits: list[dict[str, Any]],
+    branch_dossiers: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     facets = _topic_branch_facets(topic)
     source_papers = hits[:200]
     turning_by_id = {p.get("paper_id"): p for p in turning_hits}
+    branch_contract_by_id = {
+        str(b.get("branch_id")): b
+        for b in (branch_dossiers or [])
+        if isinstance(b, dict) and b.get("branch_id")
+    }
+    branch_contract_by_cluster = {
+        str(b.get("cluster_id")): b
+        for b in (branch_dossiers or [])
+        if isinstance(b, dict) and b.get("cluster_id")
+    }
     splits: list[dict[str, Any]] = []
     for facet in facets:
         matched = [
@@ -2309,6 +2320,41 @@ def _build_topic_branch_splits(
                 for p in evidence
             ]
         )
+        lineage = branch_contract_by_id.get(str(dominant_branch_id)) or branch_contract_by_cluster.get(str(dominant_cluster_id)) or {}
+        lineage_status = str(lineage.get("lineage_status") or "weak_split_candidate")
+        claim_scope = (
+            str(lineage.get("claim_scope") or "weak_branch_split_candidate")
+            if lineage
+            else "topic_facet_with_driver_papers"
+        )
+        evidence_grade = (
+            str(lineage.get("evidence_grade") or "graph_weak_branch_split")
+            if lineage
+            else (
+                "section_backed_topic_branch_candidate"
+                if primary_section_evidence
+                else "metadata_topic_branch_candidate"
+            )
+        )
+        uncertainty = [
+            *(
+                list(lineage.get("uncertainty_reasons") or [])
+                if lineage
+                else [
+                    "branch matched by topic-specific facet and driver papers; branch_lineages parent evidence is not yet attached to this dossier item"
+                ]
+            ),
+            *(
+                []
+                if primary_section_evidence
+                else ["driver papers lack local primary section evidence in this card"]
+            ),
+        ]
+        lineage_evidence_objects = [
+            obj
+            for obj in (lineage.get("evidence_objects") or [])
+            if isinstance(obj, dict) and obj.get("type") == "branch_lineage"
+        ]
         splits.append(
             {
                 "name": facet["name"],
@@ -2320,27 +2366,25 @@ def _build_topic_branch_splits(
                 "first_seen_year": min((int(p.get("year")) for p in matched if p.get("year")), default=None),
                 "dominant_branch_id": dominant_branch_id,
                 "dominant_cluster_id": dominant_cluster_id,
-                "parent_branch_id": None,
-                "lineage_status": "weak_split_candidate",
-                "claim_scope": "topic_facet_with_driver_papers",
-                "evidence_grade": (
-                    "section_backed_topic_branch_candidate"
-                    if primary_section_evidence
-                    else "metadata_topic_branch_candidate"
-                ),
-                "uncertainty_reasons": [
-                    "branch matched by topic-specific facet and driver papers; branch_lineages parent evidence is not yet attached to this dossier item",
-                    *(
-                        []
-                        if primary_section_evidence
-                        else ["driver papers lack local primary section evidence in this card"]
-                    ),
+                "parent_branch_id": lineage.get("parent_branch_id"),
+                "split_year": lineage.get("split_year"),
+                "split_confidence": lineage.get("split_confidence"),
+                "lineage_status": lineage_status,
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "uncertainty_reasons": sorted(set(uncertainty)),
+                "required_evidence": lineage.get("required_evidence") or [
+                    "parent_branch_id with time-forward citation support",
+                    "driver papers with local primary section evidence",
+                    "constraint shift tied to limitation/discussion/conclusion/results sections",
                 ],
+                "split_reason": lineage.get("split_reason"),
+                "constraint_shift": lineage.get("constraint_shift"),
                 "driver_papers": [
                     _paper_ref(p, "turning/main-path evidence" if p.get("paper_id") in turning_by_id else "topic evidence")
                     for p in evidence
                 ],
-                "evidence_objects": evidence_objects,
+                "evidence_objects": _compact_evidence_objects([*lineage_evidence_objects, *evidence_objects]),
             }
         )
     if splits:
@@ -3483,7 +3527,7 @@ def _build_topic_dossier(
         for x in bottleneck_lineage.get("top_unresolved_keywords", [])[:5]
         if x.get("keyword")
     ]
-    branch_splits = _build_topic_branch_splits(topic, hits, turning_hits)
+    branch_splits = _build_topic_branch_splits(topic, hits, turning_hits, branch_dossiers)
     bottleneck_dossiers = _build_bottleneck_dossiers(unresolved_limitations, hits)
     validation_directions = _build_validation_directions(
         topic,

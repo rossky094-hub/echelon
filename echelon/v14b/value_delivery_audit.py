@@ -828,6 +828,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     )
     source_checks = {
         "api_exposes_topic_readiness": False,
+        "api_topic_branch_splits_inherit_lineage": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_topic_dossier_branch_contracts": False,
@@ -838,6 +839,17 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             "api_exposes_topic_readiness": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
                 ("topic_readiness", "build_topic_readiness_preflight"),
+            ),
+            "api_topic_branch_splits_inherit_lineage": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _build_topic_branch_splits",
+                    "branch_dossiers",
+                    "branch_contract_by_id",
+                    "parent_branch_id",
+                    "lineage_status",
+                    "split_confidence",
+                ),
             ),
             "ui_search_fallback_is_insufficient_evidence": _source_contains(
                 repo_root / "web/visual-graph/app.js",
@@ -855,7 +867,14 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             ),
             "ui_renders_topic_dossier_branch_contracts": _source_contains(
                 repo_root / "web/visual-graph/app.js",
-                ("renderTopicDossier", "split.claim_scope", "split.evidence_grade", "split.uncertainty_reasons"),
+                (
+                    "renderTopicDossier",
+                    "split.lineage_status",
+                    "split.parent_branch_id",
+                    "split.claim_scope",
+                    "split.evidence_grade",
+                    "split.uncertainty_reasons",
+                ),
             ),
             "topic_regression_uses_shared_contract": _source_contains(
                 repo_root / "echelon/v14b/topic_regression.py",

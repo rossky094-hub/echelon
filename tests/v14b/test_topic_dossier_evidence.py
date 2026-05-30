@@ -404,6 +404,56 @@ def test_topic_branch_splits_label_facet_matches_as_weak_not_layout():
     assert names["High-efficiency visible holography"]["uncertainty_reasons"]
 
 
+def test_topic_branch_splits_inherit_parent_lineage_contracts():
+    hit = {
+        "paper_id": "p1",
+        "title": "Dynamic high efficiency 3D meta-holography in visible range",
+        "abstract": "multiplexed visible holography with metasurface fabrication tolerance",
+        "year": 2024,
+        "cluster_id": "C13",
+        "branch_id": "B13",
+        "cluster_label": "design, metasurfaces, metasurface",
+        "content_availability": {"has_primary_evidence_sections": True},
+    }
+    branch_dossiers = [
+        {
+            "cluster_id": "C13",
+            "branch_id": "B13",
+            "parent_branch_id": "B02",
+            "split_year": 2021,
+            "split_confidence": 0.72,
+            "lineage_status": "evidence_backed_split",
+            "claim_scope": "evidence_backed_branch_split_candidate",
+            "evidence_grade": "section_backed_branch_split",
+            "split_reason": "parent citation support plus section constraint shift",
+            "required_evidence": ["section-level constraint shift evidence"],
+            "uncertainty_reasons": ["still needs resolution evidence"],
+            "evidence_objects": [
+                {
+                    "type": "branch_lineage",
+                    "paper_id": "p1",
+                    "claim_scope": "evidence_backed_branch_split_candidate",
+                }
+            ],
+        }
+    ]
+
+    splits = _build_topic_branch_splits(
+        "metasurface holography",
+        hits=[hit],
+        turning_hits=[hit],
+        branch_dossiers=branch_dossiers,
+    )
+
+    split = {row["name"]: row for row in splits}["High-efficiency visible holography"]
+    assert split["parent_branch_id"] == "B02"
+    assert split["lineage_status"] == "evidence_backed_split"
+    assert split["claim_scope"] == "evidence_backed_branch_split_candidate"
+    assert split["evidence_grade"] == "section_backed_branch_split"
+    assert split["split_reason"] == "parent citation support plus section constraint shift"
+    assert any(obj["type"] == "branch_lineage" for obj in split["evidence_objects"])
+
+
 def test_topic_turning_papers_demote_broader_field_context():
     papers = [
         {

@@ -1109,12 +1109,16 @@ function renderTopicDossier(dossier = {}) {
           <strong>${esc(split.name)}</strong>
           <small>${fmt(split.paper_count || 0)} papers / first seen ${esc(split.first_seen_year || "?")}</small>
           <div class="pill-row">
+            <span class="pill ${split.lineage_status === "evidence_backed_split" ? "good" : "warn"}">${esc(split.lineage_status || "weak_split_candidate")}</span>
             <span class="pill">${esc(split.claim_scope || "branch claim scope unknown")}</span>
             <span class="pill">${esc(split.evidence_grade || "branch evidence unknown")}</span>
           </div>
+          <p class="mini">parent ${esc(split.parent_branch_id || "unverified")} / split ${esc(split.split_year || "-")} / confidence ${pct(split.split_confidence || 0)}</p>
           <p><strong>为什么出现：</strong>${esc(split.why_appeared || "")}</p>
+          ${split.split_reason ? `<p><strong>分叉证据：</strong>${esc(split.split_reason)}</p>` : ""}
           <p><strong>历史卡点：</strong>${esc(split.historical_bottleneck || "")}</p>
           <p><strong>使能条件：</strong>${esc(split.enabling_condition || "")}</p>
+          ${(split.required_evidence || []).length ? `<p class="mini"><strong>成为真实分支还需要：</strong>${(split.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
           ${(split.uncertainty_reasons || []).length ? `
             <details>
               <summary>分支证据不确定性 (${fmt((split.uncertainty_reasons || []).length)})</summary>

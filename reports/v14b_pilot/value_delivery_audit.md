@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T14:25:29Z`
+- generated_at: `2026-05-30T14:35:46Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2591,
-    "section_frontfill_no_evidence_delta": -31,
+    "primary_section_papers": 2594,
+    "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 354,
+        "strong": 357,
         "weak": 2237
       },
-      "primary_section_papers": 2591,
-      "primary_section_rows": 4517,
+      "primary_section_papers": 2594,
+      "primary_section_rows": 4526,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 425,
-        "heading_continuation": 612,
-        "inline_heading": 219,
+        "explicit_heading": 431,
+        "heading_continuation": 621,
+        "inline_heading": 222,
         "legacy_unknown_strategy": 3886,
-        "loose_inline_heading": 10,
+        "loose_inline_heading": 11,
         "parser_hint": 7
       },
-      "strong_or_moderate_papers": 354,
+      "strong_or_moderate_papers": 357,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8633732149749132
+      "weak_only_rate": 0.8623747108712413
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -228,6 +228,7 @@
   "online_readiness_contract": {
     "checks": {
       "api_exposes_topic_readiness": true,
+      "api_topic_branch_splits_inherit_lineage": true,
       "arbitrary_topic_not_benchmark_gated": true,
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
