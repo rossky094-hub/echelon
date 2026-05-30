@@ -135,6 +135,18 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
     )
     openalex_log = tmp_path / "openalex.log"
     openalex_log.write_text("Server disconnected without sending a response.\n", encoding="utf-8")
+    relink_report = tmp_path / "reference_relink_audit.json"
+    relink_report.write_text(
+        json.dumps(
+            {
+                "candidate_summary": {
+                    "scanned_unlinked_refs": 1000,
+                    "status_counts": {"exact_linkable": 1, "no_local_match": 999},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
 
     result = collect_audit(
         db_main=main,
@@ -143,6 +155,7 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
         watchdog_log=watchdog_log,
         watchdog_state=watchdog_state,
         openalex_log=openalex_log,
+        reference_relink_audit=relink_report,
     )
 
     taxonomy = {row["kind"]: row["n"] for row in result["reference_taxonomy"]["taxonomy"]}
@@ -157,6 +170,8 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
     assert result["frontfill_log_taxonomy"]["event_counts"]["low_yield_scan"] == 1
     assert result["frontfill_health"]["status"] == "soft_stall"
     assert result["frontfill_health"]["no_evidence_done_delta"] == 210
+    assert result["reference_relink_diagnosis"]["status"] == "local_corpus_gap_dominates"
+    assert "cited-work backfill" in result["reference_taxonomy"]["next_actions"][0]
 
 
 def test_watchdog_history_detects_elapsed_no_evidence_growth(tmp_path):

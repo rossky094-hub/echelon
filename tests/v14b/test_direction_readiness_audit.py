@@ -10,6 +10,7 @@ from echelon.v14b.direction_readiness_audit import (
     _public_latest_fusion_audit,
     classify_blockers,
     collect_metrics,
+    load_reference_relink_state,
     load_openalex_frontfill_state,
     load_section_frontfill_state,
     primary_section_strategy_quality,
@@ -75,6 +76,41 @@ def test_direction_readiness_blocks_raw_gnn_promotion(tmp_path):
     assert "predicted_future_edges" not in metrics
     assert readiness_level(metrics, blockers) == "candidate_generator_only"
     assert any(b["gate"] == "fusion_materialization" for b in blockers)
+
+
+def test_direction_readiness_uses_reference_relink_diagnosis_for_citation_blocker(tmp_path):
+    report = tmp_path / "reference_relink_audit.json"
+    report.write_text(
+        json.dumps(
+            {
+                "candidate_summary": {
+                    "scanned_unlinked_refs": 1000,
+                    "status_counts": {"exact_linkable": 2, "no_local_match": 998},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    relink = load_reference_relink_state(report)
+    blockers = classify_blockers(
+        {
+            "linked_ref_rate": 0.10,
+            "primary_section_papers": 9000,
+            "future_candidate_edges": 0,
+            "future_directions": 0,
+            "direction_claim_cards": 0,
+            "complete_claim_cards": 0,
+            "high_confidence_claim_cards": 0,
+            "future_visual_edges": 0,
+            "openalex_w_rate": 0.80,
+            "reference_relink_state": relink,
+        }
+    )
+
+    citation = next(b for b in blockers if b["gate"] == "citation_graph_bone")
+    assert "2 exact-linkable" in citation["why"]
+    assert "998 no-local-match" in citation["why"]
+    assert "cited-work backfill" in citation["next_action"]
 
 
 def test_direction_readiness_flags_multi_topic_evidence_gap_queue(tmp_path):

@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-30T23:33:04Z`
+- Audit: `2026-05-30T23:42:19Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 

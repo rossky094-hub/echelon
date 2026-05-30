@@ -579,6 +579,67 @@ def select_openalex_frontfill_state(repo_root: Path = Path(".")) -> dict[str, An
     return load_openalex_frontfill_state(latest)
 
 
+def load_reference_relink_state(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"available": False}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"available": False, "reason": "unreadable", "path": str(path)}
+    summary = loaded.get("candidate_summary") if isinstance(loaded, dict) else {}
+    if not isinstance(summary, dict):
+        return {"available": False, "reason": "missing_candidate_summary", "path": str(path)}
+    counts = summary.get("status_counts") or {}
+    scanned = int(summary.get("scanned_unlinked_refs") or 0)
+    exact = int(counts.get("exact_linkable") or 0)
+    no_local = int(counts.get("no_local_match") or 0)
+    ambiguous = int(counts.get("ambiguous_local_match") or 0)
+    exact_rate = exact / max(1, scanned)
+    no_local_rate = no_local / max(1, scanned)
+    if scanned and no_local_rate >= 0.95 and exact_rate < 0.01:
+        status = "local_corpus_gap_dominates"
+        next_action = (
+            "Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; "
+            "broad relinking has little remaining yield until the cited papers exist locally."
+        )
+    elif exact:
+        status = "exact_relink_pending"
+        next_action = "Run reference-relink-apply when no frontfill writer is active, then rerun graph features."
+    elif ambiguous:
+        status = "dedup_required_before_relink"
+        next_action = "Resolve duplicate local provider IDs before applying additional citation links."
+    else:
+        status = "no_pending_exact_relinks"
+        next_action = "Keep citation claims uncertainty-scoped; improve coverage through cited-work ingestion, not fuzzy relinking."
+    return {
+        "available": True,
+        "path": str(path),
+        "status": status,
+        "scanned_unlinked_refs": scanned,
+        "exact_linkable_refs": exact,
+        "no_local_match_refs": no_local,
+        "ambiguous_local_match_refs": ambiguous,
+        "exact_linkable_rate": exact_rate,
+        "no_local_match_rate": no_local_rate,
+        "next_action": next_action,
+    }
+
+
+def select_reference_relink_state(
+    repo_root: Path = Path("."),
+    report_dir: Path | None = None,
+) -> dict[str, Any]:
+    candidates = []
+    if report_dir is not None:
+        candidates.append(report_dir / "reference_relink_audit.json")
+    candidates.append(repo_root / "reports/v14b_pilot/reference_relink_audit.json")
+    existing = [p for p in candidates if p.exists()]
+    if not existing:
+        return {"available": False}
+    latest = max(existing, key=lambda p: p.stat().st_mtime)
+    return load_reference_relink_state(latest)
+
+
 def collect_metrics(
     db_main: Path,
     db_v14: Path,
@@ -689,12 +750,24 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
     future_candidate_edges = int(m.get("future_candidate_edges") or m.get("predicted_future_edges") or 0)
     if m["linked_ref_rate"] < 0.30:
+        relink = m.get("reference_relink_state") or {}
+        relink_detail = ""
+        next_action = "Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize."
+        if relink.get("available"):
+            relink_detail = (
+                f" Reference relink audit: {int(relink.get('exact_linkable_refs') or 0):,} exact-linkable, "
+                f"{int(relink.get('no_local_match_refs') or 0):,} no-local-match."
+            )
+            next_action = str(relink.get("next_action") or next_action)
         blockers.append(
             {
                 "gate": "citation_graph_bone",
                 "severity": "high",
-                "why": f"linked refs are {pct(m['linked_ref_rate'])}; branch/main-path claims need uncertainty labels.",
-                "next_action": "Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.",
+                "why": (
+                    f"linked refs are {pct(m['linked_ref_rate'])}; branch/main-path claims need uncertainty labels."
+                    f"{relink_detail}"
+                ),
+                "next_action": next_action,
             }
         )
     if m["primary_section_papers"] < 8000:
@@ -946,6 +1019,15 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         "## Metrics",
         "",
         f"- linked refs: {metrics['linked_refs']:,} / {metrics['refs']:,} ({pct(metrics['linked_ref_rate'])})",
+        *(
+            [
+                f"- reference relink audit: `{(metrics.get('reference_relink_state') or {}).get('status')}`; "
+                f"exact-linkable={(int((metrics.get('reference_relink_state') or {}).get('exact_linkable_refs') or 0)):,}; "
+                f"no-local-match={(int((metrics.get('reference_relink_state') or {}).get('no_local_match_refs') or 0)):,}"
+            ]
+            if (metrics.get("reference_relink_state") or {}).get("available")
+            else []
+        ),
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
         *openalex_frontfill_line,
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
@@ -1028,6 +1110,7 @@ def run_audit(
     metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
     metrics["section_frontfill_state"] = select_section_frontfill_state(Path("."))
     metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(Path("."))
+    metrics["reference_relink_state"] = select_reference_relink_state(Path("."), out_dir)
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)

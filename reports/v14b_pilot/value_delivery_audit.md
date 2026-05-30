@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T23:35:46Z`
+- generated_at: `2026-05-30T23:42:26Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,12 +34,15 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 1453,
+    "openalex_frontfill_cooldown_remaining_s": 1053,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 3020,
+    "reference_relink_exact_linkable_refs": 4,
+    "reference_relink_no_local_match_refs": 2769169,
+    "reference_relink_status": "local_corpus_gap_dominates",
     "section_frontfill_done": 283,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_progress_done": 283,
@@ -86,6 +89,7 @@
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
     "OpenAlex frontfill cooling_down_or_stopped; field/topic claims need local fallback and uncertainty",
+    "reference relink audit shows no-local-match refs dominate; citation backbone needs cited-work backfill, not fuzzy relinking",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
 }

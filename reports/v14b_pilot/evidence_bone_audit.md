@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T23:33:11Z`
+- generated_at: `2026-05-30T23:42:21Z`
 
 ## Reference Linkage
 
@@ -14,13 +14,21 @@
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
+### Reference Relink Diagnosis
+
+- status: `local_corpus_gap_dominates`
+- scanned unlinked refs: 2,769,173
+- exact-linkable refs: 4
+- no-local-match refs: 2,769,169
+- next action: Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
+
 ## Section Evidence
 
-- section rows: 5,411
+- section rows: 5,414
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 255
-- decision-grade primary section papers: 255
+- current parser-contract primary section papers: 257
+- decision-grade primary section papers: 257
 
 ### High-Value Priority Coverage
 
@@ -62,23 +70,24 @@
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 281/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 283/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `281/8592`
-- rows / papers / primary papers: `5,411` / `3,020` / `3,020`
+- progress: `283/8592`
+- rows / papers / primary papers: `5,414` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.
 
 ## Recommended Next Actions
 
-- Run DOI-normalized relinking before adding more crawlers; DOI refs should be exact local joins.
-- Continue OpenAlex W backfill and relink W IDs after each successful batch.
-- Normalize arXiv version/category variants, then relink against arxiv_id.
+- Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
+- Use DOI refs as exact cited-work backfill targets; avoid fuzzy title matching for citation evidence.
+- Continue OpenAlex W cited-work backfill and rerun exact relink after each successful batch.
+- Normalize arXiv version/category variants, then ingest high-value missing arXiv cited works.
 - Keep S2 IDs separate from OpenAlex IDs and relink through s2_paper_id.
 - After top12000 completes, run the delta/action queue for high-value papers missing decision-grade primary sections.
 - Prioritize decision-grade section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens

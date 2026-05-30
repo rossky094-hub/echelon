@@ -20,6 +20,7 @@ from echelon.v14b.direction_readiness_audit import (
     collect_metrics,
     scalar,
     select_openalex_frontfill_state,
+    select_reference_relink_state,
     select_section_frontfill_state,
     table_exists,
 )
@@ -175,6 +176,11 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
         reasons.append(
             f"OpenAlex frontfill {openalex_frontfill.get('status')}; field/topic claims need local fallback and uncertainty"
         )
+    relink = metrics.get("reference_relink_state") or {}
+    if relink.get("status") == "local_corpus_gap_dominates":
+        reasons.append(
+            "reference relink audit shows no-local-match refs dominate; citation backbone needs cited-work backfill, not fuzzy relinking"
+        )
     section_quality = metrics.get("section_evidence_quality") or {}
     weak_only_rate = float(section_quality.get("weak_only_rate") or 0.0)
     strong_or_moderate = int(section_quality.get("strong_or_moderate_papers") or 0)
@@ -208,6 +214,9 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "section_frontfill_total": frontfill.get("total"),
             "section_frontfill_progress_done": frontfill.get("progress_latest_done"),
             "section_frontfill_no_evidence_delta": frontfill.get("no_evidence_done_delta"),
+            "reference_relink_status": relink.get("status"),
+            "reference_relink_exact_linkable_refs": relink.get("exact_linkable_refs"),
+            "reference_relink_no_local_match_refs": relink.get("no_local_match_refs"),
             "section_provenance": section_quality,
         },
         "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -2742,6 +2751,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
     metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(repo_root)
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
+    metrics["reference_relink_state"] = select_reference_relink_state(repo_root, report_dir)
     with sqlite3.connect(str(db_v14)) as conn_v14:
         metrics["vgae_calibration_audit"] = (
             int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0)

@@ -17,7 +17,12 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
-from echelon.v14b.direction_readiness_audit import PRIMARY_SECTION_NAMES, scalar, table_exists
+from echelon.v14b.direction_readiness_audit import (
+    PRIMARY_SECTION_NAMES,
+    load_reference_relink_state,
+    scalar,
+    table_exists,
+)
 from echelon.v14b.evidence_contracts import section_provenance_strength
 from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
 
@@ -157,15 +162,24 @@ def reference_taxonomy(conn: sqlite3.Connection, *, sample_limit: int = 8) -> di
     }
 
 
-def _reference_next_actions(grouped: list[dict[str, Any]]) -> list[str]:
+def _reference_next_actions(
+    grouped: list[dict[str, Any]],
+    relink: dict[str, Any] | None = None,
+) -> list[str]:
     counts = {str(r["kind"]): int(r["n"] or 0) for r in grouped}
     actions: list[str] = []
+    relink = relink or {}
+    if relink.get("available"):
+        if relink.get("status") == "local_corpus_gap_dominates":
+            actions.append(str(relink.get("next_action")))
+        elif int(relink.get("exact_linkable_refs") or 0):
+            actions.append(str(relink.get("next_action")))
     if counts.get("doi_unlinked", 0):
-        actions.append("Run DOI-normalized relinking before adding more crawlers; DOI refs should be exact local joins.")
+        actions.append("Use DOI refs as exact cited-work backfill targets; avoid fuzzy title matching for citation evidence.")
     if counts.get("openalex_unlinked", 0):
-        actions.append("Continue OpenAlex W backfill and relink W IDs after each successful batch.")
+        actions.append("Continue OpenAlex W cited-work backfill and rerun exact relink after each successful batch.")
     if counts.get("arxiv_unlinked", 0):
-        actions.append("Normalize arXiv version/category variants, then relink against arxiv_id.")
+        actions.append("Normalize arXiv version/category variants, then ingest high-value missing arXiv cited works.")
     if counts.get("missing_normalized_id", 0) or counts.get("weak_reference_string", 0):
         actions.append("Add title/year reference parsing only for high-value unresolved refs; do not fuzzy-link all refs blindly.")
     if counts.get("s2_unlinked", 0):
@@ -631,10 +645,19 @@ def collect_audit(
     watchdog_log: Path,
     watchdog_state: Path,
     openalex_log: Path,
+    reference_relink_audit: Path | None = None,
 ) -> dict[str, Any]:
     with connect(db_main) as conn_main, connect(db_v14) as conn_v14:
         refs = reference_taxonomy(conn_main)
         sections = section_coverage(conn_main, conn_v14)
+    relink = (
+        load_reference_relink_state(reference_relink_audit)
+        if reference_relink_audit is not None
+        else {"available": False}
+    )
+    if relink.get("available"):
+        refs["reference_relink_diagnosis"] = relink
+        refs["next_actions"] = _reference_next_actions(refs.get("taxonomy") or [], relink)
     logs = section_log_taxonomy([section_log, watchdog_log, openalex_log])
     logs["source"] = {
         "section_log": str(section_log),
@@ -646,6 +669,7 @@ def collect_audit(
     return {
         "generated_at": utc_now(),
         "reference_taxonomy": refs,
+        "reference_relink_diagnosis": relink,
         "section_coverage": sections,
         "frontfill_log_taxonomy": logs,
         "frontfill_health": health,
@@ -682,6 +706,20 @@ def render_markdown(result: dict[str, Any]) -> str:
         )
         for row in refs["taxonomy"]:
             lines.append(f"| {row['kind']} | {int(row['n']):,} |")
+        relink = refs.get("reference_relink_diagnosis") or {}
+        if relink.get("available"):
+            lines.extend(
+                [
+                    "",
+                    "### Reference Relink Diagnosis",
+                    "",
+                    f"- status: `{relink.get('status')}`",
+                    f"- scanned unlinked refs: {int(relink.get('scanned_unlinked_refs') or 0):,}",
+                    f"- exact-linkable refs: {int(relink.get('exact_linkable_refs') or 0):,}",
+                    f"- no-local-match refs: {int(relink.get('no_local_match_refs') or 0):,}",
+                    f"- next action: {relink.get('next_action')}",
+                ]
+            )
     else:
         lines.append(f"- unavailable: {refs.get('reason')}")
     lines.extend(["", "## Section Evidence", ""])
@@ -801,6 +839,7 @@ def run_audit(
         watchdog_log=watchdog_log,
         watchdog_state=watchdog_state,
         openalex_log=openalex_log,
+        reference_relink_audit=out_dir / "reference_relink_audit.json",
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     md_path = out_dir / "evidence_bone_audit.md"
