@@ -1783,6 +1783,18 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             topic_gap_repair_context,
             topic_gap_repair_targets,
         ),
+        "topic_gap_repair_refuses_concurrent_section_ingest": (
+            "scripts/guard_topic_gap_repair.py" in topic_gap_repair_context
+            and _source_contains(
+                (repo_root or Path(".")) / "scripts/guard_topic_gap_repair.py",
+                (
+                    "active broad section ingest detected",
+                    "V14B_ALLOW_CONCURRENT_TOPIC_GAP_REPAIR",
+                    "watch_step5s_section_ingest.py",
+                    "run_after_frontfill_product_chain.py",
+                ),
+            )
+        ),
         "post_frontfill_uses_topic_gap_repair": _source_contains(
             (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
             ("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),

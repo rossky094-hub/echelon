@@ -296,6 +296,7 @@ section-evidence-topic-gaps:
 ## Topic gap repair: regression gaps -> queue refresh -> targeted ingest -> re-audit
 topic-gap-repair:
 	@echo ">>> Topic gap repair: refresh gaps, ingest targeted sections, then re-audit..."
+	$(PYTHON) scripts/guard_topic_gap_repair.py
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
 	$(MAKE) section-evidence-topic-gaps

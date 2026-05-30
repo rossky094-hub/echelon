@@ -224,6 +224,13 @@ def _write_product_sources(root: Path) -> None:
         "V14B_TOPIC_GAP_FRONTFILL_CMD make topic-gap-repair\n",
         encoding="utf-8",
     )
+    (scripts / "guard_topic_gap_repair.py").write_text(
+        "active broad section ingest detected\n"
+        "V14B_ALLOW_CONCURRENT_TOPIC_GAP_REPAIR\n"
+        "watch_step5s_section_ingest.py\n"
+        "run_after_frontfill_product_chain.py\n",
+        encoding="utf-8",
+    )
 
 
 def _write_makefile_contracts(root: Path) -> None:
@@ -241,6 +248,7 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) direction-readiness-audit\n"
         "\t$(MAKE) value-delivery-audit\n"
         "topic-gap-repair:\n"
+        "\tpython scripts/guard_topic_gap_repair.py\n"
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) section-evidence-topic-gaps\n"
@@ -473,6 +481,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert legacy_gate["status"] == "pass"
     assert legacy_gate["checks"]["product_chains_avoid_legacy_targets"] is True
     assert legacy_gate["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
+    assert legacy_gate["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert legacy_gate["checks"]["step9_report_avoids_old_pilot_instruction"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
@@ -552,6 +561,7 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["product_chain_runs_decision_audit"] is True
     assert result["checks"]["decision_audit_runs_regression_gap_readiness_value"] is True
     assert result["checks"]["topic_gap_repair_refreshes_queue_ingests_and_reaudits"] is True
+    assert result["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
