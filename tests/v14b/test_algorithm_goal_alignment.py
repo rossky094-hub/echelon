@@ -103,6 +103,30 @@ def test_step5b_calibration_separates_raw_score_from_product_confidence():
     assert calibrated < 0.99
 
 
+def test_step12_public_calibration_json_uses_candidate_score_labels():
+    from echelon.v14b.step12_goal_alignment_audit import report_json_with_candidate_score_names
+
+    public = report_json_with_candidate_score_names(
+        {
+            "prediction_confidence_avg": 0.83,
+            "min_vgae_confidence": 0.55,
+            "vgae_top_n": 500,
+            "raw_predicted_prob": 0.91,
+            "calibrated_predicted_prob": 0.74,
+        }
+    )
+
+    assert "candidate_ranking_score_avg" in public
+    assert "min_candidate_score_threshold" in public
+    assert "candidate_edges_used" in public
+    assert "raw_candidate_score" in public
+    assert "calibrated_candidate_score" in public
+    assert "prediction_confidence_avg" not in public
+    assert "min_vgae_confidence" not in public
+    assert "min_vgae_candidate_score" not in public
+    assert "vgae_top_n" not in public
+
+
 def test_step5b_resume_requires_calibration_audit(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step5b_vgae import (

@@ -1,6 +1,6 @@
 # V14B Goal Alignment Audit
 
-Generated: 2026-05-31 02:40
+Generated: 2026-05-31 04:03
 
 ## Project Goal
 
@@ -11,7 +11,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 - Product graph layer exists: 55,391 visual nodes, 772,947 visual edges, 5,286 clusters, 5,286 branch lineages.
 - Step5b future candidate generator is numerically strong as a ranker: test AUC=0.8371, candidate_edge_rows=1,000, cross_field=60; product evidence score is calibrated separately from raw model score.
 - Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms=730, resolutions=1,001.
-- Section evidence inventory: table_present=True, rows=4,938, primary-section papers=2,814.
+- Section evidence inventory: table_present=True, rows=5,168, primary-section papers=2,942.
 - Step6 fusion output is limited: directions=5, audit_n_directions=5, adequacy=limited_but_usable_with_uncertainty, consistent=True. This is acceptable as an honest signal only when audit/product tables agree.
 - Step13 first-principles bottleneck lineage: principles=6, atoms_covered=730, high_risk_principles=0.
 - Step13 claim cards: total=5, five-question-complete=1, high-confidence-eligible=0, lineage_triples=2,920.
@@ -40,13 +40,13 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 ## Fusion Evidence Adequacy
 
-- top_vgae_candidate_edges_used: 500
+- top_candidate_edges_used: 500
 - total_future_candidate_edges: 1000
 - cross_field_candidate_edges: 60
 - unresolved_limitations_used: 50
 - evidence_path_distribution: `{"2": 5}`
 - candidate_tier_distribution: `{"exploratory": 5}`
-- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 5}, "candidate_ranking_score_avg": 0.8329225875546147, "min_vgae_candidate_score": 0.55, "vgae_top_n": 500}`
+- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 5}, "candidate_ranking_score_avg": 0.8329225875546147, "min_candidate_score_threshold": 0.55, "candidate_edges_used": 500}`
 - limitation_quality_distribution: `{"section_level": 50}`
 
 ## Step5b Calibration
@@ -68,7 +68,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 ## Hard Acceptance Gates
 
 - linked_refs_ratio >= 30%: current=0.139 -> risk
-- top-keystone section evidence coverage >= 70%: current=2.814 (2814/1000) -> pass
+- top-keystone section evidence coverage >= 70%: current=2.942 (2942/1000) -> pass
 - every direction has 5-question claim card: current=1/5 -> risk
 - future calibration report present: current=True -> pass
 - fusion audit matches future_directions table: current=True -> pass

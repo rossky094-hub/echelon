@@ -83,7 +83,8 @@ def report_json_with_candidate_score_names(raw: Any) -> str:
         return str(raw)
     key_map = {
         "prediction_confidence_avg": "candidate_ranking_score_avg",
-        "min_vgae_confidence": "min_vgae_candidate_score",
+        "min_vgae_confidence": "min_candidate_score_threshold",
+        "vgae_top_n": "candidate_edges_used",
         "raw_predicted_prob": "raw_candidate_score",
         "calibrated_predicted_prob": "calibrated_candidate_score",
     }
@@ -396,7 +397,7 @@ def build_audit(
         "",
         "## Fusion Evidence Adequacy",
         "",
-        f"- top_vgae_candidate_edges_used: {fusion_audit.get('n_vgae_preds_top', 'n/a')}",
+        f"- top_candidate_edges_used: {fusion_audit.get('n_vgae_preds_top', 'n/a')}",
         f"- total_future_candidate_edges: {fusion_audit.get('n_vgae_preds_total', predicted_total)}",
         f"- cross_field_candidate_edges: {fusion_audit.get('n_cross_field_total', predicted_cross)}",
         f"- unresolved_limitations_used: {fusion_audit.get('n_unresolved', 'n/a')}",

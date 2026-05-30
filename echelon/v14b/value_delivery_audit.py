@@ -487,11 +487,18 @@ def audit_future_growth(
     topic_regression_path = root / "echelon/v14b/topic_regression.py"
     product_baseline_path = root / "echelon/v14b/product_baseline.py"
     direction_readiness_path = root / "echelon/v14b/direction_readiness_audit.py"
+    step12_path = root / "echelon/v14b/step12_goal_alignment_audit.py"
     direction_report_base = report_dir if report_dir is not None else root / "reports/v14b_pilot"
     direction_report_path = direction_report_base / "direction_readiness_audit.md"
     direction_report_text = (
         direction_report_path.read_text(encoding="utf-8")
         if direction_report_path.exists()
+        else ""
+    )
+    goal_alignment_report_path = direction_report_base / "goal_alignment_audit_step1_step6.md"
+    goal_alignment_report_text = (
+        goal_alignment_report_path.read_text(encoding="utf-8")
+        if goal_alignment_report_path.exists()
         else ""
     )
     api_path = root / "echelon/api/graph_visual_backend.py"
@@ -609,6 +616,38 @@ def audit_future_growth(
                     and "min_candidate_score_threshold" in direction_report_text
                     and "prediction_confidence_avg" not in direction_report_text
                     and "min_vgae_confidence" not in direction_report_text
+                )
+            )
+        ),
+        "step12_goal_alignment_report_uses_candidate_score_labels": (
+            _source_contains(
+                step12_path,
+                (
+                    "candidate_ranking_score_avg",
+                    "min_candidate_score_threshold",
+                    "candidate_edges_used",
+                    "top_candidate_edges_used",
+                ),
+            )
+            and _source_absent(
+                step12_path,
+                (
+                    "min_vgae_candidate_score",
+                    "top_vgae_candidate_edges_used",
+                ),
+            )
+            and (
+                not goal_alignment_report_text
+                or (
+                    "candidate_ranking_score_avg" in goal_alignment_report_text
+                    and "min_candidate_score_threshold" in goal_alignment_report_text
+                    and "candidate_edges_used" in goal_alignment_report_text
+                    and "top_candidate_edges_used" in goal_alignment_report_text
+                    and "prediction_confidence_avg" not in goal_alignment_report_text
+                    and "min_vgae_confidence" not in goal_alignment_report_text
+                    and "min_vgae_candidate_score" not in goal_alignment_report_text
+                    and "vgae_top_n" not in goal_alignment_report_text
+                    and "top_vgae_candidate_edges_used" not in goal_alignment_report_text
                 )
             )
         ),

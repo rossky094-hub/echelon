@@ -260,7 +260,9 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "step12_goal_alignment_audit.py").write_text(
         "bounded evidence subgraph for extraction support "
-        "bounded evidence subgraph\n",
+        "bounded evidence subgraph "
+        "candidate_ranking_score_avg min_candidate_score_threshold "
+        "candidate_edges_used top_candidate_edges_used\n",
         encoding="utf-8",
     )
     (v14 / "db_schema.py").write_text(
@@ -526,6 +528,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     assert future_gate["checks"]["public_future_candidate_language_avoids_prediction_copy"] is True
     assert future_gate["checks"]["direction_readiness_report_uses_candidate_score_labels"] is True
+    assert future_gate["checks"]["step12_goal_alignment_report_uses_candidate_score_labels"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
     assert openalex_gate["status"] == "pass"
     assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
@@ -1286,6 +1289,33 @@ def test_future_growth_audit_rejects_direction_readiness_prediction_copy(tmp_pat
 
     assert result["status"] == "fail"
     assert result["checks"]["direction_readiness_report_uses_candidate_score_labels"] is False
+
+
+def test_future_growth_audit_rejects_step12_vgae_confidence_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    step12_path = tmp_path / "echelon/v14b/step12_goal_alignment_audit.py"
+    step12_path.write_text(
+        step12_path.read_text(encoding="utf-8")
+        + '\nkey_map = {"min_vgae_confidence": "min_vgae_candidate_score", "vgae_top_n": "vgae_top_n"}\n'
+        + 'report_line = "top_vgae_candidate_edges_used"\n',
+        encoding="utf-8",
+    )
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "goal_alignment_audit_step1_step6.md").write_text(
+        "candidate_ranking_score_avg min_vgae_candidate_score vgae_top_n "
+        "top_vgae_candidate_edges_used\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step12_goal_alignment_report_uses_candidate_score_labels"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
