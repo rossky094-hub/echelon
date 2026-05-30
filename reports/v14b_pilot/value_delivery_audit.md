@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:14:04Z`
+- generated_at: `2026-05-30T16:21:38Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -16,7 +16,7 @@
 | 6 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
 | 7 | LLM Evidence Boundary Contract | pass | LLM may audit, name, classify weak labels, or explain existing evidence; it must not create decision-grade evidence unless the claim is anchored to structured evidence and carries uncertainty. |
 | 8 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
-| 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
+| 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
 | 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
 | 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
@@ -289,15 +289,18 @@
   "checks": {
     "api_evidence_map_branches_carry_contract": true,
     "api_evidence_map_future_edges_carry_contract": true,
+    "api_evidence_map_main_path_carries_contract": true,
     "api_returns_evidence_map": true,
     "api_visual_edges_carry_contract": true,
     "combination_contracts_present": true,
+    "evidence_map_main_path_contract_present": true,
     "fusion_value_is_auditable_layer": true,
     "layer_contracts_present": true,
     "required_layer_combinations_present": true,
     "required_layers_present": true,
     "ui_has_fusion_value_layer_control": true,
     "ui_renders_evidence_map_contract": true,
+    "ui_renders_evidence_map_main_path_contract": true,
     "ui_renders_future_edge_contracts": true,
     "ui_renders_local_edge_contracts": true
   },
@@ -307,7 +310,7 @@
   "layer_count": 8,
   "missing_layers": [],
   "missing_required_combinations": [],
-  "policy": "Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail.",
+  "policy": "Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail.",
   "status": "pass"
 }
 ```

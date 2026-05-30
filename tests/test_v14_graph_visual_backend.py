@@ -436,6 +436,14 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert "bottleneck_lineage" in data
     assert "rd_radar" in data
     assert "evidence_map" in data
+    evidence_main = data["evidence_map"]["main_path"]
+    assert evidence_main["claim_scope"]
+    assert evidence_main["evidence_grade"]
+    assert evidence_main["uncertainty_reasons"]
+    assert evidence_main["required_evidence"]
+    assert evidence_main["can_explain"]
+    assert evidence_main["cannot_explain"]
+    assert evidence_main["evidence_objects"][0]["type"] == "main_path_edge"
     assert data["related_papers"][0]["access_links"]
     related = data["related_papers"][0]
     assert related["claim_scope"]

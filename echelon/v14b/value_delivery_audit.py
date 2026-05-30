@@ -1096,7 +1096,37 @@ def _sample_visual_value_model() -> dict[str, Any]:
 def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict[str, Any]:
     """Verify Evolution Evidence Map layers explain use, limits, and evidence needs."""
     try:
+        from echelon.api.graph_visual_backend import (
+            _apply_history_main_path_contract,
+            _build_evidence_map,
+            _build_history_main_path_contract,
+        )
+
         model = _sample_visual_value_model()
+        sample_main_path_edges = [
+            {
+                "edge_id": "main:p1:p2",
+                "source_paper_id": "p1",
+                "target_paper_id": "p2",
+                "plain_language": "sample main-path support edge",
+            }
+        ]
+        sample_turning_hits = [{"paper_id": "p2", "title": "Sample turning paper"}]
+        history_contract = _build_history_main_path_contract(
+            main_path_edges=sample_main_path_edges,
+            key_turning_papers=sample_turning_hits,
+            broader_context_papers=[],
+            value_model=model,
+        )
+        _apply_history_main_path_contract(sample_main_path_edges, history_contract)
+        evidence_map = _build_evidence_map(
+            main_path_edges=sample_main_path_edges,
+            turning_hits=sample_turning_hits,
+            future_growth=[],
+            branch_dossiers=[],
+            value_model=model,
+            history_main_path_contract=history_contract,
+        )
     except Exception as exc:
         return {
             "issue": "Evolution Evidence Map Contract",
@@ -1109,6 +1139,7 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         combo for combo in (model.get("layer_combinations") or [])
         if isinstance(combo, dict)
     ]
+    map_main_path = evidence_map.get("main_path") or {}
     layer_names = set(layers)
     combo_sets = {tuple(combo.get("layers") or []) for combo in combos}
     missing_layers = sorted(REQUIRED_EVIDENCE_MAP_LAYERS - layer_names)
@@ -1140,12 +1171,23 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         for combo in combos
     )
     fusion_combo_ok = any("fusion_value" in (combo.get("layers") or []) for combo in combos)
+    map_main_path_contract_ok = (
+        bool(map_main_path.get("claim_scope"))
+        and bool(map_main_path.get("evidence_grade"))
+        and isinstance(map_main_path.get("uncertainty_reasons"), list)
+        and bool(map_main_path.get("required_evidence"))
+        and bool(map_main_path.get("evidence_objects"))
+        and bool(map_main_path.get("can_explain"))
+        and bool(map_main_path.get("cannot_explain"))
+    )
     source_checks = {
         "api_returns_evidence_map": False,
+        "api_evidence_map_main_path_carries_contract": False,
         "api_evidence_map_future_edges_carry_contract": False,
         "api_evidence_map_branches_carry_contract": False,
         "api_visual_edges_carry_contract": False,
         "ui_renders_evidence_map_contract": False,
+        "ui_renders_evidence_map_main_path_contract": False,
         "ui_renders_future_edge_contracts": False,
         "ui_renders_local_edge_contracts": False,
         "ui_has_fusion_value_layer_control": False,
@@ -1155,6 +1197,17 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
             "api_returns_evidence_map": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
                 ("_build_evidence_map", "recommended_layer_combinations", '"evidence_map": evidence_map'),
+            ),
+            "api_evidence_map_main_path_carries_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "_build_evidence_map",
+                    "history_main_path_contract",
+                    '"main_path": {',
+                    '"claim_scope": main_path_contract.get("claim_scope")',
+                    '"evidence_grade": main_path_contract.get("evidence_grade")',
+                    '"evidence_objects": main_path_contract.get("evidence_objects")',
+                ),
             ),
             "api_evidence_map_future_edges_carry_contract": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
@@ -1192,6 +1245,16 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                 repo_root / "web/visual-graph/app.js",
                 ("renderEvidenceMapSummary", "renderComboContract", "Fusion value"),
             ),
+            "ui_renders_evidence_map_main_path_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderEvidenceMapSummary",
+                    "const mainPath = evidence.main_path",
+                    "Main-path evidence boundary",
+                    "renderComboContract(mainPath)",
+                    "renderEvidenceObjects(mainPath.evidence_objects",
+                ),
+            ),
             "ui_renders_future_edge_contracts": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 (
@@ -1224,6 +1287,7 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "required_layer_combinations_present": not missing_combos,
         "combination_contracts_present": combo_contracts_ok,
         "fusion_value_is_auditable_layer": fusion_combo_ok,
+        "evidence_map_main_path_contract_present": map_main_path_contract_ok,
         **source_checks,
     }
     return {
@@ -1236,7 +1300,7 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "combination_count": len(combos),
         "fusion_status": model.get("fusion_status"),
         "policy": (
-            "Each Evidence Map layer and recommended layer combination must say what it shows, "
+            "Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, "
             "what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; "
             "individual visual edges must carry the same evidence boundary when exposed in API or paper detail."
         ),

@@ -1417,10 +1417,20 @@ function renderDossierRadar(radar = {}) {
 
 function renderEvidenceMapSummary(evidence = {}) {
   const combos = evidence.recommended_layer_combinations || [];
+  const mainPath = evidence.main_path || {};
   return `
     <div class="item">
       <div class="paper-meta">Evidence Map</div>
       <p>${esc(evidence.summary || "")}</p>
+      ${mainPath.claim_scope || mainPath.evidence_grade ? `
+        <div class="combo-card">
+          <strong>Main-path evidence boundary</strong>
+          <p>${esc(mainPath.meaning || "")}</p>
+          <small>edges ${fmt(mainPath.metrics?.main_path_edges || 0)} / turning papers ${fmt(mainPath.metrics?.key_turning_papers || 0)} / linked refs ${pct(mainPath.metrics?.linked_ref_rate || 0)}</small>
+          ${renderComboContract(mainPath)}
+          ${renderEvidenceObjects(mainPath.evidence_objects || [], 4)}
+        </div>
+      ` : ""}
       ${combos.map((combo) => `
         <div class="combo-card">
           <strong>${esc(combo.label || (combo.layers || []).join(" + "))}</strong>

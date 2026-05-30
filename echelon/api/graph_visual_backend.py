@@ -4677,11 +4677,40 @@ def _build_evidence_map(
     future_growth: list[dict[str, Any]],
     branch_dossiers: list[dict[str, Any]],
     value_model: dict[str, Any],
+    history_main_path_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    main_path_contract = history_main_path_contract or _build_history_main_path_contract(
+        main_path_edges=main_path_edges,
+        key_turning_papers=turning_hits,
+        broader_context_papers=[],
+        value_model=value_model,
+    )
     return {
         "summary": "Evidence Map is for auditing the dossier, not for making users infer value from raw nodes.",
         "main_path": {
             "meaning": value_model.get("layers", {}).get("main_path", {}).get("relationship"),
+            "claim_scope": main_path_contract.get("claim_scope"),
+            "evidence_grade": main_path_contract.get("evidence_grade"),
+            "uncertainty_reasons": main_path_contract.get("uncertainty_reasons") or [],
+            "required_evidence": main_path_contract.get("required_evidence") or [],
+            "evidence_objects": main_path_contract.get("evidence_objects")
+            or _main_path_evidence_objects(
+                main_path_edges,
+                claim_scope=main_path_contract.get("claim_scope"),
+                evidence_grade=main_path_contract.get("evidence_grade"),
+            ),
+            "metrics": main_path_contract.get("metrics") or {},
+            "relevance_policy": main_path_contract.get("relevance_policy"),
+            "can_explain": [
+                "topic-filtered historical trunk context",
+                "candidate key turning papers with local edge support",
+                "where citation relinking should be audited next",
+            ],
+            "cannot_explain": [
+                "complete historical causality while linked refs are below target",
+                "topic branch split reasons without section-level bottleneck evidence",
+                "future direction value or Radar promotion",
+            ],
             "edges": main_path_edges[:80],
             "key_turning_papers": turning_hits[:50],
         },
@@ -5471,6 +5500,7 @@ def get_topic_lens(
         future_growth=future_growth,
         branch_dossiers=branch_dossiers,
         value_model=value_model,
+        history_main_path_contract=history_main_path_contract,
     )
     first_principles_five_questions = _evidence_contract_for_five_questions(
         first_principles_five_questions,
