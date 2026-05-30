@@ -207,6 +207,8 @@ def primary_section_strategy_quality(
             "primary_section_rows": 0,
             "primary_section_papers": 0,
             "strategy_counts": {},
+            "parser_name_counts": {},
+            "parser_contract_version_counts": {},
             "paper_quality_counts": {},
             "strong_or_moderate_papers": 0,
             "weak_only_papers": 0,
@@ -215,11 +217,13 @@ def primary_section_strategy_quality(
 
     cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(paper_sections)").fetchall()}
     has_meta = "section_meta_json" in cols
+    has_parser_name = "parser_name" in cols
     section_names = tuple(name.lower() for name in PRIMARY_SECTION_NAMES)
     ph_names = ",".join("?" for _ in section_names)
     select_meta = "section_meta_json" if has_meta else "NULL AS section_meta_json"
+    select_parser = "parser_name" if has_parser_name else "NULL AS parser_name"
     base = f"""
-        SELECT paper_id, lower(section_name) AS section_name, {select_meta}
+        SELECT paper_id, lower(section_name) AS section_name, {select_meta}, {select_parser}
         FROM paper_sections
         WHERE lower(section_name) IN ({ph_names})
           AND length(trim(section_text)) >= 80
@@ -231,11 +235,17 @@ def primary_section_strategy_quality(
         params = section_names + tuple(paper_ids)
 
     strategy_counts: dict[str, int] = {}
+    parser_name_counts: dict[str, int] = {}
+    parser_contract_version_counts: dict[str, int] = {}
     paper_best_quality: dict[str, str] = {}
     quality_rank = {"weak": 0, "moderate": 1, "strong": 2}
     rows = conn.execute(base, params).fetchall()
-    for paper_id, _section_name, raw_meta in rows:
+    for paper_id, _section_name, raw_meta, raw_parser_name in rows:
         meta = _json_obj(raw_meta)
+        parser_name = str(raw_parser_name or "legacy_unknown_parser")
+        parser_name_counts[parser_name] = parser_name_counts.get(parser_name, 0) + 1
+        contract_version = str(meta.get("parser_contract_version") or "legacy_unknown_contract")
+        parser_contract_version_counts[contract_version] = parser_contract_version_counts.get(contract_version, 0) + 1
         raw_strategies = meta.get("extraction_strategies") or []
         strategies = {
             str(item).strip()
@@ -262,6 +272,8 @@ def primary_section_strategy_quality(
         "primary_section_rows": len(rows),
         "primary_section_papers": primary_papers,
         "strategy_counts": dict(sorted(strategy_counts.items())),
+        "parser_name_counts": dict(sorted(parser_name_counts.items())),
+        "parser_contract_version_counts": dict(sorted(parser_contract_version_counts.items())),
         "paper_quality_counts": paper_quality_counts,
         "strong_or_moderate_papers": strong_or_moderate,
         "weak_only_papers": weak_only,
@@ -271,6 +283,14 @@ def primary_section_strategy_quality(
 
 def pct(value: float) -> str:
     return f"{value * 100:.1f}%"
+
+
+def _top_counts(counts: dict[str, Any], limit: int = 3) -> str:
+    pairs = sorted(
+        ((str(key), int(value or 0)) for key, value in (counts or {}).items()),
+        key=lambda item: (-item[1], item[0]),
+    )
+    return ", ".join(f"{key}:{value:,}" for key, value in pairs[:limit]) or "none"
 
 
 _WATCHDOG_TS_RE = re.compile(r"\[(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]")
@@ -879,6 +899,8 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"{int((metrics.get('section_evidence_quality') or {}).get('strong_or_moderate_papers') or 0):,} "
         f"strong/moderate papers; weak-only="
         f"{pct(float((metrics.get('section_evidence_quality') or {}).get('weak_only_rate') or 0.0))}",
+        f"- section parser contracts: "
+        f"{_top_counts((metrics.get('section_evidence_quality') or {}).get('parser_contract_version_counts') or {})}",
         f"- multi-topic evidence-gap queue: {int(metrics.get('topic_gap_primary_section_papers') or 0):,} / "
         f"{int(metrics.get('topic_gap_queue_papers') or 0):,} primary-section covered "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",

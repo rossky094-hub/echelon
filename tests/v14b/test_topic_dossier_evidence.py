@@ -253,7 +253,11 @@ def test_context_limitations_attach_step5c_resolution_rows():
 def test_section_evidence_contract_exposes_extraction_provenance():
     explicit = _section_evidence_contract(
         "discussion",
-        {"extraction_strategies": ["explicit_heading", "heading_continuation"]},
+        {
+            "extraction_strategies": ["explicit_heading", "heading_continuation"],
+            "parser_contract_version": "v14b_section_parser_contract_v3_toc_guard",
+            "parser_contract_guards": ["toc_dot_leader"],
+        },
         [3, 4],
     )
     inline = _section_evidence_contract(
@@ -275,6 +279,8 @@ def test_section_evidence_contract_exposes_extraction_provenance():
 
     assert explicit["evidence_grade"] == "section_explicit_heading"
     assert explicit["claim_scope"] == "section_level_evidence"
+    assert explicit["parser_contract_version"] == "v14b_section_parser_contract_v3_toc_guard"
+    assert explicit["parser_contract_guards"] == ["toc_dot_leader"]
     assert not explicit["uncertainty_reasons"]
     assert embedded["evidence_grade"] == "section_embedded_heading"
     assert embedded["claim_scope"] == "section_level_evidence_with_block_boundary_uncertainty"

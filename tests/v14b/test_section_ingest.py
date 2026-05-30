@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import sqlite3
 
 from echelon.v14b.step5s_section_ingest import (
+    SECTION_PARSER_CONTRACT_VERSION,
+    SECTION_PARSER_NAME,
     _arxiv_pdf_url,
     _checkpoint_step_name,
     _has_primary_sections,
@@ -12,6 +14,7 @@ from echelon.v14b.step5s_section_ingest import (
     load_candidates,
     record_ingest_attempt,
     read_candidate_file,
+    upsert_sections,
 )
 
 
@@ -349,6 +352,33 @@ def test_method_results_sections_count_as_claim_supporting_primary_evidence():
     conn.commit()
 
     assert _has_primary_sections(conn, "p_method")
+
+
+def test_upsert_sections_records_parser_contract_version():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "This discussion section carries decision evidence. " * 5,
+                "pages": [2],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+    )
+
+    row = conn.execute(
+        "SELECT parser_name, section_meta_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    assert row["parser_name"] == SECTION_PARSER_NAME
+    assert SECTION_PARSER_CONTRACT_VERSION in row["section_meta_json"]
+    assert "toc_dot_leader" in row["section_meta_json"]
 
 
 def test_delta_queue_uses_content_addressed_checkpoint(tmp_path):

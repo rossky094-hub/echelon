@@ -126,6 +126,7 @@ def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
             paper_id TEXT,
             section_name TEXT,
             section_text TEXT,
+            parser_name TEXT,
             section_meta_json TEXT
         );
         """
@@ -133,12 +134,20 @@ def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
     conn.executemany("INSERT INTO papers VALUES (?, ?)", [("p1", "W1"), ("p2", "W2")])
     conn.executemany("INSERT INTO paper_references VALUES (?)", [("p1",), ("p2",)])
     conn.execute(
-        "INSERT INTO paper_sections VALUES ('p1', 'discussion', ?, ?)",
-        ("strong evidence " * 20, '{"extraction_strategies":["explicit_heading"]}'),
+        "INSERT INTO paper_sections VALUES ('p1', 'discussion', ?, ?, ?)",
+        (
+            "strong evidence " * 20,
+            "v14b_section_ingest_v3",
+            '{"extraction_strategies":["explicit_heading"],"parser_contract_version":"v14b_section_parser_contract_v3_toc_guard"}',
+        ),
     )
     conn.execute(
-        "INSERT INTO paper_sections VALUES ('p2', 'conclusion', ?, ?)",
-        ("weak evidence " * 20, '{"extraction_strategies":["loose_inline_heading"]}'),
+        "INSERT INTO paper_sections VALUES ('p2', 'conclusion', ?, ?, ?)",
+        (
+            "weak evidence " * 20,
+            "v14b_section_ingest_v2",
+            '{"extraction_strategies":["loose_inline_heading"]}',
+        ),
     )
     conn.commit()
     conn.close()
@@ -150,6 +159,9 @@ def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
 
     assert quality["paper_quality_counts"]["strong"] == 1
     assert quality["paper_quality_counts"]["weak"] == 1
+    assert quality["parser_name_counts"]["v14b_section_ingest_v3"] == 1
+    assert quality["parser_contract_version_counts"]["v14b_section_parser_contract_v3_toc_guard"] == 1
+    assert quality["parser_contract_version_counts"]["legacy_unknown_contract"] == 1
     assert metrics["section_evidence_quality"]["weak_only_rate"] == 0.5
     assert any(b["gate"] == "section_evidence_provenance" for b in blockers)
 

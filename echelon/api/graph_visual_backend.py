@@ -440,6 +440,8 @@ def _section_evidence_contract(
         "evidence_grade": evidence_grade,
         "uncertainty_reasons": reasons,
         "extraction_strategies": strategies,
+        "parser_contract_version": meta.get("parser_contract_version") or "legacy_unknown_contract",
+        "parser_contract_guards": meta.get("parser_contract_guards") or [],
         "required_evidence": [
             "explicit section heading",
             "page-level provenance",

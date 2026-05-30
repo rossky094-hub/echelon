@@ -50,6 +50,13 @@ SECTION_INGEST_TRUST_ENV = os.getenv("V14B_SECTION_INGEST_TRUST_ENV", "0").strip
     "yes",
     "on",
 }
+SECTION_PARSER_NAME = "v14b_section_ingest_v3"
+SECTION_PARSER_CONTRACT_VERSION = "v14b_section_parser_contract_v3_toc_guard"
+SECTION_PARSER_CONTRACT_GUARDS = (
+    "toc_dot_leader",
+    "toc_numbered_entry",
+    "ambiguous_lowercase_fragment_heading",
+)
 
 # Claim-supporting evidence sections.  Limitation/discussion/conclusion/future
 # work are strongest for bottleneck claims; method/results/error analysis/
@@ -811,7 +818,6 @@ def upsert_sections(
     source_url: str,
 ) -> int:
     inserted = 0
-    parser_name = "v14b_section_ingest_v2"
     for sec_name, payload in sections.items():
         sec_text = str((payload or {}).get("text") or "").strip()
         if not sec_text:
@@ -830,6 +836,8 @@ def upsert_sections(
                 "n_pages": len(set(pages)),
                 "n_blocks": int((payload or {}).get("n_blocks") or 0),
                 "extraction_strategies": list((payload or {}).get("extraction_strategies") or []),
+                "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                "parser_contract_guards": list(SECTION_PARSER_CONTRACT_GUARDS),
             },
             ensure_ascii=False,
         )
@@ -854,7 +862,7 @@ def upsert_sections(
                 sec_name,
                 sec_text,
                 "arxiv_pdf",
-                parser_name,
+                SECTION_PARSER_NAME,
                 source_url,
                 section_pages_json,
                 section_meta_json,
