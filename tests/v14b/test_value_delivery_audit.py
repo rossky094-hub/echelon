@@ -123,8 +123,9 @@ def _write_product_sources(root: Path) -> None:
     web.mkdir(parents=True, exist_ok=True)
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
+        "function renderTopicDossier() { return split.claim_scope + split.evidence_grade + split.uncertainty_reasons; }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
-        "function renderDossierRadar() { return 'No complete Claim Cards yet Future candidate generator pool'; }\n"
+        "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + 'Claim Card uncertainty No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
         "const mainPathCopy = 'Main-path uncertainty history.claim_scope history.evidence_grade';\n",
         encoding="utf-8",
@@ -354,6 +355,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     topic_gate = next(g for g in result["gates"] if g["issue"] == "Topic Dossier Product Value")
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
@@ -411,7 +413,9 @@ def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_pa
     assert result["checks"]["complete_cards_only_in_main_radar"] is True
     assert result["checks"]["incomplete_cards_are_candidate_pool_only"] is True
     assert result["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
+    assert result["checks"]["claim_cards_carry_evidence_contract"] is True
     assert result["checks"]["ui_radar_main_avoids_raw_edge_cards"] is True
+    assert result["checks"]["ui_renders_radar_claim_card_evidence_contract"] is True
     assert result["candidate_edges"] == 1
 
 

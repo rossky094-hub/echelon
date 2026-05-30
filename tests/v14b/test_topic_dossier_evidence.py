@@ -240,7 +240,12 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     assert len(radar["claim_cards"]) == 1
     assert radar["claim_cards"][0]["title"] == "Complete but exploratory direction"
     assert radar["claim_cards"][0]["eligible"] is False
+    assert radar["claim_cards"][0]["claim_scope"] == "exploratory_with_claim_card"
+    assert radar["claim_cards"][0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
+    assert "high-confidence" in " ".join(radar["claim_cards"][0]["uncertainty_reasons"])
     assert len(radar["incomplete_claim_cards"]) == 1
+    assert radar["incomplete_claim_cards"][0]["evidence_grade"] == "incomplete_claim_card"
+    assert radar["incomplete_claim_cards"][0]["uncertainty_reasons"]
     assert any(item["kind"] == "incomplete_claim_card" for item in radar["candidate_pool"])
     edge_items = [item for item in radar["candidate_pool"] if item["kind"] == "candidate_edge"]
     assert edge_items[0]["model_evidence"]["calibrated_prob"] == 0.75

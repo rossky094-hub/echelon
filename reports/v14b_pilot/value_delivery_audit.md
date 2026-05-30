@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T14:03:18Z`
+- generated_at: `2026-05-30T14:10:33Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2585,
+    "primary_section_papers": 2587,
     "section_frontfill_no_evidence_delta": -31,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 348,
+        "strong": 350,
         "weak": 2237
       },
-      "primary_section_papers": 2585,
-      "primary_section_rows": 4509,
+      "primary_section_papers": 2587,
+      "primary_section_rows": 4512,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 417,
-        "heading_continuation": 604,
+        "explicit_heading": 420,
+        "heading_continuation": 607,
         "inline_heading": 219,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 10,
         "parser_hint": 7
       },
-      "strong_or_moderate_papers": 348,
+      "strong_or_moderate_papers": 350,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8653771760154739
+      "weak_only_rate": 0.8647081561654426
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -224,6 +224,7 @@
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
       "topic_regression_uses_shared_contract": true,
+      "ui_renders_topic_dossier_branch_contracts": true,
       "ui_renders_topic_readiness": true
     },
     "observed_gates": [
@@ -292,12 +293,14 @@
     "api_exposes_candidate_pool": true,
     "candidate_edges_carry_evidence_contract": true,
     "candidate_pool_items_not_eligible": true,
+    "claim_cards_carry_evidence_contract": true,
     "complete_cards_only_in_main_radar": true,
     "empty_radar_policy_present": true,
     "incomplete_cards_are_candidate_pool_only": true,
     "raw_gnn_edges_are_candidate_pool_only": true,
     "step9_future_report_has_evidence_contract": true,
     "ui_radar_main_avoids_raw_edge_cards": true,
+    "ui_renders_radar_claim_card_evidence_contract": true,
     "ui_separates_radar_from_candidate_pool": true
   },
   "incomplete_claim_cards": 1,

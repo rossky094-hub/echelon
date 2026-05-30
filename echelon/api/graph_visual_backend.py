@@ -3068,6 +3068,25 @@ def _build_rd_radar(
         eligible = bool(card.get("high_confidence_eligible"))
         missing_gates = list(quality_gate.get("missing_gates") or [])
         missing_high_conf = list(quality_gate.get("missing_high_confidence_gates") or [])
+        evidence_grade = str(
+            card.get("evidence_grade")
+            or d.get("evidence_grade")
+            or d.get("evidence_tier")
+            or card.get("evidence_strength_level")
+            or (
+                "complete_claim_card_pending_high_confidence_evidence"
+                if five_complete
+                else "incomplete_claim_card"
+            )
+        )
+        uncertainty = [
+            *list(d.get("uncertainty_reasons") or []),
+            *list(card.get("uncertainty_reasons") or []),
+            *[f"missing five-question gate: {gate}" for gate in missing_gates],
+            *[f"missing high-confidence gate: {gate}" for gate in missing_high_conf],
+        ]
+        if five_complete and not eligible:
+            uncertainty.append("complete Claim Card remains exploratory until high-confidence evidence gates pass")
         item = {
             "kind": "claim_card" if five_complete else "incomplete_claim_card",
             "title": d.get("direction_name") or d.get("direction_id"),
@@ -3076,6 +3095,8 @@ def _build_rd_radar(
             "commercial_relevance": d.get("commercial_relevance"),
             "validation_cost": d.get("validation_cost"),
             "claim_scope": d.get("claim_scope"),
+            "evidence_grade": evidence_grade,
+            "uncertainty_reasons": sorted(set(uncertainty)),
             "evidence_tier": d.get("evidence_tier"),
             "eligible": eligible,
             "claim_card": card,
@@ -3170,6 +3191,10 @@ def _build_rd_radar(
             "kind": "radar_empty_state",
             "title": "No complete Claim Cards yet",
             "claim_scope": "candidate_only",
+            "evidence_grade": "no_complete_claim_card",
+            "uncertainty_reasons": [
+                "Radar main view is empty until Step6/Step13 produce complete five-question Claim Cards"
+            ],
             "eligible": False,
             "plain_language": (
                 "Radar is intentionally empty because this topic currently has future candidates but no complete "

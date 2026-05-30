@@ -782,6 +782,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     source_checks = {
         "api_exposes_topic_readiness": False,
         "ui_renders_topic_readiness": False,
+        "ui_renders_topic_dossier_branch_contracts": False,
         "topic_regression_uses_shared_contract": False,
     }
     if repo_root is not None:
@@ -793,6 +794,10 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             "ui_renders_topic_readiness": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderTopicReadiness", "topic_readiness"),
+            ),
+            "ui_renders_topic_dossier_branch_contracts": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                ("renderTopicDossier", "split.claim_scope", "split.evidence_grade", "split.uncertainty_reasons"),
             ),
             "topic_regression_uses_shared_contract": _source_contains(
                 repo_root / "echelon/v14b/topic_regression.py",
@@ -1052,6 +1057,13 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         "raw_gnn_edges_are_candidate_pool_only": bool(candidate_edges)
         and all(c.get("kind") != "candidate_edge" for c in claim_cards)
         and all(edge.get("claim_scope") == "exploratory_candidate_pool" for edge in candidate_edges),
+        "claim_cards_carry_evidence_contract": bool(claim_cards)
+        and all(
+            c.get("claim_scope")
+            and c.get("evidence_grade")
+            and isinstance(c.get("uncertainty_reasons"), list)
+            for c in claim_cards
+        ),
         "candidate_edges_carry_evidence_contract": bool(candidate_edges)
         and all(edge.get("evidence_grade") and edge.get("uncertainty_reasons") for edge in candidate_edges),
         "candidate_pool_items_not_eligible": all(not bool(c.get("eligible")) for c in candidate_pool),
@@ -1062,6 +1074,7 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         "ui_separates_radar_from_candidate_pool": False,
         "step9_future_report_has_evidence_contract": False,
         "ui_radar_main_avoids_raw_edge_cards": False,
+        "ui_renders_radar_claim_card_evidence_contract": False,
     }
     if repo_root is not None:
         app_path = repo_root / "web/visual-graph/app.js"
@@ -1084,6 +1097,11 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             and "els.radarPane.innerHTML = renderDossierRadar" in app_text
             and "renderFutureEdgeRadar" not in app_text
             and "type === \"edge\"" not in app_text,
+            "ui_renders_radar_claim_card_evidence_contract": bool(app_text)
+            and "function renderDossierRadar" in app_text
+            and "item.evidence_grade" in app_text
+            and "item.uncertainty_reasons" in app_text
+            and "Claim Card uncertainty" in app_text,
         }
     checks.update(source_checks)
     return {

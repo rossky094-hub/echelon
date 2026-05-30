@@ -1108,9 +1108,19 @@ function renderTopicDossier(dossier = {}) {
         <div class="branch-card">
           <strong>${esc(split.name)}</strong>
           <small>${fmt(split.paper_count || 0)} papers / first seen ${esc(split.first_seen_year || "?")}</small>
+          <div class="pill-row">
+            <span class="pill">${esc(split.claim_scope || "branch claim scope unknown")}</span>
+            <span class="pill">${esc(split.evidence_grade || "branch evidence unknown")}</span>
+          </div>
           <p><strong>为什么出现：</strong>${esc(split.why_appeared || "")}</p>
           <p><strong>历史卡点：</strong>${esc(split.historical_bottleneck || "")}</p>
           <p><strong>使能条件：</strong>${esc(split.enabling_condition || "")}</p>
+          ${(split.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>分支证据不确定性 (${fmt((split.uncertainty_reasons || []).length)})</summary>
+              ${(split.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
           ${evidencePaperButtons(split.driver_papers || [], 3)}
           ${renderEvidenceObjects(split.evidence_objects || [], 5)}
         </div>
@@ -1267,9 +1277,18 @@ function renderDossierRadar(radar = {}) {
             <span class="score"><small>Claim scope</small><strong>${esc(item.claim_scope || "exploratory")}</strong></span>
             <span class="score"><small>High confidence</small><strong>${item.eligible ? "yes" : "no"}</strong></span>
           </div>
+          <div class="pill-row">
+            <span class="pill">${esc(item.evidence_grade || "claim-card evidence unknown")}</span>
+          </div>
           <p>${esc(item.plain_language || "")}</p>
           ${(item.missing_gates || []).length ? `<p class="mini">五问缺口：${item.missing_gates.map(esc).join(" / ")}</p>` : ""}
           ${(item.missing_high_confidence_gates || []).length ? `<p class="mini">高置信缺口：${item.missing_high_confidence_gates.map(esc).join(" / ")}</p>` : ""}
+          ${(item.uncertainty_reasons || []).length ? `
+            <details>
+              <summary>Claim Card uncertainty (${fmt((item.uncertainty_reasons || []).length)})</summary>
+              ${(item.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+            </details>
+          ` : ""}
         </div>
       `).join("") : `
         <div class="branch-card warning-card">
@@ -1282,7 +1301,7 @@ function renderDossierRadar(radar = {}) {
         ${candidatePool.slice(0, 8).map((item) => `
           <div class="candidate-card">
             <strong>${esc(item.title || "candidate edge")}</strong>
-            <small>technical ${pct(item.technical_probability || 0)} / scope ${esc(item.claim_scope || "candidate")}</small>
+            <small>technical ${pct(item.technical_probability || 0)} / scope ${esc(item.claim_scope || "candidate")} / evidence ${esc(item.evidence_grade || "unknown")}</small>
             ${item.model_evidence ? `
               <p class="mini">模型证据：${esc(item.model_evidence.generator || "future candidate generator")}
               / ${esc(futureCalibrationCopy(item))}
@@ -1290,6 +1309,7 @@ function renderDossierRadar(radar = {}) {
             ` : ""}
             <p>${esc(item.plain_language || "")}</p>
             <p class="mini">缺口：${(item.missing_gates || []).map(esc).join(" / ")}</p>
+            ${(item.uncertainty_reasons || []).length ? `<p class="mini">不确定性：${(item.uncertainty_reasons || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
             ${evidencePaperButtons(item.evidence_papers || [], 2)}
           </div>
         `).join("") || "<p>No future candidates matched.</p>"}
