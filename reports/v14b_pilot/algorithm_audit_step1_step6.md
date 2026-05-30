@@ -132,24 +132,24 @@ layer. It should influence fusion weights, not act as ground truth.
 ## Step5b VGAE Future Growth
 
 Purpose:
-Predict likely future growth links using graph structure and paper features.
+Generate future candidate links using graph structure and paper features.
 
 Audit result:
 This was the highest-risk algorithm. The previous direction semantics trained
-on raw citation edges as `citing -> cited` but interpreted predicted edges as
-future growth. Since the decoder is symmetric, it could turn reverse historical
-citations into "future" predictions.
+on raw citation edges as `citing -> cited` but interpreted candidate edge scores
+as future growth. Since the decoder is symmetric, it could turn reverse
+historical citations into misleading future candidates.
 
 Fix/status:
 Step5b now converts raw citations into time-forward evolution records:
 older cited paper -> newer citing paper. Same-year, unknown-year, and
 time-inverted references are excluded from training. Validation/test splits are
-chronological, and negative sampling respects temporal direction. Predicted
-future edges exclude known historical pairs in either orientation.
+chronological, and negative sampling respects temporal direction. Future
+candidate edges exclude known historical pairs in either orientation.
 
 Remaining risk:
-After the semantic fix, predicted edge counts may be lower. That is preferable
-to producing misleading future links. If confidence is weak, the next fix should
+After the semantic fix, candidate edge counts may be lower. That is preferable
+to producing misleading future links. If support is weak, the next fix should
 improve candidate generation/calibration, not lower thresholds blindly.
 
 ## Step5c Limitation Tracking
@@ -176,7 +176,7 @@ The visual graph should mark limitation evidence quality and later ingest
 ## Step6 Fusion
 
 Purpose:
-Fuse main-path terminal evidence, VGAE predictions, unresolved limitations,
+Fuse main-path terminal evidence, VGAE candidate scores, unresolved limitations,
 and high-impact fields into future direction candidates.
 
 Audit result:

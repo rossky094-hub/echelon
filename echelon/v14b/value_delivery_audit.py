@@ -482,6 +482,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
         root / "reports/v14b_pilot/100h_product_execution_plan.md",
         root / "reports/v14b_pilot/100h_value_delivery_plan.md",
         root / "reports/v14b_pilot/algorithm_audit_step1_step6.md",
+        root / "reports/v14b_pilot/end_to_end_audit_goals_20260530.md",
     )
     source_checks = {
         "step9_vgae_language_is_candidate_generator": (
@@ -511,10 +512,13 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
                 path,
                 (
                     "predicted future edges",
+                    "predicted edges",
+                    "VGAE predictions",
                     "cross-field predicted edges",
                     "model probability",
                     "calibrated probability product",
                     "calibrated probability",
+                    "technical probability",
                 ),
             )
             for path in current_future_docs

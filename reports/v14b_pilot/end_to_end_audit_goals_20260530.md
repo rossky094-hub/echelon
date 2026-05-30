@@ -9,7 +9,7 @@ Generated: 2026-05-30 00:30 CST
 - OpenAlex W coverage: 34,252 / 55,391 = 61.8%
 - paper_sections: 1,241 rows / 690 papers
 - primary section papers: 690
-- predicted_future_edges: 1,000
+- future candidate edge rows: 1,000
 - future_directions: 0
 - Claim Cards: 0 complete / 0 high-confidence
 - visual graph: ready, 55,391 nodes / 739,318 edges
@@ -97,7 +97,7 @@ must improve one of three properties:
     - Acceptance: the output helps a researcher learn and act, not just browse.
 
 16. **Enterprise R&D Radar Audit**
-    - Goal: verify each Radar item has technical probability, commercial relevance, validation cost, evidence strength, and claim scope.
+    - Goal: verify each Radar item has technical score, commercial relevance, validation cost, evidence strength, and claim scope.
     - Acceptance: Radar contains only complete Claim Cards; incomplete candidates stay in candidate pool.
 
 ### Operations, Corpus, And Release

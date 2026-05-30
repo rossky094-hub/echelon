@@ -33,7 +33,7 @@ Mission: turn the optics graph from a visual paper map into a decision-grade res
 
 1. Keep section top12000 and OpenAlex running at conservative concurrency.
 2. Add Direction Readiness Audit for Step5b -> Step5c -> Step6 -> Step13 blockers.
-3. Track why `future_directions=0` while predicted edges exist.
+3. Track why `future_directions=0` while future candidate edge rows exist.
 4. Make the dashboard/report say whether the system has investable Claim Cards or only candidate edges.
 5. Confirm watchdog will auto-start delta section ingest after top12000 if primary evidence remains below target.
 
