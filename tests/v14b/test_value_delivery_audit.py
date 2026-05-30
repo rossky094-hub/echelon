@@ -224,6 +224,9 @@ def _write_product_sources(root: Path) -> None:
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
         "Citation-function evidence 覆盖率 Citation Function Evidence\n"
+        "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
+        "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
+        "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
         "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
         "linked resolution evidence 阈值不得下调\n"
@@ -447,7 +450,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     result = collect_value_gates(main, v14, tmp_path, report_dir)
 
     assert len(result["gates"]) == 15
-    assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
+    future_gate = next(g for g in result["gates"] if g["issue"] == "Future Growth Calibration")
+    assert future_gate["checks"]["step9_vgae_language_is_candidate_generator"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
     assert openalex_gate["status"] == "pass"
     assert openalex_gate["checks"]["openalex_backfill_runs_guard_before_fetch"] is True
@@ -942,6 +946,26 @@ def test_future_growth_audit_fails_uncalibrated_direction_claim(tmp_path):
     assert result["uncalibrated_promoted_direction_claims"] == 1
     assert result["checks"]["run_level_calibration_required_for_direction_claims"] is False
     assert result["uncalibrated_promoted_examples"][0]["claim_scope"] == "candidate_direction"
+
+
+def test_future_growth_audit_rejects_step9_vgae_prediction_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    step9_path = tmp_path / "echelon/v14b/step9_report.py"
+    step9_path.write_text(
+        "make product-chain make post-frontfill-chain legacy compatibility\n"
+        "VGAE 预测未来边数\n"
+        "## 7. VGAE Link Prediction\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step9_vgae_language_is_candidate_generator"] is False
 
 
 def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):

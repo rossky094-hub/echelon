@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:33:52Z`
+- generated_at: `2026-05-30T17:40:18Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 23167,
+    "openalex_frontfill_cooldown_remaining_s": 22782,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2708,
+    "primary_section_papers": 2713,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 471,
+        "strong": 476,
         "weak": 2237
       },
-      "primary_section_papers": 2708,
-      "primary_section_rows": 4737,
+      "primary_section_papers": 2713,
+      "primary_section_rows": 4744,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 574,
-        "heading_continuation": 830,
-        "inline_heading": 298,
+        "explicit_heading": 581,
+        "heading_continuation": 837,
+        "inline_heading": 299,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 13,
         "parser_hint": 9
       },
-      "strong_or_moderate_papers": 471,
+      "strong_or_moderate_papers": 476,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8260709010339734
+      "weak_only_rate": 0.8245484703280501
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -152,7 +152,8 @@
   "checks": {
     "edge_level_calibration_not_confused_with_run_audit": true,
     "raw_future_edges_not_radar_eligible": true,
-    "run_level_calibration_required_for_direction_claims": true
+    "run_level_calibration_required_for_direction_claims": true,
+    "step9_vgae_language_is_candidate_generator": true
   },
   "edge_calibrated_candidates": 1000,
   "edge_calibration_labels": {

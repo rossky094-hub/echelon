@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 01:33
+**生成时间**: 2026-05-31 01:39
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -18,7 +18,7 @@
 | 子图边数 | **38,538** |
 | 子图结论范围 | **pilot_evidence_subgraph** |
 | Citation-function evidence 覆盖率 | **100.0%** |
-| VGAE 预测未来边数 | **1,000** |
+| Future candidate generator 候选边数 | **1,000** |
 | Limitation atoms 总数 | **730** |
 | 三路融合方向数 | **5** |
 
@@ -95,14 +95,16 @@
 
 ---
 
-## 7. VGAE Link Prediction
+## 7. Future Candidate Generator
 
-- **预测边总数**: 1,000
-- **跨 Field 边占比**: **6.0%** (60/1,000)
+- **候选边总数**: 1,000
+- **跨 Field 候选边占比**: **6.0%** (60/1,000)
 
-### Top 5 预测边 (case study)
+**证据边界**: GNN/VGAE 只生成 future candidate edges；`predicted_prob`/`calibrated_prob` 是候选排序信号，不是方向结论。进入 Radar/Topic Dossier 需要 Step6 fusion + Step13 complete Claim Card + calibration audit。
 
-| 源论文 | 目标论文 | 概率 | 源年 | 目标年 |
+### Top 5 候选边 (case study)
+
+| 源论文 | 目标论文 | 候选概率 | 源年 | 目标年 |
 |---|---|---|---|---|
 
 ---
@@ -187,4 +189,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:33*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:39*

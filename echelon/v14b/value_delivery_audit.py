@@ -382,7 +382,7 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
     }
 
 
-def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     predicted = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0) if table_exists(conn_v14, "predicted_future_edges") else 0
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
     edge_calibration = future_edge_calibration_context(conn_v14)
@@ -456,7 +456,22 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
             )
             or 0
         )
-    if uncalibrated_promoted_directions or radar_eligible > 0:
+    root = repo_root or Path(".")
+    step9_path = root / "echelon/v14b/step9_report.py"
+    step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
+    source_checks = {
+        "step9_vgae_language_is_candidate_generator": (
+            bool(step9_text)
+            and "Future candidate generator 候选边数" in step9_text
+            and "## 7. Future Candidate Generator" in step9_text
+            and "GNN/VGAE 只生成 future candidate edges" in step9_text
+            and "不是方向结论" in step9_text
+            and "Step13 complete Claim Card" in step9_text
+            and "VGAE 预测未来边数" not in step9_text
+            and "VGAE Link Prediction" not in step9_text
+        ),
+    }
+    if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):
         status = "fail"
     elif calibration > 0 and high_conf_bad == 0:
         status = "pass"
@@ -496,6 +511,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection) -> dict[str, Any]:
                 and future_direction_count > 0
                 and not future_direction_calibration_status_counts
             ),
+            **source_checks,
         },
         "policy": "VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card.",
     }
@@ -2148,7 +2164,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_openalex_frontfill_guard(repo_root),
             audit_bottleneck_lineage(conn_v14, repo_root),
             audit_branch_lineage(conn_v14, repo_root),
-            audit_future_growth(conn_v14),
+            audit_future_growth(conn_v14, repo_root),
             audit_claim_card_engine(conn_v14, repo_root),
             audit_claim_card_high_confidence_evidence_contract(conn_v14, repo_root),
             audit_llm_evidence_boundary(conn_v14, repo_root),

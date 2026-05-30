@@ -3,13 +3,13 @@ Step 6: 三路融合 + 交集报告
 
 三路输入:
   1. VGAE+MPA 主干道: main_path_edges (is_main_path=1) 末端节点
-  2. VGAE Link Prediction: predicted_future_edges (top 200)
+  2. Future candidate generator (GNN/VGAE): predicted_future_edges (top 200)
   3. Limitation Tracking: 未解决 limitation_atoms (top 50)
 
 融合逻辑:
   - 主干道方向延伸 → 主干道末端 2024+ 节点 → 其 VGAE 预测边
   - 限制驱动方向 → 未解决 atom keyword → 匹配 VGAE 预测边
-  - 三路交集 = 最高可信度未来方向
+  - 三路交集 = 候选方向排序信号，仍需 Step13 Claim Card / calibration gates
 
 输出: future_directions 表 + markdown 报告
 

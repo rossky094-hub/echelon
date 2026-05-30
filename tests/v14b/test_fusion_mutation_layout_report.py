@@ -410,7 +410,7 @@ class TestReportGenerator:
         "V14 调权",
         "子图选取",
         "Citation Function Evidence",
-        "VGAE Link Prediction",
+        "Future Candidate Generator",
         "Limitation Tracking",
         "三路融合",
         "三色突变",
@@ -500,6 +500,23 @@ class TestReportGenerator:
         assert "SciBERT 分类完成率" not in report
         assert "SciBERT 引用功能分布" not in report
 
+    def test_algo_report_labels_vgae_as_future_candidate_generator(self, tmp_path):
+        from echelon.v14b.step9_report import generate_algo_report
+        db_v14_path, conn_v14 = create_full_test_db(tmp_path)
+        db_main_path, conn_main = create_main_db(tmp_path)
+
+        report = generate_algo_report(conn_main, conn_v14)
+        conn_v14.close()
+        conn_main.close()
+
+        assert "Future candidate generator 候选边数" in report
+        assert "## 7. Future Candidate Generator" in report
+        assert "GNN/VGAE 只生成 future candidate edges" in report
+        assert "不是方向结论" in report
+        assert "Step13 complete Claim Card" in report
+        assert "VGAE 预测未来边数" not in report
+        assert "VGAE Link Prediction" not in report
+
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report
         db_v14_path, conn_v14 = create_full_test_db(tmp_path)
@@ -524,6 +541,8 @@ class TestReportGenerator:
         assert "evidence_grade" in report
         assert "uncertainty_reasons" in report
         assert "candidate_pool_only" in report
+        assert "Future Candidate Generator (GNN/VGAE)" in report
+        assert "VGAE Link Prediction" not in report
 
     def test_empty_db_report_has_tbd(self, tmp_path):
         """无数据时报告有 TBD 占位"""

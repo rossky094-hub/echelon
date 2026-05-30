@@ -351,7 +351,7 @@ def generate_algo_report(
         f"| 子图边数 | **{subgraph_edges:,}** |",
         f"| 子图结论范围 | **{subgraph_scope_row.get('conclusion_scope', 'pilot/evidence')}** |",
         f"| Citation-function evidence 覆盖率 | **{classification_rate}** |",
-        f"| VGAE 预测未来边数 | **{predicted_edges:,}** |",
+        f"| Future candidate generator 候选边数 | **{predicted_edges:,}** |",
         f"| Limitation atoms 总数 | **{total_atoms:,}** |",
         f"| 三路融合方向数 | **{future_dirs:,}** |",
         f"",
@@ -446,14 +446,18 @@ def generate_algo_report(
         f"",
         f"---",
         f"",
-        f"## 7. VGAE Link Prediction",
+        f"## 7. Future Candidate Generator",
         f"",
-        f"- **预测边总数**: {predicted_edges:,}",
-        f"- **跨 Field 边占比**: **{cross_field_rate}** ({cross_field_preds:,}/{predicted_edges:,})",
+        f"- **候选边总数**: {predicted_edges:,}",
+        f"- **跨 Field 候选边占比**: **{cross_field_rate}** ({cross_field_preds:,}/{predicted_edges:,})",
         f"",
-        f"### Top 5 预测边 (case study)",
+        f"**证据边界**: GNN/VGAE 只生成 future candidate edges；`predicted_prob`/`calibrated_prob` "
+        f"是候选排序信号，不是方向结论。进入 Radar/Topic Dossier 需要 Step6 fusion + "
+        f"Step13 complete Claim Card + calibration audit。",
         f"",
-        f"| 源论文 | 目标论文 | 概率 | 源年 | 目标年 |",
+        f"### Top 5 候选边 (case study)",
+        f"",
+        f"| 源论文 | 目标论文 | 候选概率 | 源年 | 目标年 |",
         f"|---|---|---|---|---|",
     ]
 
@@ -685,7 +689,7 @@ def generate_future_directions_report(
             f"| 证据路径 | 内容 |",
             f"|---|---|",
             f"| 主干道延伸 | {d.get('main_path_evidence') or 'N/A'} |",
-            f"| VGAE Link Prediction | {d.get('vgae_evidence') or 'N/A'} |",
+            f"| Future Candidate Generator (GNN/VGAE) | {d.get('vgae_evidence') or 'N/A'} |",
             f"| Limitation 驱动 | {d.get('limitation_evidence') or 'N/A'} |",
             f"",
         ]
