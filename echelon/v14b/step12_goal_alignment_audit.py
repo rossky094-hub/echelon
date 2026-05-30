@@ -74,6 +74,30 @@ def quality_label(value: float, *, good: float, warn: float) -> str:
     return "risk"
 
 
+def report_json_with_candidate_score_names(raw: Any) -> str:
+    if not raw:
+        return "{}"
+    try:
+        payload = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return str(raw)
+    key_map = {
+        "prediction_confidence_avg": "candidate_ranking_score_avg",
+        "min_vgae_confidence": "min_vgae_candidate_score",
+        "raw_predicted_prob": "raw_candidate_score",
+        "calibrated_predicted_prob": "calibrated_candidate_score",
+    }
+
+    def rewrite(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key_map.get(str(k), str(k)): rewrite(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [rewrite(v) for v in value]
+        return value
+
+    return json.dumps(rewrite(payload), ensure_ascii=False)
+
+
 def build_audit(
     db_main: Path,
     db_v14: Path,
@@ -337,7 +361,7 @@ def build_audit(
         "## Executive Verdict",
         "",
         f"- Product graph layer exists: {visual_nodes:,} visual nodes, {visual_edges:,} visual edges, {clusters:,} clusters, {lineages:,} branch lineages.",
-        f"- Step5b future-growth signal is numerically strong as a ranker: test AUC={float(step5b.get('test_auc') or 0):.4f}, predicted_edges={predicted_total:,}, cross_field={predicted_cross:,}; product confidence is calibrated separately from raw model score.",
+        f"- Step5b future candidate generator is numerically strong as a ranker: test AUC={float(step5b.get('test_auc') or 0):.4f}, candidate_edge_rows={predicted_total:,}, cross_field={predicted_cross:,}; product evidence score is calibrated separately from raw model score.",
         f"- Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,}.",
         f"- Section evidence inventory: table_present={section_table_exists}, rows={section_rows_total:,}, primary-section papers={section_primary_papers:,}.",
         f"- Step6 fusion output is limited: directions={future_dirs:,}, audit_n_directions={fusion_audit_n_directions}, adequacy={fusion_adequacy_label}, consistent={fusion_consistent}. This is acceptable as an honest signal only when audit/product tables agree.",
@@ -355,7 +379,7 @@ def build_audit(
         f"| Step3 keystone | avg_signal_reliability={float(step3_notes.get('avg_signal_reliability') or 0):.3f}, critical_default_papers={step3_notes.get('critical_default_papers', 'n/a')} | pass | score is discriminative only while graph feature columns remain populated |",
         f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | bounded evidence subgraph for extraction support, not complete {corpus_label} graph |",
         f"| Step5a citation function | classified={sum(int(r.get('n') or 0) for r in citation_evidence):,} | weak evidence | no full citation context, therefore use only as fusion/visual weighting |",
-        f"| Step5b future growth | predicted={predicted_total:,}, cross_field={predicted_cross:,}, calibrated_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |",
+        f"| Step5b future candidates | candidate_edges={predicted_total:,}, cross_field={predicted_cross:,}, calibrated_score_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works; calibrated score is product evidence, not scientific certainty |",
         f"| Step5c limitations | atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,} | weak-to-moderate | limitation quality must be visible in graph |",
         f"| Step6 fusion | directions={future_dirs:,}, candidates={fusion_audit.get('n_candidates', 'n/a')} | {fusion_audit.get('adequacy_label', 'unknown')} | few directions means evidence intersection is sparse, not a reason to lower thresholds |",
         f"| Step13 claim cards | cards={claim_cards_total:,}, complete={claim_cards_complete:,}, high_conf={high_conf_eligible:,}, lineage_triples={lineage_triples:,} | {quality_label(claim_cards_complete / max(1, future_dirs), good=0.95, warn=0.70)} | missing 5-question cards cannot be promoted into high-confidence directions |",
@@ -372,20 +396,20 @@ def build_audit(
         "",
         "## Fusion Evidence Adequacy",
         "",
-        f"- top_vgae_used: {fusion_audit.get('n_vgae_preds_top', 'n/a')}",
-        f"- total_vgae_predictions: {fusion_audit.get('n_vgae_preds_total', predicted_total)}",
-        f"- cross_field_predictions: {fusion_audit.get('n_cross_field_total', predicted_cross)}",
+        f"- top_vgae_candidate_edges_used: {fusion_audit.get('n_vgae_preds_top', 'n/a')}",
+        f"- total_future_candidate_edges: {fusion_audit.get('n_vgae_preds_total', predicted_total)}",
+        f"- cross_field_candidate_edges: {fusion_audit.get('n_cross_field_total', predicted_cross)}",
         f"- unresolved_limitations_used: {fusion_audit.get('n_unresolved', 'n/a')}",
         f"- evidence_path_distribution: `{fusion_audit.get('evidence_path_json', '{}')}`",
         f"- candidate_tier_distribution: `{fusion_audit.get('candidate_tier_json', '{}')}`",
-        f"- calibration_distribution: `{fusion_audit.get('calibration_json', '{}')}`",
+        f"- calibration_distribution: `{report_json_with_candidate_score_names(fusion_audit.get('calibration_json', '{}'))}`",
         f"- limitation_quality_distribution: `{fusion_audit.get('limitation_quality_json', '{}')}`",
         "",
         "## Step5b Calibration",
         "",
-        f"- calibrated_predicted_prob_min_avg_max: {pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f}",
-        f"- raw_predicted_prob_min_avg_max: {raw_min:.3f}/{raw_avg:.3f}/{raw_max:.3f}" if raw_min is not None else "- raw_predicted_prob_min_avg_max: n/a",
-        f"- prediction_confidence_avg: {conf_avg:.3f}" if conf_avg is not None else "- prediction_confidence_avg: n/a",
+        f"- calibrated_candidate_score_min_avg_max: {pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f}",
+        f"- raw_candidate_score_min_avg_max: {raw_min:.3f}/{raw_avg:.3f}/{raw_max:.3f}" if raw_min is not None else "- raw_candidate_score_min_avg_max: n/a",
+        f"- candidate_ranking_score_avg: {conf_avg:.3f}" if conf_avg is not None else "- candidate_ranking_score_avg: n/a",
         f"- calibration_labels: `{json.dumps(calibration_labels, ensure_ascii=False)}`",
         f"- rolling_backtest_avg_raw_auc: {float(rolling_backtest.get('avg_raw_auc') or 0):.4f}",
         f"- rolling_backtest_avg_calibrated_auc: {float(rolling_backtest.get('avg_calibrated_auc') or 0):.4f}",
@@ -426,7 +450,7 @@ def build_audit(
         "",
         "1. Linked-reference coverage is still the largest graph-bone risk. The internal citation DAG is large enough to run, but linked_refs/raw_refs is still coverage-limited.",
         "2. OpenAlex Field/Topic coverage is partial. Cross-field color, bridge, and future direction claims should expose uncertainty until field coverage improves.",
-        "3. Step5b now includes calibration + rolling held-out-year checks, but user-facing confidence still needs external LLM/human stratified audit calibration.",
+        "3. Step5b now includes calibration + rolling held-out-year checks, but user-facing candidate scores still need external LLM/human stratified audit calibration.",
         "4. Step5c is weak when based on abstracts. Section-level `paper_sections` / Sci-Bot sections are needed before limitation-driven bottleneck claims become strong.",
         "5. Step6 evidence tiers improve transparency, but exploratory directions remain hypotheses. The next improvement should strengthen branch lineage and candidate generation with stronger external validation, not just lower thresholds.",
         "6. Branch lineage now exposes support ratios and alternative parents, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.",
@@ -435,7 +459,7 @@ def build_audit(
         "",
         "## Recommendation",
         "",
-        "The current output is suitable as an evidence-aware pilot visual graph and search/recommendation substrate. It is not yet strong enough to present future directions as high-confidence scientific forecasts. The next engineering priority is section-level evidence ingestion plus calibrated future-growth/branch-lineage validation.",
+        "The current output is suitable as an evidence-aware visual graph and search/recommendation substrate. It is not yet strong enough to present future directions as high-confidence scientific directions. The next engineering priority is section-level evidence ingestion plus calibrated future-candidate/branch-lineage validation.",
     ]
 
     conn_main.close()

@@ -1,6 +1,6 @@
 # V14B Goal Alignment Audit
 
-Generated: 2026-05-31 02:14
+Generated: 2026-05-31 02:34
 
 ## Project Goal
 
@@ -9,9 +9,9 @@ Build an explainable **all** evolution graph that can show why the field grew in
 ## Executive Verdict
 
 - Product graph layer exists: 55,391 visual nodes, 772,947 visual edges, 5,286 clusters, 5,286 branch lineages.
-- Step5b future-growth signal is numerically strong as a ranker: test AUC=0.8371, predicted_edges=1,000, cross_field=60; product confidence is calibrated separately from raw model score.
+- Step5b future candidate generator is numerically strong as a ranker: test AUC=0.8371, candidate_edge_rows=1,000, cross_field=60; product evidence score is calibrated separately from raw model score.
 - Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms=730, resolutions=1,001.
-- Section evidence inventory: table_present=True, rows=4,815, primary-section papers=2,750.
+- Section evidence inventory: table_present=True, rows=4,888, primary-section papers=2,788.
 - Step6 fusion output is limited: directions=5, audit_n_directions=5, adequacy=limited_but_usable_with_uncertainty, consistent=True. This is acceptable as an honest signal only when audit/product tables agree.
 - Step13 first-principles bottleneck lineage: principles=6, atoms_covered=730, high_risk_principles=0.
 - Step13 claim cards: total=5, five-question-complete=1, high-confidence-eligible=0, lineage_triples=2,920.
@@ -27,7 +27,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 | Step3 keystone | avg_signal_reliability=1.000, critical_default_papers=0 | pass | score is discriminative only while graph feature columns remain populated |
 | Step4 subgraph | nodes=5,000, edges=38,538, scope=bounded_evidence_subgraph | bounded_evidence_subgraph_adequate_for_extraction | bounded evidence subgraph for extraction support, not complete all graph |
 | Step5a citation function | classified=38,538 | weak evidence | no full citation context, therefore use only as fusion/visual weighting |
-| Step5b future growth | predicted=1,000, cross_field=60, calibrated_min/avg/max=0.995/0.995/0.995 | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |
+| Step5b future candidates | candidate_edges=1,000, cross_field=60, calibrated_score_min/avg/max=0.995/0.995/0.995 | warning | ranking works; calibrated score is product evidence, not scientific certainty |
 | Step5c limitations | atoms=730, resolutions=1,001 | weak-to-moderate | limitation quality must be visible in graph |
 | Step6 fusion | directions=5, candidates=5 | limited_but_usable_with_uncertainty | few directions means evidence intersection is sparse, not a reason to lower thresholds |
 | Step13 claim cards | cards=5, complete=1, high_conf=0, lineage_triples=2,920 | risk | missing 5-question cards cannot be promoted into high-confidence directions |
@@ -40,20 +40,20 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 ## Fusion Evidence Adequacy
 
-- top_vgae_used: 500
-- total_vgae_predictions: 1000
-- cross_field_predictions: 60
+- top_vgae_candidate_edges_used: 500
+- total_future_candidate_edges: 1000
+- cross_field_candidate_edges: 60
 - unresolved_limitations_used: 50
 - evidence_path_distribution: `{"2": 5}`
 - candidate_tier_distribution: `{"exploratory": 5}`
-- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 5}, "prediction_confidence_avg": 0.8329225875546147, "min_vgae_confidence": 0.55, "vgae_top_n": 500}`
+- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 5}, "candidate_ranking_score_avg": 0.8329225875546147, "min_vgae_candidate_score": 0.55, "vgae_top_n": 500}`
 - limitation_quality_distribution: `{"section_level": 50}`
 
 ## Step5b Calibration
 
-- calibrated_predicted_prob_min_avg_max: 0.995/0.995/0.995
-- raw_predicted_prob_min_avg_max: 0.985/0.991/1.000
-- prediction_confidence_avg: 0.833
+- calibrated_candidate_score_min_avg_max: 0.995/0.995/0.995
+- raw_candidate_score_min_avg_max: 0.985/0.991/1.000
+- candidate_ranking_score_avg: 0.833
 - calibration_labels: `[{"label": "calibrated_temporal_holdout", "n": 1000}]`
 - rolling_backtest_avg_raw_auc: 0.8367
 - rolling_backtest_avg_calibrated_auc: 0.8367
@@ -68,7 +68,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 ## Hard Acceptance Gates
 
 - linked_refs_ratio >= 30%: current=0.139 -> risk
-- top-keystone section evidence coverage >= 70%: current=2.750 (2750/1000) -> pass
+- top-keystone section evidence coverage >= 70%: current=2.788 (2788/1000) -> pass
 - every direction has 5-question claim card: current=1/5 -> risk
 - future calibration report present: current=True -> pass
 - fusion audit matches future_directions table: current=True -> pass
@@ -90,7 +90,7 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 1. Linked-reference coverage is still the largest graph-bone risk. The internal citation DAG is large enough to run, but linked_refs/raw_refs is still coverage-limited.
 2. OpenAlex Field/Topic coverage is partial. Cross-field color, bridge, and future direction claims should expose uncertainty until field coverage improves.
-3. Step5b now includes calibration + rolling held-out-year checks, but user-facing confidence still needs external LLM/human stratified audit calibration.
+3. Step5b now includes calibration + rolling held-out-year checks, but user-facing candidate scores still need external LLM/human stratified audit calibration.
 4. Step5c is weak when based on abstracts. Section-level `paper_sections` / Sci-Bot sections are needed before limitation-driven bottleneck claims become strong.
 5. Step6 evidence tiers improve transparency, but exploratory directions remain hypotheses. The next improvement should strengthen branch lineage and candidate generation with stronger external validation, not just lower thresholds.
 6. Branch lineage now exposes support ratios and alternative parents, but parent-child branch causality still needs stronger validation against citation/community history and LLM/human audit samples.
@@ -99,4 +99,4 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 ## Recommendation
 
-The current output is suitable as an evidence-aware pilot visual graph and search/recommendation substrate. It is not yet strong enough to present future directions as high-confidence scientific forecasts. The next engineering priority is section-level evidence ingestion plus calibrated future-growth/branch-lineage validation.
+The current output is suitable as an evidence-aware visual graph and search/recommendation substrate. It is not yet strong enough to present future directions as high-confidence scientific directions. The next engineering priority is section-level evidence ingestion plus calibrated future-candidate/branch-lineage validation.

@@ -462,6 +462,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
     config_path = root / "echelon/v14b/config.py"
     step6_path = root / "echelon/v14b/step6_fusion.py"
     api_path = root / "echelon/api/graph_visual_backend.py"
+    app_path = root / "web/visual-graph/app.js"
     current_future_docs = (
         root / "reports/v14b_pilot/100h_product_execution_plan.md",
         root / "reports/v14b_pilot/100h_value_delivery_plan.md",
@@ -493,6 +494,28 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
             for path in current_future_docs
             if path.exists()
         ),
+        "public_future_candidate_language_avoids_prediction_copy": (
+            _source_contains(api_path, ("future candidate generator", "candidate_score"))
+            and _source_contains(app_path, ("future candidate generator", "candidate score"))
+            and _source_absent(
+                api_path,
+                (
+                    "temporal link prediction",
+                    "predicted link",
+                    "predicted directions",
+                    "direction confidence",
+                    "cumulative confidence",
+                ),
+            )
+            and _source_absent(
+                app_path,
+                (
+                    "temporal link prediction",
+                    "GNN/VGAE confidence",
+                    "technical probability",
+                ),
+            )
+        ),
     }
     if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):
         status = "fail"
@@ -505,7 +528,7 @@ def audit_future_growth(conn_v14: sqlite3.Connection, repo_root: Path | None = N
     return {
         "issue": "Future Growth Calibration",
         "status": status,
-        "predicted_future_edges": predicted,
+        "future_candidate_edge_rows": predicted,
         "calibration_audits": calibration,
         "edge_calibrated_candidates": edge_calibration.get("edge_calibrated_candidates", 0),
         "edge_calibration_rate": edge_calibration.get("edge_calibration_rate", 0.0),
@@ -1682,7 +1705,7 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         source_checks = {
             "api_exposes_candidate_pool": _source_contains(
                 repo_root / "echelon/api/graph_visual_backend.py",
-                ("claim_cards", "incomplete_claim_cards", "candidate_pool", "GNN future edges"),
+                ("claim_cards", "incomplete_claim_cards", "candidate_pool", "GNN/VGAE candidate edges"),
             ),
             "ui_separates_radar_from_candidate_pool": _source_contains(
                 repo_root / "web/visual-graph/app.js",

@@ -681,8 +681,11 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
         "## Derived Product Tables",
         "",
     ]
+    table_labels = {
+        "predicted_future_edges": "future_candidate_edges_table",
+    }
     for table, count in sorted((v14.get("tables") or {}).items()):
-        lines.append(f"- {table}: {count:,}")
+        lines.append(f"- {table_labels.get(table, table)}: {count:,}")
     if "claim_cards_complete" in v14:
         lines.append(f"- complete Claim Cards: {v14['claim_cards_complete']:,}")
         lines.append(f"- high-confidence Claim Cards: {v14['claim_cards_high_confidence']:,}")

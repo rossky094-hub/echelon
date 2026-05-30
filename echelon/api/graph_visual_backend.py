@@ -1293,9 +1293,9 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
                 "display": "thin blue edges; proximity aid, not historical causality",
             },
             "future": {
-                "algorithm": "Step5b calibrated temporal link prediction + Step6/Step13 fusion when available",
-                "relationship": "candidate future growth links from older enabling papers/bottlenecks toward newer or predicted directions",
-                "display": "purple dashed arcs; treat as probability-ranked hypotheses with calibration status",
+                "algorithm": "Step5b calibrated future candidate generator + Step6/Step13 fusion when available",
+                "relationship": "candidate future-growth links from older enabling papers/bottlenecks toward newer candidate directions",
+                "display": "purple dashed arcs; treat as score-ranked hypotheses with calibration status",
             },
             "bottleneck": {
                 "algorithm": "Step5c/Step13 section-level limitation atoms and typed bottleneck lineage triples",
@@ -1310,7 +1310,7 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
             "fusion_value": {
                 "algorithm": "Step6 tiered fusion + Step13 Claim Card quality gates",
                 "relationship": (
-                    "combines main-path support, calibrated future probability, unresolved bottlenecks, section evidence, "
+                    "combines main-path support, calibrated future-candidate score, unresolved bottlenecks, section evidence, "
                     "branch lineage, and claim-card completeness into decision value"
                 ),
                 "display": "Radar/Claim Cards; unavailable as high-confidence if directions or claim cards are not materialized",
@@ -1341,7 +1341,7 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
                 question="哪些论文真正承接了最多演化流量？",
                 relationship="Main Path isolates the high-throughput citation backbone.",
                 display="Only black trunk edges are emphasized; this is the cleanest view of lineage, not topic breadth.",
-                decision_use="Use for key turning papers and historical dependency, not for future prediction.",
+                decision_use="Use for key turning papers and historical dependency, not for future candidate validation.",
                 can_explain=["historical dependency backbone", "candidate key turning papers", "where to audit local citation support"],
                 cannot_explain=["topic community breadth", "unresolved bottlenecks", "future R&D direction value"],
                 required_evidence=["linked citation refs", "SCC-condensed DAG audit", "main_path edge weights"],
@@ -1404,10 +1404,10 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
                 layers=["future", "bottleneck"],
                 label="Bottleneck-driven future candidates",
                 question="哪些未来候选是由未解卡点驱动的？",
-                relationship="GNN/VGAE proposes future links; bottleneck evidence tests whether they address real constraints.",
+                relationship="GNN/VGAE proposes future candidate links; bottleneck evidence tests whether they address real constraints.",
                 display="Purple dashed candidates with red/orange bottleneck evidence.",
                 decision_use="Use as candidate pool only; it cannot become Radar without Claim Cards.",
-                can_explain=["which predicted links overlap unresolved constraints", "where to build a Claim Card next"],
+                can_explain=["which candidate links overlap unresolved constraints", "where to build a Claim Card next"],
                 cannot_explain=["that a direction is investable", "that a bottleneck will be solved"],
                 required_evidence=["calibrated future candidates", "unresolved limitation atoms", "Step6 fusion evidence"],
                 claim_scope="candidate_pool_only",
@@ -3201,7 +3201,7 @@ def _build_validation_directions(
                         "candidate-pool prioritization for Step6/Step13 evidence gathering",
                     ],
                     "cannot_explain": [
-                        "that the predicted link will become true",
+                        "that the candidate link will become a validated future outcome",
                         "that the direction is valid or investable",
                         "Radar promotion without a complete Claim Card",
                     ],
@@ -4145,11 +4145,13 @@ def _build_rd_radar(
                 "kind": "candidate_edge",
                 "title": f"{src} -> {dst}",
                 "priority": round(conf * 0.55, 4),
-                "technical_probability": conf,
+                "technical_probability": None,
+                "candidate_score": conf,
                 "model_evidence": {
-                    "generator": "Step5b VGAE / temporal link prediction",
+                    "generator": "Step5b GNN/VGAE future candidate generator",
+                    "candidate_score": conf,
                     "calibrated_prob": evidence.get("calibrated_prob"),
-                    "raw_predicted_prob": evidence.get("raw_predicted_prob"),
+                    "raw_candidate_score": evidence.get("raw_candidate_score") or evidence.get("raw_predicted_prob"),
                     "calibration_method": evidence.get("calibration_method"),
                     "calibration_support": evidence.get("calibration_support"),
                     "calibration_label": evidence.get("calibration_label"),
@@ -4223,8 +4225,8 @@ def _build_rd_radar(
     return {
         "summary": (
             "R&D Radar only promotes complete Step13 Claim Cards. High-confidence status additionally requires "
-            "strong section evidence, calibrated future-growth backtest, and sufficient direction confidence. "
-            "GNN future edges and incomplete cards stay in the candidate pool."
+            "strong section evidence, calibrated future-growth backtest, and sufficient direction evidence score. "
+            "GNN/VGAE candidate edges and incomplete cards stay in the candidate pool."
         ),
         "items": items,
         "claim_cards": claim_cards,
@@ -5825,7 +5827,7 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
     if layer_counts.get("main_path"):
         why_parts.append(f"main-path node: {layer_counts['main_path']} loaded trunk edges, cumulative weight {main_weight:.2f}")
     if layer_counts.get("future"):
-        why_parts.append(f"future anchor/candidate endpoint: {layer_counts['future']} future edges, cumulative confidence {future_weight:.2f}")
+        why_parts.append(f"future anchor/candidate endpoint: {layer_counts['future']} future edges, cumulative candidate score {future_weight:.2f}")
     if visual_role == "limitation_bottleneck" or (paper.get("limitations") or []):
         why_parts.append("bottleneck evidence paper: local limitation atoms are available or the visual role marks it as a bottleneck")
     if not why_parts:
