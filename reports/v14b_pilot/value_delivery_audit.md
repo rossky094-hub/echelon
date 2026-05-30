@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:04:53Z`
+- generated_at: `2026-05-30T17:10:28Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 24906,
+    "openalex_frontfill_cooldown_remaining_s": 24572,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2639,
+    "primary_section_papers": 2683,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 402,
+        "strong": 446,
         "weak": 2237
       },
-      "primary_section_papers": 2639,
-      "primary_section_rows": 4602,
+      "primary_section_papers": 2683,
+      "primary_section_rows": 4691,
       "strategy_counts": {
-        "embedded_heading": 19,
-        "explicit_heading": 485,
-        "heading_continuation": 697,
-        "inline_heading": 249,
+        "embedded_heading": 20,
+        "explicit_heading": 547,
+        "heading_continuation": 785,
+        "inline_heading": 278,
         "legacy_unknown_strategy": 3886,
-        "loose_inline_heading": 12,
-        "parser_hint": 8
+        "loose_inline_heading": 13,
+        "parser_hint": 9
       },
-      "strong_or_moderate_papers": 402,
+      "strong_or_moderate_papers": 446,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8476695718075028
+      "weak_only_rate": 0.8337681699590012
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -234,10 +234,12 @@
     "citation_llm_fallback_explicit_and_weak": true,
     "fusion_llm_naming_opt_in": true,
     "limitation_llm_traced_and_optional": true,
+    "limitation_user_copy_is_section_first": true,
     "llm_citation_without_context_remains_weak": true,
     "llm_data_contract_columns_present": true,
     "llm_defaults_off": true,
     "llm_edge_audit_is_capped_audit": true,
+    "makefile_limitation_target_avoids_llm_cost_claim": true,
     "step13_non_llm_engine": true,
     "topic_preflight_no_llm": true
   },

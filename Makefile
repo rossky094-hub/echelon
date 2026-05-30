@@ -323,7 +323,7 @@ post-frontfill-chain:
 		--db-main $(DB_MAIN) \
 		--db-v14 $(DB_V14)
 
-## Step 5c: Limitation Tracking (~4h, ~$40 LLM 费用)
+## Step 5c: section-first limitation tracking; LLM opt-in only for weak traced assistance
 limitation:
 	@echo ">>> Step 5c: Limitation Tracking..."
 	$(PYTHON) -m echelon.v14b.step5c_limitation \

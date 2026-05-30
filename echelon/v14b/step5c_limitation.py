@@ -1,11 +1,16 @@
 """
-Step 5c: Sci-Bot Limitation 抽取 + Limitation Tracking
+Step 5c: section-first Limitation 抽取 + Limitation Tracking
+
+当前 V14B 主流程默认不调用外部 LLM。Step5c 先使用已入库 section
+evidence 提取 limitation / discussion / conclusion 等段落,再用可重跑的
+启发式规则把 limitation 段原子化并跟踪 resolution。LLM opt-in 只允许作为
+弱证据辅助抽检/命名/解释,必须保留 extractor_method 与 evidence_quality。
 
 4 个阶段:
-  Phase 1: Sci-Bot 抽取 top 1000 论文的 limitation 段
-  Phase 2: LLM 把 limitation 段原子化 (3-5 个 atoms/paper)
-  Phase 3: 对每个 atom 遍历后续引用,LLM 判 resolution
-  Phase 4: 排序未解决 atoms
+  Phase 1: 从结构化 section evidence 选取 limitation/context 段落
+  Phase 2: section-first/heuristic 原子化 limitation atoms
+  Phase 3: 对每个 atom 遍历后续引用,用可审计规则标记 candidate resolution
+  Phase 4: 排序未解决 atoms,供 Step6/Step13 形成低置信候选或 Claim Card 证据
 
 支持中断恢复: 每个 atom/resolution 完成后立即 commit DB
 
@@ -241,7 +246,11 @@ def extract_limitation_atoms(
     llm_client,
 ) -> List[dict]:
     """
-    调用 LLM 从论文摘要中抽取 limitation atoms。
+    从 section/abstract evidence 抽取 limitation atoms。
+
+    默认路径是 deterministic heuristic；只有显式传入 llm_client 时才调用
+    LLM,并通过 _limitation_evidence_common 继承 weak/section evidence
+    provenance,不能自动升级为决策级证据。
     """
     text = (paper.get("limitation_text") or paper.get("abstract", "") or "")[:6000]
     if llm_client is None:
@@ -394,7 +403,10 @@ def check_resolution(
     llm_client,
 ) -> Optional[dict]:
     """
-    调用 LLM 判断 resolver_paper 是否解决了 atom 描述的 limitation。
+    判断 resolver_paper 是否可能解决 atom 描述的 limitation。
+
+    默认路径用 keyword/term overlap + resolution verbs 生成可审计候选；
+    LLM 只在显式 opt-in 时辅助解释,不能替代 section/citation evidence。
     """
     if llm_client is None:
         text = f"{resolver_paper.get('title', '')} {resolver_paper.get('abstract', '')}"

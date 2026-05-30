@@ -813,6 +813,8 @@ def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | 
     source_checks = {
         "llm_defaults_off": False,
         "limitation_llm_traced_and_optional": False,
+        "limitation_user_copy_is_section_first": False,
+        "makefile_limitation_target_avoids_llm_cost_claim": False,
         "citation_llm_fallback_explicit_and_weak": False,
         "fusion_llm_naming_opt_in": False,
         "step13_non_llm_engine": False,
@@ -832,6 +834,34 @@ def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | 
             "limitation_llm_traced_and_optional": _source_contains(
                 repo_root / "echelon/v14b/step5c_limitation.py",
                 ("extractor_method", "LIMITATION_USE_LLM else None", "_limitation_evidence_common"),
+            ),
+            "limitation_user_copy_is_section_first": (
+                _source_contains(
+                    repo_root / "echelon/v14b/step5c_limitation.py",
+                    (
+                        "section-first Limitation",
+                        "默认不调用外部 LLM",
+                        "LLM opt-in",
+                        "不能自动升级为决策级证据",
+                    ),
+                )
+                and _source_absent(
+                    repo_root / "echelon/v14b/step5c_limitation.py",
+                    (
+                        "LLM 把 limitation 段原子化",
+                        "LLM 判 resolution",
+                    ),
+                )
+            ),
+            "makefile_limitation_target_avoids_llm_cost_claim": (
+                _source_contains(
+                    repo_root / "Makefile",
+                    ("section-first limitation tracking", "LLM opt-in only"),
+                )
+                and _source_absent(
+                    repo_root / "Makefile",
+                    ("~$40 LLM", "LLM 费用"),
+                )
             ),
             "citation_llm_fallback_explicit_and_weak": _source_contains(
                 repo_root / "echelon/v14b/step5a_scibert.py",

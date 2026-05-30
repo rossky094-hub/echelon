@@ -195,7 +195,9 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "step5c_limitation.py").write_text(
-        "extractor_method LIMITATION_USE_LLM else None _limitation_evidence_common\n",
+        "section-first Limitation 默认不调用外部 LLM LLM opt-in "
+        "不能自动升级为决策级证据 extractor_method LIMITATION_USE_LLM else None "
+        "_limitation_evidence_common\n",
         encoding="utf-8",
     )
     (v14 / "step5a_scibert.py").write_text(
@@ -218,6 +220,13 @@ def _write_product_sources(root: Path) -> None:
         "make product-chain make post-frontfill-chain legacy compatibility "
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n",
+        encoding="utf-8",
+    )
+    makefile = root / "Makefile"
+    makefile_text = makefile.read_text(encoding="utf-8") if makefile.exists() else ""
+    makefile.write_text(
+        makefile_text
+        + "\n## Step 5c: section-first limitation tracking; LLM opt-in only for weak traced assistance\n",
         encoding="utf-8",
     )
     scripts = root / "scripts"
@@ -496,6 +505,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     llm_gate = next(g for g in result["gates"] if g["issue"] == "LLM Evidence Boundary Contract")
     assert llm_gate["status"] == "pass"
     assert llm_gate["checks"]["abstract_llm_atoms_remain_weak"] is True
+    assert llm_gate["checks"]["limitation_user_copy_is_section_first"] is True
+    assert llm_gate["checks"]["makefile_limitation_target_avoids_llm_cost_claim"] is True
     legacy_gate = next(g for g in result["gates"] if g["issue"] == "Legacy Flow Isolation Contract")
     assert legacy_gate["status"] == "pass"
     assert legacy_gate["checks"]["product_chains_avoid_legacy_targets"] is True
@@ -768,6 +779,31 @@ def test_llm_evidence_boundary_allows_weak_traced_llm_labels(tmp_path):
     assert result["llm_limitation_atoms"] == 1
     assert result["invalid_llm_atoms"] == 0
     assert result["invalid_llm_citation_edges"] == 0
+    conn.close()
+
+
+def test_llm_evidence_boundary_rejects_step5c_llm_default_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step5c_limitation.py").write_text(
+        "Step 5c\n"
+        "Phase 2: LLM 把 limitation 段原子化\n"
+        "Phase 3: 对每个 atom 遍历后续引用,LLM 判 resolution\n"
+        "extractor_method LIMITATION_USE_LLM else None _limitation_evidence_common\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "Makefile").write_text(
+        "## Step 5c: Limitation Tracking (~4h, ~$40 LLM 费用)\n",
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+
+    result = audit_llm_evidence_boundary(conn, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["limitation_user_copy_is_section_first"] is False
+    assert result["checks"]["makefile_limitation_target_avoids_llm_cost_claim"] is False
     conn.close()
 
 
