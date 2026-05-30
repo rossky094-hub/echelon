@@ -137,6 +137,78 @@ def test_watchdog_counts_current_parser_contract_primary_sections(tmp_path):
     assert mod.get_primary_section_contract_counts(db_main) == (2, 1)
 
 
+def test_watchdog_detects_legacy_parser_attempt_contract_mismatch(tmp_path):
+    mod = _load_watchdog_module()
+    db_main = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db_main))
+    conn.executescript(
+        """
+        CREATE TABLE section_ingest_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paper_id TEXT,
+            attempt_ts TEXT,
+            outcome TEXT,
+            parser_name TEXT
+        );
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO section_ingest_attempts
+            (paper_id, attempt_ts, outcome, parser_name)
+        VALUES ('p_legacy', '2026-05-31T00:00:00Z', 'success_primary', 'v14b_section_ingest_v2')
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    latest = mod.get_latest_attempt_parser_contract(db_main)
+
+    assert latest["parser_name"] == "v14b_section_ingest_v2"
+    assert latest["parser_contract_version"] is None
+    assert mod.has_parser_contract_mismatch(latest)
+
+
+def test_watchdog_accepts_current_parser_attempt_contract(tmp_path):
+    mod = _load_watchdog_module()
+    db_main = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db_main))
+    conn.executescript(
+        """
+        CREATE TABLE section_ingest_attempts (
+            attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            paper_id TEXT,
+            attempt_ts TEXT,
+            outcome TEXT,
+            parser_name TEXT,
+            parser_contract_version TEXT
+        );
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO section_ingest_attempts
+            (paper_id, attempt_ts, outcome, parser_name, parser_contract_version)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            "p_current",
+            "2026-05-31T00:00:00Z",
+            "success_primary",
+            mod.SECTION_PARSER_NAME,
+            mod.SECTION_PARSER_CONTRACT_VERSION,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    latest = mod.get_latest_attempt_parser_contract(db_main)
+
+    assert latest["parser_name"] == mod.SECTION_PARSER_NAME
+    assert latest["parser_contract_version"] == mod.SECTION_PARSER_CONTRACT_VERSION
+    assert not mod.has_parser_contract_mismatch(latest)
+
+
 def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
     mod = _load_watchdog_module()
     # A restart should preserve evidence counters separately from ordinary

@@ -21,7 +21,7 @@ import subprocess
 import time
 from typing import Optional
 
-from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
+from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION, SECTION_PARSER_NAME
 
 PROGRESS_RE = re.compile(
     r"(?P<done>\d+)\s*/\s*(?P<total>\d+)\s*"
@@ -89,6 +89,52 @@ def _table_cols(conn: sqlite3.Connection, table: str) -> set[str]:
         return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     except sqlite3.Error:
         return set()
+
+
+def get_latest_attempt_parser_contract(db_main: pathlib.Path) -> dict:
+    """Return the latest Step5s attempt parser metadata, if available."""
+    conn = sqlite3.connect(str(db_main))
+    try:
+        cols = _table_cols(conn, "section_ingest_attempts")
+        if not cols:
+            return {}
+        parser_name_expr = "parser_name" if "parser_name" in cols else "NULL AS parser_name"
+        contract_expr = (
+            "parser_contract_version"
+            if "parser_contract_version" in cols
+            else "NULL AS parser_contract_version"
+        )
+        row = conn.execute(
+            f"""
+            SELECT paper_id, attempt_ts, outcome, {parser_name_expr}, {contract_expr}
+            FROM section_ingest_attempts
+            ORDER BY attempt_ts DESC, attempt_id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if not row:
+            return {}
+        return {
+            "paper_id": row[0],
+            "attempt_ts": row[1],
+            "outcome": row[2],
+            "parser_name": row[3],
+            "parser_contract_version": row[4],
+        }
+    finally:
+        conn.close()
+
+
+def has_parser_contract_mismatch(attempt: dict) -> bool:
+    if not attempt:
+        return False
+    parser_name = str(attempt.get("parser_name") or "").strip()
+    contract = str(attempt.get("parser_contract_version") or "").strip()
+    if contract:
+        return contract != SECTION_PARSER_CONTRACT_VERSION
+    if parser_name:
+        return parser_name != SECTION_PARSER_NAME
+    return True
 
 
 PRIMARY_SECTION_NAMES = {
@@ -271,6 +317,14 @@ def main() -> None:
     )
     parser.add_argument("--no-restart-on-stall", action="store_true")
     parser.add_argument(
+        "--no-restart-on-contract-mismatch",
+        action="store_true",
+        help=(
+            "Do not terminate a running Step5s process when latest attempts show "
+            "an older parser or missing parser-contract metadata."
+        ),
+    )
+    parser.add_argument(
         "--restart-cmd",
         default="python3 -m echelon.v14b.step5s_section_ingest --db db/echelon_library.sqlite3 --db-v14 db/v14_pilot.sqlite3 --top-n 1200",
     )
@@ -319,6 +373,7 @@ def main() -> None:
     last_contract_evidence_done = state.get("last_contract_evidence_done", last_done)
     last_contract_evidence_ts = float(state.get("last_contract_evidence_ts") or last_change_ts)
     current_contract_low_yield_intervals = int(state.get("current_contract_low_yield_intervals") or 0)
+    contract_mismatch_restart_attempt_ts = state.get("contract_mismatch_restart_attempt_ts")
 
     append_log(log_file, f"[START] {utc_now()} step5s watchdog interval={args.interval_sec}s")
 
@@ -331,6 +386,8 @@ def main() -> None:
         progress = get_progress(progress_log)
         done = progress_data.get("done")
         primary_section_papers, current_contract_primary_section_papers = get_primary_section_contract_counts(db_main)
+        latest_attempt_contract = get_latest_attempt_parser_contract(db_main)
+        parser_contract_mismatch = has_parser_contract_mismatch(latest_attempt_contract)
         log_mtime = progress_log.stat().st_mtime if progress_log.exists() else 0.0
         now = time.time()
 
@@ -412,8 +469,31 @@ def main() -> None:
                 f"no_current_contract_elapsed_s={no_current_contract_elapsed_s} "
                 f"low_yield_intervals={low_yield_intervals} "
                 f"current_contract_low_yield_intervals={current_contract_low_yield_intervals} "
+                f"latest_attempt_parser={latest_attempt_contract.get('parser_name') or 'unknown'} "
+                f"latest_attempt_contract={latest_attempt_contract.get('parser_contract_version') or 'unknown'} "
+                f"parser_contract_mismatch={int(parser_contract_mismatch)} "
                 f"stale_intervals={stale_intervals} {progress}"
             ),
+        )
+        if parser_contract_mismatch:
+            append_log(
+                log_file,
+                (
+                    f"[{ts}] SECTION_PARSER_CONTRACT_MISMATCH "
+                    f"latest_attempt_ts={latest_attempt_contract.get('attempt_ts') or 'unknown'} "
+                    f"parser={latest_attempt_contract.get('parser_name') or 'unknown'} "
+                    f"contract={latest_attempt_contract.get('parser_contract_version') or 'unknown'} "
+                    f"expected_parser={SECTION_PARSER_NAME} expected_contract={SECTION_PARSER_CONTRACT_VERSION}"
+                ),
+            )
+        mismatch_attempt_ts = latest_attempt_contract.get("attempt_ts") if parser_contract_mismatch else None
+        should_restart_contract_mismatch = (
+            bool(pid)
+            and pid != "unknown"
+            and parser_contract_mismatch
+            and not args.no_restart_on_contract_mismatch
+            and mismatch_attempt_ts
+            and mismatch_attempt_ts != contract_mismatch_restart_attempt_ts
         )
         if low_yield:
             append_log(
@@ -444,6 +524,20 @@ def main() -> None:
                     "crawler may be producing legacy/weak evidence, but not current parser-contract evidence"
                 ),
             )
+        if should_restart_contract_mismatch:
+            append_log(
+                log_file,
+                (
+                    f"[{ts}] terminate Step5s pid={pid} due to parser-contract mismatch; "
+                    f"restart Step5s with current code: {' '.join(restart_argv)}"
+                ),
+            )
+            _kill_pid(pid)
+            time.sleep(20)
+            subprocess.Popen(restart_argv, cwd=str(repo_root))
+            contract_mismatch_restart_attempt_ts = mismatch_attempt_ts
+            stale_intervals = 0
+            last_change_ts = time.time()
         if hard_stall:
             append_log(
                 log_file,
@@ -509,6 +603,11 @@ def main() -> None:
                     "low_yield_intervals": low_yield_intervals,
                     "current_contract_low_yield_intervals": current_contract_low_yield_intervals,
                     "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                    "latest_attempt_parser_name": latest_attempt_contract.get("parser_name"),
+                    "latest_attempt_parser_contract_version": latest_attempt_contract.get("parser_contract_version"),
+                    "latest_attempt_ts": latest_attempt_contract.get("attempt_ts"),
+                    "parser_contract_mismatch": parser_contract_mismatch,
+                    "contract_mismatch_restart_attempt_ts": contract_mismatch_restart_attempt_ts,
                     "stale_intervals": stale_intervals,
                     "status": status,
                 },
@@ -522,6 +621,8 @@ def main() -> None:
                 break
             append_log(log_file, f"[{ts}] step5s missing and not done; restart: {' '.join(restart_argv)}")
             subprocess.Popen(restart_argv, cwd=str(repo_root))
+            if parser_contract_mismatch and mismatch_attempt_ts:
+                contract_mismatch_restart_attempt_ts = mismatch_attempt_ts
             time.sleep(15)
 
         _write_state(
@@ -548,6 +649,11 @@ def main() -> None:
                 "low_yield_intervals": low_yield_intervals,
                 "current_contract_low_yield_intervals": current_contract_low_yield_intervals,
                 "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                "latest_attempt_parser_name": latest_attempt_contract.get("parser_name"),
+                "latest_attempt_parser_contract_version": latest_attempt_contract.get("parser_contract_version"),
+                "latest_attempt_ts": latest_attempt_contract.get("attempt_ts"),
+                "parser_contract_mismatch": parser_contract_mismatch,
+                "contract_mismatch_restart_attempt_ts": contract_mismatch_restart_attempt_ts,
                 "stale_intervals": stale_intervals,
                 "status": status,
             },
