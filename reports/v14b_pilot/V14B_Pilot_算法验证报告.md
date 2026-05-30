@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 01:15
+**生成时间**: 2026-05-31 01:20
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -182,8 +182,8 @@
 **重型算法调优建议**:
 1. Citation function: 如 extension+motivation+usage 占比 < 40%,先补 citation context 或运行 capped LLM edge audit 抽检；LLM 结果只能作为弱标签,不能直接升级结论
 2. VGAE: 如 AUC < 0.80,减少 epoch → 调 lr → 增加 negative sampling
-3. Limitation: 如 high-confidence resolution < 30%,放宽阈值到 0.5
+3. Limitation/resolution: 如 high-confidence resolution < 30%,保持 exploratory / candidate_pool, 优先补 limitation/discussion/resolution section evidence 与 linked resolution evidence；阈值不得下调来晋升高置信
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:15*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:20*

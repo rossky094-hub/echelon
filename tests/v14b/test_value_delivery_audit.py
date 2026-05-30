@@ -223,7 +223,9 @@ def _write_product_sources(root: Path) -> None:
         "make product-chain make post-frontfill-chain legacy compatibility "
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
-        "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n",
+        "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
+        "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
+        "linked resolution evidence 阈值不得下调\n",
         encoding="utf-8",
     )
     makefile = root / "Makefile"
@@ -506,6 +508,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     high_conf_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card High-Confidence Evidence Contract")
     assert high_conf_gate["status"] == "pass"
     assert high_conf_gate["checks"]["no_high_confidence_card_without_section_evidence"] is True
+    assert high_conf_gate["checks"]["step9_does_not_recommend_threshold_relaxation"] is True
     llm_gate = next(g for g in result["gates"] if g["issue"] == "LLM Evidence Boundary Contract")
     assert llm_gate["status"] == "pass"
     assert llm_gate["checks"]["abstract_llm_atoms_remain_weak"] is True
@@ -703,6 +706,33 @@ def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp
     assert result["invalid_high_confidence_cards"] == 1
     assert "section_evidence_strong" in result["invalid_examples"][0]["missing"]
     assert "section_provenance_ready" in result["invalid_examples"][0]["missing"]
+    conn.close()
+
+
+def test_claim_card_high_confidence_contract_rejects_threshold_relaxation_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step9_report.py").write_text(
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "Limitation: 如 high-confidence resolution < 30%,放宽阈值到 0.5\n",
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE direction_claim_cards (
+            claim_card_id TEXT,
+            high_confidence_eligible INTEGER,
+            quality_gate_json TEXT
+        )
+        """
+    )
+
+    result = audit_claim_card_high_confidence_evidence_contract(conn, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step9_does_not_recommend_threshold_relaxation"] is False
     conn.close()
 
 

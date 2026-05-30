@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T17:16:08Z`
+- generated_at: `2026-05-30T17:21:22Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 24231,
+    "openalex_frontfill_cooldown_remaining_s": 23918,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2691,
+    "primary_section_papers": 2699,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 454,
+        "strong": 462,
         "weak": 2237
       },
-      "primary_section_papers": 2691,
-      "primary_section_rows": 4705,
+      "primary_section_papers": 2699,
+      "primary_section_rows": 4721,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 552,
-        "heading_continuation": 798,
-        "inline_heading": 287,
+        "explicit_heading": 564,
+        "heading_continuation": 814,
+        "inline_heading": 291,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 13,
         "parser_hint": 9
       },
-      "strong_or_moderate_papers": 454,
+      "strong_or_moderate_papers": 462,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8312894834633965
+      "weak_only_rate": 0.828825490922564
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -214,7 +214,8 @@
 {
   "checks": {
     "no_high_confidence_card_without_section_evidence": true,
-    "step13_has_section_evidence_gate": true
+    "step13_has_section_evidence_gate": true,
+    "step9_does_not_recommend_threshold_relaxation": true
   },
   "high_confidence_cards": 0,
   "invalid_examples": [],

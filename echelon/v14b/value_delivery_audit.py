@@ -655,12 +655,33 @@ def audit_claim_card_high_confidence_evidence_contract(
             )
     source_checks = {
         "step13_has_section_evidence_gate": False,
+        "step9_does_not_recommend_threshold_relaxation": False,
     }
     if repo_root is not None:
         source_checks = {
             "step13_has_section_evidence_gate": _source_contains(
                 repo_root / "echelon/v14b/step13_first_principles_history.py",
                 ("section_evidence_strong", "section_provenance_ready", "missing_high_confidence_gates"),
+            ),
+            "step9_does_not_recommend_threshold_relaxation": (
+                _source_contains(
+                    repo_root / "echelon/v14b/step9_report.py",
+                    (
+                        "保持 exploratory / candidate_pool",
+                        "limitation/discussion/resolution section evidence",
+                        "linked resolution evidence",
+                        "阈值不得下调",
+                    ),
+                )
+                and _source_absent(
+                    repo_root / "echelon/v14b/step9_report.py",
+                    (
+                        "放宽阈值",
+                        "降低阈值",
+                        "调低阈值",
+                        "lower thresholds blindly",
+                    ),
+                )
             ),
         }
     checks = {

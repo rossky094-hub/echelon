@@ -558,7 +558,7 @@ def generate_algo_report(
         f"**重型算法调优建议**:",
         f"1. Citation function: 如 extension+motivation+usage 占比 < 40%,先补 citation context 或运行 capped LLM edge audit 抽检；LLM 结果只能作为弱标签,不能直接升级结论",
         f"2. VGAE: 如 AUC < 0.80,减少 epoch → 调 lr → 增加 negative sampling",
-        f"3. Limitation: 如 high-confidence resolution < 30%,放宽阈值到 0.5",
+        f"3. Limitation/resolution: 如 high-confidence resolution < 30%,保持 exploratory / candidate_pool, 优先补 limitation/discussion/resolution section evidence 与 linked resolution evidence；阈值不得下调来晋升高置信",
         f"",
         f"---",
         f"",
