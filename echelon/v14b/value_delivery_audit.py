@@ -2323,9 +2323,13 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     v14_config_path = (repo_root or Path(".")) / "echelon/v14b/config.py"
     v14_init_path = (repo_root or Path(".")) / "echelon/v14b/__init__.py"
     step4_path = (repo_root or Path(".")) / "echelon/v14b/step4_subgraph.py"
+    step0_id_repair_path = (repo_root or Path(".")) / "echelon/v14b/step0_id_repair.py"
+    step1_enrich_path = (repo_root or Path(".")) / "echelon/v14b/step1_enrich.py"
     step12_path = (repo_root or Path(".")) / "echelon/v14b/step12_goal_alignment_audit.py"
     db_schema_path = (repo_root or Path(".")) / "echelon/v14b/db_schema.py"
     step4_text = step4_path.read_text(encoding="utf-8") if step4_path.exists() else ""
+    step0_id_repair_text = step0_id_repair_path.read_text(encoding="utf-8") if step0_id_repair_path.exists() else ""
+    step1_enrich_text = step1_enrich_path.read_text(encoding="utf-8") if step1_enrich_path.exists() else ""
     step12_text = step12_path.read_text(encoding="utf-8") if step12_path.exists() else ""
     db_schema_text = db_schema_path.read_text(encoding="utf-8") if db_schema_path.exists() else ""
     step9_avoids_old_pilot_instruction = (
@@ -2491,6 +2495,18 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "package_docstring_avoids_legacy_pilot_flow": package_docstring_avoids_legacy_pilot_flow,
         "step4_and_step9_use_bounded_subgraph_scope": step4_and_step9_use_bounded_subgraph_scope,
         "step12_and_schema_use_bounded_subgraph_scope": step12_and_schema_use_bounded_subgraph_scope,
+        "id_repair_uses_unambiguous_exact_reference_relinking": (
+            bool(step0_id_repair_text)
+            and "apply_exact_relinks" in step0_id_repair_text
+            and "exact_reference_status_counts" in step0_id_repair_text
+            and "link_paper_reference_internals" not in step0_id_repair_text
+        ),
+        "legacy_enrich_relinker_delegates_to_exact_relinking": (
+            bool(step1_enrich_text)
+            and "def link_paper_reference_internals" in step1_enrich_text
+            and "apply_exact_relinks" in step1_enrich_text
+            and "link_updates_applied" in step1_enrich_text
+        ),
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context

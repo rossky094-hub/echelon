@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T23:21:52Z`
+- generated_at: `2026-05-30T23:33:11Z`
 
 ## Reference Linkage
 
@@ -16,11 +16,11 @@
 
 ## Section Evidence
 
-- section rows: 5,394
+- section rows: 5,411
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 225
-- decision-grade primary section papers: 225
+- current parser-contract primary section papers: 255
+- decision-grade primary section papers: 255
 
 ### High-Value Priority Coverage
 
@@ -47,8 +47,8 @@
 | outcome | papers |
 | --- | ---: |
 | no_target_sections | 4,976 |
-| success_primary | 1,903 |
-| already_has_primary | 416 |
+| success_primary | 1,927 |
+| already_has_primary | 407 |
 | success_secondary_only | 283 |
 | pdf_download_failed | 46 |
 | parse_no_blocks | 1 |
@@ -57,19 +57,19 @@
 
 | event | count |
 | --- | ---: |
-| pdf_graphics_warning | 55,863 |
+| pdf_graphics_warning | 55,903 |
 | download_failure | 22,646 |
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 251/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 281/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `251/8592`
-- rows / papers / primary papers: `5,394` / `3,020` / `3,020`
+- progress: `281/8592`
+- rows / papers / primary papers: `5,411` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.

@@ -44,6 +44,7 @@ class RefCandidate:
     status: str
     stale_provider: str | None = None
     stale_norm: str | None = None
+    needs_norm_update: bool = False
 
 
 def utc_now() -> str:
@@ -180,6 +181,7 @@ def evaluate_reference(
             status="unclassifiable",
             stale_provider=old_provider if stale else None,
             stale_norm=old_norm if stale else None,
+            needs_norm_update=stale,
         )
 
     targets = id_maps.get(provider, {}).get(norm, set())
@@ -204,6 +206,7 @@ def evaluate_reference(
             status="exact_linkable",
             stale_provider=old_provider if stale else None,
             stale_norm=old_norm if stale else None,
+            needs_norm_update=stale,
         )
     if len(targets) > 1:
         return RefCandidate(
@@ -216,6 +219,7 @@ def evaluate_reference(
             status="ambiguous_local_match",
             stale_provider=old_provider if stale else None,
             stale_norm=old_norm if stale else None,
+            needs_norm_update=stale,
         )
     return RefCandidate(
         rowid=int(row["rowid"]),
@@ -227,6 +231,7 @@ def evaluate_reference(
         status="no_local_match",
         stale_provider=old_provider if stale else None,
         stale_norm=old_norm if stale else None,
+        needs_norm_update=stale,
     )
 
 
@@ -263,7 +268,7 @@ def apply_candidates(conn: sqlite3.Connection, candidates: list[RefCandidate], c
     norm_updates = [
         (c.provider, c.norm, c.rowid)
         for c in candidates
-        if c.provider and c.norm and (c.stale_provider is not None or c.stale_norm is not None)
+        if c.provider and c.norm and c.needs_norm_update
     ]
 
     for start in range(0, len(norm_updates), chunk_size):
@@ -308,7 +313,7 @@ def summarize_candidates(candidates: list[RefCandidate]) -> dict[str, Any]:
     for c in candidates:
         provider = c.provider or "unknown"
         by_provider_status[provider][c.status] += 1
-        if c.stale_provider is not None or c.stale_norm is not None:
+        if c.needs_norm_update:
             stale_by_provider[provider] += 1
         if len(samples[c.status]) < 10:
             samples[c.status].append(
@@ -332,6 +337,60 @@ def summarize_candidates(candidates: list[RefCandidate]) -> dict[str, Any]:
         },
         "stale_norm_updates": dict(stale_by_provider),
         "samples": dict(samples),
+    }
+
+
+def evaluate_unlinked_references(
+    conn: sqlite3.Connection,
+    *,
+    limit: int | None = None,
+) -> tuple[dict[str, dict[str, set[str]]], list[RefCandidate]]:
+    """Evaluate exact provider-ID relinks without mutating the database."""
+    id_maps = build_paper_id_maps(conn)
+    rows = fetch_unlinked_reference_rows(conn, limit=limit)
+    return id_maps, [evaluate_reference(row, id_maps) for row in rows]
+
+
+def apply_exact_relinks(
+    conn: sqlite3.Connection,
+    *,
+    limit: int | None = None,
+    chunk_size: int = 5000,
+) -> dict[str, Any]:
+    """Apply only exact, unambiguous provider-ID relinks.
+
+    Unlike the historical enrich helper, duplicate local IDs stay unlinked.
+    Provider/norm columns are still canonicalized for no-local-match rows so
+    later OpenAlex/S2/DOI backfills can be re-run deterministically.
+    """
+    before = {
+        "refs": int(scalar(conn, "SELECT COUNT(*) FROM paper_references") or 0),
+        "linked_refs": int(
+            scalar(
+                conn,
+                "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''",
+            )
+            or 0
+        ),
+    }
+    id_maps, candidates = evaluate_unlinked_references(conn, limit=limit)
+    apply_result = apply_candidates(conn, candidates, chunk_size=chunk_size)
+    after = {
+        "refs": int(scalar(conn, "SELECT COUNT(*) FROM paper_references") or 0),
+        "linked_refs": int(
+            scalar(
+                conn,
+                "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''",
+            )
+            or 0
+        ),
+    }
+    return {
+        "before": before,
+        "after": after,
+        "paper_id_map_stats": id_map_stats(id_maps),
+        "candidate_summary": summarize_candidates(candidates),
+        "apply_result": apply_result,
     }
 
 
@@ -422,7 +481,6 @@ def run_audit(
     conn.execute("PRAGMA busy_timeout=60000")
     conn.execute("PRAGMA journal_mode=WAL")
 
-    id_maps = build_paper_id_maps(conn)
     before = {
         "refs": int(scalar(conn, "SELECT COUNT(*) FROM paper_references") or 0),
         "linked_refs": int(
@@ -433,8 +491,7 @@ def run_audit(
             or 0
         ),
     }
-    rows = fetch_unlinked_reference_rows(conn, limit=limit)
-    candidates = [evaluate_reference(row, id_maps) for row in rows]
+    id_maps, candidates = evaluate_unlinked_references(conn, limit=limit)
     result: dict[str, Any] = {
         "generated_at": utc_now(),
         "applied": apply,

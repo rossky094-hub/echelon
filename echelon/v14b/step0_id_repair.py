@@ -14,7 +14,8 @@ from echelon.v14b.id_normalization import (
     normalize_openalex_work_id,
     normalize_s2_paper_id,
 )
-from echelon.v14b.step1_enrich import ensure_enrich_tables, link_paper_reference_internals
+from echelon.v14b.reference_relink_audit import apply_exact_relinks
+from echelon.v14b.step1_enrich import ensure_enrich_tables
 from echelon.v14b.utils import setup_logging
 from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 
@@ -267,13 +268,13 @@ def repair_ids(db_path: Path = DB_MAIN, corpus_id: str | None = None) -> dict:
         WHERE s2_paper_id LIKE 'S2:%'
     """)
 
-    linked_before = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
-    ).fetchone()[0]
-    newly_linked = link_paper_reference_internals(conn)
-    linked_after = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
-    ).fetchone()[0]
+    relink_result = apply_exact_relinks(conn)
+    relink_summary = relink_result.get("candidate_summary") or {}
+    relink_status_counts = relink_summary.get("status_counts") or {}
+    relink_apply_result = relink_result.get("apply_result") or {}
+    linked_before = int((relink_result.get("before") or {}).get("linked_refs") or 0)
+    linked_after = int((relink_result.get("after") or {}).get("linked_refs") or linked_before)
+    newly_linked = int(relink_apply_result.get("link_updates_applied") or 0)
 
     field_stats = backfill_field_topic_local(conn)
     field_cov = conn.execute(
@@ -298,6 +299,9 @@ def repair_ids(db_path: Path = DB_MAIN, corpus_id: str | None = None) -> dict:
         "linked_before": linked_before,
         "newly_linked": newly_linked,
         "linked_after": linked_after,
+        "exact_reference_norm_updates": int(relink_apply_result.get("norm_updates_applied") or 0),
+        "exact_reference_candidates_scanned": int(relink_summary.get("scanned_unlinked_refs") or 0),
+        "exact_reference_status_counts": relink_status_counts,
         "corpus_id": corpus_id,
         "scoped_papers": scoped_count if corpus_id else total_papers,
         "primary_field_coverage_after": {

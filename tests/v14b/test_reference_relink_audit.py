@@ -47,6 +47,7 @@ def _make_db(path: Path) -> None:
             ("c4", "S2:S2HASH", None, None, None),
             ("c5", "10.2000/dup", None, "doi", "10.2000/dup"),
             ("c6", "plain title only", None, None, None),
+            ("c7", "https://doi.org/10.9999/missing", None, None, None),
         ],
     )
     conn.commit()
@@ -71,7 +72,9 @@ def test_reference_relink_dry_run_does_not_mutate(tmp_path):
     counts = result["candidate_summary"]["status_counts"]
     assert counts["exact_linkable"] == 4
     assert counts["ambiguous_local_match"] == 1
+    assert counts["no_local_match"] == 1
     assert counts["unclassifiable"] == 1
+    assert result["candidate_summary"]["stale_norm_updates"]["doi"] == 2
     assert _linked_count(db) == 0
     assert (tmp_path / "reports" / "reference_relink_audit.md").exists()
 
@@ -83,6 +86,7 @@ def test_reference_relink_apply_links_only_exact_unambiguous_refs(tmp_path):
     result = run_audit(db_path=db, out_dir=tmp_path / "reports", apply=True, chunk_size=2)
 
     assert result["apply_result"]["link_updates_applied"] == 4
+    assert result["apply_result"]["norm_updates_applied"] == 6
     assert _linked_count(db) == 4
     conn = sqlite3.connect(str(db))
     rows = conn.execute(
@@ -102,3 +106,6 @@ def test_reference_relink_apply_links_only_exact_unambiguous_refs(tmp_path):
     assert by_citing["c4"][1] == "p_s2"
     assert by_citing["c5"][1] is None
     assert by_citing["c6"][1] is None
+    assert by_citing["c7"][1] is None
+    assert by_citing["c7"][2] == "doi"
+    assert by_citing["c7"][3] == "10.9999/missing"

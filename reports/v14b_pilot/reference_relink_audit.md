@@ -1,11 +1,11 @@
 # V14B Reference Relink Audit
 
-- generated_at: `2026-05-29T16:47:56Z`
-- mode: `apply`
-- scanned unlinked refs: 2,755,338
+- generated_at: `2026-05-30T23:32:35Z`
+- mode: `dry_run`
+- scanned unlinked refs: 2,769,173
 - exact linkable refs: 4
 - ambiguous local matches: 0
-- no local match: 2,755,334
+- no local match: 2,769,169
 - unclassifiable: 0
 
 ## Provider Breakdown
@@ -14,7 +14,7 @@
 | --- | ---: | ---: | ---: | ---: | ---: |
 | arxiv | 0 | 0 | 7,616 | 0 | 0 |
 | doi | 0 | 0 | 1,412,486 | 0 | 0 |
-| openalex | 4 | 0 | 1,279,426 | 0 | 0 |
+| openalex | 4 | 0 | 1,293,261 | 0 | 0 |
 | s2 | 0 | 0 | 55,806 | 0 | 0 |
 
 ## Paper ID Collision Summary
@@ -22,14 +22,9 @@
 | provider | unique local IDs | collision IDs |
 | --- | ---: | ---: |
 | doi | 33,009 | 0 |
-| openalex | 34,315 | 0 |
+| openalex | 35,663 | 0 |
 | arxiv | 55,391 | 0 |
 | s2 | 49,014 | 0 |
-
-## Apply Result
-
-- norm updates applied: 0
-- link updates applied: 4
 
 ## Product Interpretation
 

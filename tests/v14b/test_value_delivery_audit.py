@@ -237,6 +237,20 @@ def _write_product_sources(root: Path) -> None:
         "    return {'candidate_ranking_score_avg': 0.8, 'min_candidate_score_threshold': 0.55}\n",
         encoding="utf-8",
     )
+    (v14 / "step0_id_repair.py").write_text(
+        "from echelon.v14b.reference_relink_audit import apply_exact_relinks\n"
+        "def repair_ids():\n"
+        "    result = apply_exact_relinks(conn)\n"
+        "    return {'exact_reference_status_counts': result['candidate_summary']['status_counts']}\n",
+        encoding="utf-8",
+    )
+    (v14 / "step1_enrich.py").write_text(
+        "from echelon.v14b.reference_relink_audit import apply_exact_relinks\n"
+        "def link_paper_reference_internals(conn):\n"
+        "    result = apply_exact_relinks(conn)\n"
+        "    return result['apply_result']['link_updates_applied']\n",
+        encoding="utf-8",
+    )
     (v14 / "step10_visual_graph_builder.py").write_text(
         '"candidate_edges": child_future\n'
         "Future candidate edges and unresolved limitation bottlenecks\n"
@@ -668,6 +682,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert legacy_gate["checks"]["step9_uses_decision_readiness_not_frontend_launch"] is True
     assert legacy_gate["checks"]["step9_algo_report_filename_is_evidence_decision"] is True
     assert legacy_gate["checks"]["package_docstring_avoids_legacy_pilot_flow"] is True
+    assert legacy_gate["checks"]["id_repair_uses_unambiguous_exact_reference_relinking"] is True
+    assert legacy_gate["checks"]["legacy_enrich_relinker_delegates_to_exact_relinking"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])

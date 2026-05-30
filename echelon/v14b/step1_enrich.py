@@ -221,127 +221,14 @@ def ensure_enrich_tables(conn: sqlite3.Connection) -> None:
 
 
 def link_paper_reference_internals(conn: sqlite3.Connection) -> int:
-    """Map external reference IDs to library ULIDs using provider-aware IDs."""
-    def doi_to_arxiv(doi_value: Optional[str]) -> Optional[str]:
-        doi_norm = normalize_doi(doi_value)
-        if not doi_norm:
-            return None
-        m = re.match(r"^10\.48550/arxiv\.(.+)$", doi_norm, flags=re.I)
-        if not m:
-            return None
-        return normalize_arxiv_id(m.group(1))
+    """Map external reference IDs to library ULIDs using exact unambiguous IDs."""
+    from echelon.v14b.reference_relink_audit import apply_exact_relinks
 
-    before = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
-    ).fetchone()[0]
-
-    paper_cols = _table_columns(conn, "papers")
-    has_s2_col = "s2_paper_id" in paper_cols
-    paper_rows = conn.execute(
-        "SELECT id, openalex_id, doi, arxiv_id"
-        + (", s2_paper_id" if has_s2_col else "")
-        + " FROM papers"
-    ).fetchall()
-
-    id_maps: dict[str, dict[str, str]] = {
-        "openalex": {},
-        "s2": {},
-        "doi": {},
-        "arxiv": {},
-    }
-    for row in paper_rows:
-        pid = row[0]
-        openalex_id = normalize_openalex_work_id(row[1])
-        doi = normalize_doi(row[2])
-        arxiv_id = normalize_arxiv_id(row[3])
-        s2_id = normalize_s2_paper_id(row[4]) if has_s2_col else None
-        if openalex_id:
-            id_maps["openalex"].setdefault(openalex_id, pid)
-        if s2_id:
-            id_maps["s2"].setdefault(s2_id, pid)
-        # legacy compatibility: historical S2 IDs may still be in openalex_id.
-        legacy_s2 = normalize_s2_paper_id(row[1])
-        if legacy_s2 and not openalex_id:
-            id_maps["s2"].setdefault(legacy_s2, pid)
-        if doi:
-            id_maps["doi"].setdefault(doi, pid)
-            # arXiv DOIs appear in reference lists frequently. Keep this alias
-            # so DOI-form references can relink to arXiv-only papers.
-            arxiv_alias = doi_to_arxiv(doi)
-            if arxiv_alias:
-                id_maps["arxiv"].setdefault(arxiv_alias, pid)
-        if arxiv_id:
-            id_maps["arxiv"].setdefault(str(arxiv_id).strip(), pid)
-
-    ref_cols = _table_columns(conn, "paper_references")
-    has_ref_norm = {
-        "cited_paper_id_provider",
-        "cited_paper_id_norm",
-    }.issubset(ref_cols)
-    if has_ref_norm:
-        rows = conn.execute("""
-            SELECT citing_paper_id, cited_paper_id_external,
-                   cited_paper_id_provider, cited_paper_id_norm
-            FROM paper_references
-            WHERE COALESCE(cited_paper_id_internal, '') = ''
-              AND cited_paper_id_external IS NOT NULL
-        """).fetchall()
-    else:
-        rows = conn.execute("""
-            SELECT citing_paper_id, cited_paper_id_external
-            FROM paper_references
-            WHERE COALESCE(cited_paper_id_internal, '') = ''
-              AND cited_paper_id_external IS NOT NULL
-        """).fetchall()
-
-    internal_updates = []
-    norm_updates = []
-    for row in rows:
-        citing_id = row[0]
-        external = row[1]
-        if has_ref_norm:
-            provider = row[2]
-            norm = row[3]
-            if not provider or not norm:
-                provider, norm = classify_external_id(external)
-                norm_updates.append((provider, norm, citing_id, external))
-        else:
-            provider, norm = classify_external_id(external)
-        target_id = id_maps.get(provider or "", {}).get(norm or "")
-        if not target_id and provider == "doi":
-            arxiv_alias = doi_to_arxiv(norm)
-            if arxiv_alias:
-                target_id = id_maps["arxiv"].get(arxiv_alias)
-        if not target_id and (provider in (None, "other") or not norm):
-            p2, n2 = classify_external_id(external)
-            if p2 and n2:
-                if has_ref_norm and (provider != p2 or norm != n2):
-                    norm_updates.append((p2, n2, citing_id, external))
-                target_id = id_maps.get(p2, {}).get(n2)
-        if target_id:
-            internal_updates.append((target_id, citing_id, external))
-
-    if has_ref_norm and norm_updates:
-        conn.executemany("""
-            UPDATE paper_references
-            SET cited_paper_id_provider = ?,
-                cited_paper_id_norm = ?
-            WHERE citing_paper_id = ?
-              AND cited_paper_id_external = ?
-        """, norm_updates)
-    if internal_updates:
-        conn.executemany("""
-            UPDATE paper_references
-            SET cited_paper_id_internal = ?
-            WHERE citing_paper_id = ?
-              AND cited_paper_id_external = ?
-        """, internal_updates)
-    conn.commit()
-    after = conn.execute(
-        "SELECT COUNT(*) FROM paper_references WHERE COALESCE(cited_paper_id_internal, '') <> ''"
-    ).fetchone()[0]
-    linked = after - before
-    logger.info("引用边内部 ID 链接: +%d (合计 %d)", linked, after)
+    result = apply_exact_relinks(conn)
+    applied = result.get("apply_result") or {}
+    after = int((result.get("after") or {}).get("linked_refs") or 0)
+    linked = int(applied.get("link_updates_applied") or 0)
+    logger.info("引用边内部 ID 精确链接: +%d (合计 %d)", linked, after)
     return linked
 
 
