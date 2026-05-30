@@ -315,7 +315,7 @@ def evaluate_subgraph_scope(
     selected_edges: int,
     corpus_id: str | None = None,
 ) -> dict:
-    """Audit whether Step4 should be interpreted as pilot evidence or full graph."""
+    """Audit whether Step4 is a complete graph or a bounded evidence subgraph."""
     if corpus_id:
         total_papers = conn_main.execute(
             "SELECT COUNT(*) FROM temp.v14b_corpus_papers"
@@ -344,16 +344,16 @@ def evaluate_subgraph_scope(
         adequacy_label = "complete"
         recommended_max_size = total_papers
     else:
-        conclusion_scope = "pilot_evidence_subgraph"
+        conclusion_scope = "bounded_evidence_subgraph"
         baseline = max(3000, int(total_papers * 0.08))
         recommended_max_size = min(total_papers, max(configured_max_size, baseline))
         if selected_nodes < 3000 or selected_edges < selected_nodes * 0.5:
-            adequacy_label = "pilot_sparse_increase_or_use_step10_full_graph"
+            adequacy_label = "evidence_subgraph_sparse_increase_or_use_step10_full_graph"
             recommended_max_size = min(total_papers, max(recommended_max_size, 8000))
         elif configured_max_size < recommended_max_size:
-            adequacy_label = "pilot_usable_but_cap_below_recommended"
+            adequacy_label = "bounded_evidence_subgraph_below_recommended_cap"
         else:
-            adequacy_label = "pilot_adequate_for_algorithmic_evidence"
+            adequacy_label = "bounded_evidence_subgraph_adequate_for_extraction"
 
     notes = {
         "interpretation": (
@@ -361,8 +361,9 @@ def evaluate_subgraph_scope(
             "Claims about the complete optics graph must come from Step10 visual graph."
         ),
         "configured_max_size_rationale": (
-            "5000 is acceptable as a memory-conscious pilot for ~55k papers when Step10 "
-            "separately positions all papers; increase if subgraph edge density is sparse."
+            "5000 is acceptable as a memory-conscious evidence extraction budget for ~55k "
+            "papers when Step10 separately positions all papers; increase if subgraph edge "
+            "density is sparse."
         ),
     }
     audit = {

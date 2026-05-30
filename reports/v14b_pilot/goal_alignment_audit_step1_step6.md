@@ -1,6 +1,6 @@
 # V14B Goal Alignment Audit
 
-Generated: 2026-05-29 12:18
+Generated: 2026-05-31 02:14
 
 ## Project Goal
 
@@ -8,29 +8,29 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 ## Executive Verdict
 
-- Product graph layer exists: 55,391 visual nodes, 739,318 visual edges, 5,426 clusters, 5,426 branch lineages.
+- Product graph layer exists: 55,391 visual nodes, 772,947 visual edges, 5,286 clusters, 5,286 branch lineages.
 - Step5b future-growth signal is numerically strong as a ranker: test AUC=0.8371, predicted_edges=1,000, cross_field=60; product confidence is calibrated separately from raw model score.
 - Step5c limitation evidence is currently mostly abstract/algorithmic unless section tables are ingested: atoms=730, resolutions=1,001.
-- Section evidence inventory: table_present=True, rows=730, primary-section papers=398.
-- Step6 fusion output is limited: directions=0, audit_n_directions=20, adequacy=stale_or_inconsistent, consistent=False. This is acceptable as an honest signal only when audit/product tables agree.
+- Section evidence inventory: table_present=True, rows=4,815, primary-section papers=2,750.
+- Step6 fusion output is limited: directions=5, audit_n_directions=5, adequacy=limited_but_usable_with_uncertainty, consistent=True. This is acceptable as an honest signal only when audit/product tables agree.
 - Step13 first-principles bottleneck lineage: principles=6, atoms_covered=730, high_risk_principles=0.
-- Step13 claim cards: total=0, five-question-complete=0, high-confidence-eligible=0, lineage_triples=2,920.
+- Step13 claim cards: total=5, five-question-complete=1, high-confidence-eligible=0, lineage_triples=2,920.
 
 ## Step1-Step6 Evidence Chain
 
 | step | key output | quality status | interpretation |
 |---|---:|---|---|
-| Step1 library/enrich | papers=55,391, abstracts=99.9%, linked_refs=414,083/3,016,141 (13.7%) | warning | citation graph is usable but still coverage-limited against all raw references |
-| Step1 field/topic | primary_field_id=55,334/55,391 (99.9%) | pass | cross-field interpretation remains partial |
+| Step1 library/enrich | papers=55,391, abstracts=99.9%, linked_refs=445,957/3,215,130 (13.9%) | warning | citation graph is usable but still coverage-limited against all raw references |
+| Step1 field/topic | primary_field_id=55,359/55,391 (99.9%) | pass | cross-field interpretation remains partial |
 | Step0 embeddings | embeddings=55,391/55,391 (100.0%) | pass | semantic layer/search/layout is well supported |
 | Step2 main path | edges=277,526, main=2,775, cycles=66, cyclic_nodes=138, intra_cycle_edges=148 | pass | SCC condensation preserves ambiguous cycles instead of arbitrary deletion |
 | Step3 keystone | avg_signal_reliability=1.000, critical_default_papers=0 | pass | score is discriminative only while graph feature columns remain populated |
-| Step4 subgraph | nodes=5,000, edges=38,538, scope=pilot_evidence_subgraph | pilot_adequate_for_algorithmic_evidence | pilot/evidence subgraph, not complete all graph |
+| Step4 subgraph | nodes=5,000, edges=38,538, scope=bounded_evidence_subgraph | bounded_evidence_subgraph_adequate_for_extraction | bounded evidence subgraph for extraction support, not complete all graph |
 | Step5a citation function | classified=38,538 | weak evidence | no full citation context, therefore use only as fusion/visual weighting |
 | Step5b future growth | predicted=1,000, cross_field=60, calibrated_min/avg/max=0.995/0.995/0.995 | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |
 | Step5c limitations | atoms=730, resolutions=1,001 | weak-to-moderate | limitation quality must be visible in graph |
-| Step6 fusion | directions=0, candidates=20 | adequate_candidate_set | few directions means evidence intersection is sparse, not a reason to lower thresholds |
-| Step13 claim cards | cards=0, complete=0, high_conf=0, lineage_triples=2,920 | risk | missing 5-question cards cannot be promoted into high-confidence directions |
+| Step6 fusion | directions=5, candidates=5 | limited_but_usable_with_uncertainty | few directions means evidence intersection is sparse, not a reason to lower thresholds |
+| Step13 claim cards | cards=5, complete=1, high_conf=0, lineage_triples=2,920 | risk | missing 5-question cards cannot be promoted into high-confidence directions |
 
 ## Limitation Evidence Quality
 
@@ -42,12 +42,12 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 - top_vgae_used: 500
 - total_vgae_predictions: 1000
-- cross_field_predictions: 37
+- cross_field_predictions: 60
 - unresolved_limitations_used: 50
-- evidence_path_distribution: `{"2": 20}`
-- candidate_tier_distribution: `{"exploratory_weak_limitation": 20}`
-- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 20}, "prediction_confidence_avg": 0.8517545731272295, "min_vgae_confidence": 0.55, "vgae_top_n": 500}`
-- limitation_quality_distribution: `{"weak_abstract": 50}`
+- evidence_path_distribution: `{"2": 5}`
+- candidate_tier_distribution: `{"exploratory": 5}`
+- calibration_distribution: `{"labels": {"calibrated_temporal_holdout": 5}, "prediction_confidence_avg": 0.8329225875546147, "min_vgae_confidence": 0.55, "vgae_top_n": 500}`
+- limitation_quality_distribution: `{"section_level": 50}`
 
 ## Step5b Calibration
 
@@ -63,21 +63,22 @@ Build an explainable **all** evolution graph that can show why the field grew in
 
 | tier | directions | avg_confidence |
 |---|---:|---:|
+| exploratory | 5 | 0.810 |
 
 ## Hard Acceptance Gates
 
-- linked_refs_ratio >= 30%: current=0.137 -> risk
-- top-keystone section evidence coverage >= 70%: current=0.398 (398/1000) -> risk
-- every direction has 5-question claim card: current=0/1 -> risk
-- future calibration report present: current=False -> risk
-- fusion audit matches future_directions table: current=False -> risk
-- claim_scope present for all directions: distribution=`[]`
+- linked_refs_ratio >= 30%: current=0.139 -> risk
+- top-keystone section evidence coverage >= 70%: current=2.750 (2750/1000) -> pass
+- every direction has 5-question claim card: current=1/5 -> risk
+- future calibration report present: current=True -> pass
+- fusion audit matches future_directions table: current=True -> pass
+- claim_scope present for all directions: distribution=`[{"claim_scope": "exploratory_incomplete_card", "n": 4}, {"claim_scope": "exploratory_with_claim_card", "n": 1}]`
 
 ## What Was Improved
 
 - Step2 now exposes canonical `source_paper_id` / `target_paper_id` for time-forward main-path semantics while retaining legacy columns for compatibility.
 - Step3 now records signal reliability and dampens KeystoneScore toward neutral if critical features regress to defaults.
-- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node subgraph as pilot/evidence and evaluating whether the cap is adequate.
+- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node bounded evidence subgraph and evaluating whether the cap is adequate for extraction support.
 - Step5a now writes method/evidence-level/weight, so title/abstract-only citation-function labels cannot masquerade as ground truth.
 - Step5c now writes limitation evidence source, quality, weight, section name, and extractor method.
 - Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.

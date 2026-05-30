@@ -222,6 +222,21 @@ def _write_product_sources(root: Path) -> None:
         "Future candidate generator GNN/VGAE candidate edge\n",
         encoding="utf-8",
     )
+    (v14 / "step4_subgraph.py").write_text(
+        "bounded_evidence_subgraph "
+        "bounded_evidence_subgraph_adequate_for_extraction "
+        "evidence_subgraph_sparse_increase_or_use_step10_full_graph\n",
+        encoding="utf-8",
+    )
+    (v14 / "step12_goal_alignment_audit.py").write_text(
+        "bounded evidence subgraph for extraction support "
+        "bounded evidence subgraph\n",
+        encoding="utf-8",
+    )
+    (v14 / "db_schema.py").write_text(
+        "bounded evidence subgraph for heavier extraction\n",
+        encoding="utf-8",
+    )
     (v14 / "step11_llm_edge_audit.py").write_text(
         "Stratified LLM edge audit Default execution is capped\n",
         encoding="utf-8",
@@ -238,6 +253,9 @@ def _write_product_sources(root: Path) -> None:
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
         "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
         "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
+        "_normalise_subgraph_scope_row "
+        "bounded_evidence_subgraph bounded evidence / extraction support "
+        "与旧 V12.5 图谱样例对比\n"
         "V14B_Evidence_Decision_算法验证报告.md\n"
         "未来候选方向_证据合同报告.md\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
@@ -659,6 +677,8 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["step9_openalex_language_is_coverage_not_success"] is True
     assert result["checks"]["step9_algo_report_filename_is_evidence_decision"] is True
     assert result["checks"]["package_docstring_avoids_legacy_pilot_flow"] is True
+    assert result["checks"]["step4_and_step9_use_bounded_subgraph_scope"] is True
+    assert result["checks"]["step12_and_schema_use_bounded_subgraph_scope"] is True
     assert result["disallowed_current_deps"] == {}
 
 
@@ -739,6 +759,31 @@ def test_legacy_flow_isolation_contract_rejects_pilot_report_filename_and_docstr
     assert result["status"] == "fail"
     assert result["checks"]["step9_algo_report_filename_is_evidence_decision"] is False
     assert result["checks"]["package_docstring_avoids_legacy_pilot_flow"] is False
+
+
+def test_legacy_flow_isolation_contract_rejects_pilot_subgraph_scope_copy(tmp_path):
+    _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+    _write_legacy_arxiv_script_contracts(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step4_subgraph.py").write_text(
+        "pilot_evidence_subgraph pilot_adequate_for_algorithmic_evidence\n",
+        encoding="utf-8",
+    )
+    (v14 / "step9_report.py").write_text(
+        "make product-chain make post-frontfill-chain legacy compatibility "
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim "
+        "证据决策放行条件 Topic Dossier multi-topic regression "
+        "Radar 主视图只允许完整 Step13 Claim Card candidate_pool_only "
+        "V14B_Evidence_Decision_算法验证报告.md "
+        "pilot_evidence_subgraph pilot/evidence 与 V12.5 Pilot 对比\n",
+        encoding="utf-8",
+    )
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step4_and_step9_use_bounded_subgraph_scope"] is False
 
 
 def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp_path):

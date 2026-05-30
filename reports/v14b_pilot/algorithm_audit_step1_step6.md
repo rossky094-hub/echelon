@@ -84,7 +84,7 @@ It is not by itself a future-direction algorithm; it is an evidence layer.
 
 Fix/status:
 Step3 now writes run metadata into `v14b_run_meta`, so monitors can distinguish
-completed scoring from stale pilot artifacts.
+completed scoring from stale derived artifacts.
 
 Remaining risk:
 Fresh/growing/mature behavior depends on the quality of feature columns such as
@@ -94,11 +94,11 @@ If those columns regress to defaults, KeystoneScore loses discriminative power.
 ## Step4 Subgraph
 
 Purpose:
-Select a tractable pilot subgraph for expensive algorithms such as citation
+Select a tractable bounded evidence subgraph for expensive algorithms such as citation
 function classification, VGAE, limitation tracking, mutation/layout/report.
 
 Audit result:
-Valid for pilot computation, not sufficient as the final visual graph product.
+Valid for bounded evidence extraction, not sufficient as the final visual graph product.
 The product visual graph must later use all 55,391 papers with LOD/tile exports,
 while Step4 can remain the expensive-model working set.
 
@@ -107,7 +107,7 @@ Current subgraph contains 5,000 nodes and 38,778 internal edges.
 
 Remaining risk:
 Any conclusion generated only from the 5,000-node subgraph must be labeled as
-pilot/evidence, not as the complete optics graph.
+bounded evidence / extraction support, not as the complete optics graph.
 
 ## Step5a Citation Function
 
@@ -201,7 +201,7 @@ future-growth algorithms need strengthening before user-facing claims.
 
 ## Overall Goal Fit
 
-Step1-Step4 now support the historical backbone and pilot evidence set.
+Step1-Step4 now support the historical backbone and bounded evidence extraction set.
 Step5a-Step6 have been corrected so they no longer silently generate misleading
 future evidence. This makes the current chain suitable for an honest alpha run:
 it can produce a stronger optics evolution graph base, and it can reveal whether
@@ -215,7 +215,7 @@ uncertainty overlays.
 
 ## Post-Fix Rerun
 
-After the fixes, Step5b-Step6 were rerun on the current V14B pilot database.
+After the fixes, Step5b-Step6 were rerun on the current V14B evidence database.
 
 - Step5b temporal evolution edges: 36,240 from 38,778 raw subgraph edges
 - Step5b skipped same-year edges: 2,128

@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 02:04
+**生成时间**: 2026-05-31 02:15
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -16,7 +16,7 @@
 | 主干道边数 (top 1%) | **2,775** / 277,526 |
 | 子图节点数 | **5,000** |
 | 子图边数 | **38,538** |
-| 子图结论范围 | **pilot_evidence_subgraph** |
+| 子图结论范围 | **bounded_evidence_subgraph** |
 | Citation-function evidence 覆盖率 | **100.0%** |
 | Future candidate generator 候选边数 | **1,000** |
 | Limitation atoms 总数 | **730** |
@@ -66,11 +66,11 @@
 | 1 度邻居节点 | **3,500** |
 | 子图边数 | **38,538** |
 
-**结论边界**: Step4 是 `pilot_evidence_subgraph`；任何只来自该子图的结论必须标为 pilot/evidence，完整 all 图谱以 Step10 visual graph 为准。
+**结论边界**: Step4 是 `bounded_evidence_subgraph`；任何只来自该子图的结论必须标为 bounded evidence / extraction support，完整 all 图谱以 Step10 visual graph 为准。
 
 - 节点覆盖率: 9.0%
 - 边覆盖率: 9.3%
-- 适配性: `pilot_adequate_for_algorithmic_evidence`
+- 适配性: `bounded_evidence_subgraph_adequate_for_extraction`
 - 推荐子图上限: 5,000
 
 ---
@@ -160,11 +160,11 @@
 
 ---
 
-## 12. 与 V12.5 Pilot 对比
+## 12. 与旧 V12.5 图谱样例对比
 
-| 维度 | V12.5 (2000 篇) | V14-B (13606 篇) |
+| 维度 | V12.5 图谱样例 (2000 篇) | V14-B Evidence Decision (55,391 篇) |
 |---|---|---|
-| 数据规模 | 2,000 篇 | **13,606 篇** |
+| 数据规模 | 2,000 篇 | **55,391 篇** |
 | 引用图 | 仅 arXiv 内部 | **DOI/arXiv/OpenAlex/S2 exact relinking；linked-ref 低覆盖时仍需 uncertainty** |
 | 评分算法 | V13 均等权重 | **V14 生命周期自适应** |
 | 未来方向 | 无 | **5 个三路融合方向** |
@@ -189,4 +189,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 02:04*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 02:15*

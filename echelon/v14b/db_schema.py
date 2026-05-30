@@ -233,8 +233,8 @@ CREATE TABLE IF NOT EXISTS subgraph_edges (
 CREATE INDEX IF NOT EXISTS idx_subgraph_edges_function
     ON subgraph_edges (citation_function);
 
--- Step 4 subgraph scope audit. Step4 is a pilot/evidence subgraph for heavier
--- algorithms. Step10 visual graph is the full product graph.
+-- Step 4 subgraph scope audit. Step4 is a bounded evidence subgraph for heavier
+-- extraction. Step10 visual graph is the full product graph.
 CREATE TABLE IF NOT EXISTS subgraph_scope_audit (
     run_id                TEXT PRIMARY KEY,
     total_papers          INTEGER NOT NULL,

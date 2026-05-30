@@ -21,6 +21,22 @@ from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
 from echelon.v14b.utils import add_common_args, setup_logging, table_columns
 
 
+def normalise_subgraph_scope(row: dict) -> dict:
+    normalised = dict(row or {})
+    scope = str(normalised.get("conclusion_scope") or "").strip()
+    if scope in {"", "pilot_evidence_subgraph", "pilot/evidence"}:
+        normalised["conclusion_scope"] = "bounded_evidence_subgraph"
+    adequacy = str(normalised.get("adequacy_label") or "").strip()
+    adequacy_map = {
+        "pilot_sparse_increase_or_use_step10_full_graph": "evidence_subgraph_sparse_increase_or_use_step10_full_graph",
+        "pilot_usable_but_cap_below_recommended": "bounded_evidence_subgraph_below_recommended_cap",
+        "pilot_adequate_for_algorithmic_evidence": "bounded_evidence_subgraph_adequate_for_extraction",
+    }
+    if adequacy in adequacy_map:
+        normalised["adequacy_label"] = adequacy_map[adequacy]
+    return normalised
+
+
 def scalar(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> Any:
     try:
         row = conn.execute(sql, params).fetchone()
@@ -123,7 +139,7 @@ def build_audit(
     step3_notes = json.loads(step3_meta[0]["notes"]) if step3_meta and step3_meta[0].get("notes") else {}
 
     subgraph_audit = rows(conn_v14, "SELECT * FROM subgraph_scope_audit ORDER BY created_at DESC LIMIT 1")
-    subgraph = subgraph_audit[0] if subgraph_audit else {}
+    subgraph = normalise_subgraph_scope(subgraph_audit[0] if subgraph_audit else {})
     citation_evidence = rows(conn_v14, """
         SELECT COALESCE(citation_function_evidence_level, 'unknown') AS level,
                COUNT(*) AS n,
@@ -337,7 +353,7 @@ def build_audit(
         f"| Step0 embeddings | embeddings={embeddings:,}/{total_papers:,} ({pct(embeddings,total_papers)}) | {quality_label(embed_ratio, good=0.95, warn=0.80)} | semantic layer/search/layout is well supported |",
         f"| Step2 main path | edges={main_edges:,}, main={main_core:,}, cycles={cycle_components}, cyclic_nodes={cyclic_nodes}, intra_cycle_edges={intra_cycle_edges} | pass | SCC condensation preserves ambiguous cycles instead of arbitrary deletion |",
         f"| Step3 keystone | avg_signal_reliability={float(step3_notes.get('avg_signal_reliability') or 0):.3f}, critical_default_papers={step3_notes.get('critical_default_papers', 'n/a')} | pass | score is discriminative only while graph feature columns remain populated |",
-        f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | pilot/evidence subgraph, not complete {corpus_label} graph |",
+        f"| Step4 subgraph | nodes={int(subgraph.get('selected_nodes') or 0):,}, edges={int(subgraph.get('selected_edges') or 0):,}, scope={subgraph.get('conclusion_scope', 'unknown')} | {subgraph.get('adequacy_label', 'unknown')} | bounded evidence subgraph for extraction support, not complete {corpus_label} graph |",
         f"| Step5a citation function | classified={sum(int(r.get('n') or 0) for r in citation_evidence):,} | weak evidence | no full citation context, therefore use only as fusion/visual weighting |",
         f"| Step5b future growth | predicted={predicted_total:,}, cross_field={predicted_cross:,}, calibrated_min/avg/max={pred_min:.3f}/{pred_avg:.3f}/{pred_max:.3f} | warning | ranking works; calibrated confidence is product evidence, not scientific certainty |",
         f"| Step5c limitations | atoms={limitation_atoms:,}, resolutions={limitation_resolutions:,} | weak-to-moderate | limitation quality must be visible in graph |",
@@ -398,7 +414,7 @@ def build_audit(
         "",
         "- Step2 now exposes canonical `source_paper_id` / `target_paper_id` for time-forward main-path semantics while retaining legacy columns for compatibility.",
         "- Step3 now records signal reliability and dampens KeystoneScore toward neutral if critical features regress to defaults.",
-        "- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node subgraph as pilot/evidence and evaluating whether the cap is adequate.",
+        "- Step4 now records `subgraph_scope_audit`, explicitly labeling the 5,000-node bounded evidence subgraph and evaluating whether the cap is adequate for extraction support.",
         "- Step5a now writes method/evidence-level/weight, so title/abstract-only citation-function labels cannot masquerade as ground truth.",
         "- Step5c now writes limitation evidence source, quality, weight, section name, and extractor method.",
         "- Step5b now separates raw VGAE scores from calibrated product confidence using chronological validation evidence.",

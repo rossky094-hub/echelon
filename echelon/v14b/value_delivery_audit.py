@@ -1919,6 +1919,12 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     step9_text = step9_path.read_text(encoding="utf-8") if step9_path.exists() else ""
     v14_config_path = (repo_root or Path(".")) / "echelon/v14b/config.py"
     v14_init_path = (repo_root or Path(".")) / "echelon/v14b/__init__.py"
+    step4_path = (repo_root or Path(".")) / "echelon/v14b/step4_subgraph.py"
+    step12_path = (repo_root or Path(".")) / "echelon/v14b/step12_goal_alignment_audit.py"
+    db_schema_path = (repo_root or Path(".")) / "echelon/v14b/db_schema.py"
+    step4_text = step4_path.read_text(encoding="utf-8") if step4_path.exists() else ""
+    step12_text = step12_path.read_text(encoding="utf-8") if step12_path.exists() else ""
+    db_schema_text = db_schema_path.read_text(encoding="utf-8") if db_schema_path.exists() else ""
     step9_avoids_old_pilot_instruction = (
         bool(step9_text)
         and "make pilot 全流程" not in step9_text
@@ -1975,6 +1981,30 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
                 "Step 1: OpenAlex enrich",
             ),
         )
+    )
+    step4_and_step9_use_bounded_subgraph_scope = (
+        bool(step4_text)
+        and bool(step9_text)
+        and "bounded_evidence_subgraph" in step4_text
+        and "bounded_evidence_subgraph" in step9_text
+        and "_normalise_subgraph_scope_row" in step9_text
+        and "bounded evidence / extraction support" in step9_text
+        and "pilot_evidence_subgraph" not in step4_text
+        and "pilot_adequate_for_algorithmic_evidence" not in step4_text
+        and "标为 pilot/evidence" not in step9_text
+        and "pilot/evidence，完整" not in step9_text
+        and "与 V12.5 Pilot 对比" not in step9_text
+    )
+    step12_and_schema_use_bounded_subgraph_scope = (
+        bool(step12_text)
+        and bool(db_schema_text)
+        and "bounded evidence subgraph for extraction support" in step12_text
+        and "bounded evidence subgraph" in step12_text
+        and "bounded evidence subgraph" in db_schema_text
+        and "pilot/evidence" not in db_schema_text
+        and "pilot/evidence subgraph" not in step12_text
+        and "as pilot/evidence" not in step12_text
+        and "explicitly labeling the 5,000-node subgraph as pilot/evidence" not in step12_text
     )
     first_current = min(
         (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
@@ -2048,6 +2078,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "step9_uses_decision_readiness_not_frontend_launch": step9_decision_readiness_not_frontend_launch,
         "step9_algo_report_filename_is_evidence_decision": step9_algo_report_filename_is_evidence_decision,
         "package_docstring_avoids_legacy_pilot_flow": package_docstring_avoids_legacy_pilot_flow,
+        "step4_and_step9_use_bounded_subgraph_scope": step4_and_step9_use_bounded_subgraph_scope,
+        "step12_and_schema_use_bounded_subgraph_scope": step12_and_schema_use_bounded_subgraph_scope,
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context

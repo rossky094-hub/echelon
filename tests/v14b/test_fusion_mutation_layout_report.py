@@ -517,6 +517,49 @@ class TestReportGenerator:
         assert "VGAE 预测未来边数" not in report
         assert "VGAE Link Prediction" not in report
 
+    def test_algo_report_normalises_legacy_pilot_subgraph_scope(self, tmp_path):
+        from echelon.v14b.step9_report import generate_algo_report
+        db_v14_path, conn_v14 = create_full_test_db(tmp_path)
+        db_main_path, conn_main = create_main_db(tmp_path)
+        conn_v14.execute(
+            """
+            INSERT INTO subgraph_scope_audit (
+                run_id, total_papers, total_linked_refs, configured_max_size,
+                recommended_max_size, selected_nodes, selected_edges,
+                node_coverage, edge_coverage, edge_density,
+                conclusion_scope, adequacy_label, notes_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy",
+                10,
+                20,
+                5,
+                8,
+                5,
+                4,
+                0.5,
+                0.2,
+                0.8,
+                "pilot_evidence_subgraph",
+                "pilot_adequate_for_algorithmic_evidence",
+                "{}",
+            ),
+        )
+        conn_v14.commit()
+
+        report = generate_algo_report(conn_main, conn_v14)
+        conn_v14.close()
+        conn_main.close()
+
+        assert "bounded_evidence_subgraph" in report
+        assert "bounded evidence / extraction support" in report
+        assert "bounded_evidence_subgraph_adequate_for_extraction" in report
+        assert "pilot_evidence_subgraph" not in report
+        assert "pilot/evidence" not in report
+        assert "与 V12.5 Pilot 对比" not in report
+
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report
         db_v14_path, conn_v14 = create_full_test_db(tmp_path)

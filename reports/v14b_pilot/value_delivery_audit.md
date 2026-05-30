@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T18:05:35Z`
+- generated_at: `2026-05-30T18:18:30Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,34 +34,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 21264,
+    "openalex_frontfill_cooldown_remaining_s": 20490,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2738,
+    "primary_section_papers": 2762,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 501,
+        "strong": 525,
         "weak": 2237
       },
-      "primary_section_papers": 2738,
-      "primary_section_rows": 4790,
+      "primary_section_papers": 2762,
+      "primary_section_rows": 4838,
       "strategy_counts": {
         "embedded_heading": 21,
-        "explicit_heading": 607,
-        "heading_continuation": 883,
-        "inline_heading": 322,
+        "explicit_heading": 640,
+        "heading_continuation": 931,
+        "inline_heading": 339,
         "legacy_unknown_strategy": 3886,
-        "loose_inline_heading": 13,
-        "parser_hint": 9
+        "loose_inline_heading": 14,
+        "parser_hint": 11
       },
-      "strong_or_moderate_papers": 501,
+      "strong_or_moderate_papers": 525,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8170197224251279
+      "weak_only_rate": 0.8099203475742216
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -432,6 +432,8 @@
     "post_frontfill_uses_topic_gap_repair": true,
     "product_chain_runs_decision_audit": true,
     "product_chains_avoid_legacy_targets": true,
+    "step12_and_schema_use_bounded_subgraph_scope": true,
+    "step4_and_step9_use_bounded_subgraph_scope": true,
     "step9_algo_report_filename_is_evidence_decision": true,
     "step9_openalex_language_is_coverage_not_success": true,
     "step9_report_avoids_old_pilot_instruction": true,

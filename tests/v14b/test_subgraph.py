@@ -181,7 +181,7 @@ class TestSubgraphConstruction:
             # 测试数据中有 70% 以上有被引 (除了 paper 20 没有被引用)
             assert ratio > 0.5, f"Expected > 50% nodes with in_degree>=1, got {ratio:.1%}"
 
-    def test_subgraph_scope_audit_marks_pilot_when_capped(self, tmp_path):
+    def test_subgraph_scope_audit_marks_bounded_evidence_when_capped(self, tmp_path):
         from echelon.v14b.step4_subgraph import evaluate_subgraph_scope
 
         db_path, conn_main = create_test_db(tmp_path)
@@ -198,6 +198,6 @@ class TestSubgraphConstruction:
         conn_main.close()
         conn_v14.close()
 
-        assert audit["conclusion_scope"] == "pilot_evidence_subgraph"
+        assert audit["conclusion_scope"] == "bounded_evidence_subgraph"
         assert audit["recommended_max_size"] >= 5
-        assert "pilot" in audit["adequacy_label"]
+        assert "evidence_subgraph" in audit["adequacy_label"]

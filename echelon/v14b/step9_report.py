@@ -78,6 +78,22 @@ def _future_candidate_evidence_text(value: object) -> str:
     return text.replace("VGAE pred:", "GNN/VGAE candidate edge:")
 
 
+def _normalise_subgraph_scope_row(row: dict) -> dict:
+    normalised = dict(row or {})
+    scope = str(normalised.get("conclusion_scope") or "").strip()
+    if scope in {"", "pilot_evidence_subgraph", "pilot/evidence"}:
+        normalised["conclusion_scope"] = "bounded_evidence_subgraph"
+    adequacy = str(normalised.get("adequacy_label") or "").strip()
+    adequacy_map = {
+        "pilot_sparse_increase_or_use_step10_full_graph": "evidence_subgraph_sparse_increase_or_use_step10_full_graph",
+        "pilot_usable_but_cap_below_recommended": "bounded_evidence_subgraph_below_recommended_cap",
+        "pilot_adequate_for_algorithmic_evidence": "bounded_evidence_subgraph_adequate_for_extraction",
+    }
+    if adequacy in adequacy_map:
+        normalised["adequacy_label"] = adequacy_map[adequacy]
+    return normalised
+
+
 def _direction_contract(direction: dict) -> dict:
     evidence = _loads_json(direction.get("evidence_json"), {})
     quality_gate = _loads_json(direction.get("quality_gate_json"), {})
@@ -247,7 +263,7 @@ def generate_algo_report(
         ORDER BY created_at DESC
         LIMIT 1
     """)
-    subgraph_scope_row = subgraph_scope[0] if subgraph_scope else {}
+    subgraph_scope_row = _normalise_subgraph_scope_row(subgraph_scope[0] if subgraph_scope else {})
 
     # VGAE 统计
     predicted_edges = safe_count(conn_v14, "predicted_future_edges")
@@ -354,7 +370,7 @@ def generate_algo_report(
         f"| 主干道边数 (top 1%) | **{main_path_core:,}** / {main_path_edges:,} |",
         f"| 子图节点数 | **{subgraph_nodes:,}** |",
         f"| 子图边数 | **{subgraph_edges:,}** |",
-        f"| 子图结论范围 | **{subgraph_scope_row.get('conclusion_scope', 'pilot/evidence')}** |",
+        f"| 子图结论范围 | **{subgraph_scope_row.get('conclusion_scope', 'bounded_evidence_subgraph')}** |",
         f"| Citation-function evidence 覆盖率 | **{classification_rate}** |",
         f"| Future candidate generator 候选边数 | **{predicted_edges:,}** |",
         f"| Limitation atoms 总数 | **{total_atoms:,}** |",
@@ -411,8 +427,8 @@ def generate_algo_report(
         f"| 1 度邻居节点 | **{subgraph_nodes - keystone_nodes - fresh_nodes:,}** |",
         f"| 子图边数 | **{subgraph_edges:,}** |",
         f"",
-        f"**结论边界**: Step4 是 `{subgraph_scope_row.get('conclusion_scope', 'pilot_evidence_subgraph')}`；"
-        f"任何只来自该子图的结论必须标为 pilot/evidence，完整 {corpus_label} 图谱以 Step10 visual graph 为准。",
+        f"**结论边界**: Step4 是 `{subgraph_scope_row.get('conclusion_scope', 'bounded_evidence_subgraph')}`；"
+        f"任何只来自该子图的结论必须标为 bounded evidence / extraction support，完整 {corpus_label} 图谱以 Step10 visual graph 为准。",
         f"",
         f"- 节点覆盖率: {float(subgraph_scope_row.get('node_coverage') or 0) * 100:.1f}%",
         f"- 边覆盖率: {float(subgraph_scope_row.get('edge_coverage') or 0) * 100:.1f}%",
@@ -545,11 +561,11 @@ def generate_algo_report(
         f"",
         f"---",
         f"",
-        f"## 12. 与 V12.5 Pilot 对比",
+        f"## 12. 与旧 V12.5 图谱样例对比",
         f"",
-        f"| 维度 | V12.5 (2000 篇) | V14-B (13606 篇) |",
+        f"| 维度 | V12.5 图谱样例 (2000 篇) | V14-B Evidence Decision ({total_papers:,} 篇) |",
         f"|---|---|---|",
-        f"| 数据规模 | 2,000 篇 | **13,606 篇** |",
+        f"| 数据规模 | 2,000 篇 | **{total_papers:,} 篇** |",
         f"| 引用图 | 仅 arXiv 内部 | **DOI/arXiv/OpenAlex/S2 exact relinking；linked-ref 低覆盖时仍需 uncertainty** |",
         f"| 评分算法 | V13 均等权重 | **V14 生命周期自适应** |",
         f"| 未来方向 | 无 | **{future_dirs:,} 个三路融合方向** |",
