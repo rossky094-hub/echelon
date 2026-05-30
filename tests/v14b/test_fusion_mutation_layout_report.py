@@ -405,7 +405,7 @@ class TestUMAPLayout:
 class TestReportGenerator:
     EXPECTED_SECTIONS = [
         "执行摘要",
-        "Enrich 数据质量",
+        "OpenAlex / Field 覆盖质量",
         "全网 Main Path",
         "V14 调权",
         "子图选取",
@@ -445,6 +445,26 @@ class TestReportGenerator:
         assert "Top 5 未来候选证据合同预览" in report
         assert "claim_scope" in report
         assert "evidence_grade" in report
+
+    def test_algo_report_labels_openalex_as_coverage_not_success(self, tmp_path):
+        from echelon.v14b.step9_report import generate_algo_report
+        db_v14_path, conn_v14 = create_full_test_db(tmp_path)
+        db_main_path, conn_main = create_main_db(tmp_path)
+        conn_main.execute("ALTER TABLE papers ADD COLUMN openalex_id TEXT")
+        conn_main.execute("ALTER TABLE papers ADD COLUMN openalex_enriched INTEGER DEFAULT 0")
+        conn_main.execute("UPDATE papers SET openalex_enriched=1")
+        conn_main.execute("UPDATE papers SET openalex_id='W123' WHERE id=1")
+        conn_main.commit()
+
+        report = generate_algo_report(conn_main, conn_v14)
+        conn_v14.close()
+        conn_main.close()
+
+        assert "OpenAlex W 覆盖率" in report
+        assert "coverage is not a success claim" in report
+        assert "OpenAlex enrich 成功率" not in report
+        assert "OpenAlex 命中率" not in report
+        assert "OpenAlex 跨库" not in report
 
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report

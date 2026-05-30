@@ -2,7 +2,7 @@
 Step 9: 报告生成器
 
 生成两份 Markdown 报告:
-  1. V14B_Pilot_算法验证报告.md (13 章节)
+  1. V14B_Pilot_算法验证报告.md (legacy filename; current Evidence Decision report)
   2. 未来方向预测_交集报告.md (top 20)
 
 从 DB 实查数据填充(无数据时用 TBD 占位)
@@ -185,6 +185,16 @@ def generate_algo_report(
     # 基础统计
     total_papers = safe_count(conn_main, "papers", scope)
     enriched_papers = safe_count(conn_main, "papers", f"{scope} AND openalex_enriched = 1")
+    openalex_w = safe_count(
+        conn_main,
+        "papers",
+        f"{scope} AND (openalex_id LIKE 'W%' OR openalex_id LIKE 'https://openalex.org/W%')",
+    )
+    field_papers = safe_count(
+        conn_main,
+        "papers",
+        f"{scope} AND primary_field_id IS NOT NULL AND trim(primary_field_id) <> ''",
+    )
     total_refs = safe_scalar(
         conn_main,
         f"""
@@ -311,13 +321,15 @@ def generate_algo_report(
     """)
     v14_top_ids = {r["id"] for r in v14_top100}
 
-    enrich_rate = f"{enriched_papers / max(1, total_papers) * 100:.1f}%"
+    openalex_enrich_rate = f"{enriched_papers / max(1, total_papers) * 100:.1f}%"
+    openalex_w_rate = f"{openalex_w / max(1, total_papers) * 100:.1f}%"
+    field_rate = f"{field_papers / max(1, total_papers) * 100:.1f}%"
     classification_rate = f"{classified_edges / max(1, subgraph_edges) * 100:.1f}%"
     cross_field_rate = f"{cross_field_preds / max(1, predicted_edges) * 100:.1f}%"
 
     # 构建报告
     lines = [
-        f"# V14-B Pilot 算法验证报告",
+        f"# V14-B Evidence Decision 算法验证报告",
         f"",
         f"**生成时间**: {now}",
         f"**数据规模**: {total_papers:,} 篇论文 (corpus={corpus_label})",
@@ -329,7 +341,8 @@ def generate_algo_report(
         f"| 指标 | 数值 |",
         f"|---|---|",
         f"| 总论文数 | **{total_papers:,}** |",
-        f"| OpenAlex enrich 成功率 | **{enrich_rate}** ({enriched_papers:,}/{total_papers:,}) |",
+        f"| OpenAlex W 覆盖率 | **{openalex_w_rate}** ({openalex_w:,}/{total_papers:,}) |",
+        f"| Field/Topic 覆盖率 | **{field_rate}** ({field_papers:,}/{total_papers:,}) |",
         f"| 引用关系总数 | **{total_refs:,}** |",
         f"| 主干道边数 (top 1%) | **{main_path_core:,}** / {main_path_edges:,} |",
         f"| 子图节点数 | **{subgraph_nodes:,}** |",
@@ -342,11 +355,14 @@ def generate_algo_report(
         f"",
         f"---",
         f"",
-        f"## 2. Enrich 数据质量",
+        f"## 2. OpenAlex / Field 覆盖质量",
         f"",
-        f"- **OpenAlex 命中率**: {enrich_rate}",
+        f"- **OpenAlex W 覆盖率**: {openalex_w_rate} ({openalex_w:,}/{total_papers:,})",
+        f"- **Field/Topic 覆盖率**: {field_rate} ({field_papers:,}/{total_papers:,})",
+        f"- **openalex_enriched 标记覆盖**: {openalex_enrich_rate}；这是历史元数据标记，不等同于 OpenAlex W 或 field/topic 决策覆盖。",
+        f"- **结论边界**: OpenAlex/field coverage is not a success claim; cross-field, bridge, and topic-color conclusions must carry uncertainty until coverage gates pass.",
         f"- **引用关系总数**: {total_refs:,} 条",
-        f"- **平均每篇引用数**: {total_refs / max(1, enriched_papers):.1f}",
+        f"- **平均每篇引用数**: {total_refs / max(1, total_papers):.1f}",
         f"",
         f"---",
         f"",
@@ -523,7 +539,7 @@ def generate_algo_report(
         f"| 维度 | V12.5 (2000 篇) | V14-B (13606 篇) |",
         f"|---|---|---|",
         f"| 数据规模 | 2,000 篇 | **13,606 篇** |",
-        f"| 引用图 | 仅 arXiv 内部 | **OpenAlex 跨库** |",
+        f"| 引用图 | 仅 arXiv 内部 | **DOI/arXiv/OpenAlex/S2 exact relinking；linked-ref 低覆盖时仍需 uncertainty** |",
         f"| 评分算法 | V13 均等权重 | **V14 生命周期自适应** |",
         f"| 未来方向 | 无 | **{future_dirs:,} 个三路融合方向** |",
         f"",

@@ -1,9 +1,9 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T16:58:01Z`
+- audit_ts: `2026-05-30T17:04:50Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,514`
-- next delta queue needing primary section/action: `6,157`
+- next delta queue needing primary section/action: `6,156`
 - multi-topic evidence-gap rows merged: `32` (46 papers)
 - topic evidence-gap delta queue: `20` papers
 
@@ -11,9 +11,9 @@
 
 | retry_class | count |
 |---|---:|
-| not_attempted_pdf_available | 6,091 |
+| not_attempted_pdf_available | 6,090 |
 | no_target_sections | 4,090 |
-| covered | 2,287 |
+| covered | 2,288 |
 | retryable_pdf_failure | 45 |
 | parser_failure | 1 |
 
@@ -22,7 +22,7 @@
 | category | total | in topN | any section | primary section | eligible PDF |
 |---|---:|---:|---:|---:|---:|
 | active_learning_uncertainty_hotspot | 3,000 | 647 | 360 | 360 | 3,000 |
-| branch_split_driver | 1,970 | 1,970 | 700 | 700 | 1,970 |
+| branch_split_driver | 1,970 | 1,970 | 701 | 701 | 1,970 |
 | cluster_representative | 5,958 | 5,331 | 698 | 698 | 5,958 |
 | future_endpoint | 291 | 291 | 96 | 96 | 291 |
 | limitation_evidence | 268 | 268 | 268 | 268 | 268 |

@@ -216,7 +216,8 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "step9_report.py").write_text(
         "make product-chain make post-frontfill-chain legacy compatibility "
-        "claim_scope evidence_grade uncertainty_reasons candidate_pool_only\n",
+        "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n",
         encoding="utf-8",
     )
     scripts = root / "scripts"
@@ -501,6 +502,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert legacy_gate["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
     assert legacy_gate["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert legacy_gate["checks"]["step9_report_avoids_old_pilot_instruction"] is True
+    assert legacy_gate["checks"]["step9_openalex_language_is_coverage_not_success"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])
@@ -606,6 +608,7 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
+    assert result["checks"]["step9_openalex_language_is_coverage_not_success"] is True
     assert result["disallowed_current_deps"] == {}
 
 

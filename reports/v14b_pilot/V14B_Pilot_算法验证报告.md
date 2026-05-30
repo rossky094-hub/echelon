@@ -1,6 +1,6 @@
-# V14-B Pilot 算法验证报告
+# V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-30 21:30
+**生成时间**: 2026-05-31 01:04
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -10,7 +10,8 @@
 | 指标 | 数值 |
 |---|---|
 | 总论文数 | **55,391** |
-| OpenAlex enrich 成功率 | **99.2%** (54,937/55,391) |
+| OpenAlex W 覆盖率 | **64.4%** (35,663/55,391) |
+| Field/Topic 覆盖率 | **99.9%** (55,359/55,391) |
 | 引用关系总数 | **3,215,130** |
 | 主干道边数 (top 1%) | **2,775** / 277,526 |
 | 子图节点数 | **5,000** |
@@ -23,11 +24,14 @@
 
 ---
 
-## 2. Enrich 数据质量
+## 2. OpenAlex / Field 覆盖质量
 
-- **OpenAlex 命中率**: 99.2%
+- **OpenAlex W 覆盖率**: 64.4% (35,663/55,391)
+- **Field/Topic 覆盖率**: 99.9% (55,359/55,391)
+- **openalex_enriched 标记覆盖**: 99.2%；这是历史元数据标记，不等同于 OpenAlex W 或 field/topic 决策覆盖。
+- **结论边界**: OpenAlex/field coverage is not a success claim; cross-field, bridge, and topic-color conclusions must carry uncertainty until coverage gates pass.
 - **引用关系总数**: 3,215,130 条
-- **平均每篇引用数**: 58.5
+- **平均每篇引用数**: 58.0
 
 ---
 
@@ -159,7 +163,7 @@
 | 维度 | V12.5 (2000 篇) | V14-B (13606 篇) |
 |---|---|---|
 | 数据规模 | 2,000 篇 | **13,606 篇** |
-| 引用图 | 仅 arXiv 内部 | **OpenAlex 跨库** |
+| 引用图 | 仅 arXiv 内部 | **DOI/arXiv/OpenAlex/S2 exact relinking；linked-ref 低覆盖时仍需 uncertainty** |
 | 评分算法 | V13 均等权重 | **V14 生命周期自适应** |
 | 未来方向 | 无 | **5 个三路融合方向** |
 
@@ -182,4 +186,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-30 21:30*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:04*

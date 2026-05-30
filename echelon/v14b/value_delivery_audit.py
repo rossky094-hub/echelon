@@ -1786,6 +1786,15 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         and "make post-frontfill-chain" in step9_text
         and "legacy compatibility" in step9_text
     )
+    step9_openalex_language_is_coverage = (
+        bool(step9_text)
+        and "OpenAlex W 覆盖率" in step9_text
+        and "Field/Topic 覆盖率" in step9_text
+        and "coverage is not a success claim" in step9_text
+        and "OpenAlex enrich 成功率" not in step9_text
+        and "OpenAlex 命中率" not in step9_text
+        and "OpenAlex 跨库" not in step9_text
+    )
     first_current = min(
         (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
         default=-1,
@@ -1854,6 +1863,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "legacy_targets_labeled": not unlabeled_legacy_targets,
         "legacy_arxiv_scripts_require_explicit_opt_in": not unguarded_legacy_scripts,
         "step9_report_avoids_old_pilot_instruction": step9_avoids_old_pilot_instruction,
+        "step9_openalex_language_is_coverage_not_success": step9_openalex_language_is_coverage,
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context
