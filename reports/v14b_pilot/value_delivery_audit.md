@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T15:18:59Z`
+- generated_at: `2026-05-30T15:25:12Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -10,7 +10,7 @@
 | ---: | --- | --- | --- |
 | 1 | Evidence Bone | warn | All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes. |
 | 2 | Bottleneck Lineage Graph | pass | Lineage is evidence-backed only when triples carry section/page evidence; otherwise it remains weak historical context. |
-| 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such. |
+| 3 | Branch Lineage Validity | pass | Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract. |
 | 4 | Future Growth Calibration | pass | VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card. |
 | 5 | Claim Card Engine | pass | A card missing any of the five hard questions is candidate_pool_only and cannot enter Radar. The minimal validation experiment must include cost, cycle, success criteria, and falsification conditions. |
 | 6 | Claim Card High-Confidence Evidence Contract | pass | A Claim Card can be high-confidence only when Step13 quality gates show strong section evidence and strong/moderate parser provenance; weak or missing section evidence keeps it exploratory. |
@@ -95,9 +95,15 @@
 ```json
 {
   "branches": 5286,
+  "checks": {
+    "api_visual_clusters_carry_lineage_contract": true,
+    "branch_lineage_columns_present": true,
+    "branch_lineage_statuses_present": true,
+    "ui_cluster_panel_renders_lineage_contract": true
+  },
   "issue": "Branch Lineage Validity",
   "missing_columns": [],
-  "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such.",
+  "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract.",
   "status": "pass",
   "status_counts": {
     "evidence_backed_split": 52,

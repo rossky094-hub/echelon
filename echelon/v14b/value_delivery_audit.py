@@ -234,7 +234,7 @@ def audit_bottleneck_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
-def audit_branch_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     required_cols = {"parent_branch_id", "split_confidence", "split_evidence_json"}
     if not table_exists(conn_v14, "branch_lineages"):
         return {
@@ -253,13 +253,47 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection) -> dict[str, Any]:
     for row in rows:
         statuses[_lineage_status(_loads(row[3], {}), row[2])] += 1
     has_labeling = bool(rows) and bool(statuses)
+    source_checks = {
+        "api_visual_clusters_carry_lineage_contract": True,
+        "ui_cluster_panel_renders_lineage_contract": True,
+    }
+    if repo_root is not None:
+        source_checks = {
+            "api_visual_clusters_carry_lineage_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _branch_lineage_contract",
+                    "get_visual_clusters",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
+                    "evidence_objects",
+                ),
+            ),
+            "ui_cluster_panel_renders_lineage_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderClusters",
+                    "lineage.claim_scope",
+                    "lineage.evidence_grade",
+                    "lineage.uncertainty_reasons",
+                    "renderEvidenceObjects(lineage.evidence_objects",
+                ),
+            ),
+        }
+    checks = {
+        "branch_lineage_columns_present": required_cols.issubset(cols),
+        "branch_lineage_statuses_present": has_labeling,
+        **source_checks,
+    }
     return {
         "issue": "Branch Lineage Validity",
-        "status": _gate_status(required_cols.issubset(cols) and has_labeling, warn=has_labeling),
+        "status": _gate_status(all(checks.values()), warn=has_labeling and all(source_checks.values())),
+        "checks": checks,
         "branches": len(rows),
         "status_counts": dict(statuses),
         "missing_columns": sorted(required_cols - cols),
-        "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such.",
+        "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract.",
     }
 
 
@@ -1636,7 +1670,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
         gates = [
             audit_evidence_bone(metrics),
             audit_bottleneck_lineage(conn_v14),
-            audit_branch_lineage(conn_v14),
+            audit_branch_lineage(conn_v14, repo_root),
             audit_future_growth(conn_v14),
             audit_claim_card_engine(conn_v14, repo_root),
             audit_claim_card_high_confidence_evidence_contract(conn_v14, repo_root),

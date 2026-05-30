@@ -3085,6 +3085,66 @@ def _split_reason(branch_id: str, parent_branch_id: Any, split_evidence: dict[st
     return "No reliable parent branch was found; this is treated as a root or layout-only cluster."
 
 
+def _branch_lineage_contract(item: dict[str, Any], lineage_payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(lineage_payload, dict):
+        lineage_payload = {}
+    lineage_status = _lineage_status(lineage_payload, item.get("split_confidence"))
+    support = int(lineage_payload.get("parent_citation_support") or 0)
+    if lineage_status == "evidence_backed_split":
+        claim_scope = "evidence_backed_branch_split_candidate"
+        evidence_grade = "graph_backed_branch_split"
+    elif lineage_status == "weak_split_candidate":
+        claim_scope = "weak_branch_split_candidate"
+        evidence_grade = "graph_weak_branch_split"
+    else:
+        claim_scope = "layout_cluster_navigation_only"
+        evidence_grade = "layout_cluster_only"
+    uncertainty = [
+        *(
+            []
+            if lineage_status == "evidence_backed_split"
+            else ["branch split is not strongly backed by parent-child lineage evidence"]
+        ),
+        "cluster-panel lineage is graph-level context until driver papers have local primary section evidence",
+        *(
+            ["layout clusters are navigation aids and must not be narrated as causal scientific evolution"]
+            if lineage_status == "layout_cluster_only"
+            else []
+        ),
+    ]
+    return {
+        "lineage_status": lineage_status,
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "parent_branch_id with time-forward citation support",
+            "driver papers with local primary section evidence",
+            "constraint shift tied to limitation/discussion/conclusion/results sections",
+            "branch split confidence and audit trail",
+        ],
+        "evidence_objects": _compact_evidence_objects(
+            [
+                {
+                    "type": "branch_lineage",
+                    "role": "cluster_panel_branch_lineage",
+                    "source": "branch_lineages",
+                    "id": f"branch_lineage:{item.get('branch_id') or ''}",
+                    "label": f"{item.get('parent_branch_id') or 'root'} -> {item.get('branch_id') or '-'}",
+                    "relationship": "split_evidence",
+                    "lineage_status": lineage_status,
+                    "confidence": item.get("split_confidence"),
+                    "description": item.get("split_reason"),
+                    "claim_scope": claim_scope,
+                    "evidence_grade": evidence_grade,
+                    "support_count": support,
+                }
+            ],
+            limit=4,
+        ),
+    }
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -5198,12 +5258,12 @@ def get_visual_clusters(limit: int = 200) -> dict:
         split_conf_sql = (
             "split_confidence"
             if "split_confidence" in lineage_cols
-            else "strength AS split_confidence"
+            else "strength"
         )
         split_evidence_sql = (
             "split_evidence_json"
             if "split_evidence_json" in lineage_cols
-            else "why_json AS split_evidence_json"
+            else "why_json"
         )
         lineage_rows = conn.execute(
             f"""
@@ -5235,6 +5295,7 @@ def get_visual_clusters(limit: int = 200) -> dict:
         lineage_payload = item.get("split_evidence") or item.get("why") or {}
         item["lineage_status"] = _lineage_status(lineage_payload, item.get("split_confidence"))
         item["split_reason"] = _split_reason(str(item.get("branch_id") or ""), item.get("parent_branch_id"), lineage_payload)
+        item.update(_branch_lineage_contract(item, lineage_payload))
         lineages.append(item)
     return {
         "schema_version": SCHEMA_VERSION,

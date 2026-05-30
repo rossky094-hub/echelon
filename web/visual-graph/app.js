@@ -904,9 +904,19 @@ function renderClusters() {
         <div class="pill-row">${terms}</div>
         <div class="pill-row">
           <span class="pill ${lineage.lineage_status === "evidence_backed_split" ? "good" : "warn"}">${esc(lineage.lineage_status || "layout_cluster_only")}</span>
+          <span class="pill">${esc(lineage.claim_scope || "layout_cluster_navigation_only")}</span>
+          <span class="pill">${esc(lineage.evidence_grade || "layout_cluster_only")}</span>
         </div>
         <p class="mini">parent ${esc(lineage.parent_branch_id || "-")} / split ${esc(lineage.split_year || "-")} / confidence ${confidence}</p>
         ${lineage.split_reason ? `<p class="mini">${esc(lineage.split_reason)}</p>` : ""}
+        ${(lineage.required_evidence || []).length ? `<p class="mini"><strong>分支成立还需要：</strong>${(lineage.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+        ${(lineage.uncertainty_reasons || []).length ? `
+          <details>
+            <summary>Branch lineage uncertainty (${fmt((lineage.uncertainty_reasons || []).length)})</summary>
+            ${(lineage.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+          </details>
+        ` : ""}
+        ${renderEvidenceObjects(lineage.evidence_objects || [], 4)}
       </div>
     `;
   }).join("");

@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T15:18:58Z`
+- generated_at: `2026-05-30T15:25:11Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics

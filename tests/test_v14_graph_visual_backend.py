@@ -153,6 +153,22 @@ def _make_visual_db(path):
                 0.15, 0.25, 0.75, '[]', '[]', '{}')
         """
     )
+    conn.execute(
+        """
+        INSERT INTO branch_lineages
+            (branch_id, parent_branch_id, split_year, strength, why_json, future_json)
+        VALUES ('B0001', 'B0000', 2023, 0.42, ?, '{}')
+        """,
+        (
+            json.dumps(
+                {
+                    "parent_citation_support": 9,
+                    "parent_support_ratio": 0.36,
+                    "split_reason": "Evidence-backed split from B0000 into integrated photonics.",
+                }
+            ),
+        ),
+    )
     for pid, title, abstract, role in (
         ("p1", "Laser photonics bottleneck", "This paper studies laser optical limits.", "bottleneck"),
         ("p2", "Foundational optics path", "A cited main-path optics paper.", "starter"),
@@ -304,6 +320,24 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert "rd_radar" in data
     assert "evidence_map" in data
     assert data["related_papers"][0]["access_links"]
+
+
+def test_visual_clusters_branch_lineages_carry_evidence_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get("/graph/visual/clusters", headers=VIEWER_HEADERS)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    lineage = data["branch_lineages"][0]
+    assert lineage["lineage_status"] == "evidence_backed_split"
+    assert lineage["claim_scope"] == "evidence_backed_branch_split_candidate"
+    assert lineage["evidence_grade"] == "graph_backed_branch_split"
+    assert lineage["uncertainty_reasons"]
+    assert lineage["required_evidence"]
+    assert lineage["evidence_objects"][0]["type"] == "branch_lineage"
 
 
 def test_visual_topic_lens_expands_to_cluster_context(tmp_path, monkeypatch):
