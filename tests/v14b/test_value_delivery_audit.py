@@ -223,6 +223,7 @@ def _write_product_sources(root: Path) -> None:
         "make product-chain make post-frontfill-chain legacy compatibility "
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "Citation-function evidence 覆盖率 Citation Function Evidence\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
         "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
         "linked resolution evidence 阈值不得下调\n"
@@ -883,6 +884,25 @@ def test_llm_evidence_boundary_rejects_hidden_scibert_llm_fallback_copy(tmp_path
     (v14 / "step9_report.py").write_text(
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
         "考虑换 LLM 分类\n",
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+
+    result = audit_llm_evidence_boundary(conn, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["citation_llm_fallback_explicit_and_weak"] is False
+    conn.close()
+
+
+def test_llm_evidence_boundary_rejects_scibert_report_claim_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step9_report.py").write_text(
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
+        "SciBERT 分类完成率 SciBERT 引用功能分布\n",
         encoding="utf-8",
     )
     conn = sqlite3.connect(":memory:")

@@ -216,7 +216,9 @@ def generate_algo_report(
     keystone_nodes = safe_count(conn_v14, "subgraph_nodes", "is_keystone = 1")
     fresh_nodes = safe_count(conn_v14, "subgraph_nodes", "is_fresh_top = 1")
 
-    # SciBERT 分类统计
+    # Citation-function evidence statistics.  The default classifier is a
+    # deterministic weak-evidence layer; do not present it as a SciBERT model
+    # conclusion.
     classified_edges = safe_count(conn_v14, "subgraph_edges", "citation_function IS NOT NULL")
     func_dist = safe_query(conn_v14, """
         SELECT citation_function, COUNT(*) as n
@@ -348,7 +350,7 @@ def generate_algo_report(
         f"| 子图节点数 | **{subgraph_nodes:,}** |",
         f"| 子图边数 | **{subgraph_edges:,}** |",
         f"| 子图结论范围 | **{subgraph_scope_row.get('conclusion_scope', 'pilot/evidence')}** |",
-        f"| SciBERT 分类完成率 | **{classification_rate}** |",
+        f"| Citation-function evidence 覆盖率 | **{classification_rate}** |",
         f"| VGAE 预测未来边数 | **{predicted_edges:,}** |",
         f"| Limitation atoms 总数 | **{total_atoms:,}** |",
         f"| 三路融合方向数 | **{future_dirs:,}** |",
@@ -414,7 +416,7 @@ def generate_algo_report(
         f"",
         f"---",
         f"",
-        f"## 6. SciBERT 引用功能分布",
+        f"## 6. Citation Function Evidence",
         f"",
         f"| 引用功能 | 边数 | 占比 |",
         f"|---|---|---|",

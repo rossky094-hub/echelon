@@ -906,6 +906,8 @@ def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | 
             and _source_contains(
                 repo_root / "echelon/v14b/step9_report.py",
                 (
+                    "Citation-function evidence 覆盖率",
+                    "Citation Function Evidence",
                     "capped LLM edge audit",
                     "LLM 结果只能作为弱标签",
                     "不能直接升级结论",
@@ -928,7 +930,11 @@ def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | 
             )
             and _source_absent(
                 repo_root / "echelon/v14b/step9_report.py",
-                ("考虑换 LLM 分类",),
+                (
+                    "考虑换 LLM 分类",
+                    "SciBERT 分类完成率",
+                    "SciBERT 引用功能分布",
+                ),
             ),
             "fusion_llm_naming_opt_in": _source_contains(
                 repo_root / "echelon/v14b/step6_fusion.py",

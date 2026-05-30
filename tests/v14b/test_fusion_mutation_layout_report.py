@@ -409,7 +409,7 @@ class TestReportGenerator:
         "全网 Main Path",
         "V14 调权",
         "子图选取",
-        "SciBERT",
+        "Citation Function Evidence",
         "VGAE Link Prediction",
         "Limitation Tracking",
         "三路融合",
@@ -484,6 +484,21 @@ class TestReportGenerator:
         assert "VGAE test AUC" not in report
         assert "主干道节点 100-200" not in report
         assert "重型算法调优建议" not in report
+
+    def test_algo_report_labels_citation_function_as_evidence_layer(self, tmp_path):
+        from echelon.v14b.step9_report import generate_algo_report
+        db_v14_path, conn_v14 = create_full_test_db(tmp_path)
+        db_main_path, conn_main = create_main_db(tmp_path)
+
+        report = generate_algo_report(conn_main, conn_v14)
+        conn_v14.close()
+        conn_main.close()
+
+        assert "Citation-function evidence 覆盖率" in report
+        assert "## 6. Citation Function Evidence" in report
+        assert "弱证据层" in report
+        assert "SciBERT 分类完成率" not in report
+        assert "SciBERT 引用功能分布" not in report
 
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report
