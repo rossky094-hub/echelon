@@ -276,6 +276,9 @@ def pct(value: float) -> str:
 _WATCHDOG_TS_RE = re.compile(r"\[(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\]")
 _WATCHDOG_COUNT_RE = re.compile(r"rows=(?P<rows>\d+)\s+papers=(?P<papers>\d+)")
 _WATCHDOG_DONE_RE = re.compile(r"done=(?P<done>\d+)/(?P<total>\d+)")
+_SECTION_PROGRESS_RE = re.compile(
+    r"(?P<done>\d+)/(?P<total>\d+)\s+\[(?P<elapsed>\d+:\d{2}:\d{2})<"
+)
 
 
 def _ts_epoch(value: str) -> float:
@@ -283,6 +286,14 @@ def _ts_epoch(value: str) -> float:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
     except Exception:
         return 0.0
+
+
+def _elapsed_to_seconds(value: str) -> int:
+    try:
+        hours, minutes, seconds = [int(part) for part in value.split(":")]
+    except Exception:
+        return 0
+    return hours * 3600 + minutes * 60 + seconds
 
 
 def _watchdog_no_evidence_elapsed(log_path: Path) -> dict[str, Any]:
@@ -326,6 +337,47 @@ def _watchdog_log_for_state(path: Path) -> Path:
     return path.with_suffix(".log")
 
 
+def _section_progress_log_for_state(path: Path) -> Path | None:
+    name = path.name
+    if name == "section_delta_watchdog_state.json":
+        return path.with_name("step5s_section_delta.log")
+    if name == "section_top12000_watchdog_state.json":
+        return path.with_name("step5s_section_top12000.log")
+    return None
+
+
+def _section_progress_tail(log_path: Path | None) -> dict[str, Any]:
+    if log_path is None or not log_path.exists():
+        return {}
+    text = log_path.read_text(errors="ignore")
+    chunks = [chunk for chunk in text.replace("\n", "\r").split("\r") if "Step5s sections:" in chunk]
+    if not chunks:
+        return {}
+    match = _SECTION_PROGRESS_RE.search(chunks[-1])
+    if not match:
+        return {}
+    done = int(match.group("done"))
+    total = int(match.group("total"))
+    elapsed_s = _elapsed_to_seconds(match.group("elapsed"))
+    return {
+        "progress_latest_done": done,
+        "progress_latest_total": total,
+        "progress_elapsed_s": elapsed_s,
+        "progress_log": str(log_path),
+    }
+
+
+def _max_int(*values: Any) -> int | None:
+    parsed = []
+    for value in values:
+        try:
+            if value is not None:
+                parsed.append(int(value))
+        except Exception:
+            continue
+    return max(parsed) if parsed else None
+
+
 def load_section_frontfill_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"available": False}
@@ -340,8 +392,19 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
     low_yield_intervals = int(state.get("low_yield_intervals") or 0)
     log_path = _watchdog_log_for_state(path)
     log_state = _watchdog_no_evidence_elapsed(log_path)
+    progress_state = _section_progress_tail(_section_progress_log_for_state(path))
     no_evidence_delta = max(no_evidence_delta, int(log_state.get("log_no_evidence_done_delta") or 0))
     no_evidence_elapsed_s = max(no_evidence_elapsed_s, int(log_state.get("log_no_evidence_elapsed_s") or 0))
+    latest_done = _max_int(
+        state.get("done"),
+        log_state.get("log_latest_done"),
+        progress_state.get("progress_latest_done"),
+    )
+    latest_total = _max_int(
+        state.get("total"),
+        log_state.get("log_latest_total"),
+        progress_state.get("progress_latest_total"),
+    )
     if low_yield_intervals >= 2 or no_evidence_elapsed_s >= 4 * 3600:
         status = "soft_stall"
     elif no_evidence_delta >= 200:
@@ -353,9 +416,12 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
         "source": path.stem.replace("_watchdog_state", ""),
         "state_path": str(path),
         "watchdog_log": str(log_path),
+        **progress_state,
         "status": status,
-        "done": state.get("done"),
-        "total": state.get("total"),
+        "done": latest_done,
+        "total": latest_total,
+        "state_done": state.get("done"),
+        "state_total": state.get("total"),
         "log_latest_done": log_state.get("log_latest_done"),
         "log_latest_total": log_state.get("log_latest_total"),
         "rows": state.get("rows"),

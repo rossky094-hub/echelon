@@ -284,6 +284,27 @@ def test_direction_readiness_prefers_active_delta_watchdog_state(tmp_path):
     assert loaded["done"] == 20
 
 
+def test_direction_readiness_uses_live_section_progress_log(tmp_path):
+    log_dir = tmp_path / "logs" / "v14b"
+    log_dir.mkdir(parents=True)
+    (log_dir / "section_delta_watchdog_state.json").write_text(
+        '{"done": 20, "total": 6603, "rows": 200, "papers": 190}',
+        encoding="utf-8",
+    )
+    (log_dir / "step5s_section_delta.log").write_text(
+        "\rStep5s sections:  13%| | 877/6603 [7:42:25<7:04:04,  4.44s/it, parsed=357]\n",
+        encoding="utf-8",
+    )
+
+    loaded = select_section_frontfill_state(tmp_path)
+
+    assert loaded["source"] == "section_delta"
+    assert loaded["state_done"] == 20
+    assert loaded["done"] == 877
+    assert loaded["progress_latest_done"] == 877
+    assert loaded["progress_log"].endswith("step5s_section_delta.log")
+
+
 def test_latest_fusion_audit_renders_candidate_score_labels():
     public = _public_latest_fusion_audit(
         {
