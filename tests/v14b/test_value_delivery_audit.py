@@ -171,6 +171,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
         "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
+        "function futureCalibrationCopy() { return 'candidate_score calibrated_candidate_score raw_candidate_score'; }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + item.candidate_score + '候选分数 Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool future candidate generator candidate score'; }\n"
         "function renderRadarScores() { return item.candidate_score; }\n"
@@ -529,6 +530,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert future_gate["checks"]["step6_future_evidence_avoids_prediction_copy"] is True
     assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     assert future_gate["checks"]["public_future_candidate_language_avoids_prediction_copy"] is True
+    assert future_gate["checks"]["ui_future_calibration_copy_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["direction_readiness_report_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["step12_goal_alignment_report_uses_candidate_score_labels"] is True
     openalex_gate = next(g for g in result["gates"] if g["issue"] == "OpenAlex Frontfill Guard Contract")
@@ -1314,6 +1316,25 @@ def test_future_growth_audit_rejects_public_model_probability_keys(tmp_path):
 
     assert result["status"] == "fail"
     assert result["checks"]["public_future_model_evidence_uses_candidate_score_labels"] is False
+
+
+def test_future_growth_audit_rejects_ui_future_calibration_probability_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    app_path = tmp_path / "web/visual-graph/app.js"
+    app_path.write_text(
+        app_path.read_text(encoding="utf-8")
+        + "\nfunction badFutureCalibrationCopy(edge) { return evidence.calibrated_prob + ' / raw ' + evidence.raw_predicted_prob + ' edge score'; }\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["ui_future_calibration_copy_uses_candidate_score_labels"] is False
 
 
 def test_future_growth_audit_rejects_direction_readiness_prediction_copy(tmp_path):

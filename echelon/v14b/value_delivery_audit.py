@@ -619,6 +619,25 @@ def audit_future_growth(
                 ),
             )
         ),
+        "ui_future_calibration_copy_uses_candidate_score_labels": (
+            _source_contains(
+                app_path,
+                (
+                    "function futureCalibrationCopy",
+                    "calibrated_candidate_score",
+                    "raw_candidate_score",
+                    "candidate_score",
+                ),
+            )
+            and _source_absent(
+                app_path,
+                (
+                    "evidence.calibrated_prob",
+                    "raw_predicted_prob",
+                    " / raw ",
+                ),
+            )
+        ),
         "public_future_model_evidence_uses_candidate_score_labels": (
             _source_contains(
                 api_path,

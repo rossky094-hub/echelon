@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T20:17:39Z`
+- generated_at: `2026-05-30T20:22:16Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,15 +34,15 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 13341,
+    "openalex_frontfill_cooldown_remaining_s": 13063,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 2943,
-    "section_frontfill_done": 883,
+    "section_frontfill_done": 885,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 883,
+    "section_frontfill_progress_done": 885,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 6603,
     "section_provenance": {
@@ -167,7 +167,8 @@
     "step12_goal_alignment_report_uses_candidate_score_labels": true,
     "step6_future_evidence_avoids_prediction_copy": true,
     "step9_vgae_language_is_candidate_generator": true,
-    "topic_dossier_builders_use_candidate_edges_contract": true
+    "topic_dossier_builders_use_candidate_edges_contract": true,
+    "ui_future_calibration_copy_uses_candidate_score_labels": true
   },
   "edge_calibrated_candidates": 1000,
   "edge_calibration_labels": {

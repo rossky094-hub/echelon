@@ -172,12 +172,13 @@ function pct(value) {
 function futureCalibrationCopy(edge) {
   const evidence = edge?.evidence || edge?.model_evidence || {};
   const status = evidence.calibration_status || evidence.lifecycle_calibration_status || "run_audit_unknown";
-  const score = edge?.candidate_score ?? evidence.candidate_score ?? edge?.confidence ?? edge?.weight ?? evidence.calibrated_prob ?? 0;
-  const raw = evidence.raw_candidate_score ?? evidence.raw_predicted_prob ?? score;
+  const score = edge?.candidate_score ?? evidence.candidate_score ?? edge?.weight ?? 0;
+  const calibrated = evidence.calibrated_candidate_score ?? score;
+  const raw = evidence.raw_candidate_score ?? score;
   if (status === "calibrated_with_run_audit") {
-    return `run-calibrated ${pct(evidence.calibrated_prob ?? score)} / raw ${pct(raw)} / ${evidence.calibration_label || evidence.calibration_method || "calibrated"}`;
+    return `run-calibrated candidate_score ${pct(score)} / calibrated_candidate_score ${pct(calibrated)} / raw_candidate_score ${pct(raw)} / ${evidence.calibration_label || evidence.calibration_method || "calibrated"}`;
   }
-  return `not run-calibrated / status ${status} / edge score ${pct(score)}`;
+  return `not run-calibrated / status ${status} / candidate_score ${pct(score)}`;
 }
 
 function clamp(value, lo, hi) {
