@@ -1949,9 +1949,15 @@ function bindEvents() {
     els.hover.classList.remove("hidden");
     els.hover.style.left = `${evt.offsetX + 14}px`;
     els.hover.style.top = `${evt.offsetY + 14}px`;
+    const hoverUncertainty = asArray(node.uncertainty_reasons).slice(0, 2).map(esc).join(" / ");
     els.hover.innerHTML = `
       <strong>${esc(node.title || node.paper_id)}</strong><br>
       <small>${esc(node.paper_id)} / ${esc(node.year || "")} / ${esc(node.cluster_id || "")}</small>
+      <div class="pill-row">
+        <span class="pill">${esc(node.claim_scope || "retrieval_context_only")}</span>
+        <span class="pill">${esc(node.evidence_grade || "graph_node_role_context")}</span>
+      </div>
+      ${hoverUncertainty ? `<small>${hoverUncertainty}</small>` : ""}
     `;
   });
   els.graph.addEventListener("click", (evt) => {

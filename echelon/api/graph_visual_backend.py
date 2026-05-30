@@ -3315,6 +3315,68 @@ def _paper_role_contract(
     }
 
 
+def _visual_node_role_contract(node: dict[str, Any]) -> dict[str, Any]:
+    visual_role = str(node.get("visual_role") or node.get("role") or "paper")
+    flags = node.get("flags")
+    if not isinstance(flags, dict):
+        flags = _loads(node.get("flags_json"), {})
+    try:
+        uncertainty_score = float(node.get("uncertainty_score") or 0.0)
+    except (TypeError, ValueError):
+        uncertainty_score = 0.0
+
+    if visual_role == "future_anchor" or flags.get("is_future_anchor"):
+        claim_scope = "candidate_pool_only"
+        evidence_grade = "graph_future_anchor_context"
+    elif visual_role == "limitation_bottleneck" or flags.get("has_unresolved_limitation"):
+        claim_scope = "bottleneck_context_only"
+        evidence_grade = "graph_bottleneck_node_context"
+    elif visual_role == "main_path" or flags.get("is_main_path"):
+        claim_scope = "main_path_context_only"
+        evidence_grade = "graph_main_path_node_context"
+    else:
+        claim_scope = "retrieval_context_only"
+        evidence_grade = "graph_node_role_context"
+
+    uncertainty = [
+        "visual node role is navigation context, not a standalone scientific conclusion",
+        "node hover does not include local section evidence; open paper detail or Claim Card before using it as evidence",
+    ]
+    if uncertainty_score >= 0.5:
+        uncertainty.append("visual embedding uncertainty score is elevated")
+    if claim_scope == "candidate_pool_only":
+        uncertainty.append("future anchors remain candidate-pool context until Step6 fusion and a complete Claim Card")
+
+    evidence_object = {
+        "type": "visual_node_role",
+        "role": "graph_node_context",
+        "source": "visual_nodes",
+        "paper_id": node.get("paper_id"),
+        "label": node.get("title") or node.get("paper_id"),
+        "year": node.get("year") or node.get("publication_year"),
+        "visual_role": visual_role,
+        "cluster_id": node.get("cluster_id"),
+        "branch_id": node.get("branch_id"),
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_score": uncertainty_score,
+        "flags": flags,
+        "click_target": {"kind": "paper", "id": node.get("paper_id")} if node.get("paper_id") else None,
+    }
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "paper detail with local primary section evidence",
+            "linked citation context when used for main-path claims",
+            "branch/bottleneck lineage evidence before narrating causal evolution",
+            "complete Step13 Claim Card before promotion to Radar",
+        ],
+        "evidence_objects": _compact_evidence_objects([evidence_object], limit=3),
+    }
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -5566,23 +5628,23 @@ def get_visual_nodes(
     nodes = []
     for row in rows:
         metadata = _loads(row["metadata_json"], {})
-        nodes.append(
-            {
-                "paper_id": row["paper_id"],
-                "title": metadata.get("title") or row["paper_id"],
-                "year": metadata.get("year") or row["publication_year"],
-                "cluster_id": row["cluster_id"],
-                "branch_id": row["branch_id"],
-                "x": row["x"],
-                "y": row["y"],
-                "z": row["z"],
-                "node_size": row["node_size"],
-                "color_hex": row["color_hex"],
-                "visual_role": row["visual_role"],
-                "uncertainty_score": row["uncertainty_score"],
-                "flags": _loads(row["flags_json"], {}),
-            }
-        )
+        item = {
+            "paper_id": row["paper_id"],
+            "title": metadata.get("title") or row["paper_id"],
+            "year": metadata.get("year") or row["publication_year"],
+            "cluster_id": row["cluster_id"],
+            "branch_id": row["branch_id"],
+            "x": row["x"],
+            "y": row["y"],
+            "z": row["z"],
+            "node_size": row["node_size"],
+            "color_hex": row["color_hex"],
+            "visual_role": row["visual_role"],
+            "uncertainty_score": row["uncertainty_score"],
+            "flags": _loads(row["flags_json"], {}),
+        }
+        item.update(_visual_node_role_contract(item))
+        nodes.append(item)
     return {
         "schema_version": SCHEMA_VERSION,
         "ready": True,

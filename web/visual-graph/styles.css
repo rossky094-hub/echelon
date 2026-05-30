@@ -589,6 +589,22 @@ canvas {
   font-size: 12px;
 }
 
+.hover-card .pill-row {
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.hover-card .pill {
+  min-height: 20px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.hover-card small {
+  display: block;
+  margin-top: 4px;
+}
+
 .hidden {
   display: none;
 }

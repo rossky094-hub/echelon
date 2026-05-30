@@ -324,6 +324,29 @@ def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monk
     assert role["evidence_objects"][0]["type"] == "paper"
 
 
+def test_visual_nodes_carry_hover_evidence_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get("/graph/visual/nodes", headers=VIEWER_HEADERS, params={"limit": 5})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    nodes = {node["paper_id"]: node for node in data["nodes"]}
+    bottleneck = nodes["p1"]
+    assert bottleneck["claim_scope"] == "bottleneck_context_only"
+    assert bottleneck["evidence_grade"] == "graph_bottleneck_node_context"
+    assert any("navigation context" in reason for reason in bottleneck["uncertainty_reasons"])
+    assert bottleneck["required_evidence"]
+    assert bottleneck["evidence_objects"][0]["type"] == "visual_node_role"
+    assert bottleneck["evidence_objects"][0]["click_target"] == {"kind": "paper", "id": "p1"}
+
+    main_path = nodes["p2"]
+    assert main_path["claim_scope"] == "main_path_context_only"
+    assert main_path["evidence_grade"] == "graph_main_path_node_context"
+
+
 def test_visual_edit_roundtrip(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

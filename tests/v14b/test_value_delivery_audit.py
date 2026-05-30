@@ -129,6 +129,8 @@ def _write_product_sources(root: Path) -> None:
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
         "def get_visual_paper_detail(): return {'paper_role': _paper_role_contract()}\n"
+        "def _visual_node_role_contract(): return visual_node_role + claim_scope + evidence_grade + uncertainty_reasons\n"
+        "def get_visual_nodes(): return _visual_node_role_contract\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
@@ -147,6 +149,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
+        "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
@@ -430,6 +433,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert main_path_gate["checks"]["ui_story_mode_renders_contract"] is True
     assert main_path_gate["checks"]["api_visual_paper_role_carry_contract"] is True
     assert main_path_gate["checks"]["ui_paper_detail_renders_role_contract"] is True
+    assert main_path_gate["checks"]["api_visual_nodes_carry_role_contract"] is True
+    assert main_path_gate["checks"]["ui_node_hover_renders_role_contract"] is True
     high_conf_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card High-Confidence Evidence Contract")
     assert high_conf_gate["status"] == "pass"
     assert high_conf_gate["checks"]["no_high_confidence_card_without_section_evidence"] is True

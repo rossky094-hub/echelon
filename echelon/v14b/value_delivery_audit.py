@@ -1378,6 +1378,8 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
         "ui_story_mode_renders_contract": False,
         "api_visual_paper_role_carry_contract": False,
         "ui_paper_detail_renders_role_contract": False,
+        "api_visual_nodes_carry_role_contract": False,
+        "ui_node_hover_renders_role_contract": False,
     }
     if repo_root is not None:
         source_checks = {
@@ -1431,6 +1433,26 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
                     "renderEvidenceObjects(paperRole.evidence_objects",
                 ),
             ),
+            "api_visual_nodes_carry_role_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _visual_node_role_contract",
+                    "get_visual_nodes",
+                    "visual_node_role",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
+                ),
+            ),
+            "ui_node_hover_renders_role_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "els.hover.innerHTML",
+                    "node.claim_scope",
+                    "node.evidence_grade",
+                    "node.uncertainty_reasons",
+                ),
+            ),
         }
     checks.update(source_checks)
     return {
@@ -1440,7 +1462,7 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
         "claim_scope": contract.get("claim_scope"),
         "evidence_grade": contract.get("evidence_grade"),
         "uncertainty_reasons": contract.get("uncertainty_reasons"),
-        "policy": "When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, and selected-paper roles must carry claim_scope, evidence_grade, and uncertainty_reasons.",
+        "policy": "When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons.",
     }
 
 
