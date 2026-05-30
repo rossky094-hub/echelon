@@ -2411,6 +2411,14 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
             ("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),
         ),
+        "post_frontfill_requires_decision_grade_section_gates": _source_contains(
+            (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
+            (
+                "decision_grade_primary_section_papers",
+                "topic_gap_decision_grade_section_rate",
+                "SECTION_PARSER_CONTRACT_VERSION",
+            ),
+        ),
         "product_chains_avoid_legacy_targets": not disallowed_current_deps,
         "legacy_targets_labeled": not unlabeled_legacy_targets,
         "legacy_arxiv_scripts_require_explicit_opt_in": not unguarded_legacy_scripts,
@@ -2447,6 +2455,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction "
             "readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that "
             "refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. "
+            "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
+            "not raw primary-section presence. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
         ),
     }

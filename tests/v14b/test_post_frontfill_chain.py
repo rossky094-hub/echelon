@@ -1,7 +1,10 @@
+import json
 import importlib.util
 import sqlite3
 from argparse import Namespace
 from pathlib import Path
+
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 
 
 def _load_module():
@@ -91,6 +94,8 @@ def test_topic_gap_queue_metrics_counts_primary_section_coverage(tmp_path):
     assert metrics["primary_section_papers"] == 1
     assert metrics["missing_primary_section_papers"] == 2
     assert metrics["primary_section_rate"] == 1 / 3
+    assert metrics["decision_grade_section_papers"] == 0
+    assert metrics["decision_grade_section_rate"] == 0.0
 
 
 def test_topic_gap_queue_metrics_reads_regression_candidate_paper_ids(tmp_path):
@@ -123,11 +128,65 @@ def test_topic_gap_queue_metrics_reads_regression_candidate_paper_ids(tmp_path):
     assert metrics["paper_ids"] == 3
     assert metrics["primary_section_papers"] == 2
     assert metrics["primary_section_rate"] == 2 / 3
+    assert metrics["decision_grade_section_papers"] == 0
+
+
+def test_topic_gap_queue_metrics_counts_decision_grade_current_contract_sections(tmp_path):
+    mod = _load_module()
+    db = tmp_path / "main.sqlite3"
+    queue = tmp_path / "topic_gap_queue.csv"
+    queue.write_text("paper_id\np1\np2\np3\n", encoding="utf-8")
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            parser_name TEXT,
+            section_meta_json TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "discussion",
+            "current contract evidence " * 20,
+            "v14b_section_ingest_v3",
+            json.dumps(
+                {
+                    "extraction_strategies": ["explicit_heading"],
+                    "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                }
+            ),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?)",
+        (
+            "p2",
+            "results",
+            "legacy weak evidence " * 20,
+            "v14b_section_ingest_v2",
+            json.dumps({"extraction_strategies": ["loose_inline_heading"]}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    metrics = mod.collect_topic_gap_queue_metrics(db, queue)
+
+    assert metrics["primary_section_papers"] == 2
+    assert metrics["decision_grade_section_papers"] == 1
+    assert metrics["missing_decision_grade_section_papers"] == 2
+    assert metrics["decision_grade_section_rate"] == 1 / 3
 
 
 def test_topic_gap_queue_gate_blocks_downstream_when_benchmark_topic_evidence_is_thin():
     mod = _load_module()
-    args = Namespace(skip_topic_gap_gate=False, min_topic_gap_primary_rate=0.70)
+    args = Namespace(skip_topic_gap_gate=False, min_topic_gap_decision_grade_rate=0.70)
 
     ready, failures = mod.topic_gap_queue_ready(
         {
@@ -135,12 +194,38 @@ def test_topic_gap_queue_gate_blocks_downstream_when_benchmark_topic_evidence_is
             "paper_ids": 10,
             "primary_section_papers": 4,
             "primary_section_rate": 0.4,
+            "decision_grade_section_papers": 2,
+            "decision_grade_section_rate": 0.2,
         },
         args,
     )
 
     assert ready is False
-    assert "topic_gap_primary_section_rate" in failures[0]
+    assert "topic_gap_decision_grade_section_rate" in failures[0]
+    assert "raw_primary=4" in failures[0]
+
+
+def test_frontfill_gate_requires_decision_grade_primary_sections():
+    mod = _load_module()
+    args = Namespace(
+        min_primary_section_papers=10,
+        min_decision_grade_primary_section_papers=10,
+        min_openalex_w_rate=0.70,
+        min_primary_field_rate=0.95,
+    )
+
+    ready, failures = mod.frontfill_ready(
+        {
+            "primary_section_papers": 10,
+            "decision_grade_primary_section_papers": 2,
+            "openalex_w_rate": 0.80,
+            "primary_field_rate": 0.99,
+        },
+        args,
+    )
+
+    assert ready is False
+    assert any("decision_grade_primary_section_papers" in failure for failure in failures)
 
 
 def test_topic_gap_frontfill_is_not_blocked_by_broad_frontfill_gate():

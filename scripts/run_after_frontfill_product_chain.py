@@ -19,6 +19,16 @@ import subprocess
 import sys
 from datetime import datetime
 
+_REPO_ROOT_HINT = pathlib.Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT_HINT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT_HINT))
+
+from echelon.v14b.evidence_contracts import (
+    SECTION_PARSER_CONTRACT_VERSION,
+    is_decision_section,
+    section_strategy_quality,
+)
+
 
 DEFAULT_STEPS = (
     "limitation",
@@ -96,6 +106,65 @@ def table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return bool(row)
 
 
+def _json_obj(raw) -> dict:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _decision_grade_primary_section_ids(
+    conn: sqlite3.Connection,
+    paper_ids: list[str] | None = None,
+) -> set[str]:
+    """Return papers with current-contract, traced primary evidence sections."""
+    if not table_exists(conn, "paper_sections"):
+        return set()
+    cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(paper_sections)").fetchall()}
+    if "section_meta_json" not in cols:
+        return set()
+
+    covered: set[str] = set()
+
+    def scan(chunk: list[str] | None) -> None:
+        where = "length(trim(section_text)) >= 80"
+        params: tuple[str, ...] = ()
+        if chunk:
+            where += f" AND paper_id IN ({','.join('?' for _ in chunk)})"
+            params = tuple(chunk)
+        rows = conn.execute(
+            f"""
+            SELECT paper_id, section_name, section_meta_json
+            FROM paper_sections
+            WHERE {where}
+            """,
+            params,
+        ).fetchall()
+        for paper_id, section_name, raw_meta in rows:
+            if not is_decision_section(section_name):
+                continue
+            meta = _json_obj(raw_meta)
+            if str(meta.get("parser_contract_version") or "") != SECTION_PARSER_CONTRACT_VERSION:
+                continue
+            strategies = {
+                str(item).strip()
+                for item in (meta.get("extraction_strategies") or [])
+                if str(item).strip()
+            }
+            if section_strategy_quality(strategies) in {"strong", "moderate"}:
+                covered.add(str(paper_id))
+
+    if paper_ids:
+        for start in range(0, len(paper_ids), 800):
+            scan(paper_ids[start : start + 800])
+    else:
+        scan(None)
+    return covered
+
+
 def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
     conn = sqlite3.connect(str(db_main))
     try:
@@ -145,6 +214,7 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
         section_rows = 0
         section_papers = 0
         primary_section_papers = 0
+        decision_grade_primary_section_papers = 0
         if table_exists(conn, "paper_sections"):
             section_rows = int(scalar(conn, "SELECT COUNT(*) FROM paper_sections") or 0)
             section_papers = int(scalar(conn, "SELECT COUNT(DISTINCT paper_id) FROM paper_sections") or 0)
@@ -158,6 +228,7 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
                 PRIMARY_SECTION_NAMES,
             ).fetchone()
             primary_section_papers = int(row[0] if row else 0)
+            decision_grade_primary_section_papers = len(_decision_grade_primary_section_ids(conn))
     finally:
         conn.close()
 
@@ -189,6 +260,8 @@ def collect_metrics(db_main: pathlib.Path, db_v14: pathlib.Path) -> dict:
         "section_papers": section_papers,
         "primary_section_papers": primary_section_papers,
         "primary_section_rate": primary_section_papers / max(1, papers),
+        "decision_grade_primary_section_papers": decision_grade_primary_section_papers,
+        "decision_grade_primary_section_rate": decision_grade_primary_section_papers / max(1, papers),
         "v14": v14_counts,
     }
 
@@ -231,11 +304,15 @@ def collect_topic_gap_queue_metrics(db_main: pathlib.Path, queue_path: pathlib.P
         "primary_section_papers": 0,
         "missing_primary_section_papers": len(ids),
         "primary_section_rate": 1.0 if not ids else 0.0,
+        "decision_grade_section_papers": 0,
+        "missing_decision_grade_section_papers": len(ids),
+        "decision_grade_section_rate": 1.0 if not ids else 0.0,
     }
     if not ids:
         return metrics
 
     covered_ids: set[str] = set()
+    decision_grade_ids: set[str] = set()
     conn = sqlite3.connect(str(db_main))
     try:
         if table_exists(conn, "paper_sections"):
@@ -254,13 +331,18 @@ def collect_topic_gap_queue_metrics(db_main: pathlib.Path, queue_path: pathlib.P
                     (*chunk, *PRIMARY_SECTION_NAMES),
                 ).fetchall()
                 covered_ids.update(str(row[0]) for row in rows)
+            decision_grade_ids = _decision_grade_primary_section_ids(conn, ids)
     finally:
         conn.close()
 
     covered = len(covered_ids)
+    decision_grade = len(decision_grade_ids)
     metrics["primary_section_papers"] = covered
     metrics["missing_primary_section_papers"] = max(0, len(ids) - covered)
     metrics["primary_section_rate"] = covered / max(1, len(ids))
+    metrics["decision_grade_section_papers"] = decision_grade
+    metrics["missing_decision_grade_section_papers"] = max(0, len(ids) - decision_grade)
+    metrics["decision_grade_section_rate"] = decision_grade / max(1, len(ids))
     return metrics
 
 
@@ -269,6 +351,13 @@ def frontfill_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool, list
     if metrics["primary_section_papers"] < args.min_primary_section_papers:
         failures.append(
             f"primary_section_papers {metrics['primary_section_papers']} < {args.min_primary_section_papers}"
+        )
+    if metrics["decision_grade_primary_section_papers"] < args.min_decision_grade_primary_section_papers:
+        failures.append(
+            "decision_grade_primary_section_papers "
+            f"{metrics['decision_grade_primary_section_papers']} < "
+            f"{args.min_decision_grade_primary_section_papers} "
+            f"(raw_primary={metrics['primary_section_papers']})"
         )
     if metrics["openalex_w_rate"] < args.min_openalex_w_rate:
         failures.append(
@@ -286,14 +375,15 @@ def topic_gap_queue_ready(metrics: dict, args: argparse.Namespace) -> tuple[bool
         return True, []
     if not metrics.get("exists") or not metrics.get("paper_ids"):
         return True, []
-    rate = float(metrics.get("primary_section_rate") or 0.0)
-    if rate >= args.min_topic_gap_primary_rate:
+    rate = float(metrics.get("decision_grade_section_rate") or 0.0)
+    if rate >= args.min_topic_gap_decision_grade_rate:
         return True, []
     return False, [
         (
-            "topic_gap_primary_section_rate "
-            f"{rate:.3f} < {args.min_topic_gap_primary_rate:.3f} "
-            f"({metrics.get('primary_section_papers', 0)}/{metrics.get('paper_ids', 0)})"
+            "topic_gap_decision_grade_section_rate "
+            f"{rate:.3f} < {args.min_topic_gap_decision_grade_rate:.3f} "
+            f"({metrics.get('decision_grade_section_papers', 0)}/{metrics.get('paper_ids', 0)}; "
+            f"raw_primary={metrics.get('primary_section_papers', 0)})"
         )
     ]
 
@@ -465,10 +555,30 @@ def main(argv=None) -> int:
     parser.add_argument("--db-v14", default="db/v14_pilot.sqlite3")
     parser.add_argument("--log-file", default="logs/v14b/after_frontfill_product_chain.log")
     parser.add_argument("--min-primary-section-papers", type=int, default=int(os.getenv("V14B_MIN_PRIMARY_SECTION_PAPERS", "8000")))
+    parser.add_argument(
+        "--min-decision-grade-primary-section-papers",
+        type=int,
+        default=int(
+            os.getenv(
+                "V14B_MIN_DECISION_GRADE_PRIMARY_SECTION_PAPERS",
+                os.getenv("V14B_MIN_PRIMARY_SECTION_PAPERS", "8000"),
+            )
+        ),
+    )
     parser.add_argument("--min-openalex-w-rate", type=float, default=float(os.getenv("V14B_MIN_OPENALEX_W_RATE", "0.70")))
     parser.add_argument("--min-primary-field-rate", type=float, default=float(os.getenv("V14B_MIN_PRIMARY_FIELD_RATE", "0.95")))
     parser.add_argument("--topic-gap-queue", default=os.getenv("V14B_TOPIC_GAP_SECTION_QUEUE", "data/v14b/topic_evidence_gap_delta_queue.csv"))
     parser.add_argument("--min-topic-gap-primary-rate", type=float, default=float(os.getenv("V14B_MIN_TOPIC_GAP_PRIMARY_RATE", "0.70")))
+    parser.add_argument(
+        "--min-topic-gap-decision-grade-rate",
+        type=float,
+        default=float(
+            os.getenv(
+                "V14B_MIN_TOPIC_GAP_DECISION_GRADE_RATE",
+                os.getenv("V14B_MIN_TOPIC_GAP_PRIMARY_RATE", "0.70"),
+            )
+        ),
+    )
     parser.add_argument("--skip-topic-gap-gate", action="store_true")
     parser.add_argument(
         "--run-topic-gap-frontfill",

@@ -1,18 +1,18 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T22:26:14Z`
+- generated_at: `2026-05-30T22:32:46Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
 - linked refs: 445,957 / 3,215,130 (13.9%)
 - OpenAlex W IDs: 35,663 (64.4%)
-- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=1.6)
+- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=1.5)
 - section evidence: 5,345 rows / 3,020 papers
 - primary section evidence: 3,020 papers (5.5%)
-- primary section provenance: 910 strong/moderate papers; weak-only=69.9%
-- current section parser contract: 153 papers (5.1%)
-- section parser contracts: legacy_unknown_contract:5,033, v14b_section_parser_contract_v3_toc_guard:312
+- primary section provenance: 911 strong/moderate papers; weak-only=69.8%
+- current section parser contract: 154 papers (5.1%)
+- section parser contracts: legacy_unknown_contract:5,031, v14b_section_parser_contract_v3_toc_guard:314
 - multi-topic evidence-gap queue: 0 / 27 decision-grade section covered (0.0%); raw primary=4 (14.8%)
 - section frontfill health: running_or_unknown [section_delta] (done=170/8592, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=144, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
 - future candidate edges: 1,000
@@ -24,11 +24,11 @@
 
 - **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Next: Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize.
 - **section_evidence** (high): primary section evidence covers only 3,020 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 910 papers have strong/moderate parser provenance; weak-only rate is 69.9%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
-- **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 153/3,020 papers (5.1%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
+- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 911 papers have strong/moderate parser provenance; weak-only rate is 69.8%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
+- **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 154/3,020 papers (5.1%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
 - **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 0/27 queued benchmark-topic papers (0.0%); raw primary-section coverage is 4/27 (14.8%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
-- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=1.6. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
+- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=1.5. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
 
 ## Latest Fusion Audit
 

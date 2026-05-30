@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T22:26:32Z`
+- generated_at: `2026-05-30T22:32:59Z`
 
 ## Reference Linkage
 
@@ -29,10 +29,10 @@
 | active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
 | branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
 | main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 64 | 1,000 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 65 | 1,000 |
 | resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
 | future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 53 | 268 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 54 | 268 |
 | topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
 | topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
 | topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |
@@ -80,7 +80,7 @@
 - Normalize arXiv version/category variants, then relink against arxiv_id.
 - Keep S2 IDs separate from OpenAlex IDs and relink through s2_paper_id.
 - After top12000 completes, run delta queue for high-value papers missing current parser-contract primary sections.
-- Prioritize current parser-contract section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, limitation_evidence
+- Prioritize current parser-contract section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens
 - Retry only high-value retryable PDF failures with conservative concurrency; do not broaden to all PDFs.
 - Mark no_target_sections papers as weak evidence unless alternate parser/Sci-Bot sections are available.
 - Suppress or downgrade noisy PDF graphics warnings so true parser failures remain visible.
