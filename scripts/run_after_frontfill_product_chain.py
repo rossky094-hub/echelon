@@ -198,20 +198,27 @@ def read_queue_paper_ids(queue_path: pathlib.Path) -> list[str]:
         return []
     seen: set[str] = set()
     ids: list[str] = []
+
+    def add(raw: str) -> None:
+        pid = (raw or "").strip()
+        if not pid or pid == "paper_id" or pid in seen:
+            return
+        seen.add(pid)
+        ids.append(pid)
+
     with queue_path.open("r", encoding="utf-8") as f:
         first = f.readline()
         f.seek(0)
-        if "paper_id" in first:
+        if "," in first:
             reader = csv.DictReader(f)
-            values = (row.get("paper_id", "") for row in reader)
+            for row in reader:
+                if "paper_id" in row:
+                    add(row.get("paper_id", ""))
+                for raw in str(row.get("candidate_paper_ids") or "").replace(",", ";").split(";"):
+                    add(raw)
         else:
-            values = (line.strip().split(",")[0] for line in f)
-        for raw in values:
-            pid = (raw or "").strip()
-            if not pid or pid == "paper_id" or pid in seen:
-                continue
-            seen.add(pid)
-            ids.append(pid)
+            for line in f:
+                add(line.strip().split(",")[0])
     return ids
 
 

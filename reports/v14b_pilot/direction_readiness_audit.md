@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T13:30:27Z`
+- generated_at: `2026-05-30T13:37:39Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
@@ -11,7 +11,7 @@
 - primary section evidence: 2,585 papers (4.7%)
 - primary section provenance: 348 strong/moderate papers; weak-only=86.5%
 - multi-topic evidence-gap queue: 0 / 20 primary-section covered (0.0%)
-- section frontfill health: running_or_unknown [section_delta] (done=267/6603, no_evidence_delta=-148, no_evidence_hours=1.0)
+- section frontfill health: running_or_unknown [section_delta] (done=326/6603, no_evidence_delta=-89, no_evidence_hours=1.5)
 - predicted future edges: 1,000
 - visual future edges: 1,000
 - future directions: 5

@@ -91,6 +91,24 @@ def test_direction_readiness_flags_multi_topic_evidence_gap_queue(tmp_path):
     assert any(b["gate"] == "multi_topic_evidence_gap" for b in blockers)
 
 
+def test_direction_readiness_reads_regression_candidate_gap_queue(tmp_path):
+    main = tmp_path / "main.sqlite3"
+    v14 = tmp_path / "v14.sqlite3"
+    queue = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    _make_main(main)
+    _make_v14(v14)
+    queue.write_text(
+        "topic,gap_type,candidate_paper_ids\n"
+        "metalens,key_turning,p1;p2\n",
+        encoding="utf-8",
+    )
+
+    metrics = collect_metrics(main, v14, topic_gap_queue=queue)
+
+    assert metrics["topic_gap_queue_papers"] == 2
+    assert metrics["topic_gap_primary_section_papers"] == 1
+
+
 def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
     main = tmp_path / "main.sqlite3"
     v14 = tmp_path / "v14.sqlite3"

@@ -93,6 +93,38 @@ def test_topic_gap_queue_metrics_counts_primary_section_coverage(tmp_path):
     assert metrics["primary_section_rate"] == 1 / 3
 
 
+def test_topic_gap_queue_metrics_reads_regression_candidate_paper_ids(tmp_path):
+    mod = _load_module()
+    db = tmp_path / "main.sqlite3"
+    queue = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    queue.write_text(
+        "topic,gap_type,candidate_paper_ids\n"
+        "metalens,key_turning,p1;p2\n"
+        "holography,bottleneck,p2;p3\n",
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT
+        )
+        """
+    )
+    conn.execute("INSERT INTO paper_sections VALUES ('p1', 'discussion', ?)", ("x" * 100,))
+    conn.execute("INSERT INTO paper_sections VALUES ('p3', 'results', ?)", ("x" * 100,))
+    conn.commit()
+    conn.close()
+
+    metrics = mod.collect_topic_gap_queue_metrics(db, queue)
+
+    assert metrics["paper_ids"] == 3
+    assert metrics["primary_section_papers"] == 2
+    assert metrics["primary_section_rate"] == 2 / 3
+
+
 def test_topic_gap_queue_gate_blocks_downstream_when_benchmark_topic_evidence_is_thin():
     mod = _load_module()
     args = Namespace(skip_topic_gap_gate=False, min_topic_gap_primary_rate=0.70)

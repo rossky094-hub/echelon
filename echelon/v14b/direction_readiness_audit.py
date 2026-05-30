@@ -74,13 +74,19 @@ def load_queue_paper_ids(path: Path) -> list[str]:
         return []
     seen: set[str] = set()
     out: list[str] = []
+
+    def add(raw: Any) -> None:
+        paper_id = str(raw or "").strip()
+        if paper_id and paper_id not in seen:
+            seen.add(paper_id)
+            out.append(paper_id)
+
     try:
         with path.open(newline="", encoding="utf-8") as fh:
             for row in csv.DictReader(fh):
-                paper_id = (row.get("paper_id") or "").strip()
-                if paper_id and paper_id not in seen:
-                    seen.add(paper_id)
-                    out.append(paper_id)
+                add(row.get("paper_id"))
+                for raw in str(row.get("candidate_paper_ids") or "").replace(",", ";").split(";"):
+                    add(raw)
     except Exception:
         return []
     return out
