@@ -183,6 +183,12 @@ def _write_makefile_contracts(root: Path) -> None:
         "#   make pilot # LEGACY compatibility only; not current V14B decision workflow\n"
         "product-chain-fast: id-repair graph-features\n"
         "product-chain: id-repair graph-prep evidence-prep\n"
+        "\t$(MAKE) decision-audit\n"
+        "decision-audit:\n"
+        "\t$(MAKE) topic-regression\n"
+        "\t$(MAKE) section-queue-audit\n"
+        "\t$(MAKE) direction-readiness-audit\n"
+        "\t$(MAKE) value-delivery-audit\n"
         "post-frontfill-chain:\n"
         "\tpython scripts/run_after_frontfill_product_chain.py\n"
         "## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow\n"
@@ -413,6 +419,8 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
 
     assert result["status"] == "pass"
     assert result["checks"]["help_prefers_current_chain"] is True
+    assert result["checks"]["product_chain_runs_decision_audit"] is True
+    assert result["checks"]["decision_audit_runs_regression_gap_readiness_value"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True
     assert result["disallowed_current_deps"] == {}

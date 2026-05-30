@@ -544,6 +544,24 @@ def _make_target_context(makefile: str, target: str, *, before: int = 3, after: 
     return ""
 
 
+def _context_contains_ordered_targets(context: str, targets: tuple[str, ...]) -> bool:
+    last = -1
+    for target in targets:
+        patterns = (
+            f"$(MAKE) {target}",
+            f"${{MAKE}} {target}",
+            f"make {target}",
+        )
+        positions = [context.find(pattern) for pattern in patterns if context.find(pattern) >= 0]
+        if not positions:
+            return False
+        pos = min(positions)
+        if pos <= last:
+            return False
+        last = pos
+    return True
+
+
 def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
     """Verify LLM outputs remain bounded to audit/naming/weak labels, not evidence conclusions."""
     llm_atoms = 0
@@ -1222,9 +1240,23 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         and (first_legacy < 0 or first_current < first_legacy)
     )
     pilot_full_context = legacy_contexts.get("pilot-full", "")
+    product_chain_context = _make_target_context(makefile, "product-chain", before=0, after=14)
+    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=10)
+    decision_audit_targets = (
+        "topic-regression",
+        "section-queue-audit",
+        "direction-readiness-audit",
+        "value-delivery-audit",
+    )
     checks = {
         "current_product_chain_present": bool(re.search(r"^product-chain\s*:", makefile, flags=re.M)),
         "post_frontfill_entry_present": bool(re.search(r"^post-frontfill-chain\s*:", makefile, flags=re.M)),
+        "decision_audit_target_present": bool(re.search(r"^decision-audit\s*:", makefile, flags=re.M)),
+        "product_chain_runs_decision_audit": "decision-audit" in product_chain_context,
+        "decision_audit_runs_regression_gap_readiness_value": _context_contains_ordered_targets(
+            decision_audit_context,
+            decision_audit_targets,
+        ),
         "product_chains_avoid_legacy_targets": not disallowed_current_deps,
         "legacy_targets_labeled": not unlabeled_legacy_targets,
         "legacy_arxiv_scripts_require_explicit_opt_in": not unguarded_legacy_scripts,
@@ -1243,14 +1275,17 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "status": _gate_status(all(checks.values())),
         "checks": checks,
         "current_target_deps": {target: sorted(deps) for target, deps in target_deps.items()},
+        "decision_audit_required_targets": list(decision_audit_targets),
         "disallowed_current_deps": disallowed_current_deps,
         "legacy_targets_present": sorted(legacy_contexts),
         "unlabeled_legacy_targets": unlabeled_legacy_targets,
         "legacy_arxiv_scripts_present": sorted(legacy_script_contexts),
         "unguarded_legacy_arxiv_scripts": unguarded_legacy_scripts,
         "policy": (
-            "Current V14B acceptance must run product-chain or post-frontfill-chain. "
-            "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
+            "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
+            "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction "
+            "readiness, and value delivery. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly "
+            "labeled legacy compatibility targets."
         ),
     }
 

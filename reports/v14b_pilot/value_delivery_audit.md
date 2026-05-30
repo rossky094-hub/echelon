@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T13:37:40Z`
+- generated_at: `2026-05-30T13:49:34Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -19,7 +19,7 @@
 | 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty. |
 | 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
 | 13 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
 | 14 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
@@ -339,11 +339,14 @@
 {
   "checks": {
     "current_product_chain_present": true,
+    "decision_audit_runs_regression_gap_readiness_value": true,
+    "decision_audit_target_present": true,
     "help_prefers_current_chain": true,
     "legacy_arxiv_scripts_require_explicit_opt_in": true,
     "legacy_targets_labeled": true,
     "pilot_full_is_legacy_compatibility_only": true,
     "post_frontfill_entry_present": true,
+    "product_chain_runs_decision_audit": true,
     "product_chains_avoid_legacy_targets": true,
     "step9_report_avoids_old_pilot_instruction": true
   },
@@ -390,6 +393,12 @@
       "visual-graph"
     ]
   },
+  "decision_audit_required_targets": [
+    "topic-regression",
+    "section-queue-audit",
+    "direction-readiness-audit",
+    "value-delivery-audit"
+  ],
   "disallowed_current_deps": {},
   "issue": "Legacy Flow Isolation Contract",
   "legacy_arxiv_scripts_present": [
@@ -408,7 +417,7 @@
     "pilot-graph",
     "pilot-visual"
   ],
-  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
+  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
   "status": "pass",
   "unguarded_legacy_arxiv_scripts": [],
   "unlabeled_legacy_targets": []

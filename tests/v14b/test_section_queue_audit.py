@@ -164,7 +164,7 @@ def _make_main_db(path: Path) -> None:
             ("p_future", "Future metalens", "metalens future", "2024-01-01", 2024, "2401.00002", None, None, "W2", 50),
             ("p_branch", "Branch driver", "split evidence", "2022-01-01", 2022, "2201.00003", None, None, "W3", 20),
             ("p_done", "Already sectioned", "metalens limitation", "2021-01-01", 2021, "2101.00004", None, None, "W4", 10),
-            ("p_gap", "Topic gap turning paper", "metalens field of view evidence gap", "2023-01-01", 2023, "2301.00005", None, None, "W5", 15),
+            ("p_gap", "Topic gap turning\npaper ", "metalens field of view evidence gap", "2023-01-01", 2023, "2301.00005", None, None, "W5", 15),
         ],
     )
     conn.execute(
@@ -323,6 +323,9 @@ def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):
     topic_gap_queue = tmp_path / "data" / "topic_evidence_gap_delta_queue.csv"
     assert topic_gap_queue.exists()
     assert "p_branch" in topic_gap_queue.read_text(encoding="utf-8")
+    topic_gap_bytes = topic_gap_queue.read_bytes()
+    assert b"\r\n" not in topic_gap_bytes
+    assert len(topic_gap_queue.read_text(encoding="utf-8").splitlines()) == result["topic_gap_delta_queue"] + 1
 
     conn = sqlite3.connect(str(db_v14))
     try:

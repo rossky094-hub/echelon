@@ -676,12 +676,18 @@ def run_section_queue_audit(
     ]
 
     def write_delta_csv(path: Path, selected_rows: list[dict[str, Any]]) -> None:
+        def clean_cell(value: Any) -> Any:
+            if isinstance(value, str):
+                return " ".join(value.split())
+            return value
+
         with path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
             writer.writeheader()
             for r in selected_rows:
                 row = dict(r)
                 row["reasons"] = "|".join(row["reasons"])
+                row = {key: clean_cell(row.get(key, "")) for key in fieldnames}
                 writer.writerow(row)
 
     write_delta_csv(csv_path, delta_rows)
@@ -742,7 +748,13 @@ def run_section_queue_audit(
 
     conn_main.close()
     conn_v14.close()
-    logger.info("section queue audit done: %s", result)
+    logger.info(
+        "section queue audit done: high_value=%s delta=%s topic_gap_delta=%s outputs=%s",
+        result["high_value_papers"],
+        result["delta_queue"],
+        result["topic_gap_delta_queue"],
+        result["outputs"],
+    )
     return result
 
 

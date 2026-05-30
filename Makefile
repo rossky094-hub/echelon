@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -190,6 +190,14 @@ value-delivery-audit:
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot \
 		--repo-root .
+
+## Decision audit: current acceptance loop for Topic Dossier / Evidence Map / Claim Card
+decision-audit:
+	@echo ">>> Decision audit: benchmark regression -> gap queue -> readiness -> value delivery..."
+	$(MAKE) topic-regression
+	$(MAKE) section-queue-audit
+	$(MAKE) direction-readiness-audit
+	$(MAKE) value-delivery-audit
 
 ## Evidence bone audit: unlinked refs + high-value section coverage + frontfill log taxonomy
 evidence-bone-audit:
@@ -413,9 +421,10 @@ product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilo
 
 ## 交付目标产物链路: 先补齐 OpenAlex/section 证据，再生成图谱与方向
 product-chain: id-repair graph-prep quality-audit reset-pilot mainpath keystone subgraph scibert vgae evidence-prep limitation fusion first-principles mutation layout report visual-graph goal-audit
+	$(MAKE) decision-audit
 	@echo ""
 	@echo "======================================"
-	@echo "✅ V14-B Visual Graph 产品链路完成!"
+	@echo "✅ V14-B Evidence Decision 产品链路完成!"
 	@echo "======================================"
 	@echo "报告位置:"
 	@echo "  reports/v14b_pilot/V14B_Pilot_算法验证报告.md"
@@ -565,6 +574,7 @@ help:
 	@echo "  make setup"
 	@echo "  make product-chain             # 当前证据约束产品链路"
 	@echo "  make post-frontfill-chain      # section/frontfill 完成后的断点推进"
+	@echo "  make decision-audit            # 当前验收闭环: regression/gap/readiness/value"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"
 	@echo ""
 	@echo "Legacy compatibility (not current acceptance path):"
