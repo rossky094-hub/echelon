@@ -191,7 +191,8 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "config.py").write_text(
         'V14B_LIMITATION_USE_LLM", "false"\n'
         'V14B_SCIBERT_LLM_FALLBACK", "false"\n'
-        'V14B_FUSION_USE_LLM_NAMING", "false"\n',
+        'V14B_FUSION_USE_LLM_NAMING", "false"\n'
+        "Low-confidence edges fall back to heuristic correction 不隐式调用 LLM\n",
         encoding="utf-8",
     )
     (v14 / "step5c_limitation.py").write_text(
@@ -201,7 +202,9 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "step5a_scibert.py").write_text(
-        "--use-llm SCIBERT_LLM_FALLBACK citation_function_evidence_level\n",
+        "--use-llm LLM opt-in weak-label audit weak-label audit mode "
+        "citation_function_evidence_level weak_paper_metadata "
+        "Ignoring V14B_SCIBERT_LLM_FALLBACK\n",
         encoding="utf-8",
     )
     (v14 / "step6_fusion.py").write_text(
@@ -219,7 +222,8 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "step9_report.py").write_text(
         "make product-chain make post-frontfill-chain legacy compatibility "
         "claim_scope evidence_grade uncertainty_reasons candidate_pool_only "
-        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n",
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n",
         encoding="utf-8",
     )
     makefile = root / "Makefile"
@@ -505,6 +509,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     llm_gate = next(g for g in result["gates"] if g["issue"] == "LLM Evidence Boundary Contract")
     assert llm_gate["status"] == "pass"
     assert llm_gate["checks"]["abstract_llm_atoms_remain_weak"] is True
+    assert llm_gate["checks"]["citation_llm_fallback_explicit_and_weak"] is True
     assert llm_gate["checks"]["limitation_user_copy_is_section_first"] is True
     assert llm_gate["checks"]["makefile_limitation_target_avoids_llm_cost_claim"] is True
     legacy_gate = next(g for g in result["gates"] if g["issue"] == "Legacy Flow Isolation Contract")
@@ -804,6 +809,37 @@ def test_llm_evidence_boundary_rejects_step5c_llm_default_copy(tmp_path):
     assert result["status"] == "fail"
     assert result["checks"]["limitation_user_copy_is_section_first"] is False
     assert result["checks"]["makefile_limitation_target_avoids_llm_cost_claim"] is False
+    conn.close()
+
+
+def test_llm_evidence_boundary_rejects_hidden_scibert_llm_fallback_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "echelon/v14b"
+    (v14 / "step5a_scibert.py").write_text(
+        "若模型不可用,自动降级到 LLM 分类。\n"
+        "低置信度的降级到 LLM\n"
+        "--use-llm SCIBERT_LLM_FALLBACK citation_function_evidence_level\n",
+        encoding="utf-8",
+    )
+    (v14 / "config.py").write_text(
+        'V14B_LIMITATION_USE_LLM", "false"\n'
+        'V14B_SCIBERT_LLM_FALLBACK", "false"\n'
+        'V14B_FUSION_USE_LLM_NAMING", "false"\n'
+        "# 置信度阈值,低于此值降级到 LLM 分类\n",
+        encoding="utf-8",
+    )
+    (v14 / "step9_report.py").write_text(
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "考虑换 LLM 分类\n",
+        encoding="utf-8",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+
+    result = audit_llm_evidence_boundary(conn, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["citation_llm_fallback_explicit_and_weak"] is False
     conn.close()
 
 

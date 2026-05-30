@@ -5,14 +5,16 @@ Step 5a: SciBERT 引用功能分类
   extension / motivation / usage / similarity / background / future_work
 
 模型优先使用 allenai/scibert_scivocab_uncased + 引用分类头。
-若模型不可用,自动降级到 LLM 分类。
+若 transformer 模型不可用,降级到 deterministic heuristic,不隐式调用 LLM。
+LLM 只允许通过 --use-llm 显式进入弱标签审计模式,并由
+citation_function_evidence_level / citation_function_weight 降权。
 
 输出: subgraph_edges 表的 citation_function, citation_function_confidence 列
 
 CLI:
     python -m echelon.v14b.step5a_scibert --help
     python -m echelon.v14b.step5a_scibert
-    python -m echelon.v14b.step5a_scibert --use-llm  # 强制 LLM 模式
+    python -m echelon.v14b.step5a_scibert --use-llm  # 显式 LLM 弱标签审计模式
 """
 from __future__ import annotations
 
@@ -58,11 +60,11 @@ Reply with JSON only: {{"function": "<label>", "confidence": <0.0-1.0>}}"""
 
 
 # ---------------------------------------------------------------------------
-# LLM 降级分类器
+# LLM opt-in weak-label audit classifier
 # ---------------------------------------------------------------------------
 
 class LLMCitationClassifier:
-    """使用 LLM 进行引用功能分类(SciBERT 不可用时的降级方案)"""
+    """Use LLM only when explicitly requested; outputs stay weak/audit labels."""
 
     def __init__(self):
         from echelon.v14b.llm_client import LLMClient
@@ -134,7 +136,7 @@ class SciBERTCitationClassifier:
             )
             logger.info("分类 pipeline 加载成功")
         except Exception as exc:
-            logger.warning("模型加载失败,将使用 LLM 降级: %s", exc)
+            logger.warning("模型加载失败,将使用启发式分类: %s", exc)
             self._pipeline = None
 
     def is_available(self) -> bool:
@@ -340,10 +342,13 @@ def classify_edges(
     use_llm: bool = False,
 ) -> List[Tuple[str, float]]:
     """
-    分类所有边。优先 SciBERT,降级到 LLM。
+    分类所有边。默认 heuristic/zero-shot,低置信只做 deterministic 修正。
+
+    LLM 只能由 --use-llm 显式触发,用于弱标签审计,不能作为隐藏 fallback
+    产生 citation-function 结论。
     """
     if use_llm:
-        logger.info("使用 LLM 分类 %d 条边", len(edges))
+        logger.info("使用显式 LLM 弱标签审计模式分类 %d 条边", len(edges))
         clf = LLMCitationClassifier()
         return clf.classify_batch(edges, {k: v.get("title", "") for k, v in metadata.items()})
 
@@ -367,7 +372,8 @@ def classify_edges(
 
     results = clf_scibert.classify_batch(texts)
 
-    # 低置信度的降级到 LLM
+    # Low-confidence edges are corrected deterministically.  Hidden LLM fallback
+    # would blur provenance, so the legacy env flag is ignored here.
     low_conf_indices = [
         i for i, (_, conf) in enumerate(results)
         if conf < SCIBERT_CONFIDENCE_THRESHOLD
@@ -379,18 +385,12 @@ def classify_edges(
         for idx, (func, conf) in zip(low_conf_indices, fallback_results):
             results[idx] = (func, conf)
 
-        if SCIBERT_LLM_FALLBACK and len(low_conf_indices) <= SCIBERT_LLM_FALLBACK_LIMIT:
-            logger.info("LLM fallback enabled for %d low-confidence edges", len(low_conf_indices))
-            try:
-                clf_llm = LLMCitationClassifier()
-                llm_results = clf_llm.classify_batch(
-                    low_conf_edges,
-                    {k: v.get("title", "") for k, v in metadata.items()},
-                )
-                for idx, (func, conf) in zip(low_conf_indices, llm_results):
-                    results[idx] = (func, conf)
-            except Exception as exc:
-                logger.warning("LLM 降级失败: %s", exc)
+        if SCIBERT_LLM_FALLBACK:
+            logger.warning(
+                "Ignoring V14B_SCIBERT_LLM_FALLBACK for %d low-confidence edges; "
+                "use --use-llm for explicit weak-label audit mode.",
+                min(len(low_conf_indices), SCIBERT_LLM_FALLBACK_LIMIT),
+            )
 
     return results
 
@@ -520,7 +520,7 @@ def main(argv=None):
         description="Step 5a: SciBERT 引用功能分类",
     )
     add_common_args(parser)
-    parser.add_argument("--use-llm", action="store_true", help="强制使用 LLM 分类(跳过 SciBERT)")
+    parser.add_argument("--use-llm", action="store_true", help="显式 LLM 弱标签审计模式(跳过默认分类器)")
     args = parser.parse_args(argv)
 
     log_level = getattr(logging, args.log_level)

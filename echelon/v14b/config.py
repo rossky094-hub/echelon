@@ -154,10 +154,10 @@ SUBGRAPH_MAX_SIZE: int = int(os.environ.get("V14B_SUBGRAPH_SIZE", "5000"))
 # Step 5a: SciBERT 引用功能分类
 # ---------------------------------------------------------------------------
 
-# HuggingFace 模型 ID.  Citation-function classification is only a weak
+# HuggingFace 模型 ID. Citation-function classification is only a weak
 # evidence layer unless real citation contexts are available, so the default
-# product-chain classifier is deterministic/heuristic.  Set
-# V14B_CITATION_CLASSIFIER=zero_shot or --use-llm explicitly for heavier modes.
+# product-chain classifier is deterministic/heuristic. Low-confidence edges fall
+# back to heuristic correction; use --use-llm only for explicit weak-label audit.
 SCIBERT_MODEL_ID: str = "allenai/scibert_scivocab_uncased"
 CITATION_CLASSIFIER_MODE: str = os.environ.get("V14B_CITATION_CLASSIFIER", "heuristic").lower()
 SCIBERT_LLM_FALLBACK: bool = os.environ.get("V14B_SCIBERT_LLM_FALLBACK", "false").lower() == "true"
@@ -166,7 +166,7 @@ SCIBERT_LLM_FALLBACK_LIMIT: int = int(os.environ.get("V14B_SCIBERT_LLM_FALLBACK_
 # 推理 batch size (MPS/CPU)
 SCIBERT_BATCH_SIZE: int = 32
 
-# 置信度阈值,低于此值降级到 LLM 分类
+# 置信度阈值,低于此值只做 heuristic 修正,不隐式调用 LLM
 SCIBERT_CONFIDENCE_THRESHOLD: float = 0.6
 
 # 引用功能标签

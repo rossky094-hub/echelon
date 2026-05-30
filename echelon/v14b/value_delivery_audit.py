@@ -865,7 +865,49 @@ def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | 
             ),
             "citation_llm_fallback_explicit_and_weak": _source_contains(
                 repo_root / "echelon/v14b/step5a_scibert.py",
-                ("--use-llm", "SCIBERT_LLM_FALLBACK", "citation_function_evidence_level"),
+                (
+                    "--use-llm",
+                    "LLM opt-in weak-label audit",
+                    "weak-label audit mode",
+                    "citation_function_evidence_level",
+                    "weak_paper_metadata",
+                    "Ignoring V14B_SCIBERT_LLM_FALLBACK",
+                ),
+            )
+            and _source_contains(
+                repo_root / "echelon/v14b/config.py",
+                (
+                    "Low-confidence edges fall",
+                    "back to heuristic correction",
+                    "不隐式调用 LLM",
+                ),
+            )
+            and _source_contains(
+                repo_root / "echelon/v14b/step9_report.py",
+                (
+                    "capped LLM edge audit",
+                    "LLM 结果只能作为弱标签",
+                    "不能直接升级结论",
+                ),
+            )
+            and _source_absent(
+                repo_root / "echelon/v14b/step5a_scibert.py",
+                (
+                    "自动降级到 LLM 分类",
+                    "降级到 LLM",
+                    "LLM 降级",
+                    "强制使用 LLM 分类",
+                    "低置信度的降级到 LLM",
+                    "将使用 LLM",
+                ),
+            )
+            and _source_absent(
+                repo_root / "echelon/v14b/config.py",
+                ("降级到 LLM 分类",),
+            )
+            and _source_absent(
+                repo_root / "echelon/v14b/step9_report.py",
+                ("考虑换 LLM 分类",),
             ),
             "fusion_llm_naming_opt_in": _source_contains(
                 repo_root / "echelon/v14b/step6_fusion.py",
