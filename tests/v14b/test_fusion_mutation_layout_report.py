@@ -466,6 +466,25 @@ class TestReportGenerator:
         assert "OpenAlex 命中率" not in report
         assert "OpenAlex 跨库" not in report
 
+    def test_algo_report_uses_decision_readiness_not_frontend_launch(self, tmp_path):
+        from echelon.v14b.step9_report import generate_algo_report
+        db_v14_path, conn_v14 = create_full_test_db(tmp_path)
+        db_main_path, conn_main = create_main_db(tmp_path)
+
+        report = generate_algo_report(conn_main, conn_v14)
+        conn_v14.close()
+        conn_main.close()
+
+        assert "证据决策放行条件" in report
+        assert "Topic Dossier multi-topic regression" in report
+        assert "Radar 主视图只允许完整 Step13 Claim Card" in report
+        assert "candidate_pool_only" in report
+        assert "前端启动条件" not in report
+        assert "可启动 V14-B 前端开发" not in report
+        assert "VGAE test AUC" not in report
+        assert "主干道节点 100-200" not in report
+        assert "重型算法调优建议" not in report
+
     def test_future_directions_report_sections(self, tmp_path):
         from echelon.v14b.step9_report import generate_future_directions_report
         db_v14_path, conn_v14 = create_full_test_db(tmp_path)
@@ -529,11 +548,11 @@ class TestReportGenerator:
         })
         assert "local_id: `01INTERNAL`" in fallback
 
-    def test_go_nogo_recommendation(self):
-        from echelon.v14b.step9_report import _go_nogo_recommendation
-        assert "GO" in _go_nogo_recommendation(15, 100, 50)
-        assert "REVISE" in _go_nogo_recommendation(5, 30, 20)
-        assert "NO-GO" in _go_nogo_recommendation(0, 0, 0)
+    def test_decision_readiness_recommendation(self):
+        from echelon.v14b.step9_report import _decision_readiness_recommendation
+        assert "CANDIDATE_POOL_READY" in _decision_readiness_recommendation(15, 100, 50)
+        assert "EVIDENCE_GATED" in _decision_readiness_recommendation(5, 30, 20)
+        assert "INSUFFICIENT_EVIDENCE" in _decision_readiness_recommendation(0, 0, 0)
 
 
 # ---------------------------------------------------------------------------

@@ -547,17 +547,18 @@ def generate_algo_report(
         f"",
         f"## 13. 下一步建议",
         f"",
-        f"### 建议: {_go_nogo_recommendation(future_dirs, predicted_edges, total_atoms)}",
+        f"### 决策状态: {_decision_readiness_recommendation(future_dirs, predicted_edges, total_atoms)}",
         f"",
-        f"**前端启动条件**:",
-        f"- [ ] 三路融合方向 ≥ 10 个 (当前: {future_dirs})",
-        f"- [ ] VGAE test AUC > 0.80 (需验证)",
-        f"- [ ] 主干道节点 100-200 个 (当前: TBD)",
-        f"- [ ] 突变节点 100-300 个 (当前: {red_count + orange_count + purple_count})",
+        f"**证据决策放行条件**:",
+        f"- [ ] Topic Dossier multi-topic regression 通过四个基准 topic,不是只让 Metalens 好看",
+        f"- [ ] linked refs >= 30%；低于门槛时 Main/Cite 演化只能标为 uncertainty",
+        f"- [ ] section evidence 覆盖 main/future/branch/keystone 关键论文和 topic-gap 队列",
+        f"- [ ] future candidates 有 rolling held-out-year calibration audit；否则只能进 candidate_pool",
+        f"- [ ] Radar 主视图只允许完整 Step13 Claim Card,裸 GNN/VGAE 边只能作为证据补齐目标",
         f"",
-        f"**重型算法调优建议**:",
+        f"**下一步证据工作**:",
         f"1. Citation function: 如 extension+motivation+usage 占比 < 40%,先补 citation context 或运行 capped LLM edge audit 抽检；LLM 结果只能作为弱标签,不能直接升级结论",
-        f"2. VGAE: 如 AUC < 0.80,减少 epoch → 调 lr → 增加 negative sampling",
+        f"2. VGAE / future candidates: 若 calibration audit 未通过,保持 candidate_pool_only；优先补 rolling held-out-year 校准和反例分析,不是追求裸边数量",
         f"3. Limitation/resolution: 如 high-confidence resolution < 30%,保持 exploratory / candidate_pool, 优先补 limitation/discussion/resolution section evidence 与 linked resolution evidence；阈值不得下调来晋升高置信",
         f"",
         f"---",
@@ -568,14 +569,13 @@ def generate_algo_report(
     return "\n".join(lines)
 
 
-def _go_nogo_recommendation(future_dirs: int, predicted_edges: int, total_atoms: int) -> str:
-    """根据关键指标给出建议"""
-    if future_dirs >= 10 and predicted_edges >= 50:
-        return "**GO** — 算法验证通过,可启动 V14-B 前端开发"
-    elif future_dirs >= 5 or predicted_edges >= 20:
-        return "**REVISE** — 部分指标达标,建议调优后再启动前端"
-    else:
-        return "**NO-GO** — 关键指标不足,需重跑 VGAE/Limitation/Fusion 步骤"
+def _decision_readiness_recommendation(future_dirs: int, predicted_edges: int, total_atoms: int) -> str:
+    """Return an evidence-gated product state, not a frontend launch decision."""
+    if future_dirs <= 0 or predicted_edges <= 0 or total_atoms <= 0:
+        return "**INSUFFICIENT_EVIDENCE** — 证据链过薄,仅能显示 readiness gaps 和补证据队列"
+    if future_dirs < 10 or total_atoms < 50:
+        return "**EVIDENCE_GATED** — 候选方向可用于补证据,但 Topic Dossier / Claim Card / Radar 不得高置信放行"
+    return "**CANDIDATE_POOL_READY** — 可进入候选池审阅；Radar 晋升仍需完整 Claim Card、校准和 section evidence"
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 01:20
+**生成时间**: 2026-05-31 01:27
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -171,19 +171,20 @@
 
 ## 13. 下一步建议
 
-### 建议: **REVISE** — 部分指标达标,建议调优后再启动前端
+### 决策状态: **EVIDENCE_GATED** — 候选方向可用于补证据,但 Topic Dossier / Claim Card / Radar 不得高置信放行
 
-**前端启动条件**:
-- [ ] 三路融合方向 ≥ 10 个 (当前: 5)
-- [ ] VGAE test AUC > 0.80 (需验证)
-- [ ] 主干道节点 100-200 个 (当前: TBD)
-- [ ] 突变节点 100-300 个 (当前: 4879)
+**证据决策放行条件**:
+- [ ] Topic Dossier multi-topic regression 通过四个基准 topic,不是只让 Metalens 好看
+- [ ] linked refs >= 30%；低于门槛时 Main/Cite 演化只能标为 uncertainty
+- [ ] section evidence 覆盖 main/future/branch/keystone 关键论文和 topic-gap 队列
+- [ ] future candidates 有 rolling held-out-year calibration audit；否则只能进 candidate_pool
+- [ ] Radar 主视图只允许完整 Step13 Claim Card,裸 GNN/VGAE 边只能作为证据补齐目标
 
-**重型算法调优建议**:
+**下一步证据工作**:
 1. Citation function: 如 extension+motivation+usage 占比 < 40%,先补 citation context 或运行 capped LLM edge audit 抽检；LLM 结果只能作为弱标签,不能直接升级结论
-2. VGAE: 如 AUC < 0.80,减少 epoch → 调 lr → 增加 negative sampling
+2. VGAE / future candidates: 若 calibration audit 未通过,保持 candidate_pool_only；优先补 rolling held-out-year 校准和反例分析,不是追求裸边数量
 3. Limitation/resolution: 如 high-confidence resolution < 30%,保持 exploratory / candidate_pool, 优先补 limitation/discussion/resolution section evidence 与 linked resolution evidence；阈值不得下调来晋升高置信
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:20*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 01:27*

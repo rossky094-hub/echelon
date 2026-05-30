@@ -1888,6 +1888,21 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         and "OpenAlex 命中率" not in step9_text
         and "OpenAlex 跨库" not in step9_text
     )
+    step9_decision_readiness_not_frontend_launch = (
+        bool(step9_text)
+        and "证据决策放行条件" in step9_text
+        and "Topic Dossier multi-topic regression" in step9_text
+        and "Radar 主视图只允许完整 Step13 Claim Card" in step9_text
+        and "candidate_pool_only" in step9_text
+        and "前端启动条件" not in step9_text
+        and "启动前端" not in step9_text
+        and "可启动 V14-B 前端开发" not in step9_text
+        and "VGAE test AUC" not in step9_text
+        and "主干道节点 100-200" not in step9_text
+        and "突变节点 100-300" not in step9_text
+        and "重型算法调优建议" not in step9_text
+        and "_go_nogo_recommendation" not in step9_text
+    )
     first_current = min(
         (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
         default=-1,
@@ -1957,6 +1972,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "legacy_arxiv_scripts_require_explicit_opt_in": not unguarded_legacy_scripts,
         "step9_report_avoids_old_pilot_instruction": step9_avoids_old_pilot_instruction,
         "step9_openalex_language_is_coverage_not_success": step9_openalex_language_is_coverage,
+        "step9_uses_decision_readiness_not_frontend_launch": step9_decision_readiness_not_frontend_launch,
         "help_prefers_current_chain": help_prefers_current,
         "pilot_full_is_legacy_compatibility_only": (
             not pilot_full_context

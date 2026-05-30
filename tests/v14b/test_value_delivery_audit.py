@@ -225,7 +225,9 @@ def _write_product_sources(root: Path) -> None:
         "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
         "capped LLM edge audit LLM 结果只能作为弱标签 不能直接升级结论\n"
         "保持 exploratory / candidate_pool limitation/discussion/resolution section evidence "
-        "linked resolution evidence 阈值不得下调\n",
+        "linked resolution evidence 阈值不得下调\n"
+        "证据决策放行条件 Topic Dossier multi-topic regression "
+        "Radar 主视图只允许完整 Step13 Claim Card candidate_pool_only\n",
         encoding="utf-8",
     )
     makefile = root / "Makefile"
@@ -522,6 +524,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert legacy_gate["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert legacy_gate["checks"]["step9_report_avoids_old_pilot_instruction"] is True
     assert legacy_gate["checks"]["step9_openalex_language_is_coverage_not_success"] is True
+    assert legacy_gate["checks"]["step9_uses_decision_readiness_not_frontend_launch"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])
@@ -666,6 +669,25 @@ def test_legacy_flow_isolation_contract_flags_unguarded_arxiv_gap_script(tmp_pat
     assert result["status"] == "fail"
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is False
     assert result["unguarded_legacy_arxiv_scripts"] == ["scripts/monitor_optics_full_pipeline.sh"]
+
+
+def test_legacy_flow_isolation_contract_rejects_frontend_launch_step9(tmp_path):
+    _write_makefile_contracts(tmp_path)
+    _write_product_sources(tmp_path)
+    _write_legacy_arxiv_script_contracts(tmp_path)
+    step9 = tmp_path / "echelon/v14b/step9_report.py"
+    step9.write_text(
+        "make product-chain make post-frontfill-chain legacy compatibility "
+        "OpenAlex W 覆盖率 Field/Topic 覆盖率 coverage is not a success claim\n"
+        "前端启动条件 VGAE test AUC 主干道节点 100-200 突变节点 100-300 "
+        "_go_nogo_recommendation 可启动 V14-B 前端开发\n",
+        encoding="utf-8",
+    )
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step9_uses_decision_readiness_not_frontend_launch"] is False
 
 
 def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp_path):
