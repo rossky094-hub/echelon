@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T22:00:24Z`
+- generated_at: `2026-05-30T22:16:22Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,47 +34,47 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 7175,
+    "openalex_frontfill_cooldown_remaining_s": 6217,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 3017,
+    "primary_section_papers": 3020,
     "section_frontfill_done": 0,
     "section_frontfill_no_evidence_delta": -1000,
     "section_frontfill_progress_done": null,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 35,
-      "current_contract_rate": 0.01160092807424594,
+      "current_contract_papers": 139,
+      "current_contract_rate": 0.04602649006622517,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 796,
-        "weak": 2221
+        "strong": 896,
+        "weak": 2124
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 5227,
-        "v14b_section_parser_contract_v3_toc_guard": 67
+        "legacy_unknown_contract": 5053,
+        "v14b_section_parser_contract_v3_toc_guard": 287
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 5227,
-        "v14b_section_ingest_v3": 67
+        "v14b_section_ingest_v2": 5053,
+        "v14b_section_ingest_v3": 287
       },
-      "primary_section_papers": 3017,
-      "primary_section_rows": 5294,
+      "primary_section_papers": 3020,
+      "primary_section_rows": 5340,
       "strategy_counts": {
-        "embedded_heading": 40,
-        "explicit_heading": 957,
-        "heading_continuation": 1397,
-        "inline_heading": 518,
-        "legacy_unknown_strategy": 3858,
-        "loose_inline_heading": 19,
-        "parser_hint": 17
+        "embedded_heading": 41,
+        "explicit_heading": 1145,
+        "heading_continuation": 1606,
+        "inline_heading": 565,
+        "legacy_unknown_strategy": 3689,
+        "loose_inline_heading": 24,
+        "parser_hint": 23
       },
-      "strong_or_moderate_papers": 796,
-      "weak_only_papers": 2221,
-      "weak_only_rate": 0.7361617500828638
+      "strong_or_moderate_papers": 896,
+      "weak_only_papers": 2124,
+      "weak_only_rate": 0.7033112582781457
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -324,6 +324,7 @@
       "five-question evidence contracts",
       "topic dossier evidence contract",
       "turning papers with access",
+      "turning papers with decision-grade section evidence",
       "turning papers with strong/moderate section provenance"
     ],
     "overall_status": "warn",
@@ -583,9 +584,9 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_primary_section_papers": 0,
-  "topic_gap_primary_section_rate": 0.0,
-  "topic_gap_queue_papers": 26
+  "topic_gap_primary_section_papers": 4,
+  "topic_gap_primary_section_rate": 0.14814814814814814,
+  "topic_gap_queue_papers": 27
 }
 ```
 

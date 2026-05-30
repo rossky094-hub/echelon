@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-30T22:00:15Z`
+- Audit: `2026-05-30T22:16:14Z`
 - Topic: `metalens`
 - Overall status: **warn**
 
@@ -13,8 +13,9 @@
 | expected bottlenecks evidenced | 6 | 6 | pass |
 | key turning papers | 13 | 5 | pass |
 | turning papers with access links | 13 | 5 | pass |
-| turning papers with primary sections | 7 | 3 | pass |
-| turning papers with strong/moderate section provenance | 7 | 3 | pass |
+| turning papers with primary sections | 8 | 3 | pass |
+| turning papers with strong/moderate section provenance | 8 | 3 | pass |
+| turning papers with decision-grade section evidence | 7 | 3 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -44,7 +45,7 @@
 
 ## Interpretation
 
-- Key turning papers: 13 total, 13 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance.
+- Key turning papers: 13 total, 13 with access links, 8 with primary local sections, 8 with strong/moderate parser provenance, 7 with decision-grade current-contract evidence.
 - Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
@@ -60,7 +61,7 @@
 
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_stale_parser_contract |  | 90 | 1 | key turning paper has strong/moderate section provenance but lacks current parser-contract evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

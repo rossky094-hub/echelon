@@ -26,6 +26,15 @@ from echelon.v14b.id_normalization import (
     normalize_s2_paper_id,
 )
 from echelon.v14b.evidence_grade import claim_scope_policy, uncertainty_reasons
+from echelon.v14b.evidence_contracts import (
+    evidence_availability_flags,
+    is_decision_section as _is_decision_section,
+    normalize_section_key as _normalize_section_key,
+    paper_has_decision_grade_primary_section as _paper_has_decision_grade_primary_evidence,
+    paper_has_primary_section as _paper_has_primary_evidence,
+    section_provenance_strength as _section_provenance_strength,
+    summarize_primary_section_provenance,
+)
 from echelon.v14b.topic_readiness import build_topic_readiness_preflight
 
 SCHEMA_VERSION = "V14B.visual.1"
@@ -313,73 +322,6 @@ def _candidate_ids_from_fts(
     ).fetchall()
     ids = [str(r["paper_id"]) for r in rows]
     return ids, {pid: 0.5 for pid in ids}
-
-
-DECISION_SECTION_NAMES = {
-    "limitation",
-    "limitations",
-    "discussion",
-    "conclusion",
-    "conclusions",
-    "future_work",
-    "future_directions",
-    "results",
-    "error_analysis",
-    "ablation",
-    "method",
-    "methods",
-    "experiments",
-}
-
-STRONG_SECTION_STRATEGIES = {
-    "explicit_heading",
-    "heading_continuation",
-    "embedded_heading",
-}
-
-MODERATE_SECTION_STRATEGIES = {
-    "inline_heading",
-}
-
-
-def _normalize_section_key(raw: Any) -> str:
-    return re.sub(r"[\s\-]+", "_", str(raw or "").strip().lower())
-
-
-def _is_decision_section(raw: Any) -> bool:
-    return _normalize_section_key(raw) in DECISION_SECTION_NAMES
-
-
-def _section_provenance_strength(section: dict[str, Any]) -> str:
-    strategies = {
-        str(v).strip()
-        for v in (section.get("extraction_strategies") or [])
-        if str(v or "").strip()
-    }
-    if strategies & STRONG_SECTION_STRATEGIES:
-        return "strong"
-    if strategies & MODERATE_SECTION_STRATEGIES:
-        return "moderate"
-    grade = str(section.get("evidence_grade") or "")
-    if grade in {"section_explicit_heading", "section_embedded_heading"}:
-        return "strong"
-    if grade == "section_inline_heading":
-        return "moderate"
-    return "weak"
-
-
-def _paper_has_primary_evidence(paper: dict[str, Any]) -> bool:
-    return bool((paper.get("content_availability") or {}).get("has_primary_evidence_sections"))
-
-
-def _paper_has_traced_primary_evidence(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    if "has_strong_or_moderate_primary_evidence_sections" in availability:
-        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
-    provenance = availability.get("primary_section_provenance")
-    if isinstance(provenance, dict):
-        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
-    return bool(availability.get("has_primary_evidence_sections"))
 
 
 def _paper_has_access(paper: dict[str, Any]) -> bool:
@@ -804,22 +746,7 @@ def _content_access_payload(
         for s in sections
         if _is_decision_section(s.get("section_name") or s.get("section_type"))
     ]
-    provenance_counts = Counter(_section_provenance_strength(s) for s in decision_sections)
-    primary_section_provenance = {
-        "strong": int(provenance_counts.get("strong", 0)),
-        "moderate": int(provenance_counts.get("moderate", 0)),
-        "weak": int(provenance_counts.get("weak", 0)),
-        "total": len(decision_sections),
-        "section_names": sorted(
-            {
-                _normalize_section_key(s.get("section_name") or s.get("section_type"))
-                for s in decision_sections
-            }
-        ),
-    }
-    strong_or_moderate_sections = (
-        primary_section_provenance["strong"] + primary_section_provenance["moderate"]
-    )
+    primary_section_provenance = summarize_primary_section_provenance(decision_sections)
     links = access.get("external_links") or _external_links_from_ids(ids, sections)
     local_content = dict(access.get("local_content") or {})
     local_content.update(
@@ -836,14 +763,7 @@ def _content_access_payload(
     availability.update(
         {
             "has_local_sections": bool(sections),
-            "has_primary_evidence_sections": bool(decision_sections),
-            "has_strong_or_moderate_primary_evidence_sections": bool(strong_or_moderate_sections),
-            "primary_section_evidence_grade": (
-                "strong_or_moderate"
-                if strong_or_moderate_sections
-                else ("weak" if decision_sections else "none")
-            ),
-            "primary_section_provenance": primary_section_provenance,
+            **evidence_availability_flags(primary_section_provenance),
             "has_limitation_atoms": bool(limitations),
             "has_claim_cards": bool(claim_cards),
             "full_text_cached": False,
@@ -1933,7 +1853,7 @@ def _split_topic_turning_papers(
         reason["topic_relevance_score"] = score
         reason["topic_relevance_terms"] = matched[:8]
         has_primary_section = _paper_has_primary_evidence(item)
-        has_traced_section = _paper_has_traced_primary_evidence(item)
+        has_traced_section = _paper_has_decision_grade_primary_evidence(item)
         if score >= 2:
             reason["topic_relevance_scope"] = "topic_specific"
             item["reason"] = reason
@@ -2022,7 +1942,7 @@ def _topic_driver_fallback_papers(
             )
             item["reason"] = reason
             has_primary_section = _paper_has_primary_evidence(item)
-            has_traced_section = _paper_has_traced_primary_evidence(item)
+            has_traced_section = _paper_has_decision_grade_primary_evidence(item)
             item["claim_scope"] = "topic_branch_driver_turning_fallback"
             item["evidence_grade"] = (
                 "section_backed_turning_candidate"
@@ -2096,7 +2016,7 @@ def _paper_hit_contract(paper: dict[str, Any]) -> dict[str, Any]:
     visual = paper.get("visual") if isinstance(paper.get("visual"), dict) else {}
     visual_role = str(visual.get("role") or paper.get("visual_role") or reason.get("role") or "paper")
     layer = str(reason.get("layer") or reason.get("edge_type") or "")
-    has_traced_section = _paper_has_traced_primary_evidence(paper)
+    has_traced_section = _paper_has_decision_grade_primary_evidence(paper)
     has_primary_section = _paper_has_primary_evidence(paper)
 
     if visual_role == "future_anchor":
@@ -2674,7 +2594,7 @@ def _evidence_contract_for_five_questions(
             "claim_scope": "topic_specific_turning_candidate",
             "evidence_grade": (
                 "section_backed_turning_context"
-                if any(_paper_has_traced_primary_evidence(p) for p in turning_hits)
+                if any(_paper_has_decision_grade_primary_evidence(p) for p in turning_hits)
                 else "weak_section_turning_context"
                 if any(_paper_has_primary_evidence(p) for p in turning_hits)
                 else "metadata_turning_candidate"
@@ -2794,11 +2714,12 @@ def _build_topic_branch_splits(
         )
         dominant_branch_id = branch_ids.most_common(1)[0][0] if branch_ids else None
         dominant_cluster_id = cluster_ids.most_common(1)[0][0] if cluster_ids else None
-        primary_section_evidence = sum(
+        decision_grade_section_evidence = sum(
             1
             for p in evidence
-            if _paper_has_traced_primary_evidence(p)
+            if _paper_has_decision_grade_primary_evidence(p)
         )
+        primary_section_evidence = sum(1 for p in evidence if _paper_has_primary_evidence(p))
         evidence_objects = _compact_evidence_objects(
             [
                 _paper_evidence_object(
@@ -2822,6 +2743,8 @@ def _build_topic_branch_splits(
             if lineage
             else (
                 "section_backed_topic_branch_candidate"
+                if decision_grade_section_evidence
+                else "weak_section_topic_branch_candidate"
                 if primary_section_evidence
                 else "metadata_topic_branch_candidate"
             )
@@ -3510,7 +3433,7 @@ def _paper_role_contract(
         "main_path" if edge.get("is_main_path") else str(edge.get("layer") or edge.get("edge_type") or "edge")
         for edge in edges
     }
-    has_traced_section = _paper_has_traced_primary_evidence(paper)
+    has_traced_section = _paper_has_decision_grade_primary_evidence(paper)
     has_primary_section = _paper_has_primary_evidence(paper)
     if "future" in layer_keys or visual_role == "future_anchor":
         claim_scope = "candidate_pool_only"
@@ -3835,7 +3758,7 @@ def _build_branch_dossiers(
         primary_driver_sections = sum(
             1
             for p in representative_evidence
-            if _paper_has_traced_primary_evidence(p)
+            if _paper_has_decision_grade_primary_evidence(p)
         )
         split_reason = _split_reason(str(branch_id or cid), row.get("parent_branch_id"), lineage_payload)
         constraint_shift = (
@@ -4327,7 +4250,7 @@ def _reading_path_item(
     if not papers and not objects:
         return None
     has_primary = any(_paper_has_primary_evidence(p) for p in papers)
-    has_traced_primary = any(_paper_has_traced_primary_evidence(p) for p in papers)
+    has_traced_primary = any(_paper_has_decision_grade_primary_evidence(p) for p in papers)
     uncertainty = list(uncertainty_reasons or [])
     if not has_primary:
         uncertainty.append("recommended papers lack local primary section evidence in this reading path item")
@@ -4381,7 +4304,7 @@ def _build_reading_path(
         hits[:80],
         key=lambda p: (
             -float(p.get("score") or 0.0),
-            0 if _paper_has_traced_primary_evidence(p) else 1,
+            0 if _paper_has_decision_grade_primary_evidence(p) else 1,
             -(int(p.get("year") or 0)),
         ),
     )[:5]
@@ -4393,7 +4316,7 @@ def _build_reading_path(
         claim_scope="retrieval_context_only",
         evidence_grade=(
             "section_backed_topic_anchor"
-            if any(_paper_has_traced_primary_evidence(p) for p in starter)
+            if any(_paper_has_decision_grade_primary_evidence(p) for p in starter)
             else "weak_section_topic_anchor"
             if any(_paper_has_primary_evidence(p) for p in starter)
             else "metadata_topic_anchor"
@@ -4415,7 +4338,7 @@ def _build_reading_path(
         claim_scope="topic_specific_turning_candidate",
         evidence_grade=(
             "section_backed_turning_path"
-            if any(_paper_has_traced_primary_evidence(p) for p in turning_hits[:6])
+            if any(_paper_has_decision_grade_primary_evidence(p) for p in turning_hits[:6])
             else "weak_section_turning_path"
             if any(_paper_has_primary_evidence(p) for p in turning_hits[:6])
             else "metadata_turning_path"
@@ -4444,7 +4367,7 @@ def _build_reading_path(
         claim_scope="branch_context_candidate",
         evidence_grade=(
             "section_backed_branch_driver_path"
-            if any(_paper_has_traced_primary_evidence(p) for p in branch_driver_papers)
+            if any(_paper_has_decision_grade_primary_evidence(p) for p in branch_driver_papers)
             else "weak_section_branch_driver_path"
             if any(_paper_has_primary_evidence(p) for p in branch_driver_papers)
             else "metadata_branch_driver_path"
@@ -4561,7 +4484,7 @@ def _build_topic_dossier(
     )
     traced_section_ready = sum(
         1 for h in hits
-        if _paper_has_traced_primary_evidence(h)
+        if _paper_has_decision_grade_primary_evidence(h)
     )
     limitation_ready = sum(
         1 for h in hits
@@ -5899,7 +5822,7 @@ def get_visual_paper_detail(paper_id: str, *, edge_limit: int = 80) -> dict:
         **_paper_role_contract(paper, edges, visual_role=visual_role, why_parts=why_parts),
         "evidence_gap": (
             "section-level evidence with strong/moderate parser provenance available"
-            if _paper_has_traced_primary_evidence(paper)
+            if _paper_has_decision_grade_primary_evidence(paper)
             else "local section evidence available but parser provenance is weak"
             if _paper_has_primary_evidence(paper)
             else "no local section evidence yet; use abstract/metadata only for weak evidence"

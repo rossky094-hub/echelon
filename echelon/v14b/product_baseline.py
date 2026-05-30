@@ -17,6 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
+from echelon.v14b.evidence_contracts import (
+    paper_has_decision_grade_primary_section,
+    paper_has_primary_section,
+    paper_has_traced_primary_section,
+)
 
 DECISION_SECTION_NAMES = (
     "limitations",
@@ -554,21 +559,6 @@ def topic_dossier_rubric() -> list[dict[str, str]]:
     ]
 
 
-def _paper_has_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    return bool(availability.get("has_primary_evidence_sections"))
-
-
-def _paper_has_traced_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    if "has_strong_or_moderate_primary_evidence_sections" in availability:
-        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
-    provenance = availability.get("primary_section_provenance")
-    if isinstance(provenance, dict):
-        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
-    return False
-
-
 def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     dossier = lens.get("topic_dossier") or {}
     branches = dossier.get("branch_splits") or []
@@ -599,12 +589,17 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     turning_with_primary_section = [
         p for p in turning
         if isinstance(p, dict)
-        and _paper_has_primary_section(p)
+        and paper_has_primary_section(p)
     ]
     turning_with_traced_primary_section = [
         p for p in turning
         if isinstance(p, dict)
-        and _paper_has_traced_primary_section(p)
+        and paper_has_traced_primary_section(p)
+    ]
+    turning_with_decision_grade_primary_section = [
+        p for p in turning
+        if isinstance(p, dict)
+        and paper_has_decision_grade_primary_section(p)
     ]
     complete_claim_cards = [
         c for c in claim_cards
@@ -631,6 +626,8 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
         gaps.append("key turning papers lack primary local section evidence")
     elif turning and not turning_with_traced_primary_section:
         gaps.append("key turning papers have only weak or stale primary section provenance")
+    elif turning and not turning_with_decision_grade_primary_section:
+        gaps.append("key turning papers lack current parser-contract decision-grade section evidence")
     if future and not complete_claim_cards:
         gaps.append("future candidates exist but no complete Claim Cards are promoted")
 
@@ -650,6 +647,7 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
         "key_turning_with_access_links": len(turning_with_links),
         "key_turning_with_primary_section": len(turning_with_primary_section),
         "key_turning_with_traced_primary_section": len(turning_with_traced_primary_section),
+        "key_turning_with_decision_grade_primary_section": len(turning_with_decision_grade_primary_section),
         "future_candidate_edges": len(future),
         "future_edges": len(future),
         "radar_claim_cards": len(claim_cards),
@@ -835,8 +833,8 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
                 "",
                 "## Multi-topic Topic Baseline",
                 "",
-                "| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Candidate Edges | Complete Cards | Gaps |",
-                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Decision-grade Primary | Candidate Edges | Complete Cards | Gaps |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in topic_suite:
@@ -845,6 +843,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
                 f"{row.get('branch_count', 0)} | {row.get('branch_driver_papers', 0)} | "
                 f"{row.get('key_turning_papers', 0)} | {row.get('key_turning_with_primary_section', 0)} | "
                 f"{row.get('key_turning_with_traced_primary_section', 0)} | "
+                f"{row.get('key_turning_with_decision_grade_primary_section', 0)} | "
                 f"{row.get('future_candidate_edges', row.get('future_edges', 0))} | "
                 f"{row.get('complete_claim_cards', 0)} | {len(row.get('quality_gaps') or [])} |"
             )
@@ -868,7 +867,8 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
             f"- Key turning papers: {topic.get('key_turning_papers', 0)}; "
             f"with access links: {topic.get('key_turning_with_access_links', 0)}; "
             f"with primary section: {topic.get('key_turning_with_primary_section', 0)}; "
-            f"with strong/moderate parser provenance: {topic.get('key_turning_with_traced_primary_section', 0)}"
+            f"with strong/moderate parser provenance: {topic.get('key_turning_with_traced_primary_section', 0)}; "
+            f"with decision-grade current-contract evidence: {topic.get('key_turning_with_decision_grade_primary_section', 0)}"
         )
         lines.append(f"- Future candidate edges: {topic.get('future_candidate_edges', topic.get('future_edges', 0))}; Radar Claim Cards: {topic.get('radar_claim_cards', 0)}; complete cards: {topic.get('complete_claim_cards', 0)}")
         if topic.get("quality_gaps"):

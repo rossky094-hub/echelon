@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T22:00:37Z`
+- Snapshot: `2026-05-30T22:16:30Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -12,7 +12,7 @@
 - Pending enrich: 454
 - Primary Field coverage: 55,359 / 55,391 (99.9%)
 - References: 3,215,130; linked refs: 445,957 (13.9%)
-- Section rows: 5,294; section papers: 3,017; primary evidence papers: 3,017 (5.4%)
+- Section rows: 5,340; section papers: 3,020; primary evidence papers: 3,020 (5.5%)
 
 ## Derived Product Tables
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,797
-- section_priority_summary: 1,472
+- section_priority_summary: 1,487
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,278
@@ -44,27 +44,27 @@
 
 | Category | Total | In topN | Any section | Primary section | Current parser primary | Eligible PDF |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| cluster_representative | 5,946 | 5,322 | 699 | 699 | 5 | 5,946 |
+| cluster_representative | 5,946 | 5,322 | 699 | 699 | 10 | 5,946 |
 | active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
-| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 12 | 2,007 |
-| main_path_node | 1,101 | 1,101 | 237 | 237 | 17 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 6 | 1,000 |
-| resolution_evidence | 464 | 206 | 170 | 170 | 0 | 464 |
-| future_endpoint | 291 | 291 | 109 | 109 | 13 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 3 | 268 |
-| topic:metalens | 257 | 86 | 95 | 95 | 10 | 257 |
-| topic:quantum light source | 227 | 73 | 43 | 43 | 12 | 227 |
-| topic:photonic crystal cavity | 150 | 45 | 20 | 20 | 10 | 150 |
-| topic:metasurface holography | 20 | 9 | 5 | 5 | 4 | 20 |
+| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 46 | 2,007 |
+| main_path_node | 1,101 | 1,101 | 237 | 237 | 72 | 1,101 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 53 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 25 | 464 |
+| future_endpoint | 291 | 291 | 109 | 109 | 38 | 291 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 43 | 268 |
+| topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
+| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
+| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |
+| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 21 |
 
 ## Multi-topic Topic Baseline
 
-| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Candidate Edges | Complete Cards | Gaps |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| metalens | True | 100.0% | 7 | 19 | 13 | 7 | 7 | 3 | 0 | 1 |
-| metasurface holography | True | 100.0% | 4 | 11 | 8 | 2 | 2 | 3 | 0 | 1 |
-| photonic crystal cavity | True | 100.0% | 4 | 11 | 9 | 3 | 3 | 320 | 0 | 1 |
-| quantum light source | True | 100.0% | 4 | 12 | 10 | 7 | 7 | 320 | 0 | 1 |
+| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Decision-grade Primary | Candidate Edges | Complete Cards | Gaps |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| metalens | True | 100.0% | 7 | 19 | 13 | 8 | 8 | 7 | 3 | 0 | 1 |
+| metasurface holography | True | 100.0% | 4 | 11 | 8 | 4 | 4 | 2 | 3 | 0 | 1 |
+| photonic crystal cavity | True | 100.0% | 4 | 11 | 9 | 3 | 3 | 2 | 320 | 0 | 1 |
+| quantum light source | True | 100.0% | 4 | 12 | 10 | 7 | 7 | 7 | 320 | 0 | 1 |
 
 ### Per-topic Quality Gaps
 

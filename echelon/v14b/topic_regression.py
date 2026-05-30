@@ -17,6 +17,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from echelon.v14b.evidence_contracts import (
+    paper_has_decision_grade_primary_section,
+    paper_has_primary_section,
+    paper_has_traced_primary_section,
+)
 from echelon.v14b.product_baseline import (
     METALENS_EXPECTED_BRANCHES,
     METASURFACE_HOLOGRAPHY_EXPECTED_BRANCHES,
@@ -418,21 +423,6 @@ def _reading_path_contract_summary(lens: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _paper_has_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    return bool(availability.get("has_primary_evidence_sections"))
-
-
-def _paper_has_traced_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    if "has_strong_or_moderate_primary_evidence_sections" in availability:
-        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
-    provenance = availability.get("primary_section_provenance")
-    if isinstance(provenance, dict):
-        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
-    return bool(availability.get("has_primary_evidence_sections"))
-
-
 def _paper_has_access(paper: dict[str, Any]) -> bool:
     return bool(paper.get("access_links") or [])
 
@@ -473,21 +463,26 @@ def _branch_driver_ids_for_bottleneck(lens: dict[str, Any], label: str, *, limit
 def _turning_primary_section_gaps(turning: list[dict[str, Any]], *, limit: int = 20) -> list[dict[str, Any]]:
     rows = []
     for paper in turning:
-        if _paper_has_traced_primary_section(paper):
+        if paper_has_decision_grade_primary_section(paper):
             continue
-        has_primary = _paper_has_primary_section(paper)
+        has_primary = paper_has_primary_section(paper)
+        has_traced = paper_has_traced_primary_section(paper)
         rows.append(
             {
                 "paper_id": paper.get("paper_id"),
                 "title": paper.get("title"),
                 "year": paper.get("year"),
                 "gap_type": (
-                    "key_turning_paper_weak_section_provenance"
+                    "key_turning_paper_stale_parser_contract"
+                    if has_traced
+                    else "key_turning_paper_weak_section_provenance"
                     if has_primary
                     else "key_turning_paper_missing_primary_section"
                 ),
                 "reason": (
-                    "key turning paper has only weak section parser provenance"
+                    "key turning paper has strong/moderate section provenance but lacks current parser-contract evidence"
+                    if has_traced
+                    else "key turning paper has only weak section parser provenance"
                     if has_primary
                     else "key turning paper lacks local primary section evidence"
                 ),
@@ -730,8 +725,11 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
         )
 
     turning_with_access = sum(1 for p in turning if _paper_has_access(p))
-    turning_with_primary_section = sum(1 for p in turning if _paper_has_primary_section(p))
-    turning_with_traced_primary_section = sum(1 for p in turning if _paper_has_traced_primary_section(p))
+    turning_with_primary_section = sum(1 for p in turning if paper_has_primary_section(p))
+    turning_with_traced_primary_section = sum(1 for p in turning if paper_has_traced_primary_section(p))
+    turning_with_decision_grade_primary_section = sum(
+        1 for p in turning if paper_has_decision_grade_primary_section(p)
+    )
     complete_claim_cards = sum(
         1
         for c in claim_cards
@@ -783,6 +781,14 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
             "actual": turning_with_traced_primary_section,
             "required": benchmark.minimum_turning_papers_with_primary_section,
             "status": _status(turning_with_traced_primary_section >= benchmark.minimum_turning_papers_with_primary_section),
+        },
+        {
+            "name": "turning papers with decision-grade section evidence",
+            "actual": turning_with_decision_grade_primary_section,
+            "required": benchmark.minimum_turning_papers_with_primary_section,
+            "status": _status(
+                turning_with_decision_grade_primary_section >= benchmark.minimum_turning_papers_with_primary_section
+            ),
         },
         {
             "name": "five-question evidence contracts",
@@ -844,6 +850,7 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
             "with_access_links": turning_with_access,
             "with_primary_section": turning_with_primary_section,
             "with_strong_or_moderate_primary_section": turning_with_traced_primary_section,
+            "with_decision_grade_primary_section": turning_with_decision_grade_primary_section,
         },
         "future_candidates": {
             "total": len(future_edges),
@@ -903,7 +910,8 @@ def render_regression_md(result: dict[str, Any]) -> str:
             "",
             f"- Key turning papers: {k['total']} total, {k['with_access_links']} with access links, "
             f"{k['with_primary_section']} with primary local sections, "
-            f"{k.get('with_strong_or_moderate_primary_section', 0)} with strong/moderate parser provenance.",
+            f"{k.get('with_strong_or_moderate_primary_section', 0)} with strong/moderate parser provenance, "
+            f"{k.get('with_decision_grade_primary_section', 0)} with decision-grade current-contract evidence.",
             f"- Future candidates: {f['total']} graph candidates, {f['claim_cards']} Radar cards, {f['complete_claim_cards']} complete cards.",
             f"- Five-question evidence contracts: {q.get('with_clickable_evidence', 0)}/{q.get('total', 0)} have claim scope, evidence grade, uncertainty, and clickable evidence.",
             f"- Bottleneck lineage contracts: {lineage.get('with_clickable_evidence', 0)}/{lineage.get('total', 0)} constraints have typed/clickable evidence contracts.",
@@ -965,6 +973,7 @@ def render_readiness_md(result: dict[str, Any]) -> str:
             f"- bottleneck candidates: {metrics.get('bottleneck_candidates', 0)}",
             f"- turning papers: {metrics.get('turning_papers', 0)}",
             f"- turning papers with strong/moderate section provenance: {metrics.get('turning_with_strong_or_moderate_section_provenance', 0)}",
+            f"- turning papers with decision-grade section evidence: {metrics.get('turning_with_decision_grade_sections', 0)}",
             f"- future candidates: {metrics.get('future_candidates', 0)}",
             f"- complete Claim Cards: {metrics.get('complete_claim_cards', 0)}",
             "",

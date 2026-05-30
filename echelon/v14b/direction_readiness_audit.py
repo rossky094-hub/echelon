@@ -15,37 +15,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
-from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
-
-
-PRIMARY_SECTION_NAMES = (
-    "limitation",
-    "limitations",
-    "discussion",
-    "conclusion",
-    "conclusions",
-    "future_work",
-    "future work",
-    "future directions",
-    "results",
-    "error_analysis",
-    "error analysis",
-    "ablation",
-    "method",
-    "methods",
-    "experiments",
+from echelon.v14b.evidence_contracts import (
+    PRIMARY_SECTION_NAMES,
+    SECTION_PARSER_CONTRACT_VERSION,
+    section_strategy_quality,
 )
-
-STRONG_SECTION_STRATEGIES = {
-    "explicit_heading",
-    "heading_continuation",
-    "embedded_heading",
-}
-
-MODERATE_SECTION_STRATEGIES = {
-    "inline_heading",
-}
+from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
 
 WEAK_SECTION_STRATEGIES = {
     "loose_inline_heading",
@@ -157,11 +132,7 @@ def _public_latest_fusion_audit(row: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def _section_quality_from_strategies(strategies: set[str]) -> str:
-    if strategies & STRONG_SECTION_STRATEGIES:
-        return "strong"
-    if strategies & MODERATE_SECTION_STRATEGIES:
-        return "moderate"
-    return "weak"
+    return section_strategy_quality(strategies)
 
 
 def primary_section_paper_count(conn: sqlite3.Connection, paper_ids: list[str] | None = None) -> int:

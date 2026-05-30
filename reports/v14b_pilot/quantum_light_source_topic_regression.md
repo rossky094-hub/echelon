@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-30T22:00:18Z`
+- Audit: `2026-05-30T22:16:16Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -15,6 +15,7 @@
 | turning papers with access links | 10 | 3 | pass |
 | turning papers with primary sections | 7 | 2 | pass |
 | turning papers with strong/moderate section provenance | 7 | 2 | pass |
+| turning papers with decision-grade section evidence | 7 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -41,7 +42,7 @@
 
 ## Interpretation
 
-- Key turning papers: 10 total, 10 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance.
+- Key turning papers: 10 total, 10 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance, 7 with decision-grade current-contract evidence.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.

@@ -38,6 +38,12 @@ from echelon.v14b.config import (
     SECTION_INGEST_TOP_N,
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
+from echelon.v14b.evidence_contracts import (
+    PRIMARY_SECTION_NAMES,
+    SECTION_PARSER_CONTRACT_GUARDS,
+    SECTION_PARSER_CONTRACT_VERSION,
+    SECTION_PARSER_NAME,
+)
 from echelon.v14b.id_normalization import normalize_arxiv_id, normalize_doi
 from echelon.v14b.utils import Checkpoint, add_common_args, make_progress, setup_logging
 
@@ -50,30 +56,6 @@ SECTION_INGEST_TRUST_ENV = os.getenv("V14B_SECTION_INGEST_TRUST_ENV", "0").strip
     "yes",
     "on",
 }
-SECTION_PARSER_NAME = "v14b_section_ingest_v3"
-SECTION_PARSER_CONTRACT_VERSION = "v14b_section_parser_contract_v3_toc_guard"
-SECTION_PARSER_CONTRACT_GUARDS = (
-    "toc_dot_leader",
-    "toc_numbered_entry",
-    "ambiguous_lowercase_fragment_heading",
-)
-
-# Claim-supporting evidence sections.  Limitation/discussion/conclusion/future
-# work are strongest for bottleneck claims; method/results/error analysis/
-# ablation/experiments are still evidence-bearing for mechanisms, failed
-# attempts, enablers, and minimal validation experiments.
-PRIMARY_SECTION_NAMES = (
-    "limitations",
-    "discussion",
-    "conclusion",
-    "future_work",
-    "results",
-    "error_analysis",
-    "ablation",
-    "method",
-    "experiments",
-)
-
 SECTION_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("limitations", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(limitation|limitations|open challenges?|challenges and limitations|limitations and future work)\s*[:.\-–—]*\s*$", re.I)),
     ("discussion", re.compile(r"^\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(discussion|discussion and outlook|discussion and conclusions?|results and discussion)\s*[:.\-–—]*\s*$", re.I)),

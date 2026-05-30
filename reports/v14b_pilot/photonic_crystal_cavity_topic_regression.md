@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-30T22:00:17Z`
+- Audit: `2026-05-30T22:16:15Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -15,6 +15,7 @@
 | turning papers with access links | 9 | 3 | pass |
 | turning papers with primary sections | 3 | 2 | pass |
 | turning papers with strong/moderate section provenance | 3 | 2 | pass |
+| turning papers with decision-grade section evidence | 2 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -41,7 +42,7 @@
 
 ## Interpretation
 
-- Key turning papers: 9 total, 9 with access links, 3 with primary local sections, 3 with strong/moderate parser provenance.
+- Key turning papers: 9 total, 9 with access links, 3 with primary local sections, 3 with strong/moderate parser provenance, 2 with decision-grade current-contract evidence.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
@@ -63,5 +64,6 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_stale_parser_contract |  | 90 | 1 | key turning paper has strong/moderate section provenance but lacks current parser-contract evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | future_candidates_missing_claim_card |  | 85 | 12 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence |

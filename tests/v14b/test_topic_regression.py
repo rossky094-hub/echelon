@@ -23,6 +23,23 @@ def _branch(name: str):
     }
 
 
+def _decision_grade_primary_availability() -> dict:
+    return {
+        "has_primary_evidence_sections": True,
+        "has_strong_or_moderate_primary_evidence_sections": True,
+        "has_current_contract_primary_evidence_sections": True,
+        "has_decision_grade_primary_evidence_sections": True,
+        "primary_section_provenance": {
+            "strong": 1,
+            "moderate": 0,
+            "weak": 0,
+            "current_contract": 1,
+            "decision_grade": 1,
+            "total": 1,
+        },
+    }
+
+
 def _evidence_contract_fragments():
     reading_steps = [
         "starter",
@@ -115,7 +132,7 @@ def test_metalens_regression_passes_on_decision_grade_fixture():
                 {
                     "paper_id": f"p{i}",
                     "access_links": [{"url": "https://example.test"}],
-                    "content_availability": {"has_primary_evidence_sections": True},
+                    "content_availability": _decision_grade_primary_availability(),
                 }
                 for i in range(8)
             ]
@@ -185,7 +202,7 @@ def test_bottleneck_synonyms_do_not_hide_evidence():
                 {
                     "paper_id": f"p{i}",
                     "access_links": [{"url": "https://example.test"}],
-                    "content_availability": {"has_primary_evidence_sections": True},
+                    "content_availability": _decision_grade_primary_availability(),
                 }
                 for i in range(8)
             ]
@@ -205,7 +222,14 @@ def test_topic_regression_flags_weak_turning_section_provenance():
     weak_availability = {
         "has_primary_evidence_sections": True,
         "has_strong_or_moderate_primary_evidence_sections": False,
-        "primary_section_provenance": {"strong": 0, "moderate": 0, "weak": 1, "total": 1},
+        "primary_section_provenance": {
+            "strong": 0,
+            "moderate": 0,
+            "weak": 1,
+            "current_contract": 1,
+            "decision_grade": 0,
+            "total": 1,
+        },
     }
     lens = {
         "ready": True,
@@ -367,8 +391,7 @@ def test_arbitrary_topic_preflight_is_llm_free_and_not_benchmark_gated():
                     "paper_id": "p1",
                     "access_links": [{"url": "https://example.test"}],
                     "content_availability": {
-                        "has_primary_evidence_sections": True,
-                        "has_strong_or_moderate_primary_evidence_sections": True,
+                        **_decision_grade_primary_availability(),
                     },
                 }
             ]

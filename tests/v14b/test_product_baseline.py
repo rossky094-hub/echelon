@@ -219,7 +219,13 @@ def test_evaluate_topic_lens_flags_weak_primary_section_provenance():
                     "access_links": [{"url": "https://example.test"}],
                     "content_availability": {
                         "has_primary_evidence_sections": True,
-                        "primary_section_provenance": {"weak": 1, "strong": 0, "moderate": 0},
+                        "primary_section_provenance": {
+                            "weak": 1,
+                            "strong": 0,
+                            "moderate": 0,
+                            "current_contract": 1,
+                            "decision_grade": 0,
+                        },
                     },
                 }
             ]
@@ -233,6 +239,48 @@ def test_evaluate_topic_lens_flags_weak_primary_section_provenance():
     assert result["key_turning_with_primary_section"] == 1
     assert result["key_turning_with_traced_primary_section"] == 0
     assert any("weak or stale primary section provenance" in gap for gap in result["quality_gaps"])
+
+
+def test_evaluate_topic_lens_flags_stale_parser_contract_provenance():
+    lens = {
+        "ready": True,
+        "topic_dossier": {
+            "branch_splits": [
+                {"name": "Imaging systems", "driver_papers": [{"paper_id": "p1"}]},
+            ],
+            "bottleneck_dossiers": [
+                {"name": "constraint", "evidence_papers": [{"paper_id": "p1"}]},
+            ],
+        },
+        "history_main_path": {
+            "key_turning_papers": [
+                {
+                    "paper_id": "p1",
+                    "access_links": [{"url": "https://example.test"}],
+                    "content_availability": {
+                        "has_primary_evidence_sections": True,
+                        "has_strong_or_moderate_primary_evidence_sections": True,
+                        "has_current_contract_primary_evidence_sections": False,
+                        "primary_section_provenance": {
+                            "strong": 1,
+                            "moderate": 0,
+                            "weak": 0,
+                            "current_contract": 0,
+                            "decision_grade": 0,
+                        },
+                    },
+                }
+            ]
+        },
+        "future_growth": {"candidate_edges": []},
+        "rd_radar": {"claim_cards": []},
+    }
+
+    result = evaluate_topic_lens("metalens", lens)
+
+    assert result["key_turning_with_traced_primary_section"] == 1
+    assert result["key_turning_with_decision_grade_primary_section"] == 0
+    assert any("current parser-contract decision-grade" in gap for gap in result["quality_gaps"])
 
 
 def test_snapshot_can_skip_live_topic_lens(tmp_path):
@@ -280,6 +328,8 @@ def test_product_baseline_defaults_to_multi_topic_suite(tmp_path, monkeypatch):
                         "content_availability": {
                             "has_primary_evidence_sections": True,
                             "has_strong_or_moderate_primary_evidence_sections": True,
+                            "has_current_contract_primary_evidence_sections": True,
+                            "has_decision_grade_primary_evidence_sections": True,
                         },
                     }
                 ]

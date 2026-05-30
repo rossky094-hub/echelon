@@ -9,6 +9,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from echelon.v14b.evidence_contracts import (
+    paper_has_current_contract_primary_section,
+    paper_has_decision_grade_primary_section,
+    paper_has_primary_section,
+    paper_has_traced_primary_section,
+)
+
 
 NO_LLM_PREFLIGHT_POLICY = (
     "no_llm_required_for_preflight; LLM may audit/name/explain only after evidence exists"
@@ -35,21 +42,6 @@ def has_clickable_evidence(item: dict[str, Any]) -> bool:
         or item.get("driver_papers")
         or item.get("access_links")
     )
-
-
-def paper_has_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    return bool(availability.get("has_primary_evidence_sections"))
-
-
-def paper_has_traced_primary_section(paper: dict[str, Any]) -> bool:
-    availability = paper.get("content_availability") or {}
-    if "has_strong_or_moderate_primary_evidence_sections" in availability:
-        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
-    provenance = availability.get("primary_section_provenance")
-    if isinstance(provenance, dict):
-        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
-    return bool(availability.get("has_primary_evidence_sections"))
 
 
 def paper_has_access(paper: dict[str, Any]) -> bool:
@@ -106,6 +98,8 @@ def build_topic_readiness_preflight(
     turning_with_access = sum(1 for p in turning_hits if paper_has_access(p))
     turning_with_primary = sum(1 for p in turning_hits if paper_has_primary_section(p))
     turning_with_traced = sum(1 for p in turning_hits if paper_has_traced_primary_section(p))
+    turning_with_current_contract = sum(1 for p in turning_hits if paper_has_current_contract_primary_section(p))
+    turning_with_decision_grade = sum(1 for p in turning_hits if paper_has_decision_grade_primary_section(p))
     complete_claim_cards = sum(
         1
         for c in claim_cards
@@ -146,6 +140,12 @@ def build_topic_readiness_preflight(
             "name": "turning papers with strong/moderate section provenance",
             "status": _status(turning_with_traced >= turning_required, warn=turning_with_primary > 0),
             "actual": turning_with_traced,
+            "required": turning_required,
+        },
+        {
+            "name": "turning papers with decision-grade section evidence",
+            "status": _status(turning_with_decision_grade >= turning_required, warn=turning_with_primary > 0),
+            "actual": turning_with_decision_grade,
             "required": turning_required,
         },
         {
@@ -203,6 +203,8 @@ def build_topic_readiness_preflight(
             "turning_with_access_links": turning_with_access,
             "turning_with_primary_sections": turning_with_primary,
             "turning_with_strong_or_moderate_section_provenance": turning_with_traced,
+            "turning_with_current_parser_contract_sections": turning_with_current_contract,
+            "turning_with_decision_grade_sections": turning_with_decision_grade,
             "future_candidates": len(future_growth),
             "claim_cards": len(claim_cards),
             "complete_claim_cards": complete_claim_cards,

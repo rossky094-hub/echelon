@@ -300,6 +300,7 @@ def test_content_availability_summarizes_primary_section_provenance():
             "section_name": "limitations",
             "extraction_strategies": ["explicit_heading"],
             "evidence_grade": "section_explicit_heading",
+            "parser_contract_version": "v14b_section_parser_contract_v3_toc_guard",
         },
         {
             "section_name": "discussion",
@@ -324,9 +325,13 @@ def test_content_availability_summarizes_primary_section_provenance():
     provenance = availability["primary_section_provenance"]
     assert availability["has_primary_evidence_sections"] is True
     assert availability["has_strong_or_moderate_primary_evidence_sections"] is True
-    assert availability["primary_section_evidence_grade"] == "strong_or_moderate"
+    assert availability["has_current_contract_primary_evidence_sections"] is True
+    assert availability["has_decision_grade_primary_evidence_sections"] is True
+    assert availability["primary_section_evidence_grade"] == "decision_grade"
     assert provenance["strong"] == 1
     assert provenance["weak"] == 1
+    assert provenance["current_contract"] == 1
+    assert provenance["decision_grade"] == 1
     assert provenance["total"] == 2
     assert local_content["primary_section_provenance"] == provenance
 
@@ -632,7 +637,7 @@ def test_branch_dossiers_carry_evidence_contracts_for_lineage_status():
             '{"doi":"10.1/example"}',
             '{"title":"Wafer scale metalens manufacturing","year":2024}',
             "abstract",
-            '[{"section_name":"discussion","text":"manufacturing yield remains constrained","extraction_strategies":["explicit_heading"]}]',
+            '[{"section_name":"discussion","text":"manufacturing yield remains constrained","extraction_strategies":["explicit_heading"],"parser_contract_version":"v14b_section_parser_contract_v3_toc_guard"}]',
             "[]",
             "{}",
             "{}",
@@ -683,7 +688,7 @@ def test_topic_branch_splits_label_facet_matches_as_weak_not_layout():
     names = {row["name"]: row for row in splits}
     assert "High-efficiency visible holography" in names
     assert names["High-efficiency visible holography"]["lineage_status"] == "weak_split_candidate"
-    assert names["High-efficiency visible holography"]["evidence_grade"] == "section_backed_topic_branch_candidate"
+    assert names["High-efficiency visible holography"]["evidence_grade"] == "weak_section_topic_branch_candidate"
     assert names["High-efficiency visible holography"]["uncertainty_reasons"]
 
 
