@@ -259,7 +259,9 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "step6_fusion.py").write_text(
         "FUSION_USE_LLM_NAMING Optional LLM naming "
-        "Future candidate generator GNN/VGAE candidate edge\n",
+        "Future candidate generator GNN/VGAE candidate edge "
+        "has_decision_grade_section_evidence limitation_decision_grade_section_count "
+        "current parser-contract decision-grade limitation section evidence triangulated_strong\n",
         encoding="utf-8",
     )
     (v14 / "step4_subgraph.py").write_text(
@@ -541,6 +543,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert future_gate["checks"]["future_report_filename_is_candidate_contract"] is True
     assert future_gate["checks"]["future_direction_report_uses_candidate_score_labels"] is True
     assert future_gate["checks"]["step6_future_evidence_avoids_prediction_copy"] is True
+    assert future_gate["checks"]["step6_strong_fusion_requires_decision_grade_sections"] is True
     assert future_gate["checks"]["current_docs_label_future_edges_as_candidates"] is True
     assert future_gate["checks"]["public_future_candidate_language_avoids_prediction_copy"] is True
     assert future_gate["checks"]["ui_future_calibration_copy_uses_candidate_score_labels"] is True

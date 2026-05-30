@@ -1,6 +1,6 @@
 # V14B Section High-Value Queue Audit
 
-- audit_ts: `2026-05-30T22:39:36Z`
+- audit_ts: `2026-05-30T22:46:41Z`
 - current top_n budget: `12000`
 - high-value papers considered: `12,797`
 - primary section papers: `3,020`; current parser-contract primary: `154`

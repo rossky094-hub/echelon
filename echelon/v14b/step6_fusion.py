@@ -37,6 +37,12 @@ from echelon.v14b.config import (
     LIMIT,
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
+from echelon.v14b.evidence_contracts import (
+    SECTION_PARSER_CONTRACT_VERSION,
+    is_decision_section,
+    normalize_section_key,
+    section_strategy_quality,
+)
 from echelon.v14b.llm_client import LLMClient
 from echelon.v14b.utils import setup_logging, Checkpoint, add_common_args, table_columns
 
@@ -202,12 +208,107 @@ def _candidate_calibration_status(pred: dict, calibration_context: dict | None) 
     return "not_calibrated"
 
 
+def _json_obj(raw) -> dict:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(str(raw))
+    except Exception:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def load_decision_grade_section_index(
+    conn_main: sqlite3.Connection,
+    paper_ids: list[str],
+) -> dict[tuple[str, str], dict]:
+    """Index current-contract traced section evidence for limitation atoms."""
+    if not paper_ids:
+        return {}
+    try:
+        cols = table_columns(conn_main, "paper_sections")
+    except sqlite3.Error:
+        return {}
+    if "section_meta_json" not in cols:
+        return {}
+    out: dict[tuple[str, str], dict] = {}
+    for start in range(0, len(paper_ids), 800):
+        chunk = [str(pid) for pid in paper_ids[start : start + 800]]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = conn_main.execute(
+            f"""
+            SELECT paper_id, section_name, section_meta_json
+            FROM paper_sections
+            WHERE paper_id IN ({placeholders})
+              AND length(trim(section_text)) >= 80
+            """,
+            chunk,
+        ).fetchall()
+        for row in rows:
+            section_name = row["section_name"] if isinstance(row, sqlite3.Row) else row[1]
+            if not is_decision_section(section_name):
+                continue
+            raw_meta = row["section_meta_json"] if isinstance(row, sqlite3.Row) else row[2]
+            meta = _json_obj(raw_meta)
+            strategies = {
+                str(item).strip()
+                for item in (meta.get("extraction_strategies") or [])
+                if str(item).strip()
+            }
+            if not strategies:
+                strategies = {"legacy_unknown_strategy"}
+            contract_version = str(meta.get("parser_contract_version") or "legacy_unknown_contract")
+            quality = section_strategy_quality(strategies)
+            decision_grade = contract_version == SECTION_PARSER_CONTRACT_VERSION and quality in {"strong", "moderate"}
+            paper_id = row["paper_id"] if isinstance(row, sqlite3.Row) else row[0]
+            out[(str(paper_id), normalize_section_key(section_name))] = {
+                "section_parser_contract_version": contract_version,
+                "section_provenance_strength": quality,
+                "section_decision_grade": decision_grade,
+                "section_extraction_strategies": sorted(strategies),
+            }
+    return out
+
+
+def attach_limitation_section_contracts(
+    limitations: list[dict],
+    conn_main: sqlite3.Connection,
+) -> list[dict]:
+    paper_ids = sorted({str(atom.get("paper_id") or "") for atom in limitations if atom.get("paper_id")})
+    index = load_decision_grade_section_index(conn_main, paper_ids)
+    enriched: list[dict] = []
+    for atom in limitations:
+        item = dict(atom)
+        key = (
+            str(item.get("paper_id") or ""),
+            normalize_section_key(item.get("source_section_name") or ""),
+        )
+        section = index.get(key, {})
+        item["section_parser_contract_version"] = section.get("section_parser_contract_version") or (
+            "legacy_unknown_contract" if item.get("evidence_quality") in {"section_level", "structured_sections"} else "none"
+        )
+        item["section_provenance_strength"] = section.get("section_provenance_strength") or (
+            "weak" if item.get("evidence_quality") in {"section_level", "structured_sections"} else "none"
+        )
+        item["section_extraction_strategies"] = section.get("section_extraction_strategies") or []
+        item["section_decision_grade"] = bool(section.get("section_decision_grade"))
+        enriched.append(item)
+    return enriched
+
+
 def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
     """加载未解决的 limitation atoms"""
-    rows = conn_v14.execute("""
+    cols = table_columns(conn_v14, "limitation_atoms")
+    source_section_expr = (
+        "COALESCE(a.source_section_name, '') AS source_section_name"
+        if "source_section_name" in cols
+        else "'' AS source_section_name"
+    )
+    rows = conn_v14.execute(f"""
         SELECT
             a.atom_id, a.paper_id, a.description, a.keyword, a.severity,
             a.evidence_source, a.evidence_quality, a.evidence_weight,
+            {source_section_expr},
             COUNT(r.atom_id) AS n_resolutions
         FROM limitation_atoms a
         LEFT JOIN limitation_resolutions r
@@ -245,6 +346,7 @@ def compute_direction_clusters(
     terminal_ids: Set[str] = {str(t["paper_id"]) for t in terminals}
 
     # 未解决 limitation keywords
+    unresolved = attach_limitation_section_contracts(unresolved, conn_main)
     limit_keywords: List[str] = list(dict.fromkeys(
         a["keyword"].lower() for a in unresolved if a.get("keyword")
     ))
@@ -339,14 +441,24 @@ def compute_direction_clusters(
                 atom.get("evidence_quality") or "unknown"
                 for atom in matched_atoms
             })
+            decision_grade_section_count = sum(1 for atom in matched_atoms if atom.get("section_decision_grade"))
+            limitation_contract_versions = sorted(
+                {
+                    str(atom.get("section_parser_contract_version") or "unknown")
+                    for atom in matched_atoms
+                }
+            )
             limitation_weight = sum(weights) / max(1, len(weights))
             limitation_evidence = (
                 f"关联未解决限制: {', '.join(matched_keywords[:3])}; "
-                f"evidence_quality={','.join(qualities[:3]) or 'unknown'}"
+                f"evidence_quality={','.join(qualities[:3]) or 'unknown'}; "
+                f"decision_grade_sections={decision_grade_section_count}"
             )
         else:
             limitation_weight = 0.0
             qualities = []
+            decision_grade_section_count = 0
+            limitation_contract_versions = []
 
         if evidence_paths >= FUSION_MIN_EVIDENCE_PATHS:
             evidence_tier = direction_evidence_tier(
@@ -355,7 +467,15 @@ def compute_direction_clusters(
                 prediction_confidence=prediction_confidence,
                 has_main_path=bool(main_path_evidence),
                 calibrated_for_fusion=calibrated_for_fusion,
+                has_decision_grade_section_evidence=decision_grade_section_count > 0,
             )
+            missing_gates = (
+                []
+                if calibrated_for_fusion
+                else ["rolling held-out-year calibration audit"]
+            )
+            if "section_level" in set(qualities) and decision_grade_section_count <= 0:
+                missing_gates.append("current parser-contract decision-grade limitation section evidence")
             direction_candidates.append({
                 "anchor_paper_id": dst_id,
                 "anchor_title": dst_title,
@@ -370,11 +490,7 @@ def compute_direction_clusters(
                 "calibration_label": calibration_label,
                 "calibration_status": calibration_status,
                 "calibrated_for_fusion": calibrated_for_fusion,
-                "missing_gates": (
-                    []
-                    if calibrated_for_fusion
-                    else ["rolling held-out-year calibration audit"]
-                ),
+                "missing_gates": missing_gates,
                 "uncertainty_reasons": (
                     []
                     if calibrated_for_fusion
@@ -386,6 +502,8 @@ def compute_direction_clusters(
                 "limitation_evidence": limitation_evidence,
                 "limitation_evidence_weight": limitation_weight,
                 "limitation_evidence_quality": qualities,
+                "limitation_decision_grade_section_count": decision_grade_section_count,
+                "limitation_section_contract_versions": limitation_contract_versions,
                 "field_id": dst_paper.get("primary_field_id"),
                 "src_ids": [src_id],
             })
@@ -433,6 +551,13 @@ def compute_direction_clusters(
                 existing["calibration_label"] = cand.get("calibration_label")
                 existing["missing_gates"] = cand.get("missing_gates") or []
                 existing["uncertainty_reasons"] = cand.get("uncertainty_reasons") or []
+            existing["limitation_decision_grade_section_count"] = max(
+                int(existing.get("limitation_decision_grade_section_count") or 0),
+                int(cand.get("limitation_decision_grade_section_count") or 0),
+            )
+            contracts = set(existing.get("limitation_section_contract_versions") or [])
+            contracts.update(cand.get("limitation_section_contract_versions") or [])
+            existing["limitation_section_contract_versions"] = sorted(contracts)
 
     return merged_candidates[:FUSION_TOP_DIRECTIONS]
 
@@ -444,13 +569,20 @@ def direction_evidence_tier(
     prediction_confidence: float,
     has_main_path: bool,
     calibrated_for_fusion: bool = True,
+    has_decision_grade_section_evidence: bool = False,
 ) -> str:
     qualities = set(limitation_quality or [])
     has_section = bool(qualities & {"section_level", "structured_sections"})
     has_weak_limitation = "weak_abstract" in qualities or not qualities
     if not calibrated_for_fusion:
         return "exploratory_uncalibrated_candidate" if evidence_paths >= 2 else "insufficient"
-    if evidence_paths >= 3 and prediction_confidence >= 0.70 and has_section and has_main_path:
+    if (
+        evidence_paths >= 3
+        and prediction_confidence >= 0.70
+        and has_section
+        and has_decision_grade_section_evidence
+        and has_main_path
+    ):
         return "triangulated_strong"
     if evidence_paths >= 3 and prediction_confidence >= 0.60:
         return "triangulated_limited"
@@ -586,6 +718,8 @@ def name_directions(
                     "uncertainty_reasons": cand.get("uncertainty_reasons") or [],
                     "limitation_evidence_quality": cand.get("limitation_evidence_quality"),
                     "limitation_evidence_weight": cand.get("limitation_evidence_weight"),
+                    "limitation_decision_grade_section_count": cand.get("limitation_decision_grade_section_count"),
+                    "limitation_section_contract_versions": cand.get("limitation_section_contract_versions") or [],
                     "claim_scope": cand.get("claim_scope"),
                 },
                 ensure_ascii=False,
@@ -642,6 +776,7 @@ def write_fusion_evidence_audit(
         atom.get("evidence_quality") or "unknown"
         for atom in unresolved
     )
+    decision_grade_limitations = sum(1 for atom in unresolved if atom.get("section_decision_grade"))
     path_counts = Counter(int(c.get("evidence_paths") or 0) for c in candidates)
     tier_counts = Counter(c.get("evidence_tier") or "unknown" for c in candidates)
     calibration_counts = Counter(c.get("calibration_label") or "legacy_raw" for c in candidates)
@@ -685,6 +820,7 @@ def write_fusion_evidence_audit(
                 ),
                 "min_vgae_confidence": FUSION_MIN_VGAE_CONFIDENCE,
                 "vgae_top_n": FUSION_VGAE_TOP_N,
+                "decision_grade_limitation_sections": decision_grade_limitations,
             },
             ensure_ascii=False,
         ),

@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 from echelon.v14b.db_schema import init_v14b_db
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +273,133 @@ class TestFusion:
 
         assert tier == "exploratory_uncalibrated_candidate"
         assert claim_scope_for_tier(tier) == "candidate_pool_only"
+
+    def test_direction_tier_requires_decision_grade_section_for_strong_fusion(self):
+        from echelon.v14b.step6_fusion import direction_evidence_tier
+
+        stale_tier = direction_evidence_tier(
+            evidence_paths=3,
+            limitation_quality=["section_level"],
+            prediction_confidence=0.82,
+            has_main_path=True,
+            calibrated_for_fusion=True,
+            has_decision_grade_section_evidence=False,
+        )
+        decision_grade_tier = direction_evidence_tier(
+            evidence_paths=3,
+            limitation_quality=["section_level"],
+            prediction_confidence=0.82,
+            has_main_path=True,
+            calibrated_for_fusion=True,
+            has_decision_grade_section_evidence=True,
+        )
+
+        assert stale_tier == "triangulated_limited"
+        assert decision_grade_tier == "triangulated_strong"
+
+    def test_step6_limits_raw_section_fusion_without_current_contract(self, tmp_path):
+        from echelon.v14b.step6_fusion import compute_direction_clusters
+
+        _, conn_main = create_main_db(tmp_path)
+        conn_main.execute("UPDATE papers SET abstract=? WHERE id=5", ("scalability remains the bottleneck",))
+        conn_main.commit()
+
+        candidates = compute_direction_clusters(
+            terminals=[{"paper_id": "4", "publication_year": 2024}],
+            vgae_preds=[
+                {
+                    "src_paper_id": "4",
+                    "dst_paper_id": "5",
+                    "predicted_prob": 0.85,
+                    "raw_predicted_prob": 0.9,
+                    "calibrated_prob": 0.82,
+                    "prediction_confidence": 0.78,
+                    "calibration_label": "calibrated_temporal_holdout",
+                    "is_cross_field": 1,
+                }
+            ],
+            unresolved=[
+                {
+                    "paper_id": "2",
+                    "keyword": "scalability",
+                    "evidence_quality": "section_level",
+                    "evidence_weight": 0.9,
+                    "source_section_name": "discussion",
+                }
+            ],
+            conn_main=conn_main,
+            calibration_context={"has_run_audit": True, "avg_calibrated_auc": 0.84},
+        )
+        conn_main.close()
+
+        assert candidates
+        assert candidates[0]["evidence_tier"] == "triangulated_limited"
+        assert candidates[0]["limitation_decision_grade_section_count"] == 0
+        assert "current parser-contract decision-grade limitation section evidence" in candidates[0]["missing_gates"]
+
+    def test_step6_allows_strong_fusion_with_current_contract_section(self, tmp_path):
+        from echelon.v14b.step6_fusion import compute_direction_clusters
+
+        _, conn_main = create_main_db(tmp_path)
+        conn_main.execute("UPDATE papers SET abstract=? WHERE id=5", ("scalability remains the bottleneck",))
+        conn_main.execute(
+            """
+            CREATE TABLE paper_sections (
+                paper_id TEXT,
+                section_name TEXT,
+                section_text TEXT,
+                section_meta_json TEXT
+            )
+            """
+        )
+        conn_main.execute(
+            "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
+            (
+                "2",
+                "discussion",
+                "current contract limitation evidence " * 20,
+                json.dumps(
+                    {
+                        "extraction_strategies": ["explicit_heading"],
+                        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                    }
+                ),
+            ),
+        )
+        conn_main.commit()
+
+        candidates = compute_direction_clusters(
+            terminals=[{"paper_id": "4", "publication_year": 2024}],
+            vgae_preds=[
+                {
+                    "src_paper_id": "4",
+                    "dst_paper_id": "5",
+                    "predicted_prob": 0.85,
+                    "raw_predicted_prob": 0.9,
+                    "calibrated_prob": 0.82,
+                    "prediction_confidence": 0.78,
+                    "calibration_label": "calibrated_temporal_holdout",
+                    "is_cross_field": 1,
+                }
+            ],
+            unresolved=[
+                {
+                    "paper_id": "2",
+                    "keyword": "scalability",
+                    "evidence_quality": "section_level",
+                    "evidence_weight": 0.9,
+                    "source_section_name": "discussion",
+                }
+            ],
+            conn_main=conn_main,
+            calibration_context={"has_run_audit": True, "avg_calibrated_auc": 0.84},
+        )
+        conn_main.close()
+
+        assert candidates
+        assert candidates[0]["evidence_tier"] == "triangulated_strong"
+        assert candidates[0]["limitation_decision_grade_section_count"] == 1
+        assert SECTION_PARSER_CONTRACT_VERSION in candidates[0]["limitation_section_contract_versions"]
 
 
 # ---------------------------------------------------------------------------

@@ -594,6 +594,15 @@ def audit_future_growth(
             and _source_absent(step6_path, ("VGAE pred:", "VGAE predicted future connections", "Link Prediction"))
             and _source_absent(step9_path, ("| 源论文 | 目标论文 | 候选概率 |",))
         ),
+        "step6_strong_fusion_requires_decision_grade_sections": _source_contains(
+            step6_path,
+            (
+                "has_decision_grade_section_evidence",
+                "limitation_decision_grade_section_count",
+                "current parser-contract decision-grade limitation section evidence",
+                "triangulated_strong",
+            ),
+        ),
         "current_docs_label_future_edges_as_candidates": all(
             _source_absent(
                 path,
