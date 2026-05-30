@@ -19,6 +19,9 @@ from typing import Any
 
 from echelon.v14b.product_baseline import (
     METALENS_EXPECTED_BRANCHES,
+    METASURFACE_HOLOGRAPHY_EXPECTED_BRANCHES,
+    PHOTONIC_CRYSTAL_CAVITY_EXPECTED_BRANCHES,
+    QUANTUM_LIGHT_SOURCE_EXPECTED_BRANCHES,
     evaluate_topic_lens,
 )
 from echelon.v14b.topic_readiness import build_topic_readiness_preflight
@@ -50,12 +53,7 @@ METALENS_BENCHMARK = BenchmarkTopic(
 
 METASURFACE_HOLOGRAPHY_BENCHMARK = BenchmarkTopic(
     topic="metasurface holography",
-    expected_branches=(
-        "High-efficiency visible holography",
-        "Large field-of-view holography",
-        "Multiplexed and dynamic holography",
-        "Fabrication-tolerant metasurface design",
-    ),
+    expected_branches=METASURFACE_HOLOGRAPHY_EXPECTED_BRANCHES,
     expected_bottlenecks=(
         "efficiency",
         "speckle",
@@ -71,12 +69,7 @@ METASURFACE_HOLOGRAPHY_BENCHMARK = BenchmarkTopic(
 
 PHOTONIC_CRYSTAL_CAVITY_BENCHMARK = BenchmarkTopic(
     topic="photonic crystal cavity",
-    expected_branches=(
-        "High-Q nanocavities",
-        "Cavity quantum electrodynamics",
-        "On-chip coupling and integration",
-        "Tunable and nonlinear cavity devices",
-    ),
+    expected_branches=PHOTONIC_CRYSTAL_CAVITY_EXPECTED_BRANCHES,
     expected_bottlenecks=(
         "quality factor",
         "mode volume",
@@ -92,12 +85,7 @@ PHOTONIC_CRYSTAL_CAVITY_BENCHMARK = BenchmarkTopic(
 
 QUANTUM_LIGHT_SOURCE_BENCHMARK = BenchmarkTopic(
     topic="quantum light source",
-    expected_branches=(
-        "Single-photon emitters",
-        "Entangled photon-pair sources",
-        "Integrated quantum photonics",
-        "Deterministic coupling and collection",
-    ),
+    expected_branches=QUANTUM_LIGHT_SOURCE_EXPECTED_BRANCHES,
     expected_bottlenecks=(
         "brightness",
         "indistinguishability",

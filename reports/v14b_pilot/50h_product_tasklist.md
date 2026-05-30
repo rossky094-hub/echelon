@@ -5,11 +5,11 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | ID | Window | Task | Output | Gate | Status |
 | --- | --- | --- | --- | --- | --- |
 | P0-01 | 0-3h | 固定当前指标快照 | product_baseline_snapshot.{json,md} | papers/OpenAlex/section/linked refs/Claim Cards/visual graph counts are recorded | completed |
-| P0-02 | 0-3h | 建立 Metalens 验收基准 | metalens expected branches and quality gaps in baseline snapshot | Metalens branches, bottlenecks, turning-paper evidence, future evidence are scored | completed |
+| P0-02 | 0-3h | 建立 multi-topic 验收基准 | metalens/metasurface holography/photonic crystal cavity/quantum light source quality gaps in baseline snapshot | each benchmark topic scores branches, bottlenecks, turning-paper evidence, and future evidence | completed |
 | P0-03 | 0-3h | 写 Topic Dossier 质量 rubric | Topic Dossier rubric in baseline snapshot | generic statements are demoted unless backed by clickable evidence | completed |
-| P1-04 | 3-8h | 做 Metalens benchmark topic fixture | tests/v14b Metalens regression fixture | fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation | completed |
-| P1-05 | 3-8h | Metalens 分支识别自动测试 | automated topic-lens regression | each expected branch returns driver papers, bottleneck, enabler, evidence gap | completed |
-| P1-06 | 3-8h | Metalens 审计报告 | reports/v14b_pilot/metalens_topic_regression.md | report shows what improved, what is still generic, and which evidence is missing | completed |
+| P1-04 | 3-8h | 做 multi-topic benchmark fixtures | tests/v14b multi-topic regression fixtures | fixtures cover metalens, metasurface holography, photonic crystal cavity, and quantum light source | completed |
+| P1-05 | 3-8h | 跨 topic 分支识别自动测试 | automated topic-lens regression | each expected branch returns driver papers, bottleneck, enabler, evidence gap | completed |
+| P1-06 | 3-8h | multi-topic 审计报告 | reports/v14b_pilot/multi_topic_regression.md | report shows per-topic improvements, generic residues, and missing evidence | completed |
 | P2-07 | 8-14h | Topic Lens 结论 evidence_objects 化 | API returns evidence_objects for every branch/bottleneck/turning/future statement | evidence types include paper, section, limitation_atom, main_path_edge, branch_lineage, future_candidate | completed |
 | P2-08 | 8-14h | 无证据结论降级 | insufficient_evidence blocks in Topic Dossier | no evidence-backed UI card is rendered from naked prose | completed |
 | P2-09 | 8-14h | 前端可点击证据闭环 | branch/bottleneck/turning/future cards open paper/section/evidence detail | each visible conclusion has an inspectable evidence drawer | completed |
@@ -20,7 +20,7 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | P4-14 | 19-24h | 自动合成外部访问链接 | arXiv/DOI/S2/OpenAlex links in paper detail | known IDs produce clickable links; missing IDs become explicit access gaps | completed |
 | P4-15 | 19-24h | 前端显示 local evidence / external access / access gap | paper detail access panel | researchers know whether they can inspect local evidence or must open an external source | completed |
 | P5-16 | 24-30h | Delta section 自动接力 | top12000 completion handoff to section-evidence-delta | if primary sections are below target, delta queue starts once and only once | completed |
-| P5-17 | 24-30h | Delta queue 优先级审查 | main/future/branch/keystone/Metalens coverage report | next crawl is evidence-budgeted, not blind sweeping | completed |
+| P5-17 | 24-30h | Delta queue 优先级审查 | main/future/branch/keystone/multi-topic coverage report | next crawl is evidence-budgeted, not blind sweeping | completed |
 | P5-18 | 24-30h | 资源保护 | single-process guard, disk floor, temp PDF cleanup | no duplicate crawler and no persistent full-PDF cache | completed |
 | P6-19 | 30-35h | 后段链路 smoke test | Step5c -> Step6 -> Step13 -> Step10 partial run log | schema, empty-table, quality-gate, frontend breaking issues are found before final run | completed |
 | P6-20 | 30-35h | 修复 smoke test 阻断点 | reviewable fixes with tests | fixes preserve algorithmic semantics and serve project goals | completed |

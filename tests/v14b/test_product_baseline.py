@@ -4,10 +4,12 @@ import sqlite3
 from pathlib import Path
 
 from echelon.v14b.product_baseline import (
+    PRODUCT_BASELINE_TOPICS,
     build_snapshot,
     collect_main_metrics,
     collect_v14_metrics,
     evaluate_topic_lens,
+    render_snapshot_md,
     render_tasklist_md,
 )
 
@@ -164,3 +166,53 @@ def test_snapshot_can_skip_live_topic_lens(tmp_path):
     assert snapshot["main"]["papers"] == 2
     assert "P0-01" in md
     assert "GNN-only future edges" in md
+
+
+def test_product_baseline_defaults_to_multi_topic_suite(tmp_path, monkeypatch):
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = tmp_path / "v14.sqlite3"
+    _make_main_db(db_main)
+    _make_v14_db(db_v14)
+
+    def fake_load_topic_lens(topic: str, top_k: int) -> dict:
+        return {
+            "ready": True,
+            "topic_dossier": {
+                "branch_splits": [
+                    {"name": "placeholder branch", "driver_papers": [{"paper_id": f"{topic}-driver"}]}
+                ],
+                "bottleneck_dossiers": [
+                    {"name": "constraint", "evidence_papers": [{"paper_id": f"{topic}-limit"}]}
+                ],
+            },
+            "history_main_path": {
+                "key_turning_papers": [
+                    {
+                        "paper_id": f"{topic}-turning",
+                        "access_links": [{"url": "https://example.test"}],
+                        "content_availability": {"has_primary_evidence_sections": True},
+                    }
+                ]
+            },
+            "future_growth": {"candidate_edges": []},
+            "rd_radar": {"claim_cards": []},
+        }
+
+    monkeypatch.setattr(
+        "echelon.v14b.product_baseline.load_topic_lens",
+        fake_load_topic_lens,
+    )
+
+    snapshot = build_snapshot(
+        db_main=db_main,
+        db_v14=db_v14,
+        topic="all",
+        top_k=10,
+        include_topic_lens=True,
+    )
+    md = render_snapshot_md(snapshot)
+
+    assert {row["topic"] for row in snapshot["topic_lens_quality_suite"]} == set(PRODUCT_BASELINE_TOPICS)
+    assert snapshot["topic_lens_quality"]["topic"] == "all"
+    assert "Multi-topic Topic Baseline" in md
+    assert "Metalens Baseline" not in md

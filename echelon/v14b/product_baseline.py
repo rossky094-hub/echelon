@@ -3,8 +3,8 @@
 This module is deliberately product-facing.  The crawler/product chain can run
 for days, so every long wait needs a stable answer to: did the system become
 more useful for a researcher or R&D lead?  The baseline records current graph
-coverage, evidence coverage, Metalens topic quality, and the 50-hour execution
-backlog used while section/OpenAlex frontfill continues.
+coverage, evidence coverage, multi-topic Topic Dossier quality, and the
+50-hour execution backlog used while section/OpenAlex frontfill continues.
 """
 from __future__ import annotations
 
@@ -39,6 +39,36 @@ METALENS_EXPECTED_BRANCHES = (
     "Computational compensation and inverse design",
 )
 
+METASURFACE_HOLOGRAPHY_EXPECTED_BRANCHES = (
+    "High-efficiency visible holography",
+    "Large field-of-view holography",
+    "Multiplexed and dynamic holography",
+    "Fabrication-tolerant metasurface design",
+)
+
+PHOTONIC_CRYSTAL_CAVITY_EXPECTED_BRANCHES = (
+    "High-Q nanocavities",
+    "Cavity quantum electrodynamics",
+    "On-chip coupling and integration",
+    "Tunable and nonlinear cavity devices",
+)
+
+QUANTUM_LIGHT_SOURCE_EXPECTED_BRANCHES = (
+    "Single-photon emitters",
+    "Entangled photon-pair sources",
+    "Integrated quantum photonics",
+    "Deterministic coupling and collection",
+)
+
+EXPECTED_BRANCHES_BY_TOPIC: dict[str, tuple[str, ...]] = {
+    "metalens": METALENS_EXPECTED_BRANCHES,
+    "metasurface holography": METASURFACE_HOLOGRAPHY_EXPECTED_BRANCHES,
+    "photonic crystal cavity": PHOTONIC_CRYSTAL_CAVITY_EXPECTED_BRANCHES,
+    "quantum light source": QUANTUM_LIGHT_SOURCE_EXPECTED_BRANCHES,
+}
+
+PRODUCT_BASELINE_TOPICS = tuple(EXPECTED_BRANCHES_BY_TOPIC)
+
 TASK_BACKLOG: tuple[dict[str, Any], ...] = (
     {
         "id": "P0-01",
@@ -50,9 +80,9 @@ TASK_BACKLOG: tuple[dict[str, Any], ...] = (
     {
         "id": "P0-02",
         "window": "0-3h",
-        "title": "建立 Metalens 验收基准",
-        "output": "metalens expected branches and quality gaps in baseline snapshot",
-        "gate": "Metalens branches, bottlenecks, turning-paper evidence, future evidence are scored",
+        "title": "建立 multi-topic 验收基准",
+        "output": "metalens/metasurface holography/photonic crystal cavity/quantum light source quality gaps in baseline snapshot",
+        "gate": "each benchmark topic scores branches, bottlenecks, turning-paper evidence, and future evidence",
     },
     {
         "id": "P0-03",
@@ -64,23 +94,23 @@ TASK_BACKLOG: tuple[dict[str, Any], ...] = (
     {
         "id": "P1-04",
         "window": "3-8h",
-        "title": "做 Metalens benchmark topic fixture",
-        "output": "tests/v14b Metalens regression fixture",
-        "gate": "fixture includes imaging, achromatic, high-NA, tunable, manufacturing, computational compensation",
+        "title": "做 multi-topic benchmark fixtures",
+        "output": "tests/v14b multi-topic regression fixtures",
+        "gate": "fixtures cover metalens, metasurface holography, photonic crystal cavity, and quantum light source",
     },
     {
         "id": "P1-05",
         "window": "3-8h",
-        "title": "Metalens 分支识别自动测试",
+        "title": "跨 topic 分支识别自动测试",
         "output": "automated topic-lens regression",
         "gate": "each expected branch returns driver papers, bottleneck, enabler, evidence gap",
     },
     {
         "id": "P1-06",
         "window": "3-8h",
-        "title": "Metalens 审计报告",
-        "output": "reports/v14b_pilot/metalens_topic_regression.md",
-        "gate": "report shows what improved, what is still generic, and which evidence is missing",
+        "title": "multi-topic 审计报告",
+        "output": "reports/v14b_pilot/multi_topic_regression.md",
+        "gate": "report shows per-topic improvements, generic residues, and missing evidence",
     },
     {
         "id": "P2-07",
@@ -156,7 +186,7 @@ TASK_BACKLOG: tuple[dict[str, Any], ...] = (
         "id": "P5-17",
         "window": "24-30h",
         "title": "Delta queue 优先级审查",
-        "output": "main/future/branch/keystone/Metalens coverage report",
+        "output": "main/future/branch/keystone/multi-topic coverage report",
         "gate": "next crawl is evidence-budgeted, not blind sweeping",
     },
     {
@@ -506,9 +536,14 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     claim_cards = radar.get("claim_cards") or []
 
     branch_names = {str(b.get("name") or "") for b in branches if isinstance(b, dict)}
-    expected = list(METALENS_EXPECTED_BRANCHES) if "metalens" in topic.lower() else []
+    expected = list(EXPECTED_BRANCHES_BY_TOPIC.get(topic.lower().strip(), ()))
     expected_hits = [name for name in expected if name in branch_names]
     branch_missing = [name for name in expected if name not in branch_names]
+    expected_branch_coverage = (
+        len(expected_hits) / len(expected)
+        if expected
+        else None
+    )
 
     branch_driver_total = sum(len(b.get("driver_papers") or []) for b in branches if isinstance(b, dict))
     bottleneck_evidence_total = sum(len(b.get("evidence_papers") or []) for b in bottlenecks if isinstance(b, dict))
@@ -550,9 +585,10 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     return {
         "topic": topic,
         "ready": bool(lens.get("ready")),
+        "benchmark_fixture_topic": bool(expected),
         "expected_branches": expected,
         "expected_branch_hits": expected_hits,
-        "expected_branch_coverage": len(expected_hits) / max(1, len(expected)),
+        "expected_branch_coverage": expected_branch_coverage,
         "branch_missing": branch_missing,
         "branch_count": len(branches),
         "branch_driver_papers": branch_driver_total,
@@ -575,6 +611,19 @@ def load_topic_lens(topic: str, top_k: int) -> dict[str, Any]:
     return get_topic_lens(topic=topic, top_k=top_k)
 
 
+def resolve_baseline_topics(topic: str) -> tuple[str, ...]:
+    """Resolve the product-baseline topic selector without using it as a gate."""
+    raw = (topic or "all").strip()
+    if not raw or raw.lower() == "all":
+        return PRODUCT_BASELINE_TOPICS
+    topics = tuple(
+        t.strip().lower() if t.strip().lower() in EXPECTED_BRANCHES_BY_TOPIC else t.strip()
+        for t in raw.split(",")
+        if t.strip()
+    )
+    return topics or PRODUCT_BASELINE_TOPICS
+
+
 def build_snapshot(
     *,
     db_main: Path,
@@ -593,15 +642,32 @@ def build_snapshot(
         "task_backlog": list(TASK_BACKLOG),
     }
     if include_topic_lens:
-        try:
-            lens = load_topic_lens(topic, top_k)
-            snapshot["topic_lens_quality"] = evaluate_topic_lens(topic, lens)
-        except Exception as exc:  # pragma: no cover - protects live audits
+        topic_results: list[dict[str, Any]] = []
+        for resolved_topic in resolve_baseline_topics(topic):
+            try:
+                lens = load_topic_lens(resolved_topic, top_k)
+                topic_results.append(evaluate_topic_lens(resolved_topic, lens))
+            except Exception as exc:  # pragma: no cover - protects live audits
+                topic_results.append(
+                    {
+                        "topic": resolved_topic,
+                        "ready": False,
+                        "error": str(exc),
+                        "quality_gaps": [f"topic lens failed: {exc}"],
+                    }
+                )
+        if len(topic_results) == 1:
+            snapshot["topic_lens_quality"] = topic_results[0]
+        else:
+            snapshot["topic_lens_quality_suite"] = topic_results
             snapshot["topic_lens_quality"] = {
-                "topic": topic,
-                "ready": False,
-                "error": str(exc),
-                "quality_gaps": [f"topic lens failed: {exc}"],
+                "topic": "all",
+                "ready": all(bool(r.get("ready")) for r in topic_results),
+                "quality_gaps": [
+                    f"{r.get('topic')}: {gap}"
+                    for r in topic_results
+                    for gap in (r.get("quality_gaps") or [])
+                ],
             }
     return snapshot
 
@@ -659,6 +725,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
     main = snapshot["main"]
     v14 = snapshot["v14"]
     topic = snapshot.get("topic_lens_quality") or {}
+    topic_suite = snapshot.get("topic_lens_quality_suite") or []
     lines = [
         "# V14B Product Baseline Snapshot",
         "",
@@ -691,10 +758,34 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
         lines.append(f"- access audit: {v14['access_audited_papers']:,} papers, {v14.get('access_gaps', 0):,} gaps")
     if v14.get("future_directions_by_scope"):
         lines.append("- future_directions by claim_scope: " + json.dumps(v14["future_directions_by_scope"], ensure_ascii=False, sort_keys=True))
-    lines.extend(["", "## Metalens Baseline", ""])
-    if topic.get("error"):
+    if topic_suite:
+        lines.extend(
+            [
+                "",
+                "## Multi-topic Topic Baseline",
+                "",
+                "| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Candidate Edges | Complete Cards | Gaps |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in topic_suite:
+            lines.append(
+                f"| {row.get('topic')} | {row.get('ready')} | {pct(row.get('expected_branch_coverage'))} | "
+                f"{row.get('branch_count', 0)} | {row.get('branch_driver_papers', 0)} | "
+                f"{row.get('key_turning_papers', 0)} | {row.get('key_turning_with_primary_section', 0)} | "
+                f"{row.get('future_candidate_edges', row.get('future_edges', 0))} | "
+                f"{row.get('complete_claim_cards', 0)} | {len(row.get('quality_gaps') or [])} |"
+            )
+        lines.extend(["", "### Per-topic Quality Gaps", ""])
+        for row in topic_suite:
+            gaps = row.get("quality_gaps") or []
+            lines.append(f"- **{row.get('topic')}**: {('; '.join(gaps)) if gaps else 'none'}")
+    elif topic.get("error"):
+        lines.extend(["", "## Topic Baseline", ""])
         lines.append(f"- Topic Lens failed: {topic['error']}")
     else:
+        lines.extend(["", "## Topic Baseline", ""])
+        lines.append(f"- Topic: {topic.get('topic')}")
         lines.append(f"- Ready: {topic.get('ready')}")
         lines.append(f"- Expected branch coverage: {pct(topic.get('expected_branch_coverage', 0))}")
         lines.append(f"- Expected branches found: {', '.join(topic.get('expected_branch_hits') or []) or 'none'}")
@@ -716,7 +807,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
             "",
             "## Next Gate",
             "",
-            "P0-P8 are complete in the first engineering pass: baseline, Metalens regression, "
+            "P0-P8 are complete in the first engineering pass: baseline, multi-topic regression, "
             "evidence-object UI loop, Step13/Radar hard gates, access-link audit, and delta-section "
             "handoff controls now exist. A temporary-DB smoke test also verified Step5c -> Step6 -> Step13 -> Step10 "
             "runs without schema breakage on partial section data. Branch dossiers now separate evidence-backed "
@@ -749,7 +840,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", default=DB_MAIN)
     parser.add_argument("--db-v14", default=DB_V14)
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
-    parser.add_argument("--topic", default="metalens")
+    parser.add_argument(
+        "--topic",
+        default="all",
+        help="topic name, comma-separated topics, or 'all' for the multi-topic product baseline suite",
+    )
     parser.add_argument("--top-k", type=int, default=80)
     parser.add_argument("--skip-topic-lens", action="store_true")
     args = parser.parse_args(argv)

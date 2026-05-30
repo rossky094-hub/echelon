@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T19:09:02Z`
+- Snapshot: `2026-05-30T19:28:37Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -12,7 +12,7 @@
 - Pending enrich: 454
 - Primary Field coverage: 55,359 / 55,391 (99.9%)
 - References: 3,215,130; linked refs: 445,957 (13.9%)
-- Section rows: 5,050; section papers: 2,870; primary evidence papers: 2,870 (5.2%)
+- Section rows: 5,062; section papers: 2,878; primary evidence papers: 2,878 (5.2%)
 
 ## Derived Product Tables
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,514
-- section_priority_summary: 1,052
+- section_priority_summary: 1,100
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,286
@@ -40,19 +40,21 @@
 - access audit: 6,903 papers, 0 gaps
 - future_directions by claim_scope: {"exploratory_incomplete_card": 4, "exploratory_with_claim_card": 1}
 
-## Metalens Baseline
+## Multi-topic Topic Baseline
 
-- Ready: True
-- Expected branch coverage: 100.0%
-- Expected branches found: Imaging systems, Broadband achromatic correction, High-NA focusing performance, Tunable and multifunctional optics, Manufacturing scale-up, Computational compensation and inverse design
-- Missing branches: none
-- Branches: 7; driver papers: 21
-- Bottlenecks: 8; evidence papers: 30
-- Key turning papers: 13; with access links: 13; with primary section: 9
-- Future candidate edges: 3; Radar Claim Cards: 0; complete cards: 0
+| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Candidate Edges | Complete Cards | Gaps |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| metalens | True | 100.0% | 7 | 21 | 13 | 9 | 3 | 0 | 1 |
+| metasurface holography | True | 100.0% | 4 | 11 | 8 | 3 | 0 | 0 | 0 |
+| photonic crystal cavity | True | 100.0% | 4 | 11 | 8 | 4 | 320 | 1 | 0 |
+| quantum light source | True | 100.0% | 4 | 10 | 11 | 6 | 320 | 0 | 1 |
 
-### Quality Gaps
-- future candidates exist but no complete Claim Cards are promoted
+### Per-topic Quality Gaps
+
+- **metalens**: future candidates exist but no complete Claim Cards are promoted
+- **metasurface holography**: none
+- **photonic crystal cavity**: none
+- **quantum light source**: future candidates exist but no complete Claim Cards are promoted
 
 ## Topic Dossier Rubric
 
@@ -64,4 +66,4 @@
 
 ## Next Gate
 
-P0-P8 are complete in the first engineering pass: baseline, Metalens regression, evidence-object UI loop, Step13/Radar hard gates, access-link audit, and delta-section handoff controls now exist. A temporary-DB smoke test also verified Step5c -> Step6 -> Step13 -> Step10 runs without schema breakage on partial section data. Branch dossiers now separate evidence-backed splits from weak layout clusters, future-growth candidates are explicitly shown as calibrated candidate-generator output unless converted into complete Claim Cards, and the Topic Lens/layer interaction now explains what the selected evidence combination means. The next gate is P10: final delivery audit, GitHub sync, and post-frontfill automatic run readiness.
+P0-P8 are complete in the first engineering pass: baseline, multi-topic regression, evidence-object UI loop, Step13/Radar hard gates, access-link audit, and delta-section handoff controls now exist. A temporary-DB smoke test also verified Step5c -> Step6 -> Step13 -> Step10 runs without schema breakage on partial section data. Branch dossiers now separate evidence-backed splits from weak layout clusters, future-growth candidates are explicitly shown as calibrated candidate-generator output unless converted into complete Claim Cards, and the Topic Lens/layer interaction now explains what the selected evidence combination means. The next gate is P10: final delivery audit, GitHub sync, and post-frontfill automatic run readiness.

@@ -2282,9 +2282,15 @@ def audit_multi_topic_regression(
     )
     topic_regression_avoids_gold_topic_aliases = True
     topic_regression_cli_defaults_to_suite = True
+    product_baseline_defaults_to_suite = True
+    makefile_product_baseline_defaults_to_suite = True
+    section_queue_defaults_to_multi_topic = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
+        product_baseline_source = repo_root / "echelon/v14b/product_baseline.py"
+        section_queue_source = repo_root / "echelon/v14b/step5s_section_queue_audit.py"
+        makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
             topic_regression_source,
             (
@@ -2299,6 +2305,35 @@ def audit_multi_topic_regression(
         topic_regression_cli_defaults_to_suite = _source_contains(
             topic_regression_source,
             ('default="all"', "BENCHMARK_TOPICS"),
+        )
+        product_baseline_defaults_to_suite = (
+            _source_contains(
+                product_baseline_source,
+                ("PRODUCT_BASELINE_TOPICS", "topic_lens_quality_suite", 'default="all"'),
+            )
+            and _source_absent(
+                product_baseline_source,
+                (
+                    "Metalens topic quality",
+                    'parser.add_argument("--topic", default="metalens")',
+                    'default="metalens"',
+                ),
+            )
+        )
+        makefile_product_baseline_defaults_to_suite = _source_contains(
+            makefile_source,
+            ("product-baseline:", "V14B_BASELINE_TOPIC:-all"),
+        )
+        section_queue_defaults_to_multi_topic = (
+            _source_contains(
+                section_queue_source,
+                (
+                    "DEFAULT_SECTION_AUDIT_TOPICS",
+                    "PRODUCT_BASELINE_TOPICS",
+                    "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)",
+                ),
+            )
+            and _source_absent(makefile_source, ("V14B_SECTION_AUDIT_TOPIC:-metalens",))
         )
         stale_gold_topic_doc_phrases = (
             "topic gold fixtures",
@@ -2320,6 +2355,9 @@ def audit_multi_topic_regression(
         benchmark_fixture_contract_ok and no_gold_topic_fields
         and topic_regression_avoids_gold_topic_aliases
         and topic_regression_cli_defaults_to_suite
+        and product_baseline_defaults_to_suite
+        and makefile_product_baseline_defaults_to_suite
+        and section_queue_defaults_to_multi_topic
         and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
@@ -2338,6 +2376,9 @@ def audit_multi_topic_regression(
             "live_results_avoid_gold_topic_fields": no_gold_topic_fields,
             "topic_regression_avoids_gold_topic_aliases": topic_regression_avoids_gold_topic_aliases,
             "topic_regression_cli_defaults_to_suite": topic_regression_cli_defaults_to_suite,
+            "product_baseline_defaults_to_suite": product_baseline_defaults_to_suite,
+            "makefile_product_baseline_defaults_to_suite": makefile_product_baseline_defaults_to_suite,
+            "section_queue_defaults_to_multi_topic": section_queue_defaults_to_multi_topic,
             "current_plan_docs_avoid_gold_topic_language": current_plan_docs_avoid_gold_topic_language,
         },
         "benchmark_topics": sorted(defined),
@@ -2351,7 +2392,7 @@ def audit_multi_topic_regression(
         "policy": (
             "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
             "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; "
-            "the active regression entrypoint must default to the full benchmark suite."
+            "the active regression and product-baseline entrypoints must default to the full benchmark suite."
         ),
     }
 

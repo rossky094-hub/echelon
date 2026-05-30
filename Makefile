@@ -132,14 +132,14 @@ quality-audit:
 		$(CORPUS_ARG) \
 		--fail-on $${V14B_AUDIT_FAIL_ON:-none}
 
-## Product baseline: 50h task list + Topic Dossier value rubric
+## Product baseline: 50h task list + multi-topic Topic Dossier value rubric
 product-baseline:
-	@echo ">>> Product baseline: task backlog + Topic Dossier quality snapshot..."
+	@echo ">>> Product baseline: task backlog + multi-topic Topic Dossier quality snapshot..."
 	$(PYTHON) -m echelon.v14b.product_baseline \
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot \
-		--topic $${V14B_BASELINE_TOPIC:-metalens} \
+		--topic $${V14B_BASELINE_TOPIC:-all} \
 		--top-k $${V14B_BASELINE_TOP_K:-80}
 
 ## Topic regression: multi-topic value baseline
@@ -313,7 +313,7 @@ section-queue-audit:
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_SECTION_INGEST_TOP_N:-12000} \
-		--topic $${V14B_SECTION_AUDIT_TOPIC:-metalens}
+		$${V14B_SECTION_AUDIT_TOPIC_ARGS:-}
 
 ## 前置补齐完成后，从证据门槛断点推进产品链
 post-frontfill-chain:

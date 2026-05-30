@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
+from echelon.v14b.product_baseline import PRODUCT_BASELINE_TOPICS
 from echelon.v14b.step5s_section_ingest import (
     PRIMARY_SECTION_NAMES,
     _arxiv_pdf_url,
@@ -27,6 +28,8 @@ from echelon.v14b.step5s_section_ingest import (
 from echelon.v14b.utils import add_common_args, setup_logging
 
 logger = logging.getLogger("echelon.v14b.step5s_section_queue_audit")
+
+DEFAULT_SECTION_AUDIT_TOPICS = PRODUCT_BASELINE_TOPICS
 
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
@@ -477,7 +480,7 @@ def run_section_queue_audit(
     topic_limit: int = 500,
     topic_evidence_gap_queue: Path | None = Path("reports/v14b_pilot/multi_topic_evidence_gap_queue.csv"),
 ) -> dict[str, Any]:
-    topic_terms = topic_terms or ["metalens"]
+    topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)
     conn_main = sqlite3.connect(str(db_main))
     conn_main.row_factory = sqlite3.Row
     conn_v14 = sqlite3.connect(str(db_v14))
@@ -782,7 +785,7 @@ def main(argv=None) -> None:
         top_n=args.top_n,
         out_dir=Path(args.out_dir),
         data_dir=Path(args.data_dir),
-        topic_terms=args.topic or ["metalens"],
+        topic_terms=args.topic or list(DEFAULT_SECTION_AUDIT_TOPICS),
         topic_limit=args.topic_limit,
         topic_evidence_gap_queue=Path(args.topic_evidence_gap_queue) if args.topic_evidence_gap_queue else None,
     )

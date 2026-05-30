@@ -192,7 +192,16 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "product_baseline.py").write_text(
+        'PRODUCT_BASELINE_TOPICS = ("metalens", "metasurface holography", "photonic crystal cavity", "quantum light source")\n'
+        'parser.add_argument("--topic", default="all")\n'
+        'def build_snapshot(): return {"topic_lens_quality_suite": []}\n'
         'def evaluate_topic_lens(topic, lens): return lens.get("future_growth", {}).get("candidate_edges") or []\n',
+        encoding="utf-8",
+    )
+    (v14 / "step5s_section_queue_audit.py").write_text(
+        "from echelon.v14b.product_baseline import PRODUCT_BASELINE_TOPICS\n"
+        "DEFAULT_SECTION_AUDIT_TOPICS = PRODUCT_BASELINE_TOPICS\n"
+        "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)\n",
         encoding="utf-8",
     )
     (v14 / "step10_visual_graph_builder.py").write_text(
@@ -324,6 +333,8 @@ def _write_makefile_contracts(root: Path) -> None:
         "\tpython scripts/guard_openalex_backfill.py --repo-root .\n"
         "\tpython -m echelon.v14b.step0_openalex_backfill\n"
         "product-chain-fast: id-repair graph-features\n"
+        "product-baseline:\n"
+        "\tpython -m echelon.v14b.product_baseline --topic $${V14B_BASELINE_TOPIC:-all}\n"
         "product-chain: id-repair graph-prep evidence-prep\n"
         "\t$(MAKE) decision-audit\n"
         "decision-audit:\n"
@@ -521,6 +532,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     multi_gate = next(g for g in result["gates"] if g["issue"] == "Multi-topic Regression")
     assert multi_gate["checks"]["topic_regression_avoids_gold_topic_aliases"] is True
     assert multi_gate["checks"]["topic_regression_cli_defaults_to_suite"] is True
+    assert multi_gate["checks"]["product_baseline_defaults_to_suite"] is True
+    assert multi_gate["checks"]["makefile_product_baseline_defaults_to_suite"] is True
+    assert multi_gate["checks"]["section_queue_defaults_to_multi_topic"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"
