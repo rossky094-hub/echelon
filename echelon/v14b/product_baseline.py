@@ -316,6 +316,25 @@ def scalar(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = (), def
     return row[0] if row else default
 
 
+def infer_current_primary_section(row: dict[str, Any]) -> int:
+    raw = row.get("current_primary_section")
+    if raw not in (None, ""):
+        return int(raw or 0)
+    coverage = row.get("coverage_json")
+    if not coverage:
+        return 0
+    try:
+        payload = json.loads(str(coverage))
+    except (TypeError, ValueError):
+        return 0
+    try:
+        rate = float(payload.get("current_primary_section_rate") or 0.0)
+        total = int(row.get("total") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(total, int(round(rate * total))))
+
+
 def table_count(conn: sqlite3.Connection, table: str) -> int:
     if not table_exists(conn, table):
         return 0
@@ -472,16 +491,27 @@ def collect_v14_metrics(db_v14: Path) -> dict[str, Any]:
             latest = scalar(conn, "SELECT MAX(audit_ts) FROM section_priority_summary", default=None)
             rows = []
             if latest:
+                cols = columns(conn, "section_priority_summary")
+                current_expr = (
+                    "current_primary_section"
+                    if "current_primary_section" in cols
+                    else "NULL AS current_primary_section"
+                )
+                coverage_expr = "coverage_json" if "coverage_json" in cols else "NULL AS coverage_json"
                 for row in conn.execute(
-                    """
-                    SELECT category, total, in_top_n, any_section, primary_section, eligible_pdf
+                    f"""
+                    SELECT category, total, in_top_n, any_section, primary_section,
+                           {current_expr}, eligible_pdf, {coverage_expr}
                     FROM section_priority_summary
                     WHERE audit_ts = ?
                     ORDER BY total DESC
                     """,
                     (latest,),
                 ).fetchall():
-                    rows.append(dict(row))
+                    item = dict(row)
+                    item["current_primary_section"] = infer_current_primary_section(item)
+                    item.pop("coverage_json", None)
+                    rows.append(item)
             metrics["section_priority_latest_audit_ts"] = latest
             metrics["section_priority_summary"] = rows
         if table_exists(conn, "access_link_audit_items"):
@@ -524,6 +554,21 @@ def topic_dossier_rubric() -> list[dict[str, str]]:
     ]
 
 
+def _paper_has_primary_section(paper: dict[str, Any]) -> bool:
+    availability = paper.get("content_availability") or {}
+    return bool(availability.get("has_primary_evidence_sections"))
+
+
+def _paper_has_traced_primary_section(paper: dict[str, Any]) -> bool:
+    availability = paper.get("content_availability") or {}
+    if "has_strong_or_moderate_primary_evidence_sections" in availability:
+        return bool(availability.get("has_strong_or_moderate_primary_evidence_sections"))
+    provenance = availability.get("primary_section_provenance")
+    if isinstance(provenance, dict):
+        return int(provenance.get("strong") or 0) + int(provenance.get("moderate") or 0) > 0
+    return False
+
+
 def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     dossier = lens.get("topic_dossier") or {}
     branches = dossier.get("branch_splits") or []
@@ -554,7 +599,12 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     turning_with_primary_section = [
         p for p in turning
         if isinstance(p, dict)
-        and ((p.get("content_availability") or {}).get("has_primary_evidence_sections"))
+        and _paper_has_primary_section(p)
+    ]
+    turning_with_traced_primary_section = [
+        p for p in turning
+        if isinstance(p, dict)
+        and _paper_has_traced_primary_section(p)
     ]
     complete_claim_cards = [
         c for c in claim_cards
@@ -579,6 +629,8 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
         gaps.append("key turning papers lack enough external access links")
     if turning and not turning_with_primary_section:
         gaps.append("key turning papers lack primary local section evidence")
+    elif turning and not turning_with_traced_primary_section:
+        gaps.append("key turning papers have only weak or stale primary section provenance")
     if future and not complete_claim_cards:
         gaps.append("future candidates exist but no complete Claim Cards are promoted")
 
@@ -597,6 +649,7 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
         "key_turning_papers": len(turning),
         "key_turning_with_access_links": len(turning_with_links),
         "key_turning_with_primary_section": len(turning_with_primary_section),
+        "key_turning_with_traced_primary_section": len(turning_with_traced_primary_section),
         "future_candidate_edges": len(future),
         "future_edges": len(future),
         "radar_claim_cards": len(claim_cards),
@@ -758,14 +811,32 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
         lines.append(f"- access audit: {v14['access_audited_papers']:,} papers, {v14.get('access_gaps', 0):,} gaps")
     if v14.get("future_directions_by_scope"):
         lines.append("- future_directions by claim_scope: " + json.dumps(v14["future_directions_by_scope"], ensure_ascii=False, sort_keys=True))
+    if v14.get("section_priority_summary"):
+        lines.extend(
+            [
+                "",
+                "## Section Evidence Priority Coverage",
+                "",
+                "| Category | Total | In topN | Any section | Primary section | Current parser primary | Eligible PDF |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in v14["section_priority_summary"][:12]:
+            lines.append(
+                f"| {row.get('category')} | {int(row.get('total') or 0):,} | "
+                f"{int(row.get('in_top_n') or 0):,} | {int(row.get('any_section') or 0):,} | "
+                f"{int(row.get('primary_section') or 0):,} | "
+                f"{int(row.get('current_primary_section') or 0):,} | "
+                f"{int(row.get('eligible_pdf') or 0):,} |"
+            )
     if topic_suite:
         lines.extend(
             [
                 "",
                 "## Multi-topic Topic Baseline",
                 "",
-                "| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Candidate Edges | Complete Cards | Gaps |",
-                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Candidate Edges | Complete Cards | Gaps |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in topic_suite:
@@ -773,6 +844,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
                 f"| {row.get('topic')} | {row.get('ready')} | {pct(row.get('expected_branch_coverage'))} | "
                 f"{row.get('branch_count', 0)} | {row.get('branch_driver_papers', 0)} | "
                 f"{row.get('key_turning_papers', 0)} | {row.get('key_turning_with_primary_section', 0)} | "
+                f"{row.get('key_turning_with_traced_primary_section', 0)} | "
                 f"{row.get('future_candidate_edges', row.get('future_edges', 0))} | "
                 f"{row.get('complete_claim_cards', 0)} | {len(row.get('quality_gaps') or [])} |"
             )
@@ -792,7 +864,12 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
         lines.append(f"- Missing branches: {', '.join(topic.get('branch_missing') or []) or 'none'}")
         lines.append(f"- Branches: {topic.get('branch_count', 0)}; driver papers: {topic.get('branch_driver_papers', 0)}")
         lines.append(f"- Bottlenecks: {topic.get('bottleneck_count', 0)}; evidence papers: {topic.get('bottleneck_evidence_papers', 0)}")
-        lines.append(f"- Key turning papers: {topic.get('key_turning_papers', 0)}; with access links: {topic.get('key_turning_with_access_links', 0)}; with primary section: {topic.get('key_turning_with_primary_section', 0)}")
+        lines.append(
+            f"- Key turning papers: {topic.get('key_turning_papers', 0)}; "
+            f"with access links: {topic.get('key_turning_with_access_links', 0)}; "
+            f"with primary section: {topic.get('key_turning_with_primary_section', 0)}; "
+            f"with strong/moderate parser provenance: {topic.get('key_turning_with_traced_primary_section', 0)}"
+        )
         lines.append(f"- Future candidate edges: {topic.get('future_candidate_edges', topic.get('future_edges', 0))}; Radar Claim Cards: {topic.get('radar_claim_cards', 0)}; complete cards: {topic.get('complete_claim_cards', 0)}")
         if topic.get("quality_gaps"):
             lines.append("")

@@ -88,6 +88,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             in_top_n INTEGER NOT NULL,
             any_section INTEGER NOT NULL,
             primary_section INTEGER NOT NULL,
+            current_primary_section INTEGER NOT NULL DEFAULT 0,
             eligible_pdf INTEGER NOT NULL,
             coverage_json TEXT NOT NULL,
             PRIMARY KEY (audit_ts, category)
@@ -110,6 +111,34 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
     }.items():
         if col not in cols:
             conn_v14.execute(ddl)
+    summary_cols = _cols(conn_v14, "section_priority_summary")
+    if "current_primary_section" not in summary_cols:
+        conn_v14.execute(
+            "ALTER TABLE section_priority_summary "
+            "ADD COLUMN current_primary_section INTEGER NOT NULL DEFAULT 0"
+        )
+        for row in conn_v14.execute(
+            """
+            SELECT audit_ts, category, total, coverage_json
+            FROM section_priority_summary
+            """
+        ).fetchall():
+            payload = _loads(row["coverage_json"], {})
+            try:
+                rate = float(payload.get("current_primary_section_rate") or 0.0)
+                total = int(row["total"] or 0)
+                current_n = int(round(rate * total))
+            except (TypeError, ValueError):
+                current_n = 0
+                total = int(row["total"] or 0)
+            conn_v14.execute(
+                """
+                UPDATE section_priority_summary
+                SET current_primary_section = ?
+                WHERE audit_ts = ? AND category = ?
+                """,
+                (max(0, min(total, current_n)), row["audit_ts"], row["category"]),
+            )
 
 
 def _add(
@@ -656,8 +685,8 @@ def run_section_queue_audit(
             """
             INSERT OR REPLACE INTO section_priority_summary
                 (audit_ts, category, total, in_top_n, any_section, primary_section,
-                 eligible_pdf, coverage_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 current_primary_section, eligible_pdf, coverage_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 audit_ts,
@@ -666,6 +695,7 @@ def run_section_queue_audit(
                 in_top,
                 any_n,
                 primary_n,
+                current_primary_n,
                 eligible_n,
                 json.dumps(payload, ensure_ascii=False),
             ),

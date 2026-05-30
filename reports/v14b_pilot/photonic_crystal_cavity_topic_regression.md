@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-30T21:35:59Z`
+- Audit: `2026-05-30T22:00:17Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -13,8 +13,8 @@
 | expected bottlenecks evidenced | 4 | 5 | fail |
 | key turning papers | 9 | 4 | pass |
 | turning papers with access links | 9 | 3 | pass |
-| turning papers with primary sections | 1 | 2 | fail |
-| turning papers with strong/moderate section provenance | 1 | 2 | fail |
+| turning papers with primary sections | 3 | 2 | pass |
+| turning papers with strong/moderate section provenance | 3 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -41,7 +41,7 @@
 
 ## Interpretation
 
-- Key turning papers: 9 total, 9 with access links, 1 with primary local sections, 1 with strong/moderate parser provenance.
+- Key turning papers: 9 total, 9 with access links, 3 with primary local sections, 3 with strong/moderate parser provenance.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
@@ -58,8 +58,6 @@
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | mode volume | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

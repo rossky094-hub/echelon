@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -25,7 +26,8 @@ def _make_main(path: Path) -> None:
         CREATE TABLE paper_sections (
             paper_id TEXT,
             section_name TEXT,
-            section_text TEXT
+            section_text TEXT,
+            section_meta_json TEXT
         );
         """
     )
@@ -40,10 +42,15 @@ def _make_main(path: Path) -> None:
         ],
     )
     conn.executemany(
-        "INSERT INTO paper_sections VALUES (?, ?, ?)",
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
         [
-            ("p1", "discussion", "evidence " * 20),
-            ("p2", "abstract", "not primary " * 20),
+            (
+                "p1",
+                "discussion",
+                "evidence " * 20,
+                json.dumps({"parser_contract_version": "v14b_section_parser_contract_v3_toc_guard"}),
+            ),
+            ("p2", "abstract", "not primary " * 20, None),
         ],
     )
     conn.commit()
@@ -73,7 +80,17 @@ def _make_v14(path: Path) -> None:
         """
     )
     conn.execute(
-        "INSERT INTO section_priority_summary VALUES ('t1', 'main_path_node', 10, 8, 2, 1, 9, '{}')"
+        "INSERT INTO section_priority_summary VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "t1",
+            "main_path_node",
+            10,
+            8,
+            2,
+            1,
+            9,
+            json.dumps({"current_primary_section_rate": 0.2}),
+        ),
     )
     conn.executemany(
         "INSERT INTO section_priority_papers VALUES (?, ?, ?, ?)",
@@ -133,6 +150,8 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
     assert taxonomy["openalex_unlinked"] == 1
     assert taxonomy["arxiv_unlinked"] == 1
     assert result["section_coverage"]["primary_section_papers"] == 1
+    assert result["section_coverage"]["current_contract_primary_section_papers"] == 1
+    assert result["section_coverage"]["priority_summary"][0]["current_primary_section"] == 2
     assert result["frontfill_log_taxonomy"]["event_counts"]["low_yield_scan"] == 1
     assert result["frontfill_health"]["status"] == "soft_stall"
     assert result["frontfill_health"]["no_evidence_done_delta"] == 210

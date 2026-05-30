@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T19:28:37Z`
+- Snapshot: `2026-05-30T22:00:37Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -12,13 +12,13 @@
 - Pending enrich: 454
 - Primary Field coverage: 55,359 / 55,391 (99.9%)
 - References: 3,215,130; linked refs: 445,957 (13.9%)
-- Section rows: 5,062; section papers: 2,878; primary evidence papers: 2,878 (5.2%)
+- Section rows: 5,294; section papers: 3,017; primary evidence papers: 3,017 (5.4%)
 
 ## Derived Product Tables
 
 - access_link_audit_items: 6,903
 - bottleneck_lineage_triples: 2,920
-- branch_lineages: 5,286
+- branch_lineages: 5,278
 - direction_claim_cards: 5
 - future_directions: 5
 - limitation_atoms: 730
@@ -26,34 +26,51 @@
 - main_path_cycle_audit: 66
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
-- section_priority_papers: 12,514
-- section_priority_summary: 1,100
+- section_priority_papers: 12,797
+- section_priority_summary: 1,472
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
-- visual_clusters: 5,286
-- visual_edges: 772,947
+- visual_clusters: 5,278
+- visual_edges: 775,406
 - visual_nodes: 55,391
 - visual_search_fts: 55,391
-- visual_tiles: 21,144
+- visual_tiles: 21,112
 - complete Claim Cards: 1
 - high-confidence Claim Cards: 0
 - access audit: 6,903 papers, 0 gaps
 - future_directions by claim_scope: {"exploratory_incomplete_card": 4, "exploratory_with_claim_card": 1}
 
+## Section Evidence Priority Coverage
+
+| Category | Total | In topN | Any section | Primary section | Current parser primary | Eligible PDF |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| cluster_representative | 5,946 | 5,322 | 699 | 699 | 5 | 5,946 |
+| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
+| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 12 | 2,007 |
+| main_path_node | 1,101 | 1,101 | 237 | 237 | 17 | 1,101 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 6 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 0 | 464 |
+| future_endpoint | 291 | 291 | 109 | 109 | 13 | 291 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 3 | 268 |
+| topic:metalens | 257 | 86 | 95 | 95 | 10 | 257 |
+| topic:quantum light source | 227 | 73 | 43 | 43 | 12 | 227 |
+| topic:photonic crystal cavity | 150 | 45 | 20 | 20 | 10 | 150 |
+| topic:metasurface holography | 20 | 9 | 5 | 5 | 4 | 20 |
+
 ## Multi-topic Topic Baseline
 
-| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Candidate Edges | Complete Cards | Gaps |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| metalens | True | 100.0% | 7 | 21 | 13 | 9 | 3 | 0 | 1 |
-| metasurface holography | True | 100.0% | 4 | 11 | 8 | 3 | 0 | 0 | 0 |
-| photonic crystal cavity | True | 100.0% | 4 | 11 | 8 | 4 | 320 | 1 | 0 |
-| quantum light source | True | 100.0% | 4 | 10 | 11 | 6 | 320 | 0 | 1 |
+| Topic | Ready | Expected Branch Coverage | Branches | Driver Papers | Turning Papers | Primary Sections | Strong/Moderate Primary | Candidate Edges | Complete Cards | Gaps |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| metalens | True | 100.0% | 7 | 19 | 13 | 7 | 7 | 3 | 0 | 1 |
+| metasurface holography | True | 100.0% | 4 | 11 | 8 | 2 | 2 | 3 | 0 | 1 |
+| photonic crystal cavity | True | 100.0% | 4 | 11 | 9 | 3 | 3 | 320 | 0 | 1 |
+| quantum light source | True | 100.0% | 4 | 12 | 10 | 7 | 7 | 320 | 0 | 1 |
 
 ### Per-topic Quality Gaps
 
 - **metalens**: future candidates exist but no complete Claim Cards are promoted
-- **metasurface holography**: none
-- **photonic crystal cavity**: none
+- **metasurface holography**: future candidates exist but no complete Claim Cards are promoted
+- **photonic crystal cavity**: future candidates exist but no complete Claim Cards are promoted
 - **quantum light source**: future candidates exist but no complete Claim Cards are promoted
 
 ## Topic Dossier Rubric

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -87,6 +88,7 @@ def _make_v14_db(path: Path) -> None:
             in_top_n INTEGER,
             any_section INTEGER,
             primary_section INTEGER,
+            current_primary_section INTEGER,
             eligible_pdf INTEGER
         );
         """
@@ -96,7 +98,7 @@ def _make_v14_db(path: Path) -> None:
     conn.execute("INSERT INTO direction_claim_cards VALUES ('cc1', 1, 0)")
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute(
-        "INSERT INTO section_priority_summary VALUES ('2026-01-01T00:00:00Z', 'main_path_node', 2, 2, 1, 1, 2)"
+        "INSERT INTO section_priority_summary VALUES ('2026-01-01T00:00:00Z', 'main_path_node', 2, 2, 1, 1, 1, 2)"
     )
     conn.commit()
     conn.close()
@@ -119,6 +121,56 @@ def test_collect_product_baseline_metrics(tmp_path):
     assert v14["main_path_is_main"] == 1
     assert v14["claim_cards_complete"] == 1
     assert v14["section_priority_summary"][0]["category"] == "main_path_node"
+    assert v14["section_priority_summary"][0]["current_primary_section"] == 1
+    snapshot = {
+        "snapshot_ts": "2026-01-01T00:00:00Z",
+        "db_main": str(db_main),
+        "db_v14": str(db_v14),
+        "main": main,
+        "v14": v14,
+        "topic_dossier_rubric": [],
+    }
+    md = render_snapshot_md(snapshot)
+    assert "Current parser primary" in md
+    assert "| main_path_node | 2 | 2 | 1 | 1 | 1 | 2 |" in md
+
+
+def test_product_baseline_infers_current_primary_from_legacy_coverage_json(tmp_path):
+    db_v14 = tmp_path / "v14_legacy.sqlite3"
+    conn = sqlite3.connect(str(db_v14))
+    conn.executescript(
+        """
+        CREATE TABLE section_priority_summary (
+            audit_ts TEXT,
+            category TEXT,
+            total INTEGER,
+            in_top_n INTEGER,
+            any_section INTEGER,
+            primary_section INTEGER,
+            eligible_pdf INTEGER,
+            coverage_json TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO section_priority_summary VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "2026-01-01T00:00:00Z",
+            "main_path_node",
+            10,
+            8,
+            4,
+            3,
+            9,
+            json.dumps({"current_primary_section_rate": 0.2}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    v14 = collect_v14_metrics(db_v14)
+
+    assert v14["section_priority_summary"][0]["current_primary_section"] == 2
 
 
 def test_evaluate_topic_lens_flags_value_gaps():
@@ -145,7 +197,42 @@ def test_evaluate_topic_lens_flags_value_gaps():
     assert result["expected_branch_coverage"] < 1
     assert "Imaging systems" in result["expected_branch_hits"]
     assert any("missing expected branches" in gap for gap in result["quality_gaps"])
+    assert any("lack primary local section evidence" in gap for gap in result["quality_gaps"])
     assert any("future candidates exist" in gap for gap in result["quality_gaps"])
+
+
+def test_evaluate_topic_lens_flags_weak_primary_section_provenance():
+    lens = {
+        "ready": True,
+        "topic_dossier": {
+            "branch_splits": [
+                {"name": "Imaging systems", "driver_papers": [{"paper_id": "p1"}]},
+            ],
+            "bottleneck_dossiers": [
+                {"name": "constraint", "evidence_papers": [{"paper_id": "p1"}]},
+            ],
+        },
+        "history_main_path": {
+            "key_turning_papers": [
+                {
+                    "paper_id": "p1",
+                    "access_links": [{"url": "https://example.test"}],
+                    "content_availability": {
+                        "has_primary_evidence_sections": True,
+                        "primary_section_provenance": {"weak": 1, "strong": 0, "moderate": 0},
+                    },
+                }
+            ]
+        },
+        "future_growth": {"candidate_edges": []},
+        "rd_radar": {"claim_cards": []},
+    }
+
+    result = evaluate_topic_lens("metalens", lens)
+
+    assert result["key_turning_with_primary_section"] == 1
+    assert result["key_turning_with_traced_primary_section"] == 0
+    assert any("weak or stale primary section provenance" in gap for gap in result["quality_gaps"])
 
 
 def test_snapshot_can_skip_live_topic_lens(tmp_path):
@@ -190,7 +277,10 @@ def test_product_baseline_defaults_to_multi_topic_suite(tmp_path, monkeypatch):
                     {
                         "paper_id": f"{topic}-turning",
                         "access_links": [{"url": "https://example.test"}],
-                        "content_availability": {"has_primary_evidence_sections": True},
+                        "content_availability": {
+                            "has_primary_evidence_sections": True,
+                            "has_strong_or_moderate_primary_evidence_sections": True,
+                        },
                     }
                 ]
             },

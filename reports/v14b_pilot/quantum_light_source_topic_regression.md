@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-30T21:36:00Z`
+- Audit: `2026-05-30T22:00:18Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -13,8 +13,8 @@
 | expected bottlenecks evidenced | 4 | 5 | fail |
 | key turning papers | 10 | 4 | pass |
 | turning papers with access links | 10 | 3 | pass |
-| turning papers with primary sections | 1 | 2 | fail |
-| turning papers with strong/moderate section provenance | 0 | 2 | fail |
+| turning papers with primary sections | 7 | 2 | pass |
+| turning papers with strong/moderate section provenance | 7 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -41,7 +41,7 @@
 
 ## Interpretation
 
-- Key turning papers: 10 total, 10 with access links, 1 with primary local sections, 0 with strong/moderate parser provenance.
+- Key turning papers: 10 total, 10 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
@@ -58,13 +58,6 @@
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | indistinguishability | 100 | 6 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

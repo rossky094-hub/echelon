@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T21:36:06Z`
+- generated_at: `2026-05-30T22:00:24Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,45 +34,47 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 8633,
+    "openalex_frontfill_cooldown_remaining_s": 7175,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 3002,
-    "section_frontfill_done": 1000,
-    "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 1000,
+    "primary_section_papers": 3017,
+    "section_frontfill_done": 0,
+    "section_frontfill_no_evidence_delta": -1000,
+    "section_frontfill_progress_done": null,
     "section_frontfill_status": "running_or_unknown",
-    "section_frontfill_total": 6603,
+    "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 0,
-      "current_contract_rate": 0.0,
+      "current_contract_papers": 35,
+      "current_contract_rate": 0.01160092807424594,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 765,
-        "weak": 2237
+        "strong": 796,
+        "weak": 2221
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 5259
+        "legacy_unknown_contract": 5227,
+        "v14b_section_parser_contract_v3_toc_guard": 67
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 5259
+        "v14b_section_ingest_v2": 5227,
+        "v14b_section_ingest_v3": 67
       },
-      "primary_section_papers": 3002,
-      "primary_section_rows": 5259,
+      "primary_section_papers": 3017,
+      "primary_section_rows": 5294,
       "strategy_counts": {
         "embedded_heading": 40,
-        "explicit_heading": 908,
-        "heading_continuation": 1335,
-        "inline_heading": 503,
-        "legacy_unknown_strategy": 3886,
+        "explicit_heading": 957,
+        "heading_continuation": 1397,
+        "inline_heading": 518,
+        "legacy_unknown_strategy": 3858,
         "loose_inline_heading": 19,
-        "parser_hint": 14
+        "parser_hint": 17
       },
-      "strong_or_moderate_papers": 765,
-      "weak_only_papers": 2237,
-      "weak_only_rate": 0.7451698867421719
+      "strong_or_moderate_papers": 796,
+      "weak_only_papers": 2221,
+      "weak_only_rate": 0.7361617500828638
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -572,7 +574,6 @@
     "topic_regression_cli_defaults_to_suite": true
   },
   "failed_topics": [
-    "metalens",
     "photonic crystal cavity",
     "quantum light source"
   ],
@@ -582,9 +583,9 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_primary_section_papers": 14,
-  "topic_gap_primary_section_rate": 0.2545454545454545,
-  "topic_gap_queue_papers": 55
+  "topic_gap_primary_section_papers": 0,
+  "topic_gap_primary_section_rate": 0.0,
+  "topic_gap_queue_papers": 26
 }
 ```
 

@@ -399,6 +399,14 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
             FROM section_priority_papers
             """
         ).fetchall()
+        summary_cols = {row[1] for row in conn.execute("PRAGMA table_info(section_priority_summary)").fetchall()}
+        summary_row = conn.execute(
+            """
+            SELECT current_primary_section, coverage_json
+            FROM section_priority_summary
+            WHERE category='main_path_node'
+            """
+        ).fetchone()
     finally:
         conn.close()
     reasons = {pid: json.loads(raw) for pid, raw, _retry, _current, _status in rows}
@@ -413,6 +421,10 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
     assert retries["p_done"] == "stale_parser_contract"
     assert current_flags["p_done"] == 0
     assert contract_status["p_done"] == "stale_or_missing_parser_contract"
+    assert "current_primary_section" in summary_cols
+    assert summary_row is not None
+    assert summary_row[0] == 0
+    assert json.loads(summary_row[1])["current_primary_section_rate"] == 0.0
 
 
 def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path):
@@ -452,10 +464,20 @@ def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path
             WHERE paper_id='p_done'
             """
         ).fetchone()
+        summary_row = conn.execute(
+            """
+            SELECT current_primary_section, coverage_json
+            FROM section_priority_summary
+            WHERE category='topic:metalens'
+            """
+        ).fetchone()
     finally:
         conn.close()
 
     assert row == ("covered", 1, "current_contract")
+    assert summary_row is not None
+    assert summary_row[0] == 1
+    assert json.loads(summary_row[1])["current_primary_section_rate"] > 0
     queue_text = (tmp_path / "data" / "section_delta_queue.csv").read_text(encoding="utf-8")
     assert "p_done" not in queue_text
 
