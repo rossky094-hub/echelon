@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:44:43Z`
+- generated_at: `2026-05-30T16:52:39Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -33,30 +33,34 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
+    "openalex_frontfill_cooldown_remaining_s": 25640,
+    "openalex_frontfill_processed": 3000,
+    "openalex_frontfill_status": "cooling_down_or_stopped",
+    "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2630,
+    "primary_section_papers": 2634,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 393,
+        "strong": 397,
         "weak": 2237
       },
-      "primary_section_papers": 2630,
-      "primary_section_rows": 4590,
+      "primary_section_papers": 2634,
+      "primary_section_rows": 4596,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 476,
-        "heading_continuation": 685,
-        "inline_heading": 244,
+        "explicit_heading": 480,
+        "heading_continuation": 691,
+        "inline_heading": 247,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 12,
         "parser_hint": 8
       },
-      "strong_or_moderate_papers": 393,
+      "strong_or_moderate_papers": 397,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8505703422053232
+      "weak_only_rate": 0.8492786636294609
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -65,6 +69,7 @@
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
+    "OpenAlex frontfill cooling_down_or_stopped; field/topic claims need local fallback and uncertainty",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
 }

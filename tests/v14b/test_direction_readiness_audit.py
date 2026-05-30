@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from echelon.v14b.direction_readiness_audit import (
     classify_blockers,
     collect_metrics,
+    load_openalex_frontfill_state,
     load_section_frontfill_state,
     primary_section_strategy_quality,
     readiness_level,
@@ -200,6 +202,65 @@ def test_direction_readiness_infers_soft_stall_from_watchdog_log(tmp_path):
 
     assert loaded["status"] == "soft_stall"
     assert loaded["no_evidence_elapsed_s"] > 9 * 3600
+
+
+def test_direction_readiness_tracks_openalex_429_cooldown(tmp_path):
+    log = tmp_path / "step0_openalex_backfill_20260530_120000.log"
+    log.write_text(
+        "2026-05-30 12:00:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill targets: 22643\n"
+        "2026-05-30 12:30:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill progress: processed=3000/22643 ok=2898 fail=102\n"
+        "2026-05-30 12:35:00 [WARNING] echelon.v14b.step0_openalex_backfill: OpenAlex 429, cooldown 7200.0s\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_openalex_frontfill_state(log, now=datetime(2026, 5, 30, 13, 0, 0))
+
+    assert loaded["status"] == "cooling_down_or_stopped"
+    assert loaded["processed"] == 3000
+    assert loaded["ok"] == 2898
+    assert loaded["cooldown_remaining_s"] == 5700
+
+
+def test_direction_readiness_uses_latest_openalex_backfill_run(tmp_path):
+    log = tmp_path / "openalex_backfill_current.log"
+    log.write_text(
+        "2026-05-29 10:00:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill targets: 10\n"
+        "2026-05-29 10:05:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill done: {'records_n': 8, 'failed': 2}\n"
+        "2026-05-30 12:00:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill targets: 22643\n"
+        "2026-05-30 12:30:00 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill progress: processed=3000/22643 ok=2898 fail=102\n"
+        "2026-05-30 12:35:00 [WARNING] echelon.v14b.step0_openalex_backfill: OpenAlex 429, cooldown 7200.0s\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_openalex_frontfill_state(log, now=datetime(2026, 5, 30, 13, 0, 0))
+
+    assert loaded["status"] == "cooling_down_or_stopped"
+    assert loaded["targets"] == 22643
+    assert loaded["processed"] == 3000
+
+
+def test_direction_readiness_flags_openalex_frontfill_after_cooldown(tmp_path):
+    metrics = {
+        "linked_ref_rate": 0.31,
+        "primary_section_papers": 9000,
+        "predicted_future_edges": 0,
+        "future_directions": 0,
+        "direction_claim_cards": 0,
+        "complete_claim_cards": 0,
+        "openalex_w_rate": 0.64,
+        "openalex_frontfill_state": {
+            "status": "stalled_after_cooldown",
+            "processed": 3000,
+            "total": 22643,
+            "cooldown_remaining_s": 0,
+        },
+    }
+
+    blockers = classify_blockers(metrics)
+
+    assert any(b["gate"] == "openalex_topic_coverage" for b in blockers)
+    health = next(b for b in blockers if b["gate"] == "openalex_frontfill_health")
+    assert health["severity"] == "high"
 
 
 def test_direction_readiness_prefers_active_delta_watchdog_state(tmp_path):

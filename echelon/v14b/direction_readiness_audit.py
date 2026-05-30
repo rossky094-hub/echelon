@@ -11,7 +11,7 @@ import csv
 import json
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -330,6 +330,119 @@ def select_section_frontfill_state(repo_root: Path = Path(".")) -> dict[str, Any
     return load_section_frontfill_state(latest)
 
 
+def _parse_log_ts(line: str) -> datetime | None:
+    match = re.match(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+    if not match:
+        return None
+    try:
+        return datetime.strptime(match.group(1), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def load_openalex_frontfill_state(
+    path: Path,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if not path.exists():
+        return {"available": False}
+    now = now or datetime.now()
+    targets = None
+    processed = None
+    total = None
+    ok = None
+    fail = None
+    last_ts = None
+    last_progress_ts = None
+    cooldown_ts = None
+    cooldown_s = None
+    done = False
+    fetch_failures = 0
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return {"available": False, "reason": "unreadable", "log_path": str(path)}
+    for line in lines:
+        ts = _parse_log_ts(line)
+        if ts is not None:
+            last_ts = ts
+        match = re.search(r"OpenAlex backfill targets:\s*(\d+)", line)
+        if match:
+            processed = None
+            total = None
+            ok = None
+            fail = None
+            cooldown_ts = None
+            cooldown_s = None
+            last_progress_ts = None
+            done = False
+            fetch_failures = 0
+            targets = int(match.group(1))
+        match = re.search(
+            r"OpenAlex backfill progress:\s*processed=(\d+)/(\d+)\s+ok=(\d+)\s+fail=(\d+)",
+            line,
+        )
+        if match:
+            processed = int(match.group(1))
+            total = int(match.group(2))
+            ok = int(match.group(3))
+            fail = int(match.group(4))
+            last_progress_ts = ts or last_ts
+        match = re.search(r"OpenAlex 429, cooldown ([0-9.]+)s", line)
+        if match:
+            cooldown_ts = ts or last_ts
+            cooldown_s = float(match.group(1))
+        if "OpenAlex fetch failed paper=" in line:
+            fetch_failures += 1
+        if "OpenAlex backfill done:" in line:
+            done = True
+            last_progress_ts = ts or last_ts
+            match = re.search(r"'records_n':\s*(\d+).*'failed':\s*(\d+)", line)
+            if match:
+                ok = int(match.group(1))
+                fail = int(match.group(2))
+    status = "running_or_unknown"
+    cooldown_remaining_s = 0
+    cooldown_until = None
+    if done:
+        status = "completed"
+    elif cooldown_ts is not None and cooldown_s is not None:
+        cooldown_until_dt = cooldown_ts + timedelta(seconds=cooldown_s)
+        cooldown_until = cooldown_until_dt.isoformat(timespec="seconds")
+        cooldown_remaining_s = int(max(0, (cooldown_until_dt - now).total_seconds()))
+        status = "cooling_down_or_stopped" if cooldown_remaining_s > 0 else "stalled_after_cooldown"
+    elif last_ts is not None and (now - last_ts).total_seconds() > 6 * 3600:
+        status = "stale_without_completion"
+    return {
+        "available": True,
+        "source": path.stem,
+        "log_path": str(path),
+        "status": status,
+        "targets": targets,
+        "processed": processed,
+        "total": total or targets,
+        "ok": ok,
+        "fail": fail,
+        "fetch_failures_logged": fetch_failures,
+        "last_event_at": last_ts.isoformat(timespec="seconds") if last_ts else None,
+        "last_progress_at": last_progress_ts.isoformat(timespec="seconds") if last_progress_ts else None,
+        "cooldown_seconds": cooldown_s,
+        "cooldown_until": cooldown_until,
+        "cooldown_remaining_s": cooldown_remaining_s,
+    }
+
+
+def select_openalex_frontfill_state(repo_root: Path = Path(".")) -> dict[str, Any]:
+    log_dir = repo_root / "logs/v14b"
+    candidates = [log_dir / "openalex_backfill_current.log", *log_dir.glob("step0_openalex_backfill_*.log")]
+    existing = [p for p in candidates if p.exists()]
+    if not existing:
+        return {"available": False}
+    latest = max(existing, key=lambda p: p.stat().st_mtime)
+    return load_openalex_frontfill_state(latest)
+
+
 def collect_metrics(
     db_main: Path,
     db_v14: Path,
@@ -563,6 +676,38 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 "next_action": "Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.",
             }
         )
+    openalex_frontfill = m.get("openalex_frontfill_state") or {}
+    if (
+        m["openalex_w_rate"] < 0.70
+        and openalex_frontfill.get("status")
+        in {"cooling_down_or_stopped", "stalled_after_cooldown", "stale_without_completion"}
+    ):
+        if openalex_frontfill.get("status") == "cooling_down_or_stopped":
+            next_action = (
+                "Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown "
+                "before promoting cross-field/topic claims."
+            )
+            severity = "medium"
+        else:
+            next_action = (
+                "Restart conservative OpenAlex backfill or run local field-topic repair before "
+                "cross-corpus or cross-field claims are treated as decision-grade."
+            )
+            severity = "high"
+        blockers.append(
+            {
+                "gate": "openalex_frontfill_health",
+                "severity": severity,
+                "why": (
+                    "OpenAlex frontfill is "
+                    f"{openalex_frontfill.get('status')}; processed="
+                    f"{openalex_frontfill.get('processed')}/{openalex_frontfill.get('total')}, "
+                    f"cooldown_remaining_hours="
+                    f"{float(openalex_frontfill.get('cooldown_remaining_s') or 0) / 3600.0:.1f}."
+                ),
+                "next_action": next_action,
+            }
+        )
     return blockers
 
 
@@ -587,6 +732,17 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"no_evidence_delta={int(frontfill.get('no_evidence_done_delta') or 0):,}, "
             f"no_evidence_hours={float(frontfill.get('no_evidence_elapsed_s') or 0) / 3600.0:.1f})"
         ]
+    openalex_frontfill = metrics.get("openalex_frontfill_state") or {}
+    openalex_frontfill_line = []
+    if openalex_frontfill.get("available"):
+        openalex_frontfill_line = [
+            f"- OpenAlex frontfill health: {openalex_frontfill.get('status')} "
+            f"[{openalex_frontfill.get('source') or 'unknown'}] "
+            f"(processed={openalex_frontfill.get('processed')}/"
+            f"{openalex_frontfill.get('total')}, ok={openalex_frontfill.get('ok')}, "
+            f"fail={openalex_frontfill.get('fail')}, cooldown_hours="
+            f"{float(openalex_frontfill.get('cooldown_remaining_s') or 0) / 3600.0:.1f})"
+        ]
     lines = [
         "# Direction Readiness Audit",
         "",
@@ -597,6 +753,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         "",
         f"- linked refs: {metrics['linked_refs']:,} / {metrics['refs']:,} ({pct(metrics['linked_ref_rate'])})",
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
+        *openalex_frontfill_line,
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
         f"- primary section evidence: {metrics['primary_section_papers']:,} papers ({pct(metrics['primary_section_rate'])})",
         f"- primary section provenance: "
@@ -667,6 +824,7 @@ def run_audit(
     metrics = collect_metrics(db_main, db_v14, topic_gap_queue=topic_gap_queue)
     metrics["candidate_lifecycle_summary"] = lifecycle["summary"]
     metrics["section_frontfill_state"] = select_section_frontfill_state(Path("."))
+    metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(Path("."))
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)

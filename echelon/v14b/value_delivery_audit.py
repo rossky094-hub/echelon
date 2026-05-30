@@ -19,6 +19,7 @@ from typing import Any
 from echelon.v14b.direction_readiness_audit import (
     collect_metrics,
     scalar,
+    select_openalex_frontfill_state,
     select_section_frontfill_state,
     table_exists,
 )
@@ -165,6 +166,15 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
         reasons.append(
             f"section frontfill {frontfill.get('status')}; process progress is not translating into new primary evidence"
         )
+    openalex_frontfill = metrics.get("openalex_frontfill_state") or {}
+    if openalex_frontfill.get("status") in {
+        "cooling_down_or_stopped",
+        "stalled_after_cooldown",
+        "stale_without_completion",
+    }:
+        reasons.append(
+            f"OpenAlex frontfill {openalex_frontfill.get('status')}; field/topic claims need local fallback and uncertainty"
+        )
     section_quality = metrics.get("section_evidence_quality") or {}
     weak_only_rate = float(section_quality.get("weak_only_rate") or 0.0)
     strong_or_moderate = int(section_quality.get("strong_or_moderate_papers") or 0)
@@ -189,6 +199,10 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "linked_ref_rate": metrics["linked_ref_rate"],
             "primary_section_papers": metrics["primary_section_papers"],
             "openalex_w_rate": metrics["openalex_w_rate"],
+            "openalex_frontfill_status": openalex_frontfill.get("status"),
+            "openalex_frontfill_processed": openalex_frontfill.get("processed"),
+            "openalex_frontfill_total": openalex_frontfill.get("total"),
+            "openalex_frontfill_cooldown_remaining_s": openalex_frontfill.get("cooldown_remaining_s"),
             "section_frontfill_status": frontfill.get("status"),
             "section_frontfill_no_evidence_delta": frontfill.get("no_evidence_done_delta"),
             "section_provenance": section_quality,
@@ -1958,6 +1972,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
         topic_gap_queue=repo_root / "data/v14b/topic_evidence_gap_delta_queue.csv",
     )
     metrics["section_frontfill_state"] = select_section_frontfill_state(repo_root)
+    metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(repo_root)
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
     with sqlite3.connect(str(db_v14)) as conn_v14:
