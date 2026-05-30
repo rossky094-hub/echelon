@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T21:18:32Z`
+- generated_at: `2026-05-30T21:24:36Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,15 +34,15 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 9687,
+    "openalex_frontfill_cooldown_remaining_s": 9323,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 2999,
-    "section_frontfill_done": 988,
+    "section_frontfill_done": 989,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 988,
+    "section_frontfill_progress_done": 989,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 6603,
     "section_provenance": {
@@ -582,9 +582,9 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_primary_section_papers": 0,
-  "topic_gap_primary_section_rate": 0.0,
-  "topic_gap_queue_papers": 41
+  "topic_gap_primary_section_papers": 14,
+  "topic_gap_primary_section_rate": 0.2545454545454545,
+  "topic_gap_queue_papers": 55
 }
 ```
 
