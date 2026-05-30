@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T16:07:43Z`
+- generated_at: `2026-05-30T16:14:04Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2625,
+    "primary_section_papers": 2626,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 388,
+        "strong": 389,
         "weak": 2237
       },
-      "primary_section_papers": 2625,
-      "primary_section_rows": 4583,
+      "primary_section_papers": 2626,
+      "primary_section_rows": 4585,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 472,
-        "heading_continuation": 678,
-        "inline_heading": 241,
+        "explicit_heading": 473,
+        "heading_continuation": 680,
+        "inline_heading": 242,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 11,
         "parser_hint": 8
       },
-      "strong_or_moderate_papers": 388,
+      "strong_or_moderate_papers": 389,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8521904761904762
+      "weak_only_rate": 0.8518659558263518
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -235,6 +235,7 @@
     "checks": {
       "api_exposes_topic_readiness": true,
       "api_limitation_atoms_carry_contract": true,
+      "api_search_hits_carry_contract": true,
       "api_topic_bottlenecks_use_resolution_evidence": true,
       "api_topic_branch_splits_inherit_lineage": true,
       "api_topic_validation_directions_inherit_claim_card_evidence": true,
@@ -242,6 +243,7 @@
       "no_llm_preflight": true,
       "required_readiness_gates_present": true,
       "topic_regression_uses_shared_contract": true,
+      "ui_paper_list_renders_hit_contract": true,
       "ui_renders_limitation_contracts": true,
       "ui_renders_topic_bottleneck_resolution_counts": true,
       "ui_renders_topic_dossier_branch_contracts": true,

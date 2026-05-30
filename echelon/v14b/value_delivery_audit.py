@@ -870,11 +870,13 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
     source_checks = {
         "api_exposes_topic_readiness": False,
         "api_topic_branch_splits_inherit_lineage": False,
+        "api_search_hits_carry_contract": False,
         "api_topic_bottlenecks_use_resolution_evidence": False,
         "api_limitation_atoms_carry_contract": False,
         "api_topic_validation_directions_inherit_claim_card_evidence": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
+        "ui_paper_list_renders_hit_contract": False,
         "ui_renders_topic_dossier_branch_contracts": False,
         "ui_renders_limitation_contracts": False,
         "ui_renders_topic_bottleneck_resolution_counts": False,
@@ -896,6 +898,18 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "parent_branch_id",
                     "lineage_status",
                     "split_confidence",
+                ),
+            ),
+            "api_search_hits_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _paper_hit_contract",
+                    "_hydrate_hits",
+                    "visual_search_hit",
+                    "retrieval_context_only",
+                    "claim_scope",
+                    "evidence_grade",
+                    "uncertainty_reasons",
                 ),
             ),
             "api_topic_bottlenecks_use_resolution_evidence": _source_contains(
@@ -941,6 +955,17 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
             "ui_renders_topic_readiness": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 ("renderTopicReadiness", "topic_readiness"),
+            ),
+            "ui_paper_list_renders_hit_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderPaperList",
+                    "paper.claim_scope",
+                    "paper.evidence_grade",
+                    "paper.uncertainty_reasons",
+                    "paper.required_evidence",
+                    "renderEvidenceObjects(paper.evidence_objects",
+                ),
             ),
             "ui_renders_topic_dossier_branch_contracts": _source_contains(
                 repo_root / "web/visual-graph/app.js",

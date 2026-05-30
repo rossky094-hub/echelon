@@ -916,40 +916,40 @@ def _hydrate_hits(
             claim_cards if isinstance(claim_cards, list) else [],
         )
         abstract = row["abstract"] or ""
-        out.append(
-            {
-                "paper_id": pid,
-                "title": metadata.get("title") or pid,
-                "abstract": abstract[:1400],
-                "year": metadata.get("year") or row["publication_year"],
-                "cited_by_count": metadata.get("cited_by_count"),
-                "ids": ids,
-                "corpus_id": metadata.get("corpus_id"),
-                "field": metadata.get("field"),
-                "subfield": metadata.get("subfield"),
-                "topic": metadata.get("topic"),
-                "cluster_id": row["cluster_id"],
-                "branch_id": row["branch_id"],
-                "cluster_label": row["cluster_label"] or metadata.get("branch_label"),
-                "coordinates": {"x": row["x"], "y": row["y"], "z": row["z"]},
-                "visual": {
-                    "node_size": row["node_size"],
-                    "color_hex": row["color_hex"],
-                    "role": row["visual_role"],
-                    "uncertainty_score": row["uncertainty_score"],
-                    "flags": flags,
-                },
-                "limitations": limitations[:5] if isinstance(limitations, list) else [],
-                "claim_cards": claim_cards[:5] if isinstance(claim_cards, list) else [],
-                "content_availability": availability,
-                "local_content": local_content,
-                "access_links": access_links,
-                "storage_policy": storage_policy,
-                "recommendations": recommendations,
-                "score": float((scores or {}).get(pid, 0.0)),
-                "reason": (reasons or {}).get(pid),
-            }
-        )
+        item = {
+            "paper_id": pid,
+            "title": metadata.get("title") or pid,
+            "abstract": abstract[:1400],
+            "year": metadata.get("year") or row["publication_year"],
+            "cited_by_count": metadata.get("cited_by_count"),
+            "ids": ids,
+            "corpus_id": metadata.get("corpus_id"),
+            "field": metadata.get("field"),
+            "subfield": metadata.get("subfield"),
+            "topic": metadata.get("topic"),
+            "cluster_id": row["cluster_id"],
+            "branch_id": row["branch_id"],
+            "cluster_label": row["cluster_label"] or metadata.get("branch_label"),
+            "coordinates": {"x": row["x"], "y": row["y"], "z": row["z"]},
+            "visual": {
+                "node_size": row["node_size"],
+                "color_hex": row["color_hex"],
+                "role": row["visual_role"],
+                "uncertainty_score": row["uncertainty_score"],
+                "flags": flags,
+            },
+            "limitations": limitations[:5] if isinstance(limitations, list) else [],
+            "claim_cards": claim_cards[:5] if isinstance(claim_cards, list) else [],
+            "content_availability": availability,
+            "local_content": local_content,
+            "access_links": access_links,
+            "storage_policy": storage_policy,
+            "recommendations": recommendations,
+            "score": float((scores or {}).get(pid, 0.0)),
+            "reason": (reasons or {}).get(pid),
+        }
+        item.update(_paper_hit_contract(item))
+        out.append(item)
     return out
 
 
@@ -2076,6 +2076,77 @@ def _paper_evidence_object(
         "access_links": paper.get("access_links") or [],
         "content_availability": paper.get("content_availability") or {},
         "click_target": {"kind": "paper", "id": paper.get("paper_id")},
+    }
+
+
+def _paper_hit_contract(paper: dict[str, Any]) -> dict[str, Any]:
+    reason = paper.get("reason") if isinstance(paper.get("reason"), dict) else {}
+    visual = paper.get("visual") if isinstance(paper.get("visual"), dict) else {}
+    visual_role = str(visual.get("role") or paper.get("visual_role") or reason.get("role") or "paper")
+    layer = str(reason.get("layer") or reason.get("edge_type") or "")
+    has_traced_section = _paper_has_traced_primary_evidence(paper)
+    has_primary_section = _paper_has_primary_evidence(paper)
+
+    if visual_role == "future_anchor":
+        claim_scope = "candidate_pool_only"
+        evidence_grade = "graph_future_anchor_context"
+    elif visual_role == "limitation_bottleneck" or (paper.get("limitations") or []):
+        claim_scope = "bottleneck_context_only"
+        evidence_grade = (
+            "section_bottleneck_context"
+            if has_traced_section
+            else "weak_bottleneck_context"
+            if has_primary_section
+            else "metadata_bottleneck_context"
+        )
+    elif bool(reason.get("is_main_path")) or visual_role == "main_path" or layer == "main_path":
+        claim_scope = "main_path_context_only"
+        evidence_grade = (
+            "section_backed_main_path_context"
+            if has_traced_section
+            else "graph_main_path_context"
+        )
+    elif layer == "citation":
+        claim_scope = "citation_context_only"
+        evidence_grade = "local_citation_edge_context"
+    else:
+        claim_scope = "retrieval_context_only"
+        evidence_grade = "metadata_search_context"
+
+    uncertainty = [
+        "paper search/list hit is retrieval context, not a standalone Topic Dossier conclusion",
+    ]
+    if not has_traced_section:
+        uncertainty.append("paper hit lacks strong/moderate local primary section evidence in this list view")
+    if layer in {"citation", "main_path"}:
+        uncertainty.append("linked edge context must be opened and audited before using this paper as citation evidence")
+    if claim_scope == "candidate_pool_only":
+        uncertainty.append("future-anchor paper remains candidate-pool context until Step6 fusion and a complete Claim Card")
+
+    evidence_object = _paper_evidence_object(
+        paper,
+        role="visual_search_hit",
+        source="visual_search_or_topic_list",
+        why=reason.get("why") or reason.get("role") or reason.get("layer") or "retrieved visual paper hit",
+    )
+    if evidence_object:
+        evidence_object.update(
+            {
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+            }
+        )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": [
+            "Topic Dossier synthesis before treating this list hit as a topic conclusion",
+            "paper detail with local primary section evidence",
+            "linked citation or branch lineage evidence when used for historical claims",
+            "complete Step13 Claim Card before promotion to Radar",
+        ],
+        "evidence_objects": _compact_evidence_objects([evidence_object], limit=3),
     }
 
 

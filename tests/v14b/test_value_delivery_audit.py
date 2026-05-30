@@ -125,6 +125,8 @@ def _write_product_sources(root: Path) -> None:
         "def _build_topic_branch_splits(branch_dossiers): branch_contract_by_id parent_branch_id lineage_status split_confidence\n"
         "def _branch_lineage_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
         "def get_visual_clusters(): return _branch_lineage_contract\n"
+        "def _paper_hit_contract(): return visual_search_hit + retrieval_context_only + claim_scope + evidence_grade + uncertainty_reasons\n"
+        "def _hydrate_hits(): return _paper_hit_contract\n"
         "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
@@ -149,6 +151,7 @@ def _write_product_sources(root: Path) -> None:
     web.mkdir(parents=True, exist_ok=True)
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
+        "function renderPaperList() { return paper.claim_scope + paper.evidence_grade + paper.uncertainty_reasons + paper.required_evidence + renderEvidenceObjects(paper.evidence_objects); }\n"
         "function renderLimitations() { return lim.claim_scope + lim.evidence_grade + lim.uncertainty_reasons + renderEvidenceObjects(lim.evidence_objects); }\n"
         "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
@@ -416,10 +419,12 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["status"] == "pass"
     assert topic_gate["online_readiness_contract"]["checks"]["no_llm_preflight"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_branch_splits_inherit_lineage"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_search_hits_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_paper_list_renders_hit_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_branch_contracts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_limitation_contracts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True

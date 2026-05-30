@@ -283,6 +283,12 @@ def test_visual_search_uses_materialized_tables(tmp_path, monkeypatch):
     assert data["ready"] is True
     assert data["hits"][0]["paper_id"] == "p1"
     assert data["hits"][0]["cluster_label"] == "integrated photonics"
+    hit = data["hits"][0]
+    assert hit["claim_scope"] == "bottleneck_context_only"
+    assert hit["evidence_grade"]
+    assert hit["uncertainty_reasons"]
+    assert hit["required_evidence"]
+    assert hit["evidence_objects"][0]["type"] == "paper"
 
 
 def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
@@ -297,6 +303,8 @@ def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
     ).json()
     assert cite["hits"][0]["paper_id"] == "p2"
     assert cite["hits"][0]["reason"]["layer"] == "citation"
+    assert cite["hits"][0]["claim_scope"] == "main_path_context_only"
+    assert cite["hits"][0]["evidence_objects"][0]["type"] == "paper"
 
     bottleneck = client.post(
         "/graph/visual/search",
@@ -304,6 +312,8 @@ def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
         json={"query_type": "bottleneck", "top_k": 5},
     ).json()
     assert bottleneck["hits"][0]["paper_id"] == "p1"
+    assert bottleneck["hits"][0]["claim_scope"] == "bottleneck_context_only"
+    assert bottleneck["hits"][0]["uncertainty_reasons"]
 
 
 def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monkeypatch):
@@ -427,6 +437,12 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert "rd_radar" in data
     assert "evidence_map" in data
     assert data["related_papers"][0]["access_links"]
+    related = data["related_papers"][0]
+    assert related["claim_scope"]
+    assert related["evidence_grade"]
+    assert related["uncertainty_reasons"]
+    assert related["required_evidence"]
+    assert related["evidence_objects"][0]["type"] == "paper"
     limitation = data["unresolved_limitations"][0]
     assert limitation["claim_scope"] in {"weak_bottleneck_hypothesis", "bottleneck_context_only", "partial_resolution_context_only"}
     assert limitation["evidence_grade"]

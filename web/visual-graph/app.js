@@ -1105,6 +1105,8 @@ function renderPaperList(papers, limit = 12) {
       ` : ""}
       ${paper.reason ? `<p class="mini">为什么关键：${esc(paper.reason.why || "")} ${esc(paper.reason.role || "")} / scope ${esc(paper.reason.relationship_scope || "graph")}</p>` : ""}
       ${(paper.uncertainty_reasons || []).length ? `<p class="mini">不确定性：${(paper.uncertainty_reasons || []).slice(0, 2).map(esc).join(" / ")}</p>` : ""}
+      ${(paper.required_evidence || []).length ? `<p class="mini"><strong>作为结论还需要：</strong>${(paper.required_evidence || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+      ${renderEvidenceObjects(paper.evidence_objects || [], 2)}
       ${Array.isArray(paper.access_links) && paper.access_links.length ? `<p class="mini">可访问：${paper.access_links.slice(0, 3).map((link) => `<a href="${esc(link.url)}" target="_blank" rel="noreferrer">${esc(link.label)}</a>`).join(" / ")}</p>` : ""}
     </div>
   `).join("");
