@@ -120,7 +120,7 @@ def test_metalens_regression_passes_on_decision_grade_fixture():
                 for i in range(8)
             ]
         },
-        "future_growth": {"predicted_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
+        "future_growth": {"candidate_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
         "rd_radar": {"claim_cards": [{"eligible": True}]},
     }
 
@@ -146,7 +146,7 @@ def test_metalens_regression_flags_missing_claim_cards_and_evidence():
         "ready": True,
         "topic_dossier": {"branch_splits": [_branch("Imaging systems")], "bottleneck_dossiers": []},
         "history_main_path": {"key_turning_papers": [{"paper_id": "p1", "access_links": []}]},
-        "future_growth": {"predicted_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
+        "future_growth": {"candidate_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
         "rd_radar": {"claim_cards": []},
     }
 
@@ -232,7 +232,7 @@ def test_topic_regression_flags_weak_turning_section_provenance():
                 for i in range(8)
             ]
         },
-        "future_growth": {"predicted_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
+        "future_growth": {"candidate_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
         "rd_radar": {"claim_cards": [{"eligible": True}]},
     }
 
@@ -267,7 +267,7 @@ def test_missing_bottleneck_becomes_frontfill_gap_not_silent_failure():
                 {"paper_id": "turning-1", "title": "Turning", "access_links": [{"url": "https://example.test"}]}
             ]
         },
-        "future_growth": {"predicted_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
+        "future_growth": {"candidate_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
         "rd_radar": {"claim_cards": []},
     }
 
@@ -301,7 +301,7 @@ def test_missing_future_candidates_becomes_actionable_frontfill_gap():
                 {"paper_id": "turning-1", "title": "Turning", "access_links": [{"url": "https://example.test"}]}
             ]
         },
-        "future_growth": {"predicted_edges": []},
+        "future_growth": {"candidate_edges": []},
         "rd_radar": {"claim_cards": []},
     }
 
@@ -373,7 +373,7 @@ def test_arbitrary_topic_preflight_is_llm_free_and_not_benchmark_gated():
                 }
             ]
         },
-        "future_growth": {"predicted_edges": []},
+        "future_growth": {"candidate_edges": []},
         "rd_radar": {"claim_cards": []},
     }
 

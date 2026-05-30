@@ -1674,6 +1674,7 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
         "step9_future_report_has_evidence_contract": False,
         "ui_radar_main_avoids_raw_edge_cards": False,
         "ui_renders_radar_claim_card_evidence_contract": False,
+        "topic_lens_public_future_growth_uses_candidate_edges": False,
     }
     if repo_root is not None:
         app_path = repo_root / "web/visual-graph/app.js"
@@ -1703,6 +1704,17 @@ def audit_rd_radar_promotion_contract(repo_root: Path | None = None) -> dict[str
             and "item.required_evidence" in app_text
             and "renderEvidenceObjects(item.evidence_objects" in app_text
             and "Claim Card uncertainty" in app_text,
+            "topic_lens_public_future_growth_uses_candidate_edges": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ('"future_growth":', '"candidate_edges": future_growth', '"future_directions": future_directions'),
+            )
+            and _source_absent(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                ('"predicted_edges": future_growth',),
+            )
+            and bool(app_text)
+            and "future_growth?.candidate_edges" in app_text
+            and "future_growth?.predicted_edges" not in app_text,
         }
     checks.update(source_checks)
     return {

@@ -125,8 +125,8 @@ const DEFAULT_VALUE_MODEL = {
   counts: { edges_by_layer: {}, future_directions: 0, claim_cards: 0, fusion_adequacy: "unknown" },
   model_components: {
     gnn_future_growth: {
-      name: "Step5b VGAE / GCN link-prediction model",
-      role: "GNN future-growth candidate generator. Needs Step6/Step13 evidence before investment-grade claims.",
+      name: "Step5b GNN/VGAE future candidate generator",
+      role: "GNN future candidate generator. Needs Step6/Step13 evidence before investment-grade claims.",
     },
   },
   fusion_status: "unknown",
@@ -1080,7 +1080,7 @@ function collectTopicIds(lens) {
   for (const p of lens?.related_papers || []) ids.add(p.paper_id);
   for (const p of lens?.history_main_path?.key_turning_papers || []) ids.add(p.paper_id);
   for (const lim of lens?.unresolved_limitations || []) ids.add(lim.paper_id);
-  for (const edge of lens?.future_growth?.predicted_edges || []) {
+  for (const edge of lens?.future_growth?.candidate_edges || []) {
     ids.add(edge.source_paper_id);
     ids.add(edge.target_paper_id);
   }
@@ -1498,7 +1498,7 @@ function renderTopicLens(lens) {
   )).join("");
   const questions = lens.first_principles?.five_questions || [];
   const limitations = lens.unresolved_limitations || [];
-  const futureEdges = lens.future_growth?.predicted_edges || [];
+  const futureEdges = lens.future_growth?.candidate_edges || [];
   const history = lens.history_main_path || {};
   const valueModel = lens.value_model || DEFAULT_VALUE_MODEL;
   const fusionCounts = valueModel.counts || {};
@@ -1508,7 +1508,7 @@ function renderTopicLens(lens) {
     ${renderTopicReadiness(lens.topic_readiness || {})}
     <div class="item">
       <strong>${esc(lens.topic)}</strong>
-      <div class="paper-meta">Evidence scope: ${fmt(lens.total_related)} related papers / ${fmt(futureEdges.length)} GNN candidates / ${fmt(lens.history_main_path?.edges?.length || 0)} main-path context edges</div>
+      <div class="paper-meta">Evidence scope: ${fmt(lens.total_related)} related papers / ${fmt(futureEdges.length)} future candidates / ${fmt(lens.history_main_path?.edges?.length || 0)} main-path context edges</div>
       <div class="pill-row">${clusters}</div>
       <p class="mini">scope: ${esc(lens.context?.scope || "direct_papers")} / seed matches ${fmt(lens.context?.seed_matches || lens.total_related)} / context papers ${fmt(lens.context?.context_papers || 0)}</p>
       <p class="mini">fusion: ${esc(valueModel.fusion_status || "unknown")} / directions ${fmt(fusionCounts.future_directions || 0)} / claim cards ${fmt(fusionCounts.claim_cards || 0)} / adequacy ${esc(fusionCounts.fusion_adequacy || "unknown")}</p>
@@ -1777,7 +1777,7 @@ function buildSearchFallbackTopicLens(text, hits = []) {
       top_unresolved_keywords: [],
     },
     unresolved_limitations: [],
-    future_growth: { predicted_edges: [], future_directions: [] },
+    future_growth: { candidate_edges: [], future_directions: [] },
     rd_radar: {
       summary: "Radar is empty because semantic search fallback produced no complete Step13 Claim Cards.",
       items: [

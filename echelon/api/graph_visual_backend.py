@@ -1325,11 +1325,11 @@ def _visual_value_model(conn: sqlite3.Connection) -> dict[str, Any]:
         "frontfill_status": frontfill,
         "model_components": {
             "gnn_future_growth": {
-                "name": "Step5b VGAE / GCN link-prediction model",
-                "algorithm": "2-layer GCN encoder -> variational latent paper embeddings -> dot-product decoder -> calibrated temporal link probability",
+                "name": "Step5b GNN/VGAE future candidate generator",
+                "algorithm": "2-layer GCN encoder -> variational latent paper embeddings -> dot-product decoder -> calibrated candidate score",
                 "source": "echelon/v14b/step5b_vgae.py",
                 "role": (
-                    "This is the project GNN. It proposes future-growth edges, but the product should only "
+                    "This is the project GNN. It proposes future candidate edges, but the product should only "
                     "treat them as high-value directions after Step6 fusion and Step13 Claim Cards add evidence."
                 ),
             }
@@ -5645,8 +5645,29 @@ def get_topic_lens(
         },
         "unresolved_limitations": unresolved_limitations,
         "future_growth": {
-            "predicted_edges": future_growth,
+            "candidate_edges": future_growth,
             "future_directions": future_directions,
+            "claim_scope": "candidate_pool_only",
+            "evidence_grade": (
+                "calibrated_future_candidate_generator"
+                if any(_future_edge_has_run_calibration(edge) for edge in future_growth)
+                else ("future_candidate_generation_gap" if not future_growth else "uncalibrated_candidate_generator")
+            ),
+            "uncertainty_reasons": sorted(
+                {
+                    "future candidates are inspection targets, not Radar directions",
+                    "Radar promotion requires Step6 fusion plus complete Step13 Claim Card",
+                    *[
+                        reason
+                        for edge in future_growth[:80]
+                        for reason in (
+                            edge.get("uncertainty_reasons")
+                            or _future_edge_claim_contract(edge).get("uncertainty_reasons")
+                            or []
+                        )
+                    ],
+                }
+            ),
         },
         "first_principles": {
             "principles": principles,

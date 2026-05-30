@@ -499,6 +499,8 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert isinstance(data["cluster_distribution"], list)
     assert "history_main_path" in data
     assert "future_growth" in data
+    assert "candidate_edges" in data["future_growth"]
+    assert "predicted_edges" not in data["future_growth"]
     assert "value_model" in data
     assert "topic_dossier" in data
     assert "branch_dossiers" in data
@@ -649,7 +651,7 @@ def test_visual_topic_lens_expands_to_cluster_context(tmp_path, monkeypatch):
     assert data["context"]["scope"] == "topic_cluster_branch_context"
     assert any(
         e["edge_id"] == "future:p2:p3"
-        for e in data["future_growth"]["predicted_edges"]
+        for e in data["future_growth"]["candidate_edges"]
     )
     assert any(
         e["evidence"]["relationship_scope"] == "cluster_branch_context"

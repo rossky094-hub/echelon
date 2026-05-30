@@ -148,6 +148,7 @@ def _write_product_sources(root: Path) -> None:
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         "claim_cards incomplete_claim_cards candidate_pool GNN future edges\n"
+        '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge'\n"
         "topic_readiness = build_topic_readiness_preflight\n",
         encoding="utf-8",
@@ -167,6 +168,7 @@ def _write_product_sources(root: Path) -> None:
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
+        "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderDossierRadar() { return item.evidence_grade + item.uncertainty_reasons + item.required_evidence + renderEvidenceObjects(item.evidence_objects) + experiment.falsification_conditions + 'Claim Card uncertainty Success criteria Falsification No complete Claim Cards yet Future candidate generator pool'; }\n"
         "function renderRadar() { els.radarPane.innerHTML = renderDossierRadar(rd_radar); }\n"
@@ -619,6 +621,7 @@ def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_pa
     assert result["checks"]["raw_gnn_edges_are_candidate_pool_only"] is True
     assert result["checks"]["claim_cards_carry_evidence_contract"] is True
     assert result["checks"]["candidate_edges_carry_evidence_contract"] is True
+    assert result["checks"]["topic_lens_public_future_growth_uses_candidate_edges"] is True
     assert result["checks"]["ui_radar_main_avoids_raw_edge_cards"] is True
     assert result["checks"]["ui_renders_radar_claim_card_evidence_contract"] is True
     assert result["candidate_edges"] == 1

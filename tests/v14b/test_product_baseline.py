@@ -134,7 +134,7 @@ def test_evaluate_topic_lens_flags_value_gaps():
             ],
         },
         "history_main_path": {"key_turning_papers": [{"paper_id": "p1", "access_links": []}]},
-        "future_growth": {"predicted_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
+        "future_growth": {"candidate_edges": [{"source_paper_id": "p1", "target_paper_id": "p2"}]},
         "rd_radar": {"claim_cards": []},
     }
 

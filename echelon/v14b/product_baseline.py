@@ -500,7 +500,10 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
     bottlenecks = dossier.get("hard_bottlenecks") or dossier.get("bottleneck_dossiers") or []
     history = lens.get("history_main_path") or {}
     turning = history.get("key_turning_papers") or []
-    future = (lens.get("future_growth") or {}).get("predicted_edges") or []
+    future_growth = lens.get("future_growth") or {}
+    future = future_growth.get("candidate_edges")
+    if future is None:
+        future = future_growth.get("predicted_edges") or []
     radar = lens.get("rd_radar") or {}
     claim_cards = radar.get("claim_cards") or []
 
@@ -560,6 +563,7 @@ def evaluate_topic_lens(topic: str, lens: dict[str, Any]) -> dict[str, Any]:
         "key_turning_papers": len(turning),
         "key_turning_with_access_links": len(turning_with_links),
         "key_turning_with_primary_section": len(turning_with_primary_section),
+        "future_candidate_edges": len(future),
         "future_edges": len(future),
         "radar_claim_cards": len(claim_cards),
         "complete_claim_cards": len(complete_claim_cards),
@@ -697,7 +701,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
         lines.append(f"- Branches: {topic.get('branch_count', 0)}; driver papers: {topic.get('branch_driver_papers', 0)}")
         lines.append(f"- Bottlenecks: {topic.get('bottleneck_count', 0)}; evidence papers: {topic.get('bottleneck_evidence_papers', 0)}")
         lines.append(f"- Key turning papers: {topic.get('key_turning_papers', 0)}; with access links: {topic.get('key_turning_with_access_links', 0)}; with primary section: {topic.get('key_turning_with_primary_section', 0)}")
-        lines.append(f"- Future edges: {topic.get('future_edges', 0)}; Radar Claim Cards: {topic.get('radar_claim_cards', 0)}; complete cards: {topic.get('complete_claim_cards', 0)}")
+        lines.append(f"- Future candidate edges: {topic.get('future_candidate_edges', topic.get('future_edges', 0))}; Radar Claim Cards: {topic.get('radar_claim_cards', 0)}; complete cards: {topic.get('complete_claim_cards', 0)}")
         if topic.get("quality_gaps"):
             lines.append("")
             lines.append("### Quality Gaps")
