@@ -1,12 +1,17 @@
 # ========================================================
-# Echelon V14-B 演化树 Pilot — Makefile
+# Echelon V14-B 演化树 Evidence Decision Workflow — Makefile
 # 平台: macOS Apple Silicon (M1/M2/M3)
 #
 # 快速开始:
 #   make setup           # 安装依赖
 #   cp .env.example .env # 配置环境变量
-#   make pilot           # 从当前 library 干净重跑图谱
-#   make pilot-full      # 包含 enrich 的一键全流程
+#   make product-chain   # 当前 V14B 证据约束产品链路
+#   make post-frontfill-chain # 前置补齐完成后从证据门槛断点推进
+#   make value-delivery-audit # 验证证据边界和交付门槛
+#
+# Legacy compatibility:
+#   make pilot           # LEGACY compatibility only; not current V14B decision workflow
+#   make pilot-full      # LEGACY compatibility only; calls enrich and is not an acceptance path
 #
 # 查看帮助:
 #   make help
@@ -44,7 +49,8 @@ setup:
 	@echo "✅ 安装完成! 下一步:"
 	@echo "   cp .env.example .env"
 	@echo "   编辑 .env,填入 API Key"
-	@echo "   make pilot-full  # 包含 enrich 的全流程"
+	@echo "   make product-chain  # 当前 V14B 证据约束产品链路"
+	@echo "   make post-frontfill-chain  # section/frontfill 完成后的断点推进"
 
 # -------------------------------------------------------
 # 各 Step
@@ -193,9 +199,10 @@ evidence-bone-audit:
 		--db-v14 $(DB_V14) \
 		--out-dir reports/v14b_pilot
 
-## Step 1: OpenAlex enrich 13606 篇 (~1.5h)
+## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow
 enrich:
-	@echo ">>> Step 1: OpenAlex Enrich..."
+	@echo ">>> LEGACY compatibility target: Step 1 OpenAlex Enrich..."
+	@echo ">>> Not current V14B decision workflow; prefer product-chain or post-frontfill-chain."
 	$(PYTHON) -m echelon.v14b.step1_enrich \
 		--db $(DB_MAIN) \
 		--concurrency $${V14B_CONCURRENCY:-10} \
@@ -389,7 +396,7 @@ llm-edge-audit-run:
 		--max-calls $${V14B_LLM_EDGE_AUDIT_MAX_CALLS:-100}
 
 # -------------------------------------------------------
-# 一键流程
+# 当前证据约束产品链路与 legacy 兼容入口
 # -------------------------------------------------------
 
 ## 快速产品链路: 不等待 OpenAlex backfill, 仅用于调试/冒烟验证
@@ -416,12 +423,14 @@ product-chain: id-repair graph-prep quality-audit reset-pilot mainpath keystone 
 	@echo "数据库:"
 	@echo "  db/v14_pilot.sqlite3"
 
-## 从当前 library 干净重跑图谱 (enrich 已单独完成时使用)
+## LEGACY compatibility: old pilot graph rerun; not current V14B decision workflow
 pilot: pilot-graph
+	@echo ">>> LEGACY compatibility alias finished; prefer product-chain or post-frontfill-chain for acceptance."
 
-## 从当前 library 干净重跑图谱 (enrich 已单独完成时使用)
+## LEGACY compatibility: old pilot graph rerun; not current V14B decision workflow
 pilot-graph: id-repair openalex-backfill graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion first-principles mutation layout report
 	@echo ""
+	@echo "LEGACY compatibility target; not current V14B decision workflow."
 	@echo "======================================"
 	@echo "✅ V14-B Pilot 图谱重跑完成!"
 	@echo "======================================"
@@ -431,17 +440,18 @@ pilot-graph: id-repair openalex-backfill graph-features embeddings quality-audit
 	@echo "数据库:"
 	@echo "  db/v14_pilot.sqlite3"
 
-## 包含 enrich 的一键全流程 (预计 15-21h, ~$45 LLM)
+## LEGACY compatibility: old enrich + pilot visual full flow; not current V14B decision workflow
 pilot-full: enrich pilot-visual
 	@echo ""
+	@echo "LEGACY compatibility target; not current V14B decision workflow."
 	@echo "======================================"
 	@echo "✅ V14-B Pilot 全流程完成!"
 	@echo "======================================"
 
-## 干净重跑图谱并构建 2.5D 可视化产品层
+## LEGACY compatibility: old pilot visual rerun; not current V14B decision workflow
 pilot-visual: pilot-graph visual-graph goal-audit
 
-# 快速调试流程 (前 100 篇)
+# LEGACY compatibility: old quick debug pilot; not current V14B decision workflow
 pilot-debug:
 	V14B_LIMIT=100 $(MAKE) pilot-graph
 
@@ -542,7 +552,7 @@ test-fast:
 
 ## 显示此帮助
 help:
-	@echo "Echelon V14-B 演化树 Pilot"
+	@echo "Echelon V14-B Evidence Decision Workflow"
 	@echo ""
 	@echo "可用命令:"
 	@awk '/^## / {help=substr($$0, 4); next} /^[a-zA-Z_-]+:/ && help {split($$1, target, ":"); printf "  %-20s %s\n", target[1], help; help=""}' $(MAKEFILE_LIST)
@@ -553,10 +563,12 @@ help:
 	@echo ""
 	@echo "例子:"
 	@echo "  make setup"
-	@echo "  make enrich mainpath keystone  # 逐步运行"
-	@echo "  make pilot                     # 从当前 library 干净重跑图谱"
-	@echo "  make pilot-visual              # 图谱 + 2.5D 可视化产品层"
-	@echo "  make pilot-full                # 包含 enrich 的全流程"
-	@echo "  V14B_LIMIT=100 make pilot      # 图谱调试模式"
+	@echo "  make product-chain             # 当前证据约束产品链路"
+	@echo "  make post-frontfill-chain      # section/frontfill 完成后的断点推进"
+	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"
+	@echo ""
+	@echo "Legacy compatibility (not current acceptance path):"
+	@echo "  make pilot                     # old graph rerun compatibility target"
+	@echo "  make pilot-full                # old enrich + pilot flow; not current V14B decision workflow"
 
 .DEFAULT_GOAL := help

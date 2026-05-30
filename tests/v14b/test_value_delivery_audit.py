@@ -8,6 +8,7 @@ from echelon.v14b.value_delivery_audit import (
     audit_claim_card_high_confidence_evidence_contract,
     audit_evolution_evidence_map_contract,
     audit_future_growth,
+    audit_legacy_flow_isolation_contract,
     audit_llm_evidence_boundary,
     audit_main_path_uncertainty_contract,
     audit_online_topic_readiness_contract,
@@ -169,6 +170,44 @@ def _write_product_sources(root: Path) -> None:
     )
 
 
+def _write_makefile_contracts(root: Path) -> None:
+    (root / "Makefile").write_text(
+        "#   make product-chain\n"
+        "#   make post-frontfill-chain\n"
+        "# Legacy compatibility:\n"
+        "#   make pilot # LEGACY compatibility only; not current V14B decision workflow\n"
+        "product-chain-fast: id-repair graph-features\n"
+        "product-chain: id-repair graph-prep evidence-prep\n"
+        "post-frontfill-chain:\n"
+        "\tpython scripts/run_after_frontfill_product_chain.py\n"
+        "## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow\n"
+        "enrich:\n"
+        "\t@echo 'LEGACY compatibility target; not current V14B decision workflow.'\n"
+        "## LEGACY compatibility: old pilot graph rerun; not current V14B decision workflow\n"
+        "pilot: pilot-graph\n"
+        "## LEGACY compatibility: old pilot graph rerun; not current V14B decision workflow\n"
+        "pilot-graph: id-repair openalex-backfill\n"
+        "## LEGACY compatibility: old pilot visual rerun; not current V14B decision workflow\n"
+        "pilot-visual: pilot-graph visual-graph goal-audit\n"
+        "## LEGACY compatibility: old enrich + pilot visual full flow; not current V14B decision workflow\n"
+        "pilot-full: enrich pilot-visual\n"
+        "\t@echo 'LEGACY compatibility target; not current V14B decision workflow.'\n"
+        "# LEGACY compatibility: old quick debug pilot; not current V14B decision workflow\n"
+        "pilot-debug:\n"
+        "\tV14B_LIMIT=100 $(MAKE) pilot-graph\n"
+        "quarterly-run:\n"
+        "quarterly-run-optics:\n"
+        "quarterly-run-cs:\n"
+        "quarterly-run-materials:\n"
+        "help:\n"
+        "\t@echo 'make product-chain'\n"
+        "\t@echo 'make post-frontfill-chain'\n"
+        "\t@echo 'Legacy compatibility (not current acceptance path):'\n"
+        "\t@echo 'make pilot-full # not current V14B decision workflow'\n",
+        encoding="utf-8",
+    )
+
+
 def _make_v14_edge_calibrated_without_run_audit(path: Path) -> None:
     conn = sqlite3.connect(str(path))
     conn.executescript(
@@ -248,11 +287,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     v14 = tmp_path / "v14.sqlite3"
     _make_main(main)
     _make_v14(v14)
-    makefile = tmp_path / "Makefile"
-    makefile.write_text(
-        "quarterly-run:\nquarterly-run-optics:\nquarterly-run-cs:\nquarterly-run-materials:\n",
-        encoding="utf-8",
-    )
+    _write_makefile_contracts(tmp_path)
     q = tmp_path / "echelon/v14b"
     q.mkdir(parents=True)
     (q / "quarterly_run.py").write_text("parser.add_argument('--corpus-id')", encoding="utf-8")
@@ -267,7 +302,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
 
     result = collect_value_gates(main, v14, tmp_path, report_dir)
 
-    assert len(result["gates"]) == 13
+    assert len(result["gates"]) == 14
     assert any(g["issue"] == "Future Growth Calibration" for g in result["gates"])
     assert any(g["issue"] == "Multi-topic Regression" and g["status"] == "pass" for g in result["gates"])
     topic_gate = next(g for g in result["gates"] if g["issue"] == "Topic Dossier Product Value")
@@ -288,6 +323,9 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     llm_gate = next(g for g in result["gates"] if g["issue"] == "LLM Evidence Boundary Contract")
     assert llm_gate["status"] == "pass"
     assert llm_gate["checks"]["abstract_llm_atoms_remain_weak"] is True
+    legacy_gate = next(g for g in result["gates"] if g["issue"] == "Legacy Flow Isolation Contract")
+    assert legacy_gate["status"] == "pass"
+    assert legacy_gate["checks"]["product_chains_avoid_legacy_targets"] is True
     evidence_gate = next(g for g in result["gates"] if g["issue"] == "Evidence Bone")
     assert "section_provenance" in evidence_gate["metrics"]
     assert any("section evidence provenance" in r for r in evidence_gate["uncertainty_reasons"])
@@ -337,6 +375,36 @@ def test_main_path_uncertainty_contract_demotes_low_linked_refs(tmp_path):
     assert result["checks"]["low_linked_refs_add_uncertainty"] is True
     assert result["checks"]["main_path_edges_inherit_uncertainty"] is True
     assert result["claim_scope"] == "main_path_context_low_linked_refs"
+
+
+def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
+    _write_makefile_contracts(tmp_path)
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "pass"
+    assert result["checks"]["help_prefers_current_chain"] is True
+    assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
+    assert result["disallowed_current_deps"] == {}
+
+
+def test_legacy_flow_isolation_contract_flags_current_chain_using_old_enrich(tmp_path):
+    (tmp_path / "Makefile").write_text(
+        "product-chain: enrich pilot-full\n"
+        "product-chain-fast: pilot\n"
+        "post-frontfill-chain:\n"
+        "pilot-full: enrich pilot-visual\n"
+        "help:\n"
+        "\t@echo 'make pilot-full'\n",
+        encoding="utf-8",
+    )
+
+    result = audit_legacy_flow_isolation_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["product_chains_avoid_legacy_targets"] is False
+    assert result["checks"]["legacy_targets_labeled"] is False
+    assert "product-chain" in result["disallowed_current_deps"]
 
 
 def test_claim_card_high_confidence_requires_section_evidence_and_provenance(tmp_path):
@@ -495,10 +563,7 @@ def test_value_delivery_audit_fails_when_live_topic_regression_fails(tmp_path):
     v14 = tmp_path / "v14.sqlite3"
     _make_main(main)
     _make_v14(v14)
-    (tmp_path / "Makefile").write_text(
-        "quarterly-run:\nquarterly-run-optics:\nquarterly-run-cs:\nquarterly-run-materials:\n",
-        encoding="utf-8",
-    )
+    _write_makefile_contracts(tmp_path)
     q = tmp_path / "echelon/v14b"
     q.mkdir(parents=True)
     (q / "quarterly_run.py").write_text("--corpus-id", encoding="utf-8")
@@ -521,10 +586,7 @@ def test_value_delivery_audit_fails_when_benchmark_topic_gap_sections_missing(tm
     v14 = tmp_path / "v14.sqlite3"
     _make_main(main)
     _make_v14(v14)
-    (tmp_path / "Makefile").write_text(
-        "quarterly-run:\nquarterly-run-optics:\nquarterly-run-cs:\nquarterly-run-materials:\n",
-        encoding="utf-8",
-    )
+    _write_makefile_contracts(tmp_path)
     q = tmp_path / "echelon/v14b"
     q.mkdir(parents=True)
     (q / "quarterly_run.py").write_text("--corpus-id", encoding="utf-8")
@@ -556,10 +618,7 @@ def test_value_delivery_audit_writes_report(tmp_path):
     v14 = tmp_path / "v14.sqlite3"
     _make_main(main)
     _make_v14(v14)
-    (tmp_path / "Makefile").write_text(
-        "quarterly-run:\nquarterly-run-optics:\nquarterly-run-cs:\nquarterly-run-materials:\n",
-        encoding="utf-8",
-    )
+    _write_makefile_contracts(tmp_path)
     q = tmp_path / "echelon/v14b"
     q.mkdir(parents=True)
     (q / "quarterly_run.py").write_text("--corpus-id", encoding="utf-8")

@@ -50,6 +50,23 @@ QUARTERLY_REQUIRED_TARGETS = (
     "quarterly-run-materials",
 )
 
+LEGACY_FLOW_TARGETS = (
+    "enrich",
+    "pilot",
+    "pilot-graph",
+    "pilot-visual",
+    "pilot-full",
+    "pilot-debug",
+)
+
+LEGACY_FLOW_DISALLOWED_CURRENT_DEPS = {
+    "enrich",
+    "pilot",
+    "pilot-graph",
+    "pilot-visual",
+    "pilot-full",
+}
+
 REQUIRED_TOPIC_READINESS_GATES = {
     "topic dossier evidence contract",
     "turning papers with strong/moderate section provenance",
@@ -494,6 +511,28 @@ def _source_contains(path: Path, needles: tuple[str, ...]) -> bool:
         return False
     text = path.read_text(encoding="utf-8")
     return all(needle in text for needle in needles)
+
+
+def _make_target_deps(makefile: str, target: str) -> list[str]:
+    match = re.search(rf"^{re.escape(target)}\s*:\s*(.*)$", makefile, flags=re.M)
+    if not match:
+        return []
+    return [
+        dep.strip()
+        for dep in match.group(1).split()
+        if dep.strip() and not dep.strip().startswith("#")
+    ]
+
+
+def _make_target_context(makefile: str, target: str, *, before: int = 3, after: int = 8) -> str:
+    lines = makefile.splitlines()
+    target_re = re.compile(rf"^{re.escape(target)}\s*:")
+    for idx, line in enumerate(lines):
+        if target_re.search(line):
+            start = max(0, idx - before)
+            end = min(len(lines), idx + after + 1)
+            return "\n".join(lines[start:end])
+    return ""
 
 
 def audit_llm_evidence_boundary(conn_v14: sqlite3.Connection, repo_root: Path | None = None) -> dict[str, Any]:
@@ -1103,6 +1142,80 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
     }
 
 
+def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[str, Any]:
+    """Verify old enrich/pilot flows are compatibility targets, not acceptance paths."""
+    makefile_path = (repo_root or Path(".")) / "Makefile"
+    makefile = makefile_path.read_text(encoding="utf-8") if makefile_path.exists() else ""
+    if not makefile:
+        return {
+            "issue": "Legacy Flow Isolation Contract",
+            "status": "fail",
+            "why": "Makefile is missing or empty",
+            "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain; legacy enrich/pilot paths must be labeled compatibility only.",
+        }
+
+    current_targets = ("product-chain", "product-chain-fast")
+    target_deps = {target: set(_make_target_deps(makefile, target)) for target in current_targets}
+    disallowed_current_deps = {
+        target: sorted(deps & LEGACY_FLOW_DISALLOWED_CURRENT_DEPS)
+        for target, deps in target_deps.items()
+        if deps & LEGACY_FLOW_DISALLOWED_CURRENT_DEPS
+    }
+    legacy_contexts = {
+        target: _make_target_context(makefile, target)
+        for target in LEGACY_FLOW_TARGETS
+    }
+    legacy_contexts = {target: context for target, context in legacy_contexts.items() if context}
+    unlabeled_legacy_targets = [
+        target
+        for target, context in legacy_contexts.items()
+        if "LEGACY compatibility" not in context or "not current V14B decision workflow" not in context
+    ]
+    first_current = min(
+        (idx for idx in (makefile.find("make product-chain"), makefile.find("make post-frontfill-chain")) if idx >= 0),
+        default=-1,
+    )
+    first_legacy = min(
+        (idx for idx in (makefile.find("make pilot"), makefile.find("make pilot-full")) if idx >= 0),
+        default=-1,
+    )
+    current_chain_advertised = "make product-chain" in makefile and "make post-frontfill-chain" in makefile
+    help_prefers_current = (
+        current_chain_advertised
+        and "Legacy compatibility (not current acceptance path)" in makefile
+        and first_current >= 0
+        and (first_legacy < 0 or first_current < first_legacy)
+    )
+    pilot_full_context = legacy_contexts.get("pilot-full", "")
+    checks = {
+        "current_product_chain_present": bool(re.search(r"^product-chain\s*:", makefile, flags=re.M)),
+        "post_frontfill_entry_present": bool(re.search(r"^post-frontfill-chain\s*:", makefile, flags=re.M)),
+        "product_chains_avoid_legacy_targets": not disallowed_current_deps,
+        "legacy_targets_labeled": not unlabeled_legacy_targets,
+        "help_prefers_current_chain": help_prefers_current,
+        "pilot_full_is_legacy_compatibility_only": (
+            not pilot_full_context
+            or (
+                "LEGACY compatibility" in pilot_full_context
+                and "not current V14B decision workflow" in pilot_full_context
+            )
+        ),
+    }
+    return {
+        "issue": "Legacy Flow Isolation Contract",
+        "status": _gate_status(all(checks.values())),
+        "checks": checks,
+        "current_target_deps": {target: sorted(deps) for target, deps in target_deps.items()},
+        "disallowed_current_deps": disallowed_current_deps,
+        "legacy_targets_present": sorted(legacy_contexts),
+        "unlabeled_legacy_targets": unlabeled_legacy_targets,
+        "policy": (
+            "Current V14B acceptance must run product-chain or post-frontfill-chain. "
+            "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
+        ),
+    }
+
+
 def audit_multi_topic_regression(report_dir: Path, metrics: dict[str, Any] | None = None) -> dict[str, Any]:
     metrics = metrics or {}
     expected = {
@@ -1198,6 +1311,7 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
             audit_evolution_evidence_map_contract(repo_root),
             audit_rd_radar_promotion_contract(repo_root),
             audit_main_path_uncertainty_contract(repo_root),
+            audit_legacy_flow_isolation_contract(repo_root),
             audit_multi_topic_regression(report_dir, metrics),
             audit_quarterly_multi_corpus(db_main, repo_root),
         ]

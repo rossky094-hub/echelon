@@ -1,8 +1,8 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T13:00:12Z`
+- generated_at: `2026-05-30T13:16:32Z`
 - evidence_policy: `insufficient_evidence`
-- gate_summary: `{"fail": 1, "pass": 11, "warn": 1}`
+- gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
 ## Product Gates
 
@@ -19,8 +19,9 @@
 | 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty. |
 | 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 12 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
-| 13 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
+| 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 13 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. |
+| 14 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
 ## Gate Details
 
@@ -34,7 +35,7 @@
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 2585,
-    "section_frontfill_no_evidence_delta": -259,
+    "section_frontfill_no_evidence_delta": -148,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
@@ -328,6 +329,77 @@
     "broader field main-path anchors are separated from topic-specific turning papers",
     "linked refs below 30%; citation backbone is incomplete"
   ]
+}
+```
+
+### Legacy Flow Isolation Contract
+
+```json
+{
+  "checks": {
+    "current_product_chain_present": true,
+    "help_prefers_current_chain": true,
+    "legacy_targets_labeled": true,
+    "pilot_full_is_legacy_compatibility_only": true,
+    "post_frontfill_entry_present": true,
+    "product_chains_avoid_legacy_targets": true
+  },
+  "current_target_deps": {
+    "product-chain": [
+      "evidence-prep",
+      "first-principles",
+      "fusion",
+      "goal-audit",
+      "graph-prep",
+      "id-repair",
+      "keystone",
+      "layout",
+      "limitation",
+      "mainpath",
+      "mutation",
+      "quality-audit",
+      "report",
+      "reset-pilot",
+      "scibert",
+      "subgraph",
+      "vgae",
+      "visual-graph"
+    ],
+    "product-chain-fast": [
+      "embeddings",
+      "first-principles",
+      "fusion",
+      "goal-audit",
+      "graph-features",
+      "id-repair",
+      "keystone",
+      "layout",
+      "limitation",
+      "mainpath",
+      "mutation",
+      "quality-audit",
+      "report",
+      "reset-pilot",
+      "scibert",
+      "section-evidence",
+      "subgraph",
+      "vgae",
+      "visual-graph"
+    ]
+  },
+  "disallowed_current_deps": {},
+  "issue": "Legacy Flow Isolation Contract",
+  "legacy_targets_present": [
+    "enrich",
+    "pilot",
+    "pilot-debug",
+    "pilot-full",
+    "pilot-graph",
+    "pilot-visual"
+  ],
+  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
+  "status": "pass",
+  "unlabeled_legacy_targets": []
 }
 ```
 
