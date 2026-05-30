@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
+from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
 
 
 PRIMARY_SECTION_NAMES = (
@@ -210,6 +211,8 @@ def primary_section_strategy_quality(
             "parser_name_counts": {},
             "parser_contract_version_counts": {},
             "paper_quality_counts": {},
+            "current_contract_papers": 0,
+            "current_contract_rate": 0.0,
             "strong_or_moderate_papers": 0,
             "weak_only_papers": 0,
             "weak_only_rate": 0.0,
@@ -238,14 +241,18 @@ def primary_section_strategy_quality(
     parser_name_counts: dict[str, int] = {}
     parser_contract_version_counts: dict[str, int] = {}
     paper_best_quality: dict[str, str] = {}
+    current_contract_papers: set[str] = set()
     quality_rank = {"weak": 0, "moderate": 1, "strong": 2}
     rows = conn.execute(base, params).fetchall()
     for paper_id, _section_name, raw_meta, raw_parser_name in rows:
+        pid = str(paper_id)
         meta = _json_obj(raw_meta)
         parser_name = str(raw_parser_name or "legacy_unknown_parser")
         parser_name_counts[parser_name] = parser_name_counts.get(parser_name, 0) + 1
         contract_version = str(meta.get("parser_contract_version") or "legacy_unknown_contract")
         parser_contract_version_counts[contract_version] = parser_contract_version_counts.get(contract_version, 0) + 1
+        if contract_version == SECTION_PARSER_CONTRACT_VERSION:
+            current_contract_papers.add(pid)
         raw_strategies = meta.get("extraction_strategies") or []
         strategies = {
             str(item).strip()
@@ -257,7 +264,6 @@ def primary_section_strategy_quality(
         for strategy in sorted(strategies):
             strategy_counts[strategy] = strategy_counts.get(strategy, 0) + 1
         quality = _section_quality_from_strategies(strategies)
-        pid = str(paper_id)
         if pid not in paper_best_quality or quality_rank[quality] > quality_rank.get(paper_best_quality[pid], 0):
             paper_best_quality[pid] = quality
 
@@ -275,6 +281,8 @@ def primary_section_strategy_quality(
         "parser_name_counts": dict(sorted(parser_name_counts.items())),
         "parser_contract_version_counts": dict(sorted(parser_contract_version_counts.items())),
         "paper_quality_counts": paper_quality_counts,
+        "current_contract_papers": len(current_contract_papers),
+        "current_contract_rate": len(current_contract_papers) / max(1, primary_papers),
         "strong_or_moderate_papers": strong_or_moderate,
         "weak_only_papers": weak_only,
         "weak_only_rate": weak_only / max(1, primary_papers),
@@ -722,6 +730,28 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 ),
             }
         )
+    if (
+        m.get("primary_section_papers", 0)
+        and "current_contract_papers" in section_quality
+        and float(section_quality.get("current_contract_rate") or 0.0) < 0.70
+    ):
+        blockers.append(
+            {
+                "gate": "section_parser_contract_coverage",
+                "severity": "medium",
+                "why": (
+                    "primary section evidence has current parser-contract coverage for only "
+                    f"{int(section_quality.get('current_contract_papers') or 0):,}/"
+                    f"{int(section_quality.get('primary_section_papers') or m.get('primary_section_papers') or 0):,} papers "
+                    f"({pct(float(section_quality.get('current_contract_rate') or 0.0))}); "
+                    "legacy parser-contract sections may predate TOC/fragment guards."
+                ),
+                "next_action": (
+                    "Re-run section evidence with the current parser contract before promoting "
+                    "section-derived bottleneck, Topic Dossier, or Claim Card claims."
+                ),
+            }
+        )
     if m.get("topic_gap_queue_papers", 0) and m.get("topic_gap_primary_section_rate", 0.0) < 0.70:
         blockers.append(
             {
@@ -899,6 +929,9 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"{int((metrics.get('section_evidence_quality') or {}).get('strong_or_moderate_papers') or 0):,} "
         f"strong/moderate papers; weak-only="
         f"{pct(float((metrics.get('section_evidence_quality') or {}).get('weak_only_rate') or 0.0))}",
+        f"- current section parser contract: "
+        f"{int((metrics.get('section_evidence_quality') or {}).get('current_contract_papers') or 0):,} "
+        f"papers ({pct(float((metrics.get('section_evidence_quality') or {}).get('current_contract_rate') or 0.0))})",
         f"- section parser contracts: "
         f"{_top_counts((metrics.get('section_evidence_quality') or {}).get('parser_contract_version_counts') or {})}",
         f"- multi-topic evidence-gap queue: {int(metrics.get('topic_gap_primary_section_papers') or 0):,} / "

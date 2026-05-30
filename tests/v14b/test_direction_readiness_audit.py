@@ -162,8 +162,11 @@ def test_direction_readiness_tracks_section_parser_provenance(tmp_path):
     assert quality["parser_name_counts"]["v14b_section_ingest_v3"] == 1
     assert quality["parser_contract_version_counts"]["v14b_section_parser_contract_v3_toc_guard"] == 1
     assert quality["parser_contract_version_counts"]["legacy_unknown_contract"] == 1
+    assert quality["current_contract_papers"] == 1
+    assert quality["current_contract_rate"] == 0.5
     assert metrics["section_evidence_quality"]["weak_only_rate"] == 0.5
     assert any(b["gate"] == "section_evidence_provenance" for b in blockers)
+    assert any(b["gate"] == "section_parser_contract_coverage" for b in blockers)
 
 
 def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
@@ -375,6 +378,7 @@ def test_direction_readiness_report_hides_legacy_prediction_confidence_copy():
 
     assert "candidate_ranking_score_avg" in md
     assert "min_candidate_score_threshold" in md
+    assert "current section parser contract" in md
     assert "prediction_confidence_avg" not in md
     assert "min_vgae_confidence" not in md
 
