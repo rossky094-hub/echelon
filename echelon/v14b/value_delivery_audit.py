@@ -372,7 +372,7 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
             "ui_branch_scores_are_labeled_as_support": (
                 _source_contains(
                     repo_root / "web/visual-graph/app.js",
-                    ("split/support", " / support ", "edge score"),
+                    ("split/support", " / support "),
                 )
                 and _source_absent(
                     repo_root / "web/visual-graph/app.js",
@@ -1840,12 +1840,16 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                 repo_root / "web/visual-graph/app.js",
                 (
                     "renderLocalEdges",
+                    "localEdgeScoreCopy",
+                    "candidate_score",
+                    "support_score",
                     "edge.claim_scope",
                     "edge.evidence_grade",
                     "edge.uncertainty_reasons",
                     "renderEvidenceObjects(edge.evidence_objects",
                 ),
-            ),
+            )
+            and _source_absent(repo_root / "web/visual-graph/app.js", ("edge score",)),
             "ui_has_fusion_value_layer_control": _source_contains(
                 repo_root / "web/visual-graph/index.html",
                 ('data-layer="fusion_value"', "Fusion value"),

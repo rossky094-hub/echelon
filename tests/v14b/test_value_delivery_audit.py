@@ -161,7 +161,8 @@ def _write_product_sources(root: Path) -> None:
         "function renderTopicReadiness() { return topic_readiness; }\n"
         "function renderPaperList() { return paper.claim_scope + paper.evidence_grade + paper.uncertainty_reasons + paper.required_evidence + renderEvidenceObjects(paper.evidence_objects); }\n"
         "function renderLimitations() { return lim.claim_scope + lim.evidence_grade + lim.uncertainty_reasons + renderEvidenceObjects(lim.evidence_objects); }\n"
-        "function renderLocalEdges() { return edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + 'edge score' + renderEvidenceObjects(edge.evidence_objects); }\n"
+        "function localEdgeScoreCopy() { return 'candidate_score support_score'; }\n"
+        "function renderLocalEdges() { return localEdgeScoreCopy(edge) + edge.claim_scope + edge.evidence_grade + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + 'split/support / support ' + renderEvidenceObjects(lineage.evidence_objects); }\n"
         "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function renderPaper() { return paperRole.claim_scope + paperRole.evidence_grade + paperRole.uncertainty_reasons + renderEvidenceObjects(paperRole.evidence_objects); }\n"
@@ -669,6 +670,21 @@ def test_evolution_evidence_map_contract_exposes_layer_limits_and_fusion_value(t
     assert result["checks"]["fusion_value_is_auditable_layer"] is True
     assert result["checks"]["evidence_map_main_path_contract_present"] is True
     assert result["missing_required_combinations"] == []
+
+
+def test_evolution_evidence_map_contract_rejects_generic_local_edge_score_copy(tmp_path):
+    _write_product_sources(tmp_path)
+    app_path = tmp_path / "web/visual-graph/app.js"
+    app_path.write_text(
+        app_path.read_text(encoding="utf-8")
+        + "\nfunction badLocalEdges() { return 'edge score'; }\n",
+        encoding="utf-8",
+    )
+
+    result = audit_evolution_evidence_map_contract(tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["checks"]["ui_renders_local_edge_contracts"] is False
 
 
 def test_rd_radar_promotion_contract_keeps_raw_gnn_edges_out_of_main_view(tmp_path):

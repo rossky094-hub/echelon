@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T20:42:47Z`
+- generated_at: `2026-05-30T20:50:17Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,37 +34,37 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 11832,
+    "openalex_frontfill_cooldown_remaining_s": 11383,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2952,
-    "section_frontfill_done": 902,
+    "primary_section_papers": 2955,
+    "section_frontfill_done": 905,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 902,
+    "section_frontfill_progress_done": 905,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 6603,
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 715,
+        "strong": 718,
         "weak": 2237
       },
-      "primary_section_papers": 2952,
-      "primary_section_rows": 5180,
+      "primary_section_papers": 2955,
+      "primary_section_rows": 5183,
       "strategy_counts": {
         "embedded_heading": 36,
-        "explicit_heading": 869,
-        "heading_continuation": 1260,
-        "inline_heading": 464,
+        "explicit_heading": 871,
+        "heading_continuation": 1263,
+        "inline_heading": 465,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 19,
         "parser_hint": 14
       },
-      "strong_or_moderate_papers": 715,
+      "strong_or_moderate_papers": 718,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.7577913279132791
+      "weak_only_rate": 0.7570219966159052
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",

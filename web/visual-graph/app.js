@@ -181,6 +181,17 @@ function futureCalibrationCopy(edge) {
   return `not run-calibrated / status ${status} / candidate_score ${pct(score)}`;
 }
 
+function localEdgeScoreCopy(edge) {
+  const isFuture = edge?.layer === "future" || edge?.edge_type === "future_growth";
+  if (isFuture) {
+    const evidence = edge?.evidence || {};
+    const score = edge?.candidate_score ?? evidence.candidate_score ?? edge?.confidence ?? edge?.weight ?? 0;
+    return `candidate_score ${pct(score)} / ${futureCalibrationCopy(edge)}`;
+  }
+  const support = edge?.confidence ?? edge?.weight ?? 0;
+  return `support_score ${pct(support)}`;
+}
+
 function clamp(value, lo, hi) {
   return Math.max(lo, Math.min(hi, value));
 }
@@ -953,11 +964,10 @@ function renderLocalEdges(edges = []) {
   return `
     <div class="evidence-list">
       ${items.map((edge) => {
-        const edgeScore = edge.confidence == null ? "-" : pct(edge.confidence);
         return `
           <div class="evidence-paper">
             <strong>${esc(edge.edge_type || edge.layer || "edge")}</strong>
-            <small>${esc(edge.source_paper_id || "?")} -> ${esc(edge.target_paper_id || "?")} / weight ${fmt(edge.weight || 0)} / edge score ${edgeScore}</small>
+            <small>${esc(edge.source_paper_id || "?")} -> ${esc(edge.target_paper_id || "?")} / weight ${fmt(edge.weight || 0)} / ${esc(localEdgeScoreCopy(edge))}</small>
             <div class="pill-row">
               <span class="pill">${esc(edge.claim_scope || "graph_edge_context_only")}</span>
               <span class="pill">${esc(edge.evidence_grade || "visual_edge_context")}</span>
