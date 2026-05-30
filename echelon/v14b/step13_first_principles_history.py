@@ -270,7 +270,10 @@ def ensure_schema(conn_v14: sqlite3.Connection) -> None:
             unresolved_bottleneck_json TEXT NOT NULL,
             minimal_validation_experiment_json TEXT NOT NULL,
             evidence_strength_level TEXT NOT NULL,
+            evidence_grade TEXT NOT NULL DEFAULT 'incomplete_claim_card',
             claim_scope TEXT NOT NULL,
+            uncertainty_reasons_json TEXT NOT NULL DEFAULT '[]',
+            evidence_objects_json TEXT NOT NULL DEFAULT '[]',
             five_question_complete INTEGER NOT NULL DEFAULT 0,
             high_confidence_eligible INTEGER NOT NULL DEFAULT 0,
             quality_gate_json TEXT,
@@ -292,6 +295,16 @@ def ensure_schema(conn_v14: sqlite3.Connection) -> None:
         conn_v14.execute("ALTER TABLE future_directions ADD COLUMN high_confidence_eligible INTEGER DEFAULT 0")
     if "quality_gate_json" not in cols:
         conn_v14.execute("ALTER TABLE future_directions ADD COLUMN quality_gate_json TEXT")
+    claim_cols = {
+        row[1] for row in conn_v14.execute("PRAGMA table_info(direction_claim_cards)").fetchall()
+    }
+    for col, ddl in {
+        "evidence_grade": "ALTER TABLE direction_claim_cards ADD COLUMN evidence_grade TEXT NOT NULL DEFAULT 'incomplete_claim_card'",
+        "uncertainty_reasons_json": "ALTER TABLE direction_claim_cards ADD COLUMN uncertainty_reasons_json TEXT NOT NULL DEFAULT '[]'",
+        "evidence_objects_json": "ALTER TABLE direction_claim_cards ADD COLUMN evidence_objects_json TEXT NOT NULL DEFAULT '[]'",
+    }.items():
+        if col not in claim_cols:
+            conn_v14.execute(ddl)
     conn_v14.commit()
 
 
@@ -850,6 +863,128 @@ def _high_confidence_gate_labels(gates: dict[str, bool]) -> list[str]:
         "fusion_tier_ready": "triangulated Step6 fusion evidence",
     }
     return [labels.get(k, k) for k, ok in gates.items() if not ok]
+
+
+def _claim_card_evidence_grade(*, five_complete: bool, high_confidence_eligible: bool) -> str:
+    if high_confidence_eligible:
+        return "decision_grade_claim_card"
+    if five_complete:
+        return "complete_claim_card_pending_high_confidence_evidence"
+    return "incomplete_claim_card"
+
+
+def _claim_card_uncertainty_reasons(
+    *,
+    five_complete: bool,
+    high_confidence_eligible: bool,
+    missing_gates: list[str],
+    missing_high_confidence_gates: list[str],
+) -> list[str]:
+    reasons = [
+        *[f"missing five-question gate: {gate}" for gate in missing_gates],
+        *[f"missing high-confidence gate: {gate}" for gate in missing_high_confidence_gates],
+    ]
+    if not five_complete:
+        reasons.append("Claim Card is incomplete; direction remains candidate_pool_only")
+    elif not high_confidence_eligible:
+        reasons.append("complete Claim Card remains exploratory until high-confidence evidence gates pass")
+    return sorted(set(reasons))
+
+
+def _claim_card_evidence_objects(
+    *,
+    card_id: str,
+    direction_id: int,
+    direction_name: str,
+    claim_scope: str,
+    evidence_grade: str,
+    root_constraint: dict[str, Any],
+    attempts: list[dict[str, Any]],
+    unresolved: list[dict[str, Any]],
+    minimal_experiment: dict[str, Any],
+    quality_gate: dict[str, Any],
+) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = [
+        {
+            "type": "claim_card",
+            "role": "five_question_contract",
+            "source": "Step13 Claim Card",
+            "id": card_id,
+            "direction_id": direction_id,
+            "label": direction_name,
+            "claim_scope": claim_scope,
+            "evidence_grade": evidence_grade,
+            "five_question_complete": bool(quality_gate.get("five_question_complete")),
+            "high_confidence_eligible": bool(quality_gate.get("high_confidence_eligible")),
+        }
+    ]
+    if minimal_experiment:
+        objects.append(
+            {
+                "type": "minimal_validation_experiment",
+                "role": "falsifiable_validation",
+                "source": "Step13 Claim Card",
+                "id": card_id,
+                "direction_id": direction_id,
+                "label": minimal_experiment.get("experiment") or "minimal validation experiment",
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "success_criteria": minimal_experiment.get("success_criteria") or [],
+                "falsification_conditions": minimal_experiment.get("falsification_conditions") or [],
+            }
+        )
+    if root_constraint:
+        objects.append(
+            {
+                "type": "claim_card_root_constraint",
+                "role": "root_constraint",
+                "source": "Step13 Claim Card",
+                "id": root_constraint.get("principle_id") or card_id,
+                "direction_id": direction_id,
+                "label": root_constraint.get("type") or "root constraint",
+                "description": root_constraint.get("constraint"),
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+            }
+        )
+    for attempt in attempts[:4]:
+        objects.append(
+            {
+                "type": "claim_card_attempt",
+                "role": "past_attempt_failure",
+                "source": "Step13 Claim Card",
+                "id": attempt.get("paper_id") or card_id,
+                "direction_id": direction_id,
+                "paper_id": attempt.get("paper_id"),
+                "label": attempt.get("attempt_path") or attempt.get("keyword") or "past attempt",
+                "description": attempt.get("why_failed"),
+                "event_year": attempt.get("year"),
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "evidence_quality": attempt.get("evidence_quality"),
+                "section_provenance_strength": attempt.get("section_provenance_strength"),
+                "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
+            }
+        )
+    for bottleneck in unresolved[:4]:
+        objects.append(
+            {
+                "type": "claim_card_unresolved_bottleneck",
+                "role": "open_bottleneck",
+                "source": "Step13 Claim Card",
+                "id": bottleneck.get("paper_id") or card_id,
+                "direction_id": direction_id,
+                "paper_id": bottleneck.get("paper_id"),
+                "label": bottleneck.get("keyword") or "unresolved bottleneck",
+                "description": bottleneck.get("description"),
+                "claim_scope": claim_scope,
+                "evidence_grade": evidence_grade,
+                "evidence_quality": bottleneck.get("evidence_quality"),
+                "section_provenance_strength": bottleneck.get("section_provenance_strength"),
+                "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
+            }
+        )
+    return [obj for obj in objects if obj]
 
 
 def score_atom(atom: dict) -> float:
@@ -1538,6 +1673,28 @@ def build_direction_claim_cards(
         }
 
         card_id = f"claim:{direction_id}"
+        evidence_grade = _claim_card_evidence_grade(
+            five_complete=bool(five_complete),
+            high_confidence_eligible=bool(high_confidence_eligible),
+        )
+        uncertainty_reasons = _claim_card_uncertainty_reasons(
+            five_complete=bool(five_complete),
+            high_confidence_eligible=bool(high_confidence_eligible),
+            missing_gates=missing_gates,
+            missing_high_confidence_gates=missing_high_confidence_gates,
+        )
+        evidence_objects = _claim_card_evidence_objects(
+            card_id=card_id,
+            direction_id=direction_id,
+            direction_name=direction_name,
+            claim_scope=claim_scope,
+            evidence_grade=evidence_grade,
+            root_constraint=root_constraint,
+            attempts=attempts,
+            unresolved=unresolved,
+            minimal_experiment=minimal_experiment,
+            quality_gate=quality_gate,
+        )
         cards.append(
             {
                 "claim_card_id": card_id,
@@ -1555,7 +1712,10 @@ def build_direction_claim_cards(
                 ),
                 "minimal_validation_experiment_json": jdumps(minimal_experiment),
                 "evidence_strength_level": section_strength,
+                "evidence_grade": evidence_grade,
                 "claim_scope": claim_scope,
+                "uncertainty_reasons_json": jdumps(uncertainty_reasons),
+                "evidence_objects_json": jdumps(evidence_objects),
                 "five_question_complete": five_complete,
                 "high_confidence_eligible": high_confidence_eligible,
                 "quality_gate_json": jdumps(quality_gate),
@@ -1606,12 +1766,14 @@ def write_lineage_and_claim_cards(
             INSERT INTO direction_claim_cards (
                 claim_card_id, direction_id, direction_name, root_constraint_json,
                 attempts_last_10y_json, enabling_conditions_json, unresolved_bottleneck_json,
-                minimal_validation_experiment_json, evidence_strength_level, claim_scope,
+                minimal_validation_experiment_json, evidence_strength_level, evidence_grade,
+                claim_scope, uncertainty_reasons_json, evidence_objects_json,
                 five_question_complete, high_confidence_eligible, quality_gate_json
             ) VALUES (
                 :claim_card_id, :direction_id, :direction_name, :root_constraint_json,
                 :attempts_last_10y_json, :enabling_conditions_json, :unresolved_bottleneck_json,
-                :minimal_validation_experiment_json, :evidence_strength_level, :claim_scope,
+                :minimal_validation_experiment_json, :evidence_strength_level, :evidence_grade,
+                :claim_scope, :uncertainty_reasons_json, :evidence_objects_json,
                 :five_question_complete, :high_confidence_eligible, :quality_gate_json
             )
             """,

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T23:03:30Z`
+- generated_at: `2026-05-30T23:21:39Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -34,49 +34,49 @@
   "issue": "Evidence Bone",
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 3389,
+    "openalex_frontfill_cooldown_remaining_s": 2300,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6438410572114603,
     "primary_section_papers": 3020,
-    "section_frontfill_done": 188,
+    "section_frontfill_done": 250,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 188,
+    "section_frontfill_progress_done": 250,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 162,
-      "current_contract_rate": 0.05364238410596026,
-      "decision_grade_papers": 162,
-      "decision_grade_rate": 0.05364238410596026,
+      "current_contract_papers": 224,
+      "current_contract_rate": 0.07417218543046358,
+      "decision_grade_papers": 224,
+      "decision_grade_rate": 0.07417218543046358,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 919,
-        "weak": 2101
+        "strong": 981,
+        "weak": 2039
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 5011,
-        "v14b_section_parser_contract_v3_toc_guard": 342
+        "legacy_unknown_contract": 4889,
+        "v14b_section_parser_contract_v3_toc_guard": 505
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 5011,
-        "v14b_section_ingest_v3": 342
+        "v14b_section_ingest_v2": 4889,
+        "v14b_section_ingest_v3": 505
       },
       "primary_section_papers": 3020,
-      "primary_section_rows": 5353,
+      "primary_section_rows": 5394,
       "strategy_counts": {
-        "embedded_heading": 43,
-        "explicit_heading": 1194,
-        "heading_continuation": 1659,
-        "inline_heading": 575,
-        "legacy_unknown_strategy": 3647,
-        "loose_inline_heading": 24,
-        "parser_hint": 24
+        "embedded_heading": 44,
+        "explicit_heading": 1337,
+        "heading_continuation": 1816,
+        "inline_heading": 602,
+        "legacy_unknown_strategy": 3525,
+        "loose_inline_heading": 30,
+        "parser_hint": 30
       },
-      "strong_or_moderate_papers": 919,
-      "weak_only_papers": 2101,
-      "weak_only_rate": 0.6956953642384106
+      "strong_or_moderate_papers": 981,
+      "weak_only_papers": 2039,
+      "weak_only_rate": 0.6751655629139073
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -130,7 +130,7 @@
   ],
   "status": "pass",
   "triples": 2920,
-  "triples_with_page": 1368
+  "triples_with_page": 1600
 }
 ```
 
@@ -222,6 +222,7 @@
   "bad_high_confidence_cards": 0,
   "cards": 5,
   "checks": {
+    "claim_cards_carry_persisted_evidence_contract": true,
     "complete_cards_have_falsifiable_validation_experiment": true,
     "no_high_confidence_without_complete_card": true,
     "required_columns_present": true,
@@ -230,6 +231,7 @@
   },
   "complete_cards": 1,
   "high_confidence_cards": 0,
+  "invalid_evidence_contracts": [],
   "invalid_minimal_validation_experiments": [],
   "issue": "Claim Card Engine",
   "missing_columns": [],
@@ -591,9 +593,9 @@
   "topic_gap_blocking": true,
   "topic_gap_decision_grade_section_papers": 0,
   "topic_gap_decision_grade_section_rate": 0.0,
-  "topic_gap_primary_section_papers": 4,
-  "topic_gap_primary_section_rate": 0.14814814814814814,
-  "topic_gap_queue_papers": 27
+  "topic_gap_primary_section_papers": 6,
+  "topic_gap_primary_section_rate": 0.1935483870967742,
+  "topic_gap_queue_papers": 31
 }
 ```
 

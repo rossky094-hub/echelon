@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-30T23:03:25Z`
+- Audit: `2026-05-30T23:21:33Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -34,11 +34,11 @@
 
 | Bottleneck | Evidence | Branch Hypothesis | Candidate Papers | Status |
 | --- | --- | --- | ---: | --- |
-| brightness | True | True | 6 | pass |
-| indistinguishability | False | True | 6 | fail |
+| brightness | True | True | 5 | pass |
+| indistinguishability | False | True | 5 | fail |
 | collection efficiency | True | True | 5 | pass |
 | scalability | True | True | 3 | pass |
-| integration | True | True | 6 | pass |
+| integration | True | True | 5 | pass |
 
 ## Interpretation
 
@@ -58,7 +58,7 @@
 
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
-| missing_bottleneck_section_evidence | indistinguishability | 100 | 6 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
+| missing_bottleneck_section_evidence | indistinguishability | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

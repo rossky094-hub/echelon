@@ -1095,14 +1095,33 @@ def load_direction_claim_cards(conn_v14: sqlite3.Connection) -> dict[str, list[d
         row[0] for row in conn_v14.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     }:
         return {}
+    cols = {row[1] for row in conn_v14.execute("PRAGMA table_info(direction_claim_cards)").fetchall()}
+    evidence_grade_sql = (
+        "c.evidence_grade AS evidence_grade"
+        if "evidence_grade" in cols
+        else "'claim_card_evidence_unknown' AS evidence_grade"
+    )
+    uncertainty_sql = (
+        "c.uncertainty_reasons_json AS uncertainty_reasons_json"
+        if "uncertainty_reasons_json" in cols
+        else "'[]' AS uncertainty_reasons_json"
+    )
+    evidence_objects_sql = (
+        "c.evidence_objects_json AS evidence_objects_json"
+        if "evidence_objects_json" in cols
+        else "'[]' AS evidence_objects_json"
+    )
     rows = conn_v14.execute(
-        """
+        f"""
         SELECT
             c.claim_card_id,
             c.direction_id,
             c.direction_name,
             c.evidence_strength_level,
+            {evidence_grade_sql},
             c.claim_scope,
+            {uncertainty_sql},
+            {evidence_objects_sql},
             c.five_question_complete,
             c.high_confidence_eligible,
             c.quality_gate_json,
@@ -1125,7 +1144,10 @@ def load_direction_claim_cards(conn_v14: sqlite3.Connection) -> dict[str, list[d
             "direction_id": item.get("direction_id"),
             "direction_name": item.get("direction_name"),
             "evidence_strength_level": item.get("evidence_strength_level"),
+            "evidence_grade": item.get("evidence_grade"),
             "claim_scope": item.get("claim_scope"),
+            "uncertainty_reasons": json.loads(item.get("uncertainty_reasons_json") or "[]"),
+            "evidence_objects": json.loads(item.get("evidence_objects_json") or "[]"),
             "five_question_complete": int(item.get("five_question_complete") or 0),
             "high_confidence_eligible": int(item.get("high_confidence_eligible") or 0),
             "quality_gate": json.loads(item.get("quality_gate_json") or "{}"),

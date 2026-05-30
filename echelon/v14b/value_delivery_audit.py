@@ -843,6 +843,10 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
         "minimal_validation_experiment_json",
         "five_question_complete",
         "high_confidence_eligible",
+        "evidence_grade",
+        "claim_scope",
+        "uncertainty_reasons_json",
+        "evidence_objects_json",
         "quality_gate_json",
     }
     if not table_exists(conn_v14, "direction_claim_cards"):
@@ -864,6 +868,7 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
         or 0
     )
     invalid_experiments: list[str] = []
+    invalid_evidence_contracts: list[dict[str, Any]] = []
     if required_cols.issubset(cols):
         rows = conn_v14.execute(
             """
@@ -884,6 +889,29 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
                 and experiment.get("falsification_conditions")
             ):
                 invalid_experiments.append(str(row[0]))
+        contract_rows = conn_v14.execute(
+            """
+            SELECT claim_card_id, evidence_grade, claim_scope,
+                   uncertainty_reasons_json, evidence_objects_json
+            FROM direction_claim_cards
+            LIMIT 100
+            """
+        ).fetchall()
+        for row in contract_rows:
+            claim_card_id, evidence_grade, claim_scope, uncertainty_raw, objects_raw = row
+            reasons = _loads(uncertainty_raw, None)
+            objects = _loads(objects_raw, None)
+            missing: list[str] = []
+            if not evidence_grade:
+                missing.append("evidence_grade")
+            if not claim_scope:
+                missing.append("claim_scope")
+            if not isinstance(reasons, list):
+                missing.append("uncertainty_reasons_json")
+            if not isinstance(objects, list) or not objects:
+                missing.append("evidence_objects_json")
+            if missing:
+                invalid_evidence_contracts.append({"claim_card_id": claim_card_id, "missing": missing})
     source_checks = {
         "step13_requires_success_and_falsification": False,
         "ui_renders_success_and_falsification": False,
@@ -892,7 +920,14 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
         source_checks = {
             "step13_requires_success_and_falsification": _source_contains(
                 repo_root / "echelon/v14b/step13_first_principles_history.py",
-                ("success_criteria", "falsification_conditions", "minimal validation experiment with success and falsification criteria"),
+                (
+                    "success_criteria",
+                    "falsification_conditions",
+                    "minimal validation experiment with success and falsification criteria",
+                    "evidence_grade",
+                    "uncertainty_reasons_json",
+                    "evidence_objects_json",
+                ),
             ),
             "ui_renders_success_and_falsification": _source_contains(
                 repo_root / "web/visual-graph/app.js",
@@ -903,6 +938,7 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
         "required_columns_present": required_cols.issubset(cols),
         "no_high_confidence_without_complete_card": bad_high == 0,
         "complete_cards_have_falsifiable_validation_experiment": not invalid_experiments,
+        "claim_cards_carry_persisted_evidence_contract": not invalid_evidence_contracts,
         **source_checks,
     }
     if not all(checks.values()):
@@ -919,6 +955,7 @@ def audit_claim_card_engine(conn_v14: sqlite3.Connection, repo_root: Path | None
         "high_confidence_cards": high,
         "bad_high_confidence_cards": bad_high,
         "invalid_minimal_validation_experiments": invalid_experiments,
+        "invalid_evidence_contracts": invalid_evidence_contracts,
         "checks": checks,
         "missing_columns": sorted(required_cols - cols),
         "policy": (

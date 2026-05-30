@@ -102,6 +102,13 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     claim_rows = conn_v14.execute(
         "SELECT COUNT(*), SUM(five_question_complete), SUM(high_confidence_eligible) FROM direction_claim_cards"
     ).fetchone()
+    claim_contract = conn_v14.execute(
+        """
+        SELECT evidence_grade, claim_scope, uncertainty_reasons_json, evidence_objects_json
+        FROM direction_claim_cards
+        LIMIT 1
+        """
+    ).fetchone()
     future_gate = conn_v14.execute(
         "SELECT claim_card_complete, high_confidence_eligible, claim_scope, quality_gate_json FROM future_directions LIMIT 1"
     ).fetchone()
@@ -110,6 +117,11 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     assert any((r[1] or 0) > 0 for r in rows)
     assert lineage_n > 0
     assert claim_rows[0] >= 1
+    assert claim_contract is not None
+    assert claim_contract[0]
+    assert claim_contract[1]
+    assert isinstance(json.loads(claim_contract[2]), list)
+    assert json.loads(claim_contract[3])
     assert future_gate is not None
     gate = json.loads(future_gate[3])
     assert future_gate[0] == 0
@@ -167,6 +179,15 @@ def test_step13_complete_exploratory_card_is_not_high_confidence():
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
+    assert cards[0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
+    assert any(
+        "high-confidence" in reason
+        for reason in json.loads(cards[0]["uncertainty_reasons_json"])
+    )
+    assert any(
+        obj["type"] == "minimal_validation_experiment"
+        for obj in json.loads(cards[0]["evidence_objects_json"])
+    )
     experiment = json.loads(cards[0]["minimal_validation_experiment_json"])
     assert experiment["success_criteria"]
     assert experiment["falsification_conditions"]
@@ -230,6 +251,7 @@ def test_step13_weak_section_provenance_blocks_high_confidence():
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["high_confidence_eligible"] == 0
     assert cards[0]["evidence_strength_level"] == "weak"
+    assert cards[0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
     assert gate["section_provenance"]["weak"] == 1
     assert gate["candidate_score"] == 0.86
     assert gate["high_confidence_gates"]["candidate_score_ready"] is True
@@ -293,6 +315,7 @@ def test_step13_stale_strong_sections_block_high_confidence():
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["evidence_strength_level"] == "strong"
     assert cards[0]["high_confidence_eligible"] == 0
+    assert cards[0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
     assert gate["high_confidence_gates"]["section_evidence_strong"] is True
     assert gate["high_confidence_gates"]["section_provenance_ready"] is True
     assert gate["high_confidence_gates"]["section_decision_grade_ready"] is False
@@ -354,6 +377,12 @@ def test_step13_current_contract_decision_grade_sections_can_be_high_confidence(
     assert cards[0]["five_question_complete"] == 1
     assert cards[0]["high_confidence_eligible"] == 1
     assert cards[0]["claim_scope"] == "validated_candidate"
+    assert cards[0]["evidence_grade"] == "decision_grade_claim_card"
+    assert json.loads(cards[0]["uncertainty_reasons_json"]) == []
+    assert any(
+        obj["type"] == "claim_card_unresolved_bottleneck"
+        for obj in json.loads(cards[0]["evidence_objects_json"])
+    )
     assert gate["high_confidence_gates"]["section_decision_grade_ready"] is True
     assert gate["section_provenance"]["decision_grade"] == 3
     assert unresolved["section_provenance"]["current_contract"] == 3

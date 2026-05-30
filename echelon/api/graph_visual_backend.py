@@ -4092,7 +4092,8 @@ def _build_rd_radar(
         item["minimal_validation_experiment"] = _format_minimal_validation_experiment(
             card.get("minimal_validation_experiment")
         )
-        item["evidence_objects"] = _claim_card_evidence_objects(item)
+        persisted_objects = card.get("evidence_objects") if isinstance(card.get("evidence_objects"), list) else []
+        item["evidence_objects"] = persisted_objects or _claim_card_evidence_objects(item)
         item["evidence_papers"] = [
             {
                 "paper_id": obj.get("paper_id"),
@@ -5277,8 +5278,24 @@ def get_topic_lens(
         if _table_exists(conn, "future_directions"):
             has_claim_cards = _table_exists(conn, "direction_claim_cards")
             claim_join = "LEFT JOIN direction_claim_cards c ON c.direction_id = f.direction_id" if has_claim_cards else ""
+            claim_card_cols = _table_columns(conn, "direction_claim_cards") if has_claim_cards else set()
+            card_evidence_grade_sql = (
+                "c.evidence_grade AS claim_card_evidence_grade"
+                if "evidence_grade" in claim_card_cols
+                else "'claim_card_evidence_unknown' AS claim_card_evidence_grade"
+            )
+            card_uncertainty_sql = (
+                "c.uncertainty_reasons_json AS claim_card_uncertainty_reasons_json"
+                if "uncertainty_reasons_json" in claim_card_cols
+                else "'[]' AS claim_card_uncertainty_reasons_json"
+            )
+            card_evidence_objects_sql = (
+                "c.evidence_objects_json AS claim_card_evidence_objects_json"
+                if "evidence_objects_json" in claim_card_cols
+                else "'[]' AS claim_card_evidence_objects_json"
+            )
             claim_cols = (
-                """
+                f"""
                 , c.claim_card_id,
                   c.root_constraint_json,
                   c.attempts_last_10y_json,
@@ -5286,6 +5303,9 @@ def get_topic_lens(
                   c.unresolved_bottleneck_json,
                   c.minimal_validation_experiment_json,
                   c.evidence_strength_level,
+                  {card_evidence_grade_sql},
+                  {card_uncertainty_sql},
+                  {card_evidence_objects_sql},
                   c.five_question_complete,
                   c.high_confidence_eligible,
                   c.quality_gate_json
@@ -5299,6 +5319,9 @@ def get_topic_lens(
                   '{}' AS unresolved_bottleneck_json,
                   '{}' AS minimal_validation_experiment_json,
                   'unknown' AS evidence_strength_level,
+                  'claim_card_evidence_unknown' AS claim_card_evidence_grade,
+                  '[]' AS claim_card_uncertainty_reasons_json,
+                  '[]' AS claim_card_evidence_objects_json,
                   0 AS five_question_complete,
                   0 AS high_confidence_eligible,
                   '{}' AS quality_gate_json
@@ -5339,6 +5362,9 @@ def get_topic_lens(
                         "unresolved_bottleneck": _loads(item.pop("unresolved_bottleneck_json", "{}"), {}),
                         "minimal_validation_experiment": _loads(item.pop("minimal_validation_experiment_json", "{}"), {}),
                         "evidence_strength_level": item.pop("evidence_strength_level", "unknown"),
+                        "evidence_grade": item.pop("claim_card_evidence_grade", "claim_card_evidence_unknown"),
+                        "uncertainty_reasons": _loads(item.pop("claim_card_uncertainty_reasons_json", "[]"), []),
+                        "evidence_objects": _loads(item.pop("claim_card_evidence_objects_json", "[]"), []),
                         "five_question_complete": bool(item.pop("five_question_complete", 0)),
                         "high_confidence_eligible": bool(item.pop("high_confidence_eligible", 0)),
                         "quality_gate": _loads(item.pop("quality_gate_json", "{}"), {}),

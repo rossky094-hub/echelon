@@ -388,9 +388,12 @@ def build_lifecycle_rows(
             gate = jloads(card.get("quality_gate_json"), {})
             missing_gates = list(gate.get("missing_gates") or [])
             missing_high = list(gate.get("missing_high_confidence_gates") or [])
+            card_uncertainty = jloads(card.get("uncertainty_reasons_json"), [])
+            if isinstance(card_uncertainty, list):
+                uncertainty.extend(str(reason) for reason in card_uncertainty if str(reason or "").strip())
             complete = int(card.get("five_question_complete") or 0) == 1
             high = int(card.get("high_confidence_eligible") or 0) == 1
-            evidence_grade = str(card.get("evidence_strength_level") or "metadata_only")
+            evidence_grade = str(card.get("evidence_grade") or card.get("evidence_strength_level") or "metadata_only")
             claim_scope = str(card.get("claim_scope") or direction.get("claim_scope") or "candidate_pool_only")
             if high:
                 state = "fused_to_radar_claim_card"

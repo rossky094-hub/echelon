@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T23:03:46Z`
+- generated_at: `2026-05-30T23:21:52Z`
 
 ## Reference Linkage
 
@@ -16,11 +16,11 @@
 
 ## Section Evidence
 
-- section rows: 5,353
+- section rows: 5,394
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 162
-- decision-grade primary section papers: 162
+- current parser-contract primary section papers: 225
+- decision-grade primary section papers: 225
 
 ### High-Value Priority Coverage
 
@@ -28,27 +28,27 @@
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 12 | 5,946 |
 | active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 0 | 3,000 |
-| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 52 | 2,007 |
-| main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 73 | 73 | 1,000 |
-| resolution_evidence | 464 | 206 | 170 | 170 | 26 | 26 | 464 |
-| future_endpoint | 291 | 291 | 109 | 109 | 40 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 62 | 62 | 268 |
-| topic:metalens | 257 | 86 | 96 | 96 | 16 | 16 | 257 |
-| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 15 | 227 |
-| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 10 | 151 |
-| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 0 | 21 |
+| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 59 | 59 | 2,007 |
+| main_path_node | 1,101 | 1,101 | 237 | 237 | 95 | 95 | 1,101 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 114 | 114 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 34 | 34 | 464 |
+| future_endpoint | 291 | 291 | 109 | 109 | 45 | 45 | 291 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 101 | 101 | 268 |
+| topic:metalens | 257 | 86 | 96 | 96 | 18 | 18 | 257 |
+| topic:quantum light source | 226 | 73 | 40 | 40 | 12 | 12 | 226 |
+| topic:photonic crystal cavity | 150 | 45 | 20 | 20 | 9 | 9 | 150 |
+| topic_gap_key_turning_section | 23 | 10 | 6 | 6 | 0 | 0 | 23 |
 | topic:metasurface holography | 20 | 9 | 7 | 7 | 4 | 4 | 20 |
 | topic_gap_claim_card_inputs | 14 | 14 | 11 | 11 | 11 | 11 | 14 |
-| topic_gap_bottleneck_evidence | 11 | 1 | 4 | 4 | 4 | 4 | 11 |
+| topic_gap_bottleneck_evidence | 10 | 1 | 1 | 1 | 0 | 0 | 10 |
 
 ### Latest Section Ingest Outcomes
 
 | outcome | papers |
 | --- | ---: |
 | no_target_sections | 4,976 |
-| success_primary | 1,852 |
-| already_has_primary | 437 |
+| success_primary | 1,903 |
+| already_has_primary | 416 |
 | success_secondary_only | 283 |
 | pdf_download_failed | 46 |
 | parse_no_blocks | 1 |
@@ -57,19 +57,19 @@
 
 | event | count |
 | --- | ---: |
-| pdf_graphics_warning | 55,732 |
+| pdf_graphics_warning | 55,863 |
 | download_failure | 22,646 |
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 188/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 251/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `188/8592`
-- rows / papers / primary papers: `5,353` / `3,020` / `3,020`
+- progress: `251/8592`
+- rows / papers / primary papers: `5,394` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.

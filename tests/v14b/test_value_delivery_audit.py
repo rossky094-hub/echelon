@@ -67,7 +67,10 @@ def _make_v14(path: Path) -> None:
             unresolved_bottleneck_json TEXT,
             minimal_validation_experiment_json TEXT,
             evidence_strength_level TEXT,
+            evidence_grade TEXT,
             claim_scope TEXT,
+            uncertainty_reasons_json TEXT,
+            evidence_objects_json TEXT,
             five_question_complete INTEGER,
             high_confidence_eligible INTEGER,
             quality_gate_json TEXT
@@ -100,8 +103,28 @@ def _make_v14(path: Path) -> None:
             "falsification_conditions": ["metric does not improve"],
         }
     )
-    conn.execute("INSERT INTO direction_claim_cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                 ("cc1", 1, "d", "{}", "[]", "{}", "{}", minimal_experiment, "moderate", "exploratory", 1, 0, "{}"))
+    evidence_objects = json.dumps([{"type": "claim_card", "id": "cc1"}])
+    conn.execute(
+        "INSERT INTO direction_claim_cards VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "cc1",
+            1,
+            "d",
+            "{}",
+            "[]",
+            "{}",
+            "{}",
+            minimal_experiment,
+            "moderate",
+            "complete_claim_card_pending_high_confidence_evidence",
+            "exploratory",
+            json.dumps(["missing high-confidence gate: fixture"]),
+            evidence_objects,
+            1,
+            0,
+            "{}",
+        ),
+    )
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute("INSERT INTO visual_edges VALUES ('future')")
     conn.execute(
@@ -293,7 +316,8 @@ def _write_product_sources(root: Path) -> None:
         "section_evidence_strong section_provenance_ready section_decision_grade_ready "
         "SECTION_PARSER_CONTRACT_VERSION missing_high_confidence_gates "
         "candidate_score_ready \"candidate_score\": candidate_score future candidate score "
-        "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria\n",
+        "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria "
+        "evidence_grade uncertainty_reasons_json evidence_objects_json\n",
         encoding="utf-8",
     )
     (v14 / "step9_report.py").write_text(
@@ -575,6 +599,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"
     assert claim_card_gate["checks"]["complete_cards_have_falsifiable_validation_experiment"] is True
+    assert claim_card_gate["checks"]["claim_cards_carry_persisted_evidence_contract"] is True
     assert claim_card_gate["checks"]["step13_requires_success_and_falsification"] is True
     assert claim_card_gate["checks"]["ui_renders_success_and_falsification"] is True
     high_conf_contract = next(
