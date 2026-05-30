@@ -85,6 +85,17 @@ def _make_visual_db(path):
             reason_json TEXT,
             PRIMARY KEY(mode, rank)
         );
+        CREATE TABLE visual_story_steps (
+            story_step_id TEXT PRIMARY KEY,
+            order_idx INTEGER NOT NULL,
+            year_start INTEGER,
+            year_end INTEGER,
+            title TEXT,
+            narrative TEXT,
+            focus_cluster_id TEXT,
+            focus_papers_json TEXT,
+            evidence_json TEXT
+        );
         """
     )
     try:
@@ -227,6 +238,31 @@ def _make_visual_db(path):
         VALUES ('bottleneck', 1, 'p1', 0.95, '{"why":"unresolved limitation"}')
         """
     )
+    conn.execute(
+        """
+        INSERT INTO visual_story_steps
+            (story_step_id, order_idx, year_start, year_end, title, narrative,
+             focus_cluster_id, focus_papers_json, evidence_json)
+        VALUES ('story:2020-2024', 1, 2020, 2024, 'Branch expansion',
+                'Time-sliced view of active optics branches.', 'C0001', ?, ?)
+        """,
+        (
+            json.dumps([{"paper_id": "p1", "title": "Laser photonics bottleneck", "year": 2024}]),
+            json.dumps({"active_clusters": ["C0001"]}),
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO visual_story_steps
+            (story_step_id, order_idx, year_start, year_end, title, narrative,
+             focus_cluster_id, focus_papers_json, evidence_json)
+        VALUES ('story:future', 2, 2024, 2029, 'Future growth candidates',
+                'Predicted growth arcs and unresolved limitations.', NULL, '[]', ?)
+        """,
+        (
+            json.dumps({"source": "predicted_future_edges + limitation_atoms + direction_claim_cards"}),
+        ),
+    )
     conn.commit()
     conn.close()
 
@@ -338,6 +374,26 @@ def test_visual_clusters_branch_lineages_carry_evidence_contract(tmp_path, monke
     assert lineage["uncertainty_reasons"]
     assert lineage["required_evidence"]
     assert lineage["evidence_objects"][0]["type"] == "branch_lineage"
+
+
+def test_visual_story_steps_carry_evidence_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get("/graph/visual/story", headers=VIEWER_HEADERS)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    story = {step["story_step_id"]: step for step in data["story_steps"]}
+    assert story["story:2020-2024"]["claim_scope"] == "timeline_context_only"
+    assert story["story:2020-2024"]["evidence_grade"] == "metadata_cluster_timeline_context"
+    assert story["story:2020-2024"]["uncertainty_reasons"]
+    assert story["story:2020-2024"]["required_evidence"]
+    assert any(obj["type"] == "paper" for obj in story["story:2020-2024"]["evidence_objects"])
+    assert story["story:future"]["claim_scope"] == "candidate_pool_only"
+    assert story["story:future"]["evidence_grade"] == "future_candidate_story_context"
+    assert any("Claim Card" in reason for reason in story["story:future"]["uncertainty_reasons"])
 
 
 def test_visual_topic_lens_expands_to_cluster_context(tmp_path, monkeypatch):

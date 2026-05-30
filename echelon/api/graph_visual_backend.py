@@ -3145,6 +3145,90 @@ def _branch_lineage_contract(item: dict[str, Any], lineage_payload: dict[str, An
     }
 
 
+def _story_focus_paper_object(paper: Any) -> dict[str, Any] | None:
+    if isinstance(paper, dict):
+        pid = paper.get("paper_id") or paper.get("id")
+        data = {
+            "paper_id": pid,
+            "title": paper.get("title"),
+            "year": paper.get("year"),
+            "cluster_id": paper.get("cluster_id"),
+            "branch_id": paper.get("branch_id"),
+        }
+    else:
+        data = {"paper_id": str(paper) if paper else None}
+    return _paper_evidence_object(
+        data,
+        role="story_focus_paper",
+        source="visual_story_steps",
+        why="paper used to anchor this Story Mode time slice",
+    )
+
+
+def _story_step_contract(item: dict[str, Any]) -> dict[str, Any]:
+    evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
+    step_id = str(item.get("story_step_id") or "")
+    is_future = step_id.endswith(":future") or "future" in step_id or "predicted_future_edges" in str(evidence.get("source") or "")
+    if is_future:
+        claim_scope = "candidate_pool_only"
+        evidence_grade = "future_candidate_story_context"
+        required_evidence = [
+            "rolling held-out-year calibration audit",
+            "Step6 fusion evidence",
+            "complete Step13 Claim Card",
+            "section-level bottleneck evidence",
+        ]
+        uncertainty = [
+            "Story Mode future slice is a candidate-generation view, not a conclusion",
+            "future candidates cannot enter Radar without complete Claim Cards",
+        ]
+    else:
+        claim_scope = "timeline_context_only"
+        evidence_grade = "metadata_cluster_timeline_context"
+        required_evidence = [
+            "linked citation/main-path support",
+            "branch_lineages evidence for parent-child splits",
+            "representative papers with local primary section evidence",
+            "bottleneck or Claim Card evidence before decision claims",
+        ]
+        uncertainty = [
+            "Story Mode is explanatory timeline context, not decision-grade evidence",
+            "cluster activity does not prove causal branch evolution without branch lineage evidence",
+        ]
+    focus_papers = item.get("focus_papers") if isinstance(item.get("focus_papers"), list) else []
+    if not focus_papers:
+        uncertainty.append("story step has no focus papers attached")
+    story_object = {
+        "type": "visual_story_step",
+        "role": "story_timeline_context",
+        "source": "visual_story_steps",
+        "id": step_id,
+        "label": item.get("title") or step_id,
+        "relationship": "timeline_slice",
+        "description": item.get("narrative"),
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "focus_cluster_id": item.get("focus_cluster_id"),
+        "year_start": item.get("year_start"),
+        "year_end": item.get("year_end"),
+        "click_target": {"kind": "story_step", "id": step_id},
+    }
+    evidence_objects = _compact_evidence_objects(
+        [
+            story_object,
+            *[_story_focus_paper_object(p) for p in focus_papers[:5]],
+        ],
+        limit=8,
+    )
+    return {
+        "claim_scope": claim_scope,
+        "evidence_grade": evidence_grade,
+        "uncertainty_reasons": sorted(set(uncertainty)),
+        "required_evidence": required_evidence,
+        "evidence_objects": evidence_objects,
+    }
+
+
 def _extract_rep_ids(representatives: Any, max_n: int = 5) -> list[str]:
     reps = representatives
     if isinstance(reps, str):
@@ -5328,6 +5412,7 @@ def get_visual_story_steps() -> dict:
         item = dict(row)
         item["focus_papers"] = _loads(item.pop("focus_papers_json", None), [])
         item["evidence"] = _loads(item.pop("evidence_json", None), {})
+        item.update(_story_step_contract(item))
         steps.append(item)
     return {
         "schema_version": SCHEMA_VERSION,

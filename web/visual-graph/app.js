@@ -929,6 +929,18 @@ function renderStory() {
         <strong>${esc(step.title || step.story_step_id)}</strong><br>
         <small>${esc(step.year_start || "")}-${esc(step.year_end || "")} / ${esc(step.focus_cluster_id || "")}</small>
         <p>${esc(step.narrative || "")}</p>
+        <div class="pill-row">
+          <span class="pill">${esc(step.claim_scope || "timeline_context_only")}</span>
+          <span class="pill">${esc(step.evidence_grade || "metadata_cluster_timeline_context")}</span>
+        </div>
+        ${(step.required_evidence || []).length ? `<p class="mini"><strong>叙事成立还需要：</strong>${(step.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+        ${(step.uncertainty_reasons || []).length ? `
+          <details>
+            <summary>Story uncertainty (${fmt((step.uncertainty_reasons || []).length)})</summary>
+            ${(step.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+          </details>
+        ` : ""}
+        ${renderEvidenceObjects(step.evidence_objects || [], 5)}
       </button>
     </div>
   `).join("") || '<div class="item">Story steps are not materialized yet.</div>';

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T15:25:12Z`
+- generated_at: `2026-05-30T15:31:13Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 12, "warn": 1}`
 
@@ -18,7 +18,7 @@
 | 8 | Topic Dossier Product Value | pass | Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration. |
 | 9 | Evolution Evidence Map Contract | pass | Each Evidence Map layer and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty. |
 | 10 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
-| 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons. |
+| 11 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, and Story Mode timeline narratives must carry claim_scope, evidence_grade, and uncertainty_reasons. |
 | 12 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
 | 13 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression entrypoint must default to the full benchmark suite. |
 | 14 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
@@ -34,29 +34,29 @@
   "metrics": {
     "linked_ref_rate": 0.13870574440224812,
     "openalex_w_rate": 0.6438410572114603,
-    "primary_section_papers": 2615,
+    "primary_section_papers": 2617,
     "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_status": "running_or_unknown",
     "section_provenance": {
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 378,
+        "strong": 380,
         "weak": 2237
       },
-      "primary_section_papers": 2615,
-      "primary_section_rows": 4566,
+      "primary_section_papers": 2617,
+      "primary_section_rows": 4571,
       "strategy_counts": {
         "embedded_heading": 19,
-        "explicit_heading": 458,
-        "heading_continuation": 661,
-        "inline_heading": 238,
+        "explicit_heading": 462,
+        "heading_continuation": 666,
+        "inline_heading": 239,
         "legacy_unknown_strategy": 3886,
         "loose_inline_heading": 11,
         "parser_hint": 8
       },
-      "strong_or_moderate_papers": 378,
+      "strong_or_moderate_papers": 380,
       "weak_only_papers": 2237,
-      "weak_only_rate": 0.8554493307839388
+      "weak_only_rate": 0.8547955674436377
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -340,18 +340,20 @@
 {
   "checks": {
     "api_returns_history_contract": true,
+    "api_visual_story_steps_carry_contract": true,
     "history_main_path_has_claim_scope": true,
     "history_main_path_has_evidence_grade": true,
     "history_main_path_has_evidence_objects": true,
     "history_main_path_has_required_evidence": true,
     "low_linked_refs_add_uncertainty": true,
     "main_path_edges_inherit_uncertainty": true,
-    "ui_renders_main_path_uncertainty": true
+    "ui_renders_main_path_uncertainty": true,
+    "ui_story_mode_renders_contract": true
   },
   "claim_scope": "main_path_context_low_linked_refs",
   "evidence_grade": "citation_backbone_partial_low_linked_refs",
   "issue": "Main Path Uncertainty Contract",
-  "policy": "When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons.",
+  "policy": "When linked refs are below 30%, citation evolution, main-path claims, and Story Mode timeline narratives must carry claim_scope, evidence_grade, and uncertainty_reasons.",
   "status": "pass",
   "uncertainty_reasons": [
     "broader field main-path anchors are separated from topic-specific turning papers",

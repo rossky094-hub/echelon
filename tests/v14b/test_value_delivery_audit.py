@@ -125,6 +125,8 @@ def _write_product_sources(root: Path) -> None:
         "def _build_topic_branch_splits(branch_dossiers): branch_contract_by_id parent_branch_id lineage_status split_confidence\n"
         "def _branch_lineage_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
         "def get_visual_clusters(): return _branch_lineage_contract\n"
+        "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
+        "def get_visual_story_steps(): return _story_step_contract\n"
         "def _limitation_is_resolved(): limitation_resolutions resolved_evidence_count unresolved_evidence_count resolution_status\n"
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
@@ -141,6 +143,7 @@ def _write_product_sources(root: Path) -> None:
     (web / "app.js").write_text(
         "function renderTopicReadiness() { return topic_readiness; }\n"
         "function renderClusters() { return lineage.claim_scope + lineage.evidence_grade + lineage.uncertainty_reasons + renderEvidenceObjects(lineage.evidence_objects); }\n"
+        "function renderStory() { return step.claim_scope + step.evidence_grade + step.uncertainty_reasons + renderEvidenceObjects(step.evidence_objects); }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { return renderComboContract('Fusion value'); }\n"
@@ -420,6 +423,8 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     main_path_gate = next(g for g in result["gates"] if g["issue"] == "Main Path Uncertainty Contract")
     assert main_path_gate["status"] == "pass"
     assert main_path_gate["checks"]["low_linked_refs_add_uncertainty"] is True
+    assert main_path_gate["checks"]["api_visual_story_steps_carry_contract"] is True
+    assert main_path_gate["checks"]["ui_story_mode_renders_contract"] is True
     high_conf_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card High-Confidence Evidence Contract")
     assert high_conf_gate["status"] == "pass"
     assert high_conf_gate["checks"]["no_high_confidence_card_without_section_evidence"] is True

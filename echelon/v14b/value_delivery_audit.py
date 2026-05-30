@@ -1374,6 +1374,8 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
     source_checks = {
         "api_returns_history_contract": False,
         "ui_renders_main_path_uncertainty": False,
+        "api_visual_story_steps_carry_contract": False,
+        "ui_story_mode_renders_contract": False,
     }
     if repo_root is not None:
         source_checks = {
@@ -1385,6 +1387,26 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
                 repo_root / "web/visual-graph/app.js",
                 ("Main-path uncertainty", "history.claim_scope", "history.evidence_grade"),
             ),
+            "api_visual_story_steps_carry_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _story_step_contract",
+                    "get_visual_story_steps",
+                    "timeline_context_only",
+                    "future_candidate_story_context",
+                    "evidence_objects",
+                ),
+            ),
+            "ui_story_mode_renders_contract": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderStory",
+                    "step.claim_scope",
+                    "step.evidence_grade",
+                    "step.uncertainty_reasons",
+                    "renderEvidenceObjects(step.evidence_objects",
+                ),
+            ),
         }
     checks.update(source_checks)
     return {
@@ -1394,7 +1416,7 @@ def audit_main_path_uncertainty_contract(repo_root: Path | None = None) -> dict[
         "claim_scope": contract.get("claim_scope"),
         "evidence_grade": contract.get("evidence_grade"),
         "uncertainty_reasons": contract.get("uncertainty_reasons"),
-        "policy": "When linked refs are below 30%, citation evolution and main-path claims must carry claim_scope, evidence_grade, and uncertainty_reasons.",
+        "policy": "When linked refs are below 30%, citation evolution, main-path claims, and Story Mode timeline narratives must carry claim_scope, evidence_grade, and uncertainty_reasons.",
     }
 
 
