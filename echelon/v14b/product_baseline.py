@@ -340,6 +340,25 @@ def infer_current_primary_section(row: dict[str, Any]) -> int:
     return max(0, min(total, int(round(rate * total))))
 
 
+def infer_decision_grade_primary_section(row: dict[str, Any]) -> int:
+    raw = row.get("decision_grade_primary_section")
+    if raw not in (None, ""):
+        return int(raw or 0)
+    coverage = row.get("coverage_json")
+    if not coverage:
+        return 0
+    try:
+        payload = json.loads(str(coverage))
+    except (TypeError, ValueError):
+        return 0
+    try:
+        rate = float(payload.get("decision_grade_primary_section_rate") or 0.0)
+        total = int(row.get("total") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(total, int(round(rate * total))))
+
+
 def table_count(conn: sqlite3.Connection, table: str) -> int:
     if not table_exists(conn, table):
         return 0
@@ -502,11 +521,16 @@ def collect_v14_metrics(db_v14: Path) -> dict[str, Any]:
                     if "current_primary_section" in cols
                     else "NULL AS current_primary_section"
                 )
+                decision_expr = (
+                    "decision_grade_primary_section"
+                    if "decision_grade_primary_section" in cols
+                    else "NULL AS decision_grade_primary_section"
+                )
                 coverage_expr = "coverage_json" if "coverage_json" in cols else "NULL AS coverage_json"
                 for row in conn.execute(
                     f"""
                     SELECT category, total, in_top_n, any_section, primary_section,
-                           {current_expr}, eligible_pdf, {coverage_expr}
+                           {current_expr}, {decision_expr}, eligible_pdf, {coverage_expr}
                     FROM section_priority_summary
                     WHERE audit_ts = ?
                     ORDER BY total DESC
@@ -515,6 +539,7 @@ def collect_v14_metrics(db_v14: Path) -> dict[str, Any]:
                 ).fetchall():
                     item = dict(row)
                     item["current_primary_section"] = infer_current_primary_section(item)
+                    item["decision_grade_primary_section"] = infer_decision_grade_primary_section(item)
                     item.pop("coverage_json", None)
                     rows.append(item)
             metrics["section_priority_latest_audit_ts"] = latest
@@ -815,8 +840,8 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
                 "",
                 "## Section Evidence Priority Coverage",
                 "",
-                "| Category | Total | In topN | Any section | Primary section | Current parser primary | Eligible PDF |",
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| Category | Total | In topN | Any section | Primary section | Current parser primary | Decision-grade primary | Eligible PDF |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in v14["section_priority_summary"][:12]:
@@ -825,6 +850,7 @@ def render_snapshot_md(snapshot: dict[str, Any]) -> str:
                 f"{int(row.get('in_top_n') or 0):,} | {int(row.get('any_section') or 0):,} | "
                 f"{int(row.get('primary_section') or 0):,} | "
                 f"{int(row.get('current_primary_section') or 0):,} | "
+                f"{int(row.get('decision_grade_primary_section') or 0):,} | "
                 f"{int(row.get('eligible_pdf') or 0):,} |"
             )
     if topic_suite:

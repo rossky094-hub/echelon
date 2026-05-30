@@ -151,7 +151,9 @@ def test_evidence_bone_audit_classifies_refs_sections_and_logs(tmp_path):
     assert taxonomy["arxiv_unlinked"] == 1
     assert result["section_coverage"]["primary_section_papers"] == 1
     assert result["section_coverage"]["current_contract_primary_section_papers"] == 1
+    assert result["section_coverage"]["decision_grade_primary_section_papers"] == 0
     assert result["section_coverage"]["priority_summary"][0]["current_primary_section"] == 2
+    assert result["section_coverage"]["priority_summary"][0]["decision_grade_primary_section"] == 0
     assert result["frontfill_log_taxonomy"]["event_counts"]["low_yield_scan"] == 1
     assert result["frontfill_health"]["status"] == "soft_stall"
     assert result["frontfill_health"]["no_evidence_done_delta"] == 210

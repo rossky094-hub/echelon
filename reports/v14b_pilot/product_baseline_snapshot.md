@@ -1,6 +1,6 @@
 # V14B Product Baseline Snapshot
 
-- Snapshot: `2026-05-30T22:53:20Z`
+- Snapshot: `2026-05-30T23:03:34Z`
 - Main DB: `db/echelon_library.sqlite3`
 - V14 DB: `db/v14_pilot.sqlite3`
 
@@ -27,7 +27,7 @@
 - main_path_edges: 277,526
 - future_candidate_edges_table: 1,000
 - section_priority_papers: 12,797
-- section_priority_summary: 1,562
+- section_priority_summary: 1,592
 - subgraph_edges: 38,538
 - subgraph_nodes: 5,000
 - visual_clusters: 5,278
@@ -42,20 +42,20 @@
 
 ## Section Evidence Priority Coverage
 
-| Category | Total | In topN | Any section | Primary section | Current parser primary | Eligible PDF |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 5,946 |
-| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
-| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
-| main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 72 | 1,000 |
-| resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
-| future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 61 | 268 |
-| topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
-| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
-| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |
-| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 21 |
+| Category | Total | In topN | Any section | Primary section | Current parser primary | Decision-grade primary | Eligible PDF |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 12 | 5,946 |
+| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 0 | 3,000 |
+| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 52 | 2,007 |
+| main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 74 | 1,101 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 73 | 73 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 26 | 26 | 464 |
+| future_endpoint | 291 | 291 | 109 | 109 | 40 | 40 | 291 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 62 | 62 | 268 |
+| topic:metalens | 257 | 86 | 96 | 96 | 16 | 16 | 257 |
+| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 15 | 227 |
+| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 10 | 151 |
+| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 0 | 21 |
 
 ## Multi-topic Topic Baseline
 

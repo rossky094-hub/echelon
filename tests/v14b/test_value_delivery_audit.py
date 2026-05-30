@@ -203,7 +203,10 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "step5s_section_queue_audit.py").write_text(
         "from echelon.v14b.product_baseline import PRODUCT_BASELINE_TOPICS\n"
         "DEFAULT_SECTION_AUDIT_TOPICS = PRODUCT_BASELINE_TOPICS\n"
-        "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)\n",
+        "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)\n"
+        '"has_decision_grade_primary_section"\n'
+        '"decision_grade_primary_section_rate"\n'
+        'not r["has_decision_grade_primary_section"]\n',
         encoding="utf-8",
     )
     (v14 / "direction_readiness_audit.py").write_text(

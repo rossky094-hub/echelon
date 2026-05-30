@@ -2531,6 +2531,7 @@ def audit_multi_topic_regression(
     product_baseline_defaults_to_suite = True
     makefile_product_baseline_defaults_to_suite = True
     section_queue_defaults_to_multi_topic = True
+    section_queue_tracks_decision_grade_gap_coverage = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
@@ -2581,6 +2582,14 @@ def audit_multi_topic_regression(
             )
             and _source_absent(makefile_source, ("V14B_SECTION_AUDIT_TOPIC:-metalens",))
         )
+        section_queue_tracks_decision_grade_gap_coverage = _source_contains(
+            section_queue_source,
+            (
+                "has_decision_grade_primary_section",
+                "decision_grade_primary_section_rate",
+                'not r["has_decision_grade_primary_section"]',
+            ),
+        )
         stale_gold_topic_doc_phrases = (
             "topic gold fixtures",
             "Create gold expectations",
@@ -2604,6 +2613,7 @@ def audit_multi_topic_regression(
         and product_baseline_defaults_to_suite
         and makefile_product_baseline_defaults_to_suite
         and section_queue_defaults_to_multi_topic
+        and section_queue_tracks_decision_grade_gap_coverage
         and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
@@ -2626,6 +2636,7 @@ def audit_multi_topic_regression(
             "product_baseline_defaults_to_suite": product_baseline_defaults_to_suite,
             "makefile_product_baseline_defaults_to_suite": makefile_product_baseline_defaults_to_suite,
             "section_queue_defaults_to_multi_topic": section_queue_defaults_to_multi_topic,
+            "section_queue_tracks_decision_grade_gap_coverage": section_queue_tracks_decision_grade_gap_coverage,
             "current_plan_docs_avoid_gold_topic_language": current_plan_docs_avoid_gold_topic_language,
         },
         "benchmark_topics": sorted(defined),

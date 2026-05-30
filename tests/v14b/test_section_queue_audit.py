@@ -395,6 +395,7 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
         rows = conn.execute(
             """
             SELECT paper_id, reasons_json, retry_class, has_current_primary_section,
+                   has_decision_grade_primary_section,
                    section_contract_status
             FROM section_priority_papers
             """
@@ -402,17 +403,18 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
         summary_cols = {row[1] for row in conn.execute("PRAGMA table_info(section_priority_summary)").fetchall()}
         summary_row = conn.execute(
             """
-            SELECT current_primary_section, coverage_json
+            SELECT current_primary_section, decision_grade_primary_section, coverage_json
             FROM section_priority_summary
             WHERE category='main_path_node'
             """
         ).fetchone()
     finally:
         conn.close()
-    reasons = {pid: json.loads(raw) for pid, raw, _retry, _current, _status in rows}
-    retries = {pid: retry for pid, _raw, retry, _current, _status in rows}
-    current_flags = {pid: current for pid, _raw, _retry, current, _status in rows}
-    contract_status = {pid: status for pid, _raw, _retry, _current, status in rows}
+    reasons = {pid: json.loads(raw) for pid, raw, _retry, _current, _decision, _status in rows}
+    retries = {pid: retry for pid, _raw, retry, _current, _decision, _status in rows}
+    current_flags = {pid: current for pid, _raw, _retry, current, _decision, _status in rows}
+    decision_flags = {pid: decision for pid, _raw, _retry, _current, decision, _status in rows}
+    contract_status = {pid: status for pid, _raw, _retry, _current, _decision, status in rows}
     assert "main_path_node" in reasons["p_main"]
     assert "future_endpoint" in reasons["p_future"]
     assert "branch_split_driver" in reasons["p_branch"]
@@ -420,11 +422,16 @@ def test_section_queue_audit_writes_delta_queue(tmp_path):
     assert retries["p_branch"] == "no_target_sections"
     assert retries["p_done"] == "stale_parser_contract"
     assert current_flags["p_done"] == 0
+    assert decision_flags["p_done"] == 0
     assert contract_status["p_done"] == "stale_or_missing_parser_contract"
     assert "current_primary_section" in summary_cols
+    assert "decision_grade_primary_section" in summary_cols
     assert summary_row is not None
     assert summary_row[0] == 0
-    assert json.loads(summary_row[1])["current_primary_section_rate"] == 0.0
+    assert summary_row[1] == 0
+    coverage = json.loads(summary_row[2])
+    assert coverage["current_primary_section_rate"] == 0.0
+    assert coverage["decision_grade_primary_section_rate"] == 0.0
 
 
 def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path):
@@ -438,7 +445,14 @@ def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path
         conn.execute("ALTER TABLE paper_sections ADD COLUMN section_meta_json TEXT")
         conn.execute(
             "UPDATE paper_sections SET section_meta_json=? WHERE paper_id='p_done'",
-            (json.dumps({"parser_contract_version": SECTION_PARSER_CONTRACT_VERSION}),),
+            (
+                json.dumps(
+                    {
+                        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                        "extraction_strategies": ["explicit_heading"],
+                    }
+                ),
+            ),
         )
         conn.commit()
     finally:
@@ -455,18 +469,20 @@ def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path
     )
 
     assert result["current_contract_primary_section_papers"] == 1
+    assert result["decision_grade_primary_section_papers"] == 1
     conn = sqlite3.connect(str(db_v14))
     try:
         row = conn.execute(
             """
-            SELECT retry_class, has_current_primary_section, section_contract_status
+            SELECT retry_class, has_current_primary_section, has_decision_grade_primary_section,
+                   section_contract_status
             FROM section_priority_papers
             WHERE paper_id='p_done'
             """
         ).fetchone()
         summary_row = conn.execute(
             """
-            SELECT current_primary_section, coverage_json
+            SELECT current_primary_section, decision_grade_primary_section, coverage_json
             FROM section_priority_summary
             WHERE category='topic:metalens'
             """
@@ -474,12 +490,70 @@ def test_section_queue_audit_treats_current_contract_primary_as_covered(tmp_path
     finally:
         conn.close()
 
-    assert row == ("covered", 1, "current_contract")
+    assert row == ("covered", 1, 1, "decision_grade_current_contract")
     assert summary_row is not None
     assert summary_row[0] == 1
-    assert json.loads(summary_row[1])["current_primary_section_rate"] > 0
+    assert summary_row[1] == 1
+    coverage = json.loads(summary_row[2])
+    assert coverage["current_primary_section_rate"] > 0
+    assert coverage["decision_grade_primary_section_rate"] > 0
     queue_text = (tmp_path / "data" / "section_delta_queue.csv").read_text(encoding="utf-8")
     assert "p_done" not in queue_text
+
+
+def test_section_queue_audit_keeps_weak_current_contract_sections_actionable(tmp_path):
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = tmp_path / "v14.sqlite3"
+    _make_main_db(db_main)
+    _make_v14_db(db_v14)
+
+    conn = sqlite3.connect(str(db_main))
+    try:
+        conn.execute("ALTER TABLE paper_sections ADD COLUMN section_meta_json TEXT")
+        conn.execute(
+            "UPDATE paper_sections SET section_meta_json=? WHERE paper_id='p_done'",
+            (
+                json.dumps(
+                    {
+                        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                        "extraction_strategies": ["loose_inline_heading"],
+                    }
+                ),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    result = run_section_queue_audit(
+        db_main=db_main,
+        db_v14=db_v14,
+        top_n=10,
+        out_dir=tmp_path / "reports",
+        data_dir=tmp_path / "data",
+        topic_terms=["metalens"],
+        topic_evidence_gap_queue=None,
+    )
+
+    assert result["current_contract_primary_section_papers"] == 1
+    assert result["decision_grade_primary_section_papers"] == 0
+    assert result["weak_current_contract_primary_section_papers"] == 1
+    conn = sqlite3.connect(str(db_v14))
+    try:
+        row = conn.execute(
+            """
+            SELECT retry_class, has_current_primary_section, has_decision_grade_primary_section,
+                   section_contract_status
+            FROM section_priority_papers
+            WHERE paper_id='p_done'
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row == ("weak_current_contract", 1, 0, "current_contract_weak")
+    queue_text = (tmp_path / "data" / "section_delta_queue.csv").read_text(encoding="utf-8")
+    assert "p_done" in queue_text
 
 
 def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):

@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T22:53:29Z`
+- generated_at: `2026-05-30T23:03:46Z`
 
 ## Reference Linkage
 
@@ -19,34 +19,35 @@
 - section rows: 5,353
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 161
+- current parser-contract primary section papers: 162
+- decision-grade primary section papers: 162
 
 ### High-Value Priority Coverage
 
-| category | total | in topN | any section | primary section | current parser primary | eligible PDF |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 5,946 |
-| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 3,000 |
-| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 2,007 |
-| main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 1,101 |
-| top_keystone | 1,000 | 1,000 | 438 | 438 | 72 | 1,000 |
-| resolution_evidence | 464 | 206 | 170 | 170 | 26 | 464 |
-| future_endpoint | 291 | 291 | 109 | 109 | 40 | 291 |
-| limitation_evidence | 268 | 268 | 268 | 268 | 61 | 268 |
-| topic:metalens | 257 | 86 | 96 | 96 | 16 | 257 |
-| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 227 |
-| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 151 |
-| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 21 |
-| topic:metasurface holography | 20 | 9 | 7 | 7 | 4 | 20 |
-| topic_gap_claim_card_inputs | 14 | 14 | 11 | 11 | 11 | 14 |
-| topic_gap_bottleneck_evidence | 11 | 1 | 4 | 4 | 4 | 11 |
+| category | total | in topN | any section | primary section | current parser primary | decision-grade primary | eligible PDF |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cluster_representative | 5,946 | 5,322 | 699 | 699 | 12 | 12 | 5,946 |
+| active_learning_uncertainty_hotspot | 3,000 | 650 | 373 | 373 | 0 | 0 | 3,000 |
+| branch_split_driver | 2,007 | 2,007 | 946 | 946 | 52 | 52 | 2,007 |
+| main_path_node | 1,101 | 1,101 | 237 | 237 | 74 | 74 | 1,101 |
+| top_keystone | 1,000 | 1,000 | 438 | 438 | 73 | 73 | 1,000 |
+| resolution_evidence | 464 | 206 | 170 | 170 | 26 | 26 | 464 |
+| future_endpoint | 291 | 291 | 109 | 109 | 40 | 40 | 291 |
+| limitation_evidence | 268 | 268 | 268 | 268 | 62 | 62 | 268 |
+| topic:metalens | 257 | 86 | 96 | 96 | 16 | 16 | 257 |
+| topic:quantum light source | 227 | 73 | 43 | 43 | 15 | 15 | 227 |
+| topic:photonic crystal cavity | 151 | 45 | 21 | 21 | 10 | 10 | 151 |
+| topic_gap_key_turning_section | 21 | 9 | 4 | 4 | 0 | 0 | 21 |
+| topic:metasurface holography | 20 | 9 | 7 | 7 | 4 | 4 | 20 |
+| topic_gap_claim_card_inputs | 14 | 14 | 11 | 11 | 11 | 11 | 14 |
+| topic_gap_bottleneck_evidence | 11 | 1 | 4 | 4 | 4 | 4 | 11 |
 
 ### Latest Section Ingest Outcomes
 
 | outcome | papers |
 | --- | ---: |
 | no_target_sections | 4,976 |
-| success_primary | 1,851 |
+| success_primary | 1,852 |
 | already_has_primary | 437 |
 | success_secondary_only | 283 |
 | pdf_download_failed | 46 |
@@ -61,13 +62,13 @@
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 187/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 188/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `187/8592`
+- progress: `188/8592`
 - rows / papers / primary papers: `5,353` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
@@ -79,8 +80,8 @@
 - Continue OpenAlex W backfill and relink W IDs after each successful batch.
 - Normalize arXiv version/category variants, then relink against arxiv_id.
 - Keep S2 IDs separate from OpenAlex IDs and relink through s2_paper_id.
-- After top12000 completes, run delta queue for high-value papers missing current parser-contract primary sections.
-- Prioritize current parser-contract section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens
+- After top12000 completes, run the delta/action queue for high-value papers missing decision-grade primary sections.
+- Prioritize decision-grade section evidence for weak high-value classes: cluster_representative, active_learning_uncertainty_hotspot, branch_split_driver, main_path_node, top_keystone, resolution_evidence, future_endpoint, topic:metalens
 - Retry only high-value retryable PDF failures with conservative concurrency; do not broaden to all PDFs.
 - Mark no_target_sections papers as weak evidence unless alternate parser/Sci-Bot sections are available.
 - Suppress or downgrade noisy PDF graphics warnings so true parser failures remain visible.

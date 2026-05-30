@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
+from echelon.v14b.evidence_contracts import section_provenance_strength
 from echelon.v14b.product_baseline import PRODUCT_BASELINE_TOPICS
 from echelon.v14b.step5s_section_ingest import (
     PRIMARY_SECTION_NAMES,
@@ -69,6 +70,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             has_any_section INTEGER NOT NULL DEFAULT 0,
             has_primary_section INTEGER NOT NULL DEFAULT 0,
             has_current_primary_section INTEGER NOT NULL DEFAULT 0,
+            has_decision_grade_primary_section INTEGER NOT NULL DEFAULT 0,
             eligible_pdf INTEGER NOT NULL DEFAULT 0,
             last_attempt_outcome TEXT,
             last_attempt_ts TEXT,
@@ -89,6 +91,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             any_section INTEGER NOT NULL,
             primary_section INTEGER NOT NULL,
             current_primary_section INTEGER NOT NULL DEFAULT 0,
+            decision_grade_primary_section INTEGER NOT NULL DEFAULT 0,
             eligible_pdf INTEGER NOT NULL,
             coverage_json TEXT NOT NULL,
             PRIMARY KEY (audit_ts, category)
@@ -107,6 +110,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
         "retry_priority": "ALTER TABLE section_priority_papers ADD COLUMN retry_priority REAL NOT NULL DEFAULT 0",
         "access_strategy": "ALTER TABLE section_priority_papers ADD COLUMN access_strategy TEXT",
         "has_current_primary_section": "ALTER TABLE section_priority_papers ADD COLUMN has_current_primary_section INTEGER NOT NULL DEFAULT 0",
+        "has_decision_grade_primary_section": "ALTER TABLE section_priority_papers ADD COLUMN has_decision_grade_primary_section INTEGER NOT NULL DEFAULT 0",
         "section_contract_status": "ALTER TABLE section_priority_papers ADD COLUMN section_contract_status TEXT",
     }.items():
         if col not in cols:
@@ -139,6 +143,11 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
                 """,
                 (max(0, min(total, current_n)), row["audit_ts"], row["category"]),
             )
+    if "decision_grade_primary_section" not in summary_cols:
+        conn_v14.execute(
+            "ALTER TABLE section_priority_summary "
+            "ADD COLUMN decision_grade_primary_section INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def _add(
@@ -415,9 +424,9 @@ def collect_priority_sets(
     return reasons, scores, categories, candidate_ids
 
 
-def _section_status(conn_main: sqlite3.Connection) -> tuple[set[str], set[str], set[str]]:
+def _section_status(conn_main: sqlite3.Connection) -> tuple[set[str], set[str], set[str], set[str]]:
     if not _table_exists(conn_main, "paper_sections"):
-        return set(), set(), set()
+        return set(), set(), set(), set()
     any_rows = conn_main.execute("SELECT DISTINCT paper_id FROM paper_sections").fetchall()
     any_section = {str(r[0]) for r in any_rows}
     ph = ",".join("?" for _ in PRIMARY_SECTION_NAMES)
@@ -432,10 +441,11 @@ def _section_status(conn_main: sqlite3.Connection) -> tuple[set[str], set[str], 
     ).fetchall()
     primary_section = {str(r[0]) for r in primary_rows}
     current_primary_section: set[str] = set()
+    decision_grade_primary_section: set[str] = set()
     if "section_meta_json" in _cols(conn_main, "paper_sections"):
         current_rows = conn_main.execute(
             f"""
-            SELECT paper_id, section_meta_json
+            SELECT paper_id, section_name, section_meta_json
             FROM paper_sections
             WHERE section_name IN ({ph})
               AND section_text IS NOT NULL
@@ -443,12 +453,23 @@ def _section_status(conn_main: sqlite3.Connection) -> tuple[set[str], set[str], 
             """,
             PRIMARY_SECTION_NAMES,
         ).fetchall()
-        current_primary_section = {
-            str(row[0])
-            for row in current_rows
-            if _loads(row[1], {}).get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION
-        }
-    return any_section, primary_section, current_primary_section
+        for row in current_rows:
+            meta = _loads(row["section_meta_json"], {})
+            if meta.get("parser_contract_version") != SECTION_PARSER_CONTRACT_VERSION:
+                continue
+            paper_id = str(row["paper_id"])
+            current_primary_section.add(paper_id)
+            strength = section_provenance_strength(
+                {
+                    "section_name": row["section_name"],
+                    "extraction_strategies": meta.get("extraction_strategies"),
+                    "evidence_grade": meta.get("evidence_grade"),
+                    "parser_contract_version": meta.get("parser_contract_version"),
+                }
+            )
+            if strength in {"strong", "moderate"}:
+                decision_grade_primary_section.add(paper_id)
+    return any_section, primary_section, current_primary_section, decision_grade_primary_section
 
 
 def _latest_attempts(conn_main: sqlite3.Connection, paper_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -486,9 +507,12 @@ def _retry_class_and_strategy(
     eligible_pdf: bool,
     has_primary: bool,
     has_current_primary: bool,
+    has_decision_grade_primary: bool,
 ) -> tuple[str, float, str]:
+    if has_decision_grade_primary:
+        return "covered", 0.0, "decision_grade_section_ready"
     if has_current_primary:
-        return "covered", 0.0, "local_section_ready"
+        return "weak_current_contract", 3.0, "manual/alternate parser review before evidence promotion"
     if has_primary or outcome == "success_primary":
         if eligible_pdf:
             return "stale_parser_contract", 6.0, "reparse with current parser contract before evidence promotion"
@@ -530,9 +554,16 @@ def _paper_metadata(conn_main: sqlite3.Connection, paper_ids: list[str]) -> dict
     return out
 
 
-def _section_contract_status(*, has_primary: bool, has_current_primary: bool) -> str:
+def _section_contract_status(
+    *,
+    has_primary: bool,
+    has_current_primary: bool,
+    has_decision_grade_primary: bool,
+) -> str:
+    if has_decision_grade_primary:
+        return "decision_grade_current_contract"
     if has_current_primary:
-        return "current_contract"
+        return "current_contract_weak"
     if has_primary:
         return "stale_or_missing_parser_contract"
     return "missing_primary_section"
@@ -571,7 +602,7 @@ def run_section_queue_audit(
         gap_rows=gap_rows,
     )
     candidate_set = set(candidate_ids)
-    any_section, primary_section, current_primary_section = _section_status(conn_main)
+    any_section, primary_section, current_primary_section, decision_grade_primary_section = _section_status(conn_main)
     all_ids = sorted(reasons.keys(), key=lambda pid: (-scores[pid], pid))
     meta = _paper_metadata(conn_main, all_ids)
     attempts = _latest_attempts(conn_main, all_ids)
@@ -587,10 +618,12 @@ def run_section_queue_audit(
             eligible_pdf=eligible,
             has_primary=pid in primary_section,
             has_current_primary=pid in current_primary_section,
+            has_decision_grade_primary=pid in decision_grade_primary_section,
         )
         section_contract_status = _section_contract_status(
             has_primary=pid in primary_section,
             has_current_primary=pid in current_primary_section,
+            has_decision_grade_primary=pid in decision_grade_primary_section,
         )
         rows.append(
             {
@@ -601,6 +634,7 @@ def run_section_queue_audit(
                 "has_any_section": pid in any_section,
                 "has_primary_section": pid in primary_section,
                 "has_current_primary_section": pid in current_primary_section,
+                "has_decision_grade_primary_section": pid in decision_grade_primary_section,
                 "eligible_pdf": eligible,
                 "last_attempt_outcome": attempt.get("outcome") or "",
                 "last_attempt_ts": attempt.get("attempt_ts") or "",
@@ -623,11 +657,11 @@ def run_section_queue_audit(
         """
         INSERT OR REPLACE INTO section_priority_papers
             (paper_id, priority_score, reasons_json, in_top_n, has_any_section,
-             has_primary_section, has_current_primary_section, eligible_pdf,
+             has_primary_section, has_current_primary_section, has_decision_grade_primary_section, eligible_pdf,
              last_attempt_outcome, last_attempt_ts, retry_class, retry_priority,
              access_strategy, section_contract_status, title, publication_year,
              source_url, audit_ts)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -638,6 +672,7 @@ def run_section_queue_audit(
                 int(r["has_any_section"]),
                 int(r["has_primary_section"]),
                 int(r["has_current_primary_section"]),
+                int(r["has_decision_grade_primary_section"]),
                 int(r["eligible_pdf"]),
                 r["last_attempt_outcome"],
                 r["last_attempt_ts"],
@@ -662,11 +697,13 @@ def run_section_queue_audit(
         any_n = len(ids_set & any_section)
         primary_n = len(ids_set & primary_section)
         current_primary_n = len(ids_set & current_primary_section)
+        decision_grade_primary_n = len(ids_set & decision_grade_primary_section)
         eligible_n = sum(1 for pid in ids_set if meta.get(pid, {}).get("source_url"))
         payload = {
             "in_top_n_rate": in_top / max(1, total),
             "primary_section_rate": primary_n / max(1, total),
             "current_primary_section_rate": current_primary_n / max(1, total),
+            "decision_grade_primary_section_rate": decision_grade_primary_n / max(1, total),
             "eligible_pdf_rate": eligible_n / max(1, total),
         }
         summary_rows.append(
@@ -677,6 +714,7 @@ def run_section_queue_audit(
                 "any_section": any_n,
                 "primary_section": primary_n,
                 "current_primary_section": current_primary_n,
+                "decision_grade_primary_section": decision_grade_primary_n,
                 "eligible_pdf": eligible_n,
                 "coverage": payload,
             }
@@ -685,8 +723,8 @@ def run_section_queue_audit(
             """
             INSERT OR REPLACE INTO section_priority_summary
                 (audit_ts, category, total, in_top_n, any_section, primary_section,
-                 current_primary_section, eligible_pdf, coverage_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 current_primary_section, decision_grade_primary_section, eligible_pdf, coverage_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 audit_ts,
@@ -696,6 +734,7 @@ def run_section_queue_audit(
                 any_n,
                 primary_n,
                 current_primary_n,
+                decision_grade_primary_n,
                 eligible_n,
                 json.dumps(payload, ensure_ascii=False),
             ),
@@ -707,7 +746,7 @@ def run_section_queue_audit(
 
     delta_rows = [
         r for r in rows
-        if not r["has_current_primary_section"]
+        if not r["has_decision_grade_primary_section"]
         and r["retry_class"] != "covered"
         and (
             r["retry_class"] != "no_target_sections"
@@ -721,6 +760,7 @@ def run_section_queue_audit(
                 "parser_failure",
                 "no_target_sections",
                 "stale_parser_contract",
+                "weak_current_contract",
             }
         )
     ]
@@ -743,6 +783,8 @@ def run_section_queue_audit(
         "candidate_top_n": len(candidate_set),
         "primary_section_papers": len(primary_section),
         "current_contract_primary_section_papers": len(current_primary_section),
+        "decision_grade_primary_section_papers": len(decision_grade_primary_section),
+        "weak_current_contract_primary_section_papers": len(current_primary_section - decision_grade_primary_section),
         "stale_primary_section_papers": len(primary_section - current_primary_section),
         "delta_queue": len(delta_rows),
         "topic_gap_delta_queue": len(topic_gap_rows),
@@ -760,7 +802,8 @@ def run_section_queue_audit(
     json_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     fieldnames = [
         "paper_id", "priority_score", "reasons", "in_top_n", "has_any_section",
-        "has_primary_section", "has_current_primary_section", "section_contract_status",
+        "has_primary_section", "has_current_primary_section", "has_decision_grade_primary_section",
+        "section_contract_status",
         "eligible_pdf", "last_attempt_outcome", "last_attempt_ts", "retry_class",
         "retry_priority", "access_strategy", "publication_year", "title", "source_url",
         "doi", "arxiv_id", "openalex_id", "s2_paper_id",
@@ -794,7 +837,9 @@ def run_section_queue_audit(
         f"- audit_ts: `{audit_ts}`",
         f"- current top_n budget: `{top_n}`",
         f"- high-value papers considered: `{len(rows):,}`",
-        f"- primary section papers: `{len(primary_section):,}`; current parser-contract primary: `{len(current_primary_section):,}`",
+        f"- primary section papers: `{len(primary_section):,}`; "
+        f"current parser-contract primary: `{len(current_primary_section):,}`; "
+        f"decision-grade primary: `{len(decision_grade_primary_section):,}`",
         f"- next delta queue needing primary section/action: `{len(delta_rows):,}`",
         f"- multi-topic evidence-gap rows merged: `{gap_summary['gap_rows']:,}` "
         f"({gap_summary['gap_paper_ids']:,} papers)",
@@ -812,14 +857,15 @@ def run_section_queue_audit(
         "",
         "## Category Coverage",
         "",
-        "| category | total | in topN | any section | primary section | current parser primary | eligible PDF |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| category | total | in topN | any section | primary section | current parser primary | decision-grade primary | eligible PDF |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ])
     for s in summary_rows:
         lines.append(
             f"| {s['category']} | {s['total']:,} | {s['in_top_n']:,} | "
             f"{s['any_section']:,} | {s['primary_section']:,} | "
-            f"{s['current_primary_section']:,} | {s['eligible_pdf']:,} |"
+            f"{s['current_primary_section']:,} | {s['decision_grade_primary_section']:,} | "
+            f"{s['eligible_pdf']:,} |"
         )
     lines.extend(
         [

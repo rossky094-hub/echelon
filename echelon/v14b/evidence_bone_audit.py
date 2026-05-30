@@ -18,6 +18,7 @@ from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
 from echelon.v14b.direction_readiness_audit import PRIMARY_SECTION_NAMES, scalar, table_exists
+from echelon.v14b.evidence_contracts import section_provenance_strength
 from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
 
 
@@ -84,6 +85,25 @@ def infer_current_primary_section(row: dict[str, Any]) -> int:
         return 0
     try:
         rate = float(payload.get("current_primary_section_rate") or 0.0)
+        total = int(row.get("total") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(total, int(round(rate * total))))
+
+
+def infer_decision_grade_primary_section(row: dict[str, Any]) -> int:
+    raw = row.get("decision_grade_primary_section")
+    if raw not in (None, ""):
+        return int(raw or 0)
+    coverage = row.get("coverage_json")
+    if not coverage:
+        return 0
+    try:
+        payload = json.loads(str(coverage))
+    except (TypeError, ValueError):
+        return 0
+    try:
+        rate = float(payload.get("decision_grade_primary_section_rate") or 0.0)
         total = int(row.get("total") or 0)
     except (TypeError, ValueError):
         return 0
@@ -173,10 +193,11 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
         or 0
     )
     current_primary = 0
+    decision_grade_primary = 0
     if "section_meta_json" in columns(conn_main, "paper_sections"):
         current_rows = conn_main.execute(
             f"""
-            SELECT paper_id, section_meta_json
+            SELECT paper_id, section_name, section_meta_json
             FROM paper_sections
             WHERE section_name IN ({ph})
               AND length(trim(section_text)) >= 80
@@ -184,14 +205,27 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
             tuple(PRIMARY_SECTION_NAMES),
         ).fetchall()
         current_ids = set()
+        decision_grade_ids = set()
         for row in current_rows:
             try:
                 payload = json.loads(str(row["section_meta_json"] or "{}"))
             except (TypeError, ValueError):
                 payload = {}
             if payload.get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION:
-                current_ids.add(str(row["paper_id"]))
+                paper_id = str(row["paper_id"])
+                current_ids.add(paper_id)
+                strength = section_provenance_strength(
+                    {
+                        "section_name": row["section_name"],
+                        "extraction_strategies": payload.get("extraction_strategies"),
+                        "evidence_grade": payload.get("evidence_grade"),
+                        "parser_contract_version": payload.get("parser_contract_version"),
+                    }
+                )
+                if strength in {"strong", "moderate"}:
+                    decision_grade_ids.add(paper_id)
         current_primary = len(current_ids)
+        decision_grade_primary = len(decision_grade_ids)
     section_name_rows = _rows(
         conn_main,
         """
@@ -242,12 +276,17 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
                 if "current_primary_section" in summary_cols
                 else "NULL AS current_primary_section"
             )
+            decision_expr = (
+                "decision_grade_primary_section"
+                if "decision_grade_primary_section" in summary_cols
+                else "NULL AS decision_grade_primary_section"
+            )
             coverage_expr = "coverage_json" if "coverage_json" in summary_cols else "NULL AS coverage_json"
             priority_summary = _rows(
                 conn_v14,
                 f"""
                 SELECT category, total, in_top_n, any_section, primary_section,
-                       {current_expr}, eligible_pdf, {coverage_expr}
+                       {current_expr}, {decision_expr}, eligible_pdf, {coverage_expr}
                 FROM section_priority_summary
                 WHERE audit_ts = ?
                 ORDER BY total DESC, category
@@ -256,12 +295,18 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
             )
             for row in priority_summary:
                 row["current_primary_section"] = infer_current_primary_section(row)
+                row["decision_grade_primary_section"] = infer_decision_grade_primary_section(row)
     if table_exists(conn_v14, "section_priority_papers"):
         paper_cols = columns(conn_v14, "section_priority_papers")
         current_missing_predicate = (
             "has_current_primary_section=0"
             if "has_current_primary_section" in paper_cols
             else "has_primary_section=0"
+        )
+        decision_grade_missing_predicate = (
+            "has_decision_grade_primary_section=0"
+            if "has_decision_grade_primary_section" in paper_cols
+            else current_missing_predicate
         )
         priority_totals = {
             "high_value_papers": int(scalar(conn_v14, "SELECT COUNT(*) FROM section_priority_papers") or 0),
@@ -279,6 +324,13 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
                 )
                 or 0
             ),
+            "missing_decision_grade_primary_with_pdf": int(
+                scalar(
+                    conn_v14,
+                    f"SELECT COUNT(*) FROM section_priority_papers WHERE {decision_grade_missing_predicate} AND eligible_pdf=1",
+                )
+                or 0
+            ),
             "missing_primary_in_top_n": int(
                 scalar(
                     conn_v14,
@@ -293,6 +345,13 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
                 )
                 or 0
             ),
+            "missing_decision_grade_primary_in_top_n": int(
+                scalar(
+                    conn_v14,
+                    f"SELECT COUNT(*) FROM section_priority_papers WHERE {decision_grade_missing_predicate} AND eligible_pdf=1 AND in_top_n=1",
+                )
+                or 0
+            ),
         }
     return {
         "available": True,
@@ -300,6 +359,7 @@ def section_coverage(conn_main: sqlite3.Connection, conn_v14: sqlite3.Connection
         "section_papers": papers,
         "primary_section_papers": primary,
         "current_contract_primary_section_papers": current_primary,
+        "decision_grade_primary_section_papers": decision_grade_primary,
         "section_name_distribution": section_name_rows,
         "attempt_totals": attempt_totals,
         "latest_attempt_outcomes": latest_attempts,
@@ -315,23 +375,23 @@ def _section_next_actions(
     latest_attempts: list[dict[str, Any]] | None = None,
 ) -> list[str]:
     actions: list[str] = []
-    missing_current = totals.get("missing_current_primary_with_pdf", totals.get("missing_primary_with_pdf", 0))
-    if missing_current:
+    missing_decision_grade = totals.get("missing_decision_grade_primary_with_pdf", totals.get("missing_current_primary_with_pdf", 0))
+    if missing_decision_grade:
         actions.append(
-            "After top12000 completes, run delta queue for high-value papers missing current parser-contract primary sections."
+            "After top12000 completes, run the delta/action queue for high-value papers missing decision-grade primary sections."
         )
     weak_categories = [
         str(row["category"])
         for row in summary
         if int(row.get("total") or 0) >= 10
         and pct(
-            int(row.get("current_primary_section") if row.get("current_primary_section") is not None else row.get("primary_section") or 0),
+            int(row.get("decision_grade_primary_section") if row.get("decision_grade_primary_section") is not None else row.get("current_primary_section") or 0),
             int(row.get("total") or 0),
         )
         < 0.20
     ]
     if weak_categories:
-        actions.append("Prioritize current parser-contract section evidence for weak high-value classes: " + ", ".join(weak_categories[:8]))
+        actions.append("Prioritize decision-grade section evidence for weak high-value classes: " + ", ".join(weak_categories[:8]))
     attempt_counts = {str(r.get("outcome")): int(r.get("n") or 0) for r in (latest_attempts or [])}
     if attempt_counts.get("no_pdf_url", 0):
         actions.append("For no_pdf_url papers, synthesize access links and backfill OA PDF metadata before retrying section ingest.")
@@ -632,18 +692,21 @@ def render_markdown(result: dict[str, Any]) -> str:
                 f"- section papers: {sections['section_papers']:,}",
                 f"- primary section papers: {sections['primary_section_papers']:,}",
                 f"- current parser-contract primary section papers: {sections.get('current_contract_primary_section_papers', 0):,}",
+                f"- decision-grade primary section papers: {sections.get('decision_grade_primary_section_papers', 0):,}",
                 "",
                 "### High-Value Priority Coverage",
                 "",
-                "| category | total | in topN | any section | primary section | current parser primary | eligible PDF |",
-                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+                "| category | total | in topN | any section | primary section | current parser primary | decision-grade primary | eligible PDF |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in sections.get("priority_summary") or []:
             lines.append(
                 f"| {row['category']} | {int(row['total']):,} | {int(row['in_top_n']):,} | "
                 f"{int(row['any_section']):,} | {int(row['primary_section']):,} | "
-                f"{int(row.get('current_primary_section') or 0):,} | {int(row['eligible_pdf']):,} |"
+                f"{int(row.get('current_primary_section') or 0):,} | "
+                f"{int(row.get('decision_grade_primary_section') or 0):,} | "
+                f"{int(row['eligible_pdf']):,} |"
             )
         if sections.get("latest_attempt_outcomes"):
             lines.extend(

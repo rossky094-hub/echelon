@@ -122,6 +122,7 @@ def test_collect_product_baseline_metrics(tmp_path):
     assert v14["claim_cards_complete"] == 1
     assert v14["section_priority_summary"][0]["category"] == "main_path_node"
     assert v14["section_priority_summary"][0]["current_primary_section"] == 1
+    assert v14["section_priority_summary"][0]["decision_grade_primary_section"] == 0
     snapshot = {
         "snapshot_ts": "2026-01-01T00:00:00Z",
         "db_main": str(db_main),
@@ -132,7 +133,8 @@ def test_collect_product_baseline_metrics(tmp_path):
     }
     md = render_snapshot_md(snapshot)
     assert "Current parser primary" in md
-    assert "| main_path_node | 2 | 2 | 1 | 1 | 1 | 2 |" in md
+    assert "Decision-grade primary" in md
+    assert "| main_path_node | 2 | 2 | 1 | 1 | 1 | 0 | 2 |" in md
 
 
 def test_product_baseline_infers_current_primary_from_legacy_coverage_json(tmp_path):
@@ -171,6 +173,7 @@ def test_product_baseline_infers_current_primary_from_legacy_coverage_json(tmp_p
     v14 = collect_v14_metrics(db_v14)
 
     assert v14["section_priority_summary"][0]["current_primary_section"] == 2
+    assert v14["section_priority_summary"][0]["decision_grade_primary_section"] == 0
 
 
 def test_evaluate_topic_lens_flags_value_gaps():
