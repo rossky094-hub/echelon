@@ -830,10 +830,12 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
         "api_exposes_topic_readiness": False,
         "api_topic_branch_splits_inherit_lineage": False,
         "api_topic_bottlenecks_use_resolution_evidence": False,
+        "api_topic_validation_directions_inherit_claim_card_evidence": False,
         "ui_search_fallback_is_insufficient_evidence": False,
         "ui_renders_topic_readiness": False,
         "ui_renders_topic_dossier_branch_contracts": False,
         "ui_renders_topic_bottleneck_resolution_counts": False,
+        "ui_renders_validation_direction_evidence_objects": False,
         "topic_regression_uses_shared_contract": False,
     }
     if repo_root is not None:
@@ -861,6 +863,15 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "resolved_evidence_count",
                     "unresolved_evidence_count",
                     "resolution_status",
+                ),
+            ),
+            "api_topic_validation_directions_inherit_claim_card_evidence": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _claim_card_evidence_objects",
+                    "minimal_validation_experiment",
+                    "Step13 Claim Card",
+                    '"evidence_objects": item.get("evidence_objects")',
                 ),
             ),
             "ui_search_fallback_is_insufficient_evidence": _source_contains(
@@ -895,6 +906,14 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "b.resolution_status",
                     "b.unresolved_evidence_count",
                     "b.resolved_evidence_count",
+                ),
+            ),
+            "ui_renders_validation_direction_evidence_objects": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderTopicDossier",
+                    "d.minimal_validation_experiment",
+                    "renderEvidenceObjects(d.evidence_objects",
                 ),
             ),
             "topic_regression_uses_shared_contract": _source_contains(

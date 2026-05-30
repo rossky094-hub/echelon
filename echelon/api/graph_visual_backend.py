@@ -2214,6 +2214,112 @@ def _future_edge_evidence_grade(edge: dict[str, Any] | None) -> str:
     return "future_candidate_generation_gap"
 
 
+def _format_minimal_validation_experiment(experiment: dict[str, Any] | None) -> str | None:
+    if not isinstance(experiment, dict) or not experiment:
+        return None
+    pieces = []
+    if experiment.get("experiment"):
+        pieces.append(str(experiment.get("experiment")))
+    if experiment.get("cost_level") or experiment.get("cycle_weeks"):
+        pieces.append(
+            "cost={cost}; cycle={cycle} weeks".format(
+                cost=experiment.get("cost_level") or "unknown",
+                cycle=experiment.get("cycle_weeks") or "unknown",
+            )
+        )
+    success = experiment.get("success_criteria") or []
+    if isinstance(success, str):
+        success = [success]
+    falsification = experiment.get("falsification_conditions") or []
+    if isinstance(falsification, str):
+        falsification = [falsification]
+    if success:
+        pieces.append("success: " + "; ".join(str(x) for x in success[:2] if x))
+    if falsification:
+        pieces.append("falsify: " + "; ".join(str(x) for x in falsification[:2] if x))
+    return " | ".join(pieces) if pieces else None
+
+
+def _claim_card_evidence_objects(item: dict[str, Any]) -> list[dict[str, Any]]:
+    card = item.get("claim_card") or {}
+    if not isinstance(card, dict):
+        card = {}
+    experiment = card.get("minimal_validation_experiment") or {}
+    objects: list[dict[str, Any] | None] = [
+        {
+            "type": "claim_card",
+            "role": "five_question_contract",
+            "source": "Step13 Claim Card",
+            "id": card.get("claim_card_id") or item.get("direction_id"),
+            "label": item.get("direction_name") or item.get("title") or item.get("direction_id"),
+            "claim_scope": item.get("claim_scope"),
+            "evidence_grade": item.get("evidence_grade") or item.get("evidence_tier"),
+            "five_question_complete": bool(card.get("five_question_complete")),
+            "high_confidence_eligible": bool(card.get("high_confidence_eligible")),
+            "description": "Step13 five-question Claim Card; Radar promotion still depends on high-confidence gates.",
+        },
+        {
+            "type": "minimal_validation_experiment",
+            "role": "falsifiable_validation",
+            "source": "Step13 Claim Card",
+            "id": card.get("claim_card_id") or item.get("direction_id"),
+            "label": (experiment or {}).get("experiment") or "minimal validation experiment",
+            "description": _format_minimal_validation_experiment(experiment),
+            "claim_scope": item.get("claim_scope"),
+            "evidence_grade": item.get("evidence_grade") or item.get("evidence_tier"),
+        } if experiment else None,
+    ]
+    root = card.get("root_constraint") or {}
+    if isinstance(root, dict) and root:
+        objects.append(
+            {
+                "type": "claim_card_root_constraint",
+                "role": "root_constraint",
+                "source": "Step13 Claim Card",
+                "id": root.get("principle_id") or card.get("claim_card_id"),
+                "label": root.get("type") or "root constraint",
+                "description": root.get("constraint"),
+                "claim_scope": item.get("claim_scope"),
+                "evidence_grade": item.get("evidence_grade") or item.get("evidence_tier"),
+            }
+        )
+    for attempt in (card.get("attempts_last_10y") or [])[:4]:
+        if not isinstance(attempt, dict):
+            continue
+        objects.append(
+            {
+                "type": "claim_card_attempt",
+                "role": "past_attempt_failure",
+                "source": "Step13 Claim Card",
+                "paper_id": attempt.get("paper_id"),
+                "label": attempt.get("attempt_path") or attempt.get("keyword") or "past attempt",
+                "description": attempt.get("why_failed"),
+                "event_year": attempt.get("year"),
+                "evidence_quality": attempt.get("evidence_quality"),
+                "section_provenance_strength": attempt.get("section_provenance_strength"),
+                "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
+            }
+        )
+    unresolved = card.get("unresolved_bottleneck") or {}
+    for bottleneck in (unresolved.get("items") if isinstance(unresolved, dict) else []) or []:
+        if not isinstance(bottleneck, dict):
+            continue
+        objects.append(
+            {
+                "type": "claim_card_unresolved_bottleneck",
+                "role": "open_bottleneck",
+                "source": "Step13 Claim Card",
+                "paper_id": bottleneck.get("paper_id"),
+                "label": bottleneck.get("keyword") or "unresolved bottleneck",
+                "description": bottleneck.get("description"),
+                "evidence_quality": bottleneck.get("evidence_quality"),
+                "section_provenance_strength": bottleneck.get("section_provenance_strength"),
+                "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
+            }
+        )
+    return _compact_evidence_objects(objects, limit=12)
+
+
 def _compact_evidence_objects(objects: list[dict[str, Any] | None], *, limit: int = 12) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[tuple[Any, Any, Any]] = set()
@@ -2734,7 +2840,7 @@ def _build_validation_directions(
                 "name": item.get("title"),
                 "claim_scope": item.get("claim_scope"),
                 "evidence_strength": item.get("evidence_tier") or item.get("claim_card", {}).get("evidence_strength_level"),
-                "evidence_grade": (
+                "evidence_grade": item.get("evidence_grade") or (
                     "complete_claim_card"
                     if item.get("claim_card", {}).get("five_question_complete")
                     else "incomplete_claim_card"
@@ -2749,9 +2855,13 @@ def _build_validation_directions(
                 ],
                 "why_worth_testing": item.get("plain_language"),
                 "why_not_ready": None if item.get("eligible") else "Claim Card exists but high-confidence gates are not fully passed.",
-                "evidence_papers": [],
+                "minimal_validation_experiment": item.get("minimal_validation_experiment")
+                or _format_minimal_validation_experiment(
+                    (item.get("claim_card") or {}).get("minimal_validation_experiment")
+                ),
+                "evidence_papers": item.get("evidence_papers") or [],
                 "source": "Step6/Step13 Claim Card",
-                "evidence_objects": [],
+                "evidence_objects": item.get("evidence_objects") or _claim_card_evidence_objects(item),
             }
             for item in rd_radar.get("claim_cards", [])[:5]
         ]
@@ -3346,6 +3456,20 @@ def _build_rd_radar(
                 else "Incomplete Claim Card: this direction remains in the candidate pool until all five questions are answered."
             ),
         }
+        item["minimal_validation_experiment"] = _format_minimal_validation_experiment(
+            card.get("minimal_validation_experiment")
+        )
+        item["evidence_objects"] = _claim_card_evidence_objects(item)
+        item["evidence_papers"] = [
+            {
+                "paper_id": obj.get("paper_id"),
+                "title": obj.get("label") or obj.get("paper_id"),
+                "year": obj.get("event_year"),
+                "why": obj.get("role"),
+            }
+            for obj in item["evidence_objects"]
+            if obj.get("paper_id")
+        ][:6]
         if five_complete:
             claim_cards.append(item)
         else:

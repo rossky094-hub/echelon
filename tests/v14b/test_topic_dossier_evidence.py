@@ -12,6 +12,7 @@ from echelon.api.graph_visual_backend import (
     _build_topic_branch_splits,
     _build_topic_dossier,
     _build_topic_readiness_preflight,
+    _build_validation_directions,
     _content_access_payload,
     _evidence_contract_for_five_questions,
     _load_context_limitations,
@@ -354,7 +355,44 @@ def test_rd_radar_promotes_only_complete_claim_cards():
                 "direction_name": "Complete but exploratory direction",
                 "confidence": 0.72,
                 "claim_scope": "exploratory_with_claim_card",
+                "evidence_grade": "complete_claim_card_pending_high_confidence_evidence",
                 "claim_card": {
+                    "claim_card_id": "cc2",
+                    "root_constraint": {
+                        "type": "engineering",
+                        "constraint": "fabrication tolerance limits verified performance",
+                        "principle_id": "FP1",
+                    },
+                    "attempts_last_10y": [
+                        {
+                            "paper_id": "p1",
+                            "year": 2022,
+                            "attempt_path": "inverse design manufacturing attempt",
+                            "why_failed": "yield remained unstable",
+                            "keyword": "fabrication",
+                            "evidence_quality": "section_level",
+                        }
+                    ],
+                    "enabling_conditions": {
+                        "new_enablers": ["calibrated future candidate plus section evidence"]
+                    },
+                    "unresolved_bottleneck": {
+                        "items": [
+                            {
+                                "paper_id": "p1",
+                                "keyword": "fabrication",
+                                "description": "yield remains unstable",
+                                "evidence_quality": "section_level",
+                            }
+                        ]
+                    },
+                    "minimal_validation_experiment": {
+                        "experiment": "fabricate ten devices and measure yield",
+                        "cost_level": "medium",
+                        "cycle_weeks": 8,
+                        "success_criteria": ["yield above 80%"],
+                        "falsification_conditions": ["yield below baseline"],
+                    },
                     "five_question_complete": True,
                     "high_confidence_eligible": False,
                     "quality_gate": {
@@ -384,6 +422,10 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     assert radar["claim_cards"][0]["claim_scope"] == "exploratory_with_claim_card"
     assert radar["claim_cards"][0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
     assert "high-confidence" in " ".join(radar["claim_cards"][0]["uncertainty_reasons"])
+    assert radar["claim_cards"][0]["minimal_validation_experiment"]
+    assert any(obj["type"] == "claim_card" for obj in radar["claim_cards"][0]["evidence_objects"])
+    assert any(obj["type"] == "minimal_validation_experiment" for obj in radar["claim_cards"][0]["evidence_objects"])
+    assert any(obj["type"] == "claim_card_attempt" for obj in radar["claim_cards"][0]["evidence_objects"])
     assert len(radar["incomplete_claim_cards"]) == 1
     assert radar["incomplete_claim_cards"][0]["evidence_grade"] == "incomplete_claim_card"
     assert radar["incomplete_claim_cards"][0]["uncertainty_reasons"]
@@ -391,6 +433,78 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     edge_items = [item for item in radar["candidate_pool"] if item["kind"] == "candidate_edge"]
     assert edge_items[0]["model_evidence"]["calibrated_prob"] == 0.75
     assert edge_items[0]["evidence_grade"] == "calibrated_candidate_generator"
+
+
+def test_validation_directions_from_claim_cards_carry_five_question_evidence():
+    radar = _build_rd_radar(
+        future_directions=[
+            {
+                "direction_id": 2,
+                "direction_name": "Complete but exploratory direction",
+                "confidence": 0.72,
+                "claim_scope": "exploratory_with_claim_card",
+                "evidence_grade": "complete_claim_card_pending_high_confidence_evidence",
+                "claim_card": {
+                    "claim_card_id": "cc2",
+                    "root_constraint": {
+                        "type": "engineering",
+                        "constraint": "fabrication tolerance limits verified performance",
+                        "principle_id": "FP1",
+                    },
+                    "attempts_last_10y": [
+                        {
+                            "paper_id": "p1",
+                            "year": 2022,
+                            "attempt_path": "inverse design manufacturing attempt",
+                            "why_failed": "yield remained unstable",
+                            "keyword": "fabrication",
+                            "evidence_quality": "section_level",
+                        }
+                    ],
+                    "unresolved_bottleneck": {
+                        "items": [
+                            {
+                                "paper_id": "p1",
+                                "keyword": "fabrication",
+                                "description": "yield remains unstable",
+                                "evidence_quality": "section_level",
+                            }
+                        ]
+                    },
+                    "minimal_validation_experiment": {
+                        "experiment": "fabricate ten devices and measure yield",
+                        "cost_level": "medium",
+                        "cycle_weeks": 8,
+                        "success_criteria": ["yield above 80%"],
+                        "falsification_conditions": ["yield below baseline"],
+                    },
+                    "five_question_complete": True,
+                    "high_confidence_eligible": False,
+                    "quality_gate": {
+                        "missing_high_confidence_gates": ["strong section-level evidence"]
+                    },
+                },
+            }
+        ],
+        future_growth=[],
+    )
+
+    directions = _build_validation_directions(
+        "metalens",
+        branch_splits=[],
+        bottlenecks=[],
+        future_growth=[],
+        rd_radar=radar,
+    )
+
+    direction = directions[0]
+    assert direction["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
+    assert "success: yield above 80%" in direction["minimal_validation_experiment"]
+    assert "falsify: yield below baseline" in direction["minimal_validation_experiment"]
+    assert any(obj["type"] == "claim_card" for obj in direction["evidence_objects"])
+    assert any(obj["type"] == "minimal_validation_experiment" for obj in direction["evidence_objects"])
+    assert any(obj.get("paper_id") == "p1" for obj in direction["evidence_objects"])
+    assert direction["evidence_papers"]
 
 
 def test_branch_lineage_status_distinguishes_layout_from_evidence():

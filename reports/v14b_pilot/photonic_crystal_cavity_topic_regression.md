@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-30T14:52:40Z`
+- Audit: `2026-05-30T15:00:16Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -17,7 +17,7 @@
 | turning papers with strong/moderate section provenance | 4 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 5 | 1 | pass |
-| auditable reading path | 4 | 4 | pass |
+| auditable reading path | 5 | 4 | pass |
 | Claim Cards for Radar | 1 | 1 | pass |
 
 ## Expected Branches
@@ -45,7 +45,7 @@
 - Future candidates: 320 graph candidates, 1 Radar cards, 1 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: 5/5 constraints have typed/clickable evidence contracts.
-- Reading path contracts: 4/4 steps are auditable; modes=bottleneck, branch_driver, starter, turning.
+- Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, claim_card, starter, turning.
 - Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.
 

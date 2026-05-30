@@ -1,12 +1,12 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-30T14:52:40Z`
+- Audit: `2026-05-30T15:00:17Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | metalens | fail | 1.00 | 13 | 5 | 5 | 5 | 0 |
 | metasurface holography | fail | 1.00 | 8 | 5 | 5 | 4 | 0 |
-| photonic crystal cavity | fail | 1.00 | 8 | 5 | 5 | 4 | 1 |
+| photonic crystal cavity | fail | 1.00 | 8 | 5 | 5 | 5 | 1 |
 | quantum light source | fail | 1.00 | 11 | 5 | 5 | 5 | 0 |
 
 ## Product Gate
