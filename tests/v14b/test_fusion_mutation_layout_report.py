@@ -512,8 +512,12 @@ class TestReportGenerator:
         assert "Future candidate generator 候选边数" in report
         assert "## 7. Future Candidate Generator" in report
         assert "GNN/VGAE 只生成 future candidate edges" in report
+        assert "candidate_score (候选排序分数)" in report
+        assert "公开报告只显示 `candidate_score`" in report
         assert "不是方向结论" in report
         assert "Step13 complete Claim Card" in report
+        assert "predicted_prob" not in report
+        assert "calibrated_prob" not in report
         assert "VGAE 预测未来边数" not in report
         assert "VGAE Link Prediction" not in report
 

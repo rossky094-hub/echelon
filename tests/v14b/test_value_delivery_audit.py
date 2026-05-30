@@ -287,8 +287,8 @@ def _write_product_sources(root: Path) -> None:
         "Citation-function evidence 覆盖率 Citation Function Evidence\n"
         "Future candidate generator 候选边数 ## 7. Future Candidate Generator\n"
         "_future_candidate_evidence_text candidate_score= 候选排序分数\n"
-        "GNN/VGAE 只生成 future candidate edges predicted_prob/calibrated_prob "
-        "是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
+        "GNN/VGAE 只生成 future candidate edges 公开报告只显示 candidate_score "
+        "candidate_score 是候选排序信号 不是方向结论 Step13 complete Claim Card\n"
         "_normalise_subgraph_scope_row "
         "bounded_evidence_subgraph bounded evidence / extraction support "
         "与旧 V12.5 图谱样例对比\n"
@@ -1153,6 +1153,26 @@ def test_future_growth_audit_rejects_step9_vgae_prediction_copy(tmp_path):
 
     conn = sqlite3.connect(str(v14))
     result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["step9_vgae_language_is_candidate_generator"] is False
+
+
+def test_future_growth_audit_rejects_step9_public_prediction_fields(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    report_dir = tmp_path / "reports/v14b_pilot"
+    report_dir.mkdir(parents=True)
+    (report_dir / "V14B_Evidence_Decision_算法验证报告.md").write_text(
+        "## 7. Future Candidate Generator\n"
+        "`predicted_prob`/`calibrated_prob` 是候选排序信号\n",
+        encoding="utf-8",
+    )
+
+    conn = sqlite3.connect(str(v14))
+    result = audit_future_growth(conn, tmp_path, report_dir)
     conn.close()
 
     assert result["status"] == "fail"

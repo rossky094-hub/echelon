@@ -1,6 +1,6 @@
 # V14-B Evidence Decision 算法验证报告
 
-**生成时间**: 2026-05-31 04:04
+**生成时间**: 2026-05-31 04:10
 **数据规模**: 55,391 篇论文 (corpus=all)
 
 ---
@@ -100,11 +100,11 @@
 - **候选边总数**: 1,000
 - **跨 Field 候选边占比**: **6.0%** (60/1,000)
 
-**证据边界**: GNN/VGAE 只生成 future candidate edges；`predicted_prob`/`calibrated_prob` 是候选排序信号，不是方向结论。进入 Radar/Topic Dossier 需要 Step6 fusion + Step13 complete Claim Card + calibration audit。
+**证据边界**: GNN/VGAE 只生成 future candidate edges；公开报告只显示 `candidate_score`，它是候选排序分数，不是方向结论或验证置信度。进入 Radar/Topic Dossier 需要 Step6 fusion + Step13 complete Claim Card + calibration audit。
 
 ### Top 5 候选边 (case study)
 
-| 源论文 | 目标论文 | 候选排序分数 | 源年 | 目标年 |
+| 源论文 | 目标论文 | candidate_score (候选排序分数) | 源年 | 目标年 |
 |---|---|---|---|---|
 
 ---
@@ -189,4 +189,4 @@
 
 ---
 
-*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 04:04*
+*报告由 V14-B step9_report.py 自动生成 | 2026-05-31 04:10*

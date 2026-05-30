@@ -501,6 +501,12 @@ def audit_future_growth(
         if goal_alignment_report_path.exists()
         else ""
     )
+    algorithm_report_path = direction_report_base / "V14B_Evidence_Decision_算法验证报告.md"
+    algorithm_report_text = (
+        algorithm_report_path.read_text(encoding="utf-8")
+        if algorithm_report_path.exists()
+        else ""
+    )
     api_path = root / "echelon/api/graph_visual_backend.py"
     app_path = root / "web/visual-graph/app.js"
     current_future_docs = (
@@ -515,10 +521,21 @@ def audit_future_growth(
             and "Future candidate generator 候选边数" in step9_text
             and "## 7. Future Candidate Generator" in step9_text
             and "GNN/VGAE 只生成 future candidate edges" in step9_text
+            and "公开报告只显示" in step9_text
+            and "candidate_score" in step9_text
             and "不是方向结论" in step9_text
             and "Step13 complete Claim Card" in step9_text
             and "VGAE 预测未来边数" not in step9_text
             and "VGAE Link Prediction" not in step9_text
+            and (
+                not algorithm_report_text
+                or (
+                    "candidate_score" in algorithm_report_text
+                    and "predicted_prob" not in algorithm_report_text
+                    and "calibrated_prob" not in algorithm_report_text
+                    and "候选概率" not in algorithm_report_text
+                )
+            )
         ),
         "future_report_filename_is_candidate_contract": (
             _source_contains(config_path, ("REPORT_FUTURE_DIRECTIONS", "未来候选方向_证据合同报告.md"))

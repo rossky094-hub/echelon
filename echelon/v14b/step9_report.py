@@ -268,16 +268,39 @@ def generate_algo_report(
     """)
     subgraph_scope_row = _normalise_subgraph_scope_row(subgraph_scope[0] if subgraph_scope else {})
 
-    # VGAE 统计
+    # VGAE/Future candidate statistics.  Internal DB columns keep legacy names,
+    # while reports expose only candidate-score semantics.
     predicted_edges = safe_count(conn_v14, "predicted_future_edges")
     cross_field_preds = safe_count(conn_v14, "predicted_future_edges", "is_cross_field = 1")
-    top_vgae = safe_query(conn_v14, """
+    pred_cols = table_columns(conn_v14, "predicted_future_edges")
+    candidate_score_terms = [
+        f"pfe.{col}"
+        for col in ("prediction_confidence", "calibrated_prob", "predicted_prob")
+        if col in pred_cols
+    ]
+    candidate_score_expr = (
+        f"COALESCE({', '.join(candidate_score_terms)}, 0)"
+        if candidate_score_terms
+        else "0"
+    )
+    raw_score_terms = [
+        f"pfe.{col}"
+        for col in ("raw_predicted_prob", "predicted_prob")
+        if col in pred_cols
+    ]
+    raw_score_expr = (
+        f"COALESCE({', '.join(raw_score_terms)}, 0)"
+        if raw_score_terms
+        else candidate_score_expr
+    )
+    top_vgae = safe_query(conn_v14, f"""
         SELECT p1.title AS src_title, p2.title AS dst_title,
-               pfe.predicted_prob, pfe.src_year, pfe.dst_year
+               {candidate_score_expr} AS candidate_score,
+               pfe.src_year, pfe.dst_year
         FROM predicted_future_edges pfe
         LEFT JOIN papers p1 ON pfe.src_paper_id = p1.id
         LEFT JOIN papers p2 ON pfe.dst_paper_id = p2.id
-        ORDER BY pfe.predicted_prob DESC
+        ORDER BY candidate_score DESC, {raw_score_expr} DESC
         LIMIT 5
     """)
 
@@ -475,13 +498,14 @@ def generate_algo_report(
         f"- **候选边总数**: {predicted_edges:,}",
         f"- **跨 Field 候选边占比**: **{cross_field_rate}** ({cross_field_preds:,}/{predicted_edges:,})",
         f"",
-        f"**证据边界**: GNN/VGAE 只生成 future candidate edges；`predicted_prob`/`calibrated_prob` "
-        f"是候选排序信号，不是方向结论。进入 Radar/Topic Dossier 需要 Step6 fusion + "
+        f"**证据边界**: GNN/VGAE 只生成 future candidate edges；公开报告只显示 "
+        f"`candidate_score`，它是候选排序分数，不是方向结论或验证置信度。"
+        f"进入 Radar/Topic Dossier 需要 Step6 fusion + "
         f"Step13 complete Claim Card + calibration audit。",
         f"",
         f"### Top 5 候选边 (case study)",
         f"",
-        f"| 源论文 | 目标论文 | 候选排序分数 | 源年 | 目标年 |",
+        f"| 源论文 | 目标论文 | candidate_score (候选排序分数) | 源年 | 目标年 |",
         f"|---|---|---|---|---|",
     ]
 
@@ -489,7 +513,7 @@ def generate_algo_report(
         src_t = (e.get("src_title") or "TBD")[:40]
         dst_t = (e.get("dst_title") or "TBD")[:40]
         lines.append(
-            f"| {src_t} | {dst_t} | {e['predicted_prob']:.3f} | "
+            f"| {src_t} | {dst_t} | {float(e.get('candidate_score') or 0.0):.3f} | "
             f"{e.get('src_year', 'TBD')} | {e.get('dst_year', 'TBD')} |"
         )
 
