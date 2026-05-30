@@ -242,7 +242,8 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
             inserted_sections INTEGER NOT NULL DEFAULT 0,
             primary_sections INTEGER NOT NULL DEFAULT 0,
             candidate_file TEXT,
-            parser_name TEXT
+            parser_name TEXT,
+            parser_contract_version TEXT
         )
         """
     )
@@ -251,6 +252,8 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
     }
     if "parser_name" not in attempt_cols:
         conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN parser_name TEXT")
+    if "parser_contract_version" not in attempt_cols:
+        conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN parser_contract_version TEXT")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_section_ingest_attempts_paper_ts
@@ -285,8 +288,9 @@ def record_ingest_attempt(
         """
         INSERT INTO section_ingest_attempts
             (paper_id, attempt_ts, run_id, outcome, source_url, detail,
-             inserted_sections, primary_sections, candidate_file, parser_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             inserted_sections, primary_sections, candidate_file, parser_name,
+             parser_contract_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             paper_id,
@@ -299,6 +303,7 @@ def record_ingest_attempt(
             int(primary_sections or 0),
             str(candidate_file) if candidate_file else None,
             SECTION_PARSER_NAME,
+            SECTION_PARSER_CONTRACT_VERSION,
         ),
     )
 

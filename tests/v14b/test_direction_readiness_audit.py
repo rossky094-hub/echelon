@@ -179,9 +179,14 @@ def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
           "rows": 1241,
           "papers": 690,
           "primary_section_papers": 690,
+          "current_contract_primary_section_papers": 0,
           "no_evidence_done_delta": 240,
           "no_evidence_elapsed_s": 7200,
-          "low_yield_intervals": 2
+          "low_yield_intervals": 2,
+          "no_current_contract_done_delta": 240,
+          "no_current_contract_elapsed_s": 7200,
+          "current_contract_low_yield_intervals": 2,
+          "parser_contract_version": "v14b_section_parser_contract_v3_toc_guard"
         }
         """,
         encoding="utf-8",
@@ -200,7 +205,9 @@ def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
     blockers = classify_blockers(metrics)
 
     assert metrics["section_frontfill_state"]["status"] == "soft_stall"
+    assert metrics["section_frontfill_state"]["current_contract_status"] == "soft_stall"
     assert any(b["gate"] == "section_frontfill_efficiency" for b in blockers)
+    assert any(b["gate"] == "section_frontfill_contract_efficiency" for b in blockers)
 
 
 def test_direction_readiness_infers_soft_stall_from_watchdog_log(tmp_path):

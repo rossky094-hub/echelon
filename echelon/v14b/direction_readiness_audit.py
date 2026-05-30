@@ -418,6 +418,9 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
     no_evidence_delta = int(state.get("no_evidence_done_delta") or 0)
     no_evidence_elapsed_s = int(state.get("no_evidence_elapsed_s") or 0)
     low_yield_intervals = int(state.get("low_yield_intervals") or 0)
+    no_current_contract_delta = int(state.get("no_current_contract_done_delta") or 0)
+    no_current_contract_elapsed_s = int(state.get("no_current_contract_elapsed_s") or 0)
+    current_contract_low_yield_intervals = int(state.get("current_contract_low_yield_intervals") or 0)
     log_path = _watchdog_log_for_state(path)
     log_state = _watchdog_no_evidence_elapsed(log_path)
     progress_state = _section_progress_tail(_section_progress_log_for_state(path))
@@ -439,6 +442,12 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
         status = "low_yield"
     else:
         status = "running_or_unknown"
+    if current_contract_low_yield_intervals >= 2 or no_current_contract_elapsed_s >= 4 * 3600:
+        contract_status = "soft_stall"
+    elif no_current_contract_delta >= 200:
+        contract_status = "low_yield"
+    else:
+        contract_status = "running_or_unknown"
     return {
         "available": True,
         "source": path.stem.replace("_watchdog_state", ""),
@@ -455,9 +464,15 @@ def load_section_frontfill_state(path: Path) -> dict[str, Any]:
         "rows": state.get("rows"),
         "papers": state.get("papers"),
         "primary_section_papers": state.get("primary_section_papers"),
+        "current_contract_primary_section_papers": state.get("current_contract_primary_section_papers"),
+        "parser_contract_version": state.get("parser_contract_version"),
         "no_evidence_done_delta": no_evidence_delta,
         "no_evidence_elapsed_s": no_evidence_elapsed_s,
         "low_yield_intervals": low_yield_intervals,
+        "current_contract_status": contract_status,
+        "no_current_contract_done_delta": no_current_contract_delta,
+        "no_current_contract_elapsed_s": no_current_contract_elapsed_s,
+        "current_contract_low_yield_intervals": current_contract_low_yield_intervals,
     }
 
 
@@ -808,6 +823,23 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 ),
             }
         )
+    if frontfill.get("current_contract_status") in {"low_yield", "soft_stall"}:
+        delta = int(frontfill.get("no_current_contract_done_delta") or 0)
+        elapsed_h = float(frontfill.get("no_current_contract_elapsed_s") or 0) / 3600.0
+        blockers.append(
+            {
+                "gate": "section_frontfill_contract_efficiency",
+                "severity": "high" if frontfill.get("current_contract_status") == "soft_stall" else "medium",
+                "why": (
+                    f"section frontfill is {frontfill.get('current_contract_status')} for current parser-contract evidence: "
+                    f"{delta:,} scanned items and {elapsed_h:.1f}h since current-contract primary-section growth."
+                ),
+                "next_action": (
+                    "Ensure the active Step5s process was started with the current parser contract and prioritize "
+                    "stale-parser-contract reparse queues before promoting section-derived claims."
+                ),
+            }
+        )
     if future_candidate_edges and not m["future_directions"]:
         blockers.append(
             {
@@ -895,11 +927,21 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     frontfill_line = []
     if frontfill.get("available"):
         source = frontfill.get("source") or "unknown"
+        current_contract_primary = frontfill.get("current_contract_primary_section_papers")
+        current_contract_primary_text = (
+            str(current_contract_primary)
+            if current_contract_primary is not None
+            else "unknown"
+        )
         frontfill_line = [
             f"- section frontfill health: {frontfill.get('status')} [{source}] "
             f"(done={frontfill.get('done')}/{frontfill.get('total')}, "
             f"no_evidence_delta={int(frontfill.get('no_evidence_done_delta') or 0):,}, "
-            f"no_evidence_hours={float(frontfill.get('no_evidence_elapsed_s') or 0) / 3600.0:.1f})"
+            f"no_evidence_hours={float(frontfill.get('no_evidence_elapsed_s') or 0) / 3600.0:.1f}, "
+            f"current_contract_primary={current_contract_primary_text}, "
+            f"contract_status={frontfill.get('current_contract_status')}, "
+            f"no_current_contract_delta={int(frontfill.get('no_current_contract_done_delta') or 0):,}, "
+            f"no_current_contract_hours={float(frontfill.get('no_current_contract_elapsed_s') or 0) / 3600.0:.1f})"
         ]
     openalex_frontfill = metrics.get("openalex_frontfill_state") or {}
     openalex_frontfill_line = []

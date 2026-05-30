@@ -1,20 +1,20 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T21:24:35Z`
+- generated_at: `2026-05-30T21:31:11Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
 - linked refs: 445,957 / 3,215,130 (13.9%)
 - OpenAlex W IDs: 35,663 (64.4%)
-- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=2.6)
+- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=2.5)
 - section evidence: 5,256 rows / 2,999 papers
 - primary section evidence: 2,999 papers (5.4%)
 - primary section provenance: 762 strong/moderate papers; weak-only=74.6%
 - current section parser contract: 0 papers (0.0%)
 - section parser contracts: legacy_unknown_contract:5,256
 - multi-topic evidence-gap queue: 14 / 55 primary-section covered (25.5%)
-- section frontfill health: running_or_unknown [section_delta] (done=989/6603, no_evidence_delta=0, no_evidence_hours=0.0)
+- section frontfill health: running_or_unknown [section_delta] (done=989/6603, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=unknown, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
 - future candidate edges: 1,000
 - visual future edges: 1,000
 - future directions: 5
@@ -29,7 +29,7 @@
 - **multi_topic_evidence_gap** (high): multi-topic regression still has primary section evidence for 14/55 queued benchmark-topic papers (25.5%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **multi_topic_section_provenance** (medium): benchmark-topic gap papers have primary sections, but too many are weak parser matches (71.4% weak-only). Next: Do not pass multi-topic Dossier claims on loose parser evidence alone; re-parse or audit those topic papers before promotion.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
-- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=2.6. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
+- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=2.5. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
 
 ## Latest Fusion Audit
 

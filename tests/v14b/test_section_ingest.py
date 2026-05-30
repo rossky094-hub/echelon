@@ -539,7 +539,10 @@ def test_section_ingest_records_attempt_outcomes(tmp_path):
     conn.commit()
 
     row = conn.execute(
-        "SELECT paper_id, outcome, source_url, detail FROM section_ingest_attempts"
+        """
+        SELECT paper_id, outcome, source_url, detail, parser_contract_version
+        FROM section_ingest_attempts
+        """
     ).fetchone()
     conn.close()
     assert row == (
@@ -547,4 +550,5 @@ def test_section_ingest_records_attempt_outcomes(tmp_path):
         "no_target_sections",
         "https://arxiv.org/pdf/2401.00001.pdf",
         "parsed but no target section",
+        SECTION_PARSER_CONTRACT_VERSION,
     )

@@ -21,6 +21,8 @@ import subprocess
 import time
 from typing import Optional
 
+from echelon.v14b.step5s_section_ingest import SECTION_PARSER_CONTRACT_VERSION
+
 PROGRESS_RE = re.compile(
     r"(?P<done>\d+)\s*/\s*(?P<total>\d+)\s*"
     r"\[(?P<elapsed>(?:\d+:)?\d{1,2}:\d{2})<"
@@ -82,6 +84,13 @@ def get_section_counts(db_main: pathlib.Path) -> tuple[int, int]:
         conn.close()
 
 
+def _table_cols(conn: sqlite3.Connection, table: str) -> set[str]:
+    try:
+        return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    except sqlite3.Error:
+        return set()
+
+
 PRIMARY_SECTION_NAMES = {
     "limitation",
     "limitations",
@@ -102,29 +111,48 @@ PRIMARY_SECTION_NAMES = {
 }
 
 
-def get_primary_section_papers(db_main: pathlib.Path) -> int:
-    """Count papers with section evidence strong enough to support claims."""
+def get_primary_section_contract_counts(db_main: pathlib.Path) -> tuple[int, int]:
+    """Count all primary sections and the subset parsed under the current contract."""
     conn = sqlite3.connect(str(db_main))
     try:
+        has_meta = "section_meta_json" in _table_cols(conn, "paper_sections")
         paper_ids = conn.execute(
             """
             SELECT DISTINCT paper_id, section_name, section_text
+                   {meta_select}
             FROM paper_sections
             WHERE paper_id IS NOT NULL
-            """
+            """.format(meta_select=", section_meta_json" if has_meta else "")
         ).fetchall()
         # Keep this small and explicit: the watchdog uses the count as a value gate,
         # not as a scientific metric, so we require a minimum text length.
-        return len(
-            {
-                str(pid)
-                for pid, name, text in paper_ids
-                if str(name or "").strip().lower() in PRIMARY_SECTION_NAMES
-                and len(str(text or "").strip()) >= 80
-            }
-        )
+        primary: set[str] = set()
+        current_contract: set[str] = set()
+        for row in paper_ids:
+            pid, name, text = row[:3]
+            if (
+                str(name or "").strip().lower() not in PRIMARY_SECTION_NAMES
+                or len(str(text or "").strip()) < 80
+            ):
+                continue
+            paper_id = str(pid)
+            primary.add(paper_id)
+            if has_meta:
+                try:
+                    meta = json.loads(row[3] or "{}")
+                except Exception:
+                    meta = {}
+                if meta.get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION:
+                    current_contract.add(paper_id)
+        return len(primary), len(current_contract)
     finally:
         conn.close()
+
+
+def get_primary_section_papers(db_main: pathlib.Path) -> int:
+    """Count papers with primary local section evidence, regardless of parser contract."""
+    primary, _current_contract = get_primary_section_contract_counts(db_main)
+    return primary
 
 
 def is_step5s_done(status: str, progress_data: dict) -> bool:
@@ -287,6 +315,10 @@ def main() -> None:
     last_evidence_done = state.get("last_evidence_done", last_done)
     last_evidence_ts = float(state.get("last_evidence_ts") or last_change_ts)
     low_yield_intervals = int(state.get("low_yield_intervals") or 0)
+    last_current_contract_primary = int(state.get("current_contract_primary_section_papers") or 0)
+    last_contract_evidence_done = state.get("last_contract_evidence_done", last_done)
+    last_contract_evidence_ts = float(state.get("last_contract_evidence_ts") or last_change_ts)
+    current_contract_low_yield_intervals = int(state.get("current_contract_low_yield_intervals") or 0)
 
     append_log(log_file, f"[START] {utc_now()} step5s watchdog interval={args.interval_sec}s")
 
@@ -298,7 +330,7 @@ def main() -> None:
         progress_data = parse_progress(progress_log)
         progress = get_progress(progress_log)
         done = progress_data.get("done")
-        primary_section_papers = get_primary_section_papers(db_main)
+        primary_section_papers, current_contract_primary_section_papers = get_primary_section_contract_counts(db_main)
         log_mtime = progress_log.stat().st_mtime if progress_log.exists() else 0.0
         now = time.time()
 
@@ -336,6 +368,30 @@ def main() -> None:
         elif evidence_changed:
             low_yield_intervals = 0
         evidence_soft_stall = low_yield and low_yield_intervals >= int(args.soft_stall_intervals)
+        contract_evidence_changed = current_contract_primary_section_papers != last_current_contract_primary
+        if contract_evidence_changed or last_contract_evidence_done is None:
+            last_current_contract_primary = current_contract_primary_section_papers
+            last_contract_evidence_done = done
+            last_contract_evidence_ts = now
+            current_contract_low_yield_intervals = 0
+        no_current_contract_done_delta = (
+            int(done) - int(last_contract_evidence_done)
+            if done is not None and last_contract_evidence_done is not None
+            else 0
+        )
+        no_current_contract_elapsed_s = int(max(0, now - last_contract_evidence_ts))
+        contract_low_yield = (
+            no_current_contract_done_delta >= int(args.low_yield_progress_items)
+            and current_contract_primary_section_papers == last_current_contract_primary
+        )
+        if contract_low_yield:
+            current_contract_low_yield_intervals += 1
+        elif contract_evidence_changed:
+            current_contract_low_yield_intervals = 0
+        contract_evidence_soft_stall = (
+            contract_low_yield
+            and current_contract_low_yield_intervals >= int(args.soft_stall_intervals)
+        )
         hard_stall = (
             pid
             and pid != "unknown"
@@ -348,10 +404,14 @@ def main() -> None:
             (
                 f"[{ts}] pid={pid or 'none'} status={status} rows={rows} papers={papers} "
                 f"primary_section_papers={primary_section_papers} "
+                f"current_contract_primary_section_papers={current_contract_primary_section_papers} "
                 f"delta_rows={rows_delta} delta_papers={papers_delta} "
                 f"no_evidence_done_delta={no_evidence_done_delta} "
+                f"no_current_contract_done_delta={no_current_contract_done_delta} "
                 f"no_evidence_elapsed_s={no_evidence_elapsed_s} "
+                f"no_current_contract_elapsed_s={no_current_contract_elapsed_s} "
                 f"low_yield_intervals={low_yield_intervals} "
+                f"current_contract_low_yield_intervals={current_contract_low_yield_intervals} "
                 f"stale_intervals={stale_intervals} {progress}"
             ),
         )
@@ -371,6 +431,17 @@ def main() -> None:
                     f"[{ts}] SECTION_EVIDENCE_SOFT_STALL progress_delta={no_evidence_done_delta} "
                     f"low_yield_intervals={low_yield_intervals}; "
                     "keep process conservative, but treat topN as low-yield and prepare delta/frontier queue"
+                ),
+            )
+        if contract_evidence_soft_stall:
+            append_log(
+                log_file,
+                (
+                    f"[{ts}] SECTION_CONTRACT_EVIDENCE_SOFT_STALL "
+                    f"progress_delta={no_current_contract_done_delta} "
+                    f"current_contract_primary_section_papers={current_contract_primary_section_papers} "
+                    f"contract={SECTION_PARSER_CONTRACT_VERSION}; "
+                    "crawler may be producing legacy/weak evidence, but not current parser-contract evidence"
                 ),
             )
         if hard_stall:
@@ -421,6 +492,7 @@ def main() -> None:
                     "rows": rows,
                     "papers": papers,
                     "primary_section_papers": primary_section_papers,
+                    "current_contract_primary_section_papers": current_contract_primary_section_papers,
                     "done": done,
                     "total": progress_data.get("total"),
                     "last_change_ts": last_change_ts,
@@ -428,9 +500,15 @@ def main() -> None:
                     "last_evidence_papers": last_evidence_papers,
                     "last_evidence_done": last_evidence_done,
                     "last_evidence_ts": last_evidence_ts,
+                    "last_contract_evidence_done": last_contract_evidence_done,
+                    "last_contract_evidence_ts": last_contract_evidence_ts,
                     "no_evidence_done_delta": no_evidence_done_delta,
                     "no_evidence_elapsed_s": no_evidence_elapsed_s,
+                    "no_current_contract_done_delta": no_current_contract_done_delta,
+                    "no_current_contract_elapsed_s": no_current_contract_elapsed_s,
                     "low_yield_intervals": low_yield_intervals,
+                    "current_contract_low_yield_intervals": current_contract_low_yield_intervals,
+                    "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
                     "stale_intervals": stale_intervals,
                     "status": status,
                 },
@@ -453,6 +531,7 @@ def main() -> None:
                 "rows": rows,
                 "papers": papers,
                 "primary_section_papers": primary_section_papers,
+                "current_contract_primary_section_papers": current_contract_primary_section_papers,
                 "done": done,
                 "total": progress_data.get("total"),
                 "last_change_ts": last_change_ts,
@@ -460,9 +539,15 @@ def main() -> None:
                 "last_evidence_papers": last_evidence_papers,
                 "last_evidence_done": last_evidence_done,
                 "last_evidence_ts": last_evidence_ts,
+                "last_contract_evidence_done": last_contract_evidence_done,
+                "last_contract_evidence_ts": last_contract_evidence_ts,
                 "no_evidence_done_delta": no_evidence_done_delta,
                 "no_evidence_elapsed_s": no_evidence_elapsed_s,
+                "no_current_contract_done_delta": no_current_contract_done_delta,
+                "no_current_contract_elapsed_s": no_current_contract_elapsed_s,
                 "low_yield_intervals": low_yield_intervals,
+                "current_contract_low_yield_intervals": current_contract_low_yield_intervals,
+                "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
                 "stale_intervals": stale_intervals,
                 "status": status,
             },

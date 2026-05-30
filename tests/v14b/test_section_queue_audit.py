@@ -95,8 +95,46 @@ def test_watchdog_done_and_primary_section_gate(tmp_path):
     assert mod.is_step5s_done("running", {"done": 12000, "total": 12000})
     assert mod.is_step5s_done("done", {"done": None, "total": None})
     assert mod.get_primary_section_papers(db_main) == 2
+    assert mod.get_primary_section_contract_counts(db_main) == (2, 0)
     assert mod.handoff_reason(8000, 8000) == "frontfill_threshold_met"
     assert mod.handoff_reason(2, 8000) == "frontfill_threshold_not_met_downstream_gate_will_hold"
+
+
+def test_watchdog_counts_current_parser_contract_primary_sections(tmp_path):
+    mod = _load_watchdog_module()
+    db_main = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db_main))
+    conn.executescript(
+        """
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.executemany(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
+        [
+            (
+                "p_current",
+                "discussion",
+                "rich current contract evidence " * 8,
+                json.dumps({"parser_contract_version": mod.SECTION_PARSER_CONTRACT_VERSION}),
+            ),
+            (
+                "p_legacy",
+                "discussion",
+                "rich legacy evidence " * 8,
+                json.dumps({"parser_contract_version": "legacy_unknown_contract"}),
+            ),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    assert mod.get_primary_section_contract_counts(db_main) == (2, 1)
 
 
 def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
@@ -113,6 +151,9 @@ def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
         "last_evidence_done": 815,
         "last_evidence_ts": 1000.0,
         "low_yield_intervals": 1,
+        "current_contract_primary_section_papers": 0,
+        "no_current_contract_done_delta": 200,
+        "current_contract_low_yield_intervals": 1,
     }
     path = tmp_path / "state.json"
     mod._write_state(path, state)
@@ -123,6 +164,8 @@ def test_watchdog_soft_stall_state_tracks_evidence_not_just_progress(tmp_path):
     assert loaded["last_evidence_done"] == 815
     assert loaded["done"] - loaded["last_evidence_done"] == 200
     assert loaded["low_yield_intervals"] == 1
+    assert loaded["no_current_contract_done_delta"] == 200
+    assert loaded["current_contract_low_yield_intervals"] == 1
 
 
 def _make_main_db(path: Path) -> None:
