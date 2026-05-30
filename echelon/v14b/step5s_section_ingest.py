@@ -106,6 +106,12 @@ LOOSE_INLINE_HEADINGS = {
     "outlook",
 }
 
+AMBIGUOUS_FRAGMENT_HEADINGS = {
+    "outlook",
+    "perspective",
+    "perspectives",
+}
+
 FALSE_INLINE_BODY_STARTS = {
     "show",
     "shows",
@@ -144,6 +150,12 @@ EMBEDDED_BOUNDARY_PHRASES: tuple[str, ...] = (
 STOP_SECTION_PATTERNS: list[re.Pattern] = [
     re.compile(r"^\s*(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(references|bibliography|acknowledg(e)?ments?|appendix|supplementary|supporting information|data availability|code availability|author contributions?|conflicts? of interest)\s*[:.\-–—]*\s*$", re.I),
 ]
+
+TOC_DOT_LEADER_RE = re.compile(r"\.\s*(?:\.\s*){2,}\d{1,4}(?:\s|$)")
+TOC_NUMBERED_ENTRY_RE = re.compile(
+    r"^\s*(?:section\s+)?(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)?)\s+"
+    r"[A-Z][A-Za-z0-9,&()/+'\-\s]{2,90}\s+\d{1,4}\s*$"
+)
 
 SECTION_INGEST_OUTCOMES = {
     "already_has_primary",
@@ -531,10 +543,24 @@ def _heading_to_section(line: str) -> Optional[str]:
     normalized = normalized[:120]
     if not normalized:
         return None
+    if _looks_like_toc_line(normalized):
+        return None
+    bare = normalized.strip(" .:;-–—").lower()
+    if bare in AMBIGUOUS_FRAGMENT_HEADINGS and not normalized[0].isupper():
+        return None
     for sec_name, pattern in SECTION_PATTERNS:
         if pattern.match(normalized):
             return sec_name
     return None
+
+
+def _looks_like_toc_line(line: str) -> bool:
+    clean = re.sub(r"\s+", " ", line.strip())[:180]
+    if not clean:
+        return False
+    if TOC_DOT_LEADER_RE.search(clean):
+        return True
+    return bool(TOC_NUMBERED_ENTRY_RE.match(clean))
 
 
 def _is_stop_heading(line: str) -> bool:
@@ -554,6 +580,8 @@ def _inline_heading_to_section(line: str) -> tuple[Optional[str], str, str]:
     clean = re.sub(r"\s+", " ", line.strip())
     if not clean:
         return None, "", ""
+    if _looks_like_toc_line(clean):
+        return None, "", ""
     prefix = r"(?P<prefix>\s*(section\s+)?(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*)"
     for sec_name, phrases in INLINE_SECTION_PREFIXES:
         for phrase in phrases:
@@ -565,6 +593,14 @@ def _inline_heading_to_section(line: str) -> tuple[Optional[str], str, str]:
             if not match:
                 continue
             numbered = bool(re.search(r"(\d+(\.\d+)*|[ivx]+|[a-z])", match.group("prefix") or "", re.I))
+            has_section_prefix = bool(re.search(r"\bsection\s+", match.group("prefix") or "", re.I))
+            if (
+                phrase.lower() in AMBIGUOUS_FRAGMENT_HEADINGS
+                and not clean[0].isupper()
+                and not numbered
+                and not has_section_prefix
+            ):
+                continue
             sep = match.group("sep") or ""
             rest = (match.group("rest") or "").strip()
             title_is_specific = len(phrase.split()) > 1
@@ -627,6 +663,9 @@ def _embedded_heading_sections(text: str) -> list[tuple[str, str]]:
     found: list[tuple[int, int, str, str]] = []
     for sec_name, pattern in target_patterns:
         for match in pattern.finditer(clean):
+            candidate_prefix = clean[match.start(): min(len(clean), match.end() + 120)]
+            if TOC_DOT_LEADER_RE.search(candidate_prefix):
+                continue
             next_boundary = next((b for b in boundaries if b > match.start()), len(clean))
             body = clean[match.end():next_boundary].strip(" .;:-–—")
             if len(body) >= SECTION_INGEST_MIN_CHARS:

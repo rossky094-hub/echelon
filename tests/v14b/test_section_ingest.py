@@ -113,6 +113,39 @@ def test_extract_sections_handles_loose_single_word_heading_without_promoting_re
     assert sections["conclusion"]["pages"] == [12]
 
 
+def test_extract_sections_rejects_table_of_contents_entries():
+    blocks = [
+        _Block("5.1 Experiments. . . . . . . . . . . . . . . . . . . . 38", page_no=2),
+        _Block("11 Summary and perspectives 100", page_no=3),
+        _Block(
+            "1. Introduction\n"
+            + "This review text is an introduction, not section evidence. " * 12,
+            page_no=4,
+        ),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "experiments" not in sections
+    assert "conclusion" not in sections
+    assert "future_work" not in sections
+
+
+def test_extract_sections_rejects_lowercase_perspectives_fragment():
+    blocks = [
+        _Block("perspectives.", page_no=6),
+        _Block(
+            "This sentence follows a wrapped paragraph fragment and should not be "
+            "promoted into future-work evidence. " * 10,
+            page_no=6,
+        ),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "future_work" not in sections
+
+
 def test_extract_sections_stops_at_references_heading():
     long_tail = " This paragraph carries concrete claim evidence." * 10
     reference_tail = " [1] unrelated bibliography text should not become evidence." * 20
