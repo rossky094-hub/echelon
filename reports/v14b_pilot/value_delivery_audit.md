@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T08:16:29Z`
+- generated_at: `2026-05-31T08:43:16Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 325,
-    "section_frontfill_no_evidence_delta": 5,
-    "section_frontfill_progress_done": 325,
+    "section_frontfill_done": 354,
+    "section_frontfill_no_evidence_delta": 0,
+    "section_frontfill_progress_done": 354,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 527,
-      "current_contract_rate": 0.173984813469792,
-      "decision_grade_papers": 523,
-      "decision_grade_rate": 0.17266424562561902,
+      "current_contract_papers": 556,
+      "current_contract_rate": 0.18355893034004622,
+      "decision_grade_papers": 552,
+      "decision_grade_rate": 0.18223836249587322,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1252,
-        "weak": 1777
+        "strong": 1280,
+        "weak": 1749
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4371,
-        "v14b_section_parser_contract_v3_toc_guard": 1194
+        "legacy_unknown_contract": 4323,
+        "v14b_section_parser_contract_v3_toc_guard": 1261
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4371,
-        "v14b_section_ingest_v3": 1194
+        "v14b_section_ingest_v2": 4323,
+        "v14b_section_ingest_v3": 1261
       },
       "primary_section_papers": 3029,
-      "primary_section_rows": 5565,
+      "primary_section_rows": 5584,
       "strategy_counts": {
-        "embedded_heading": 52,
-        "explicit_heading": 1884,
-        "heading_continuation": 2440,
-        "inline_heading": 728,
-        "legacy_unknown_strategy": 3047,
-        "loose_inline_heading": 39,
-        "parser_hint": 55,
+        "embedded_heading": 54,
+        "explicit_heading": 1937,
+        "heading_continuation": 2501,
+        "inline_heading": 740,
+        "legacy_unknown_strategy": 3001,
+        "loose_inline_heading": 42,
+        "parser_hint": 57,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1252,
-      "weak_only_papers": 1777,
-      "weak_only_rate": 0.5866622647738527
+      "strong_or_moderate_papers": 1280,
+      "weak_only_papers": 1749,
+      "weak_only_rate": 0.5774182898646418
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -392,6 +392,7 @@
     "api_evidence_map_branches_carry_contract": true,
     "api_evidence_map_future_edges_carry_contract": true,
     "api_evidence_map_main_path_carries_contract": true,
+    "api_evidence_map_uncertainty_overlays": true,
     "api_returns_evidence_map": true,
     "api_visual_edges_carry_contract": true,
     "combination_contracts_present": true,
@@ -400,11 +401,14 @@
     "layer_contracts_present": true,
     "required_layer_combinations_present": true,
     "required_layers_present": true,
+    "required_uncertainty_overlay_gates_present": true,
     "ui_has_fusion_value_layer_control": true,
     "ui_renders_evidence_map_contract": true,
     "ui_renders_evidence_map_main_path_contract": true,
     "ui_renders_future_edge_contracts": true,
-    "ui_renders_local_edge_contracts": true
+    "ui_renders_local_edge_contracts": true,
+    "ui_renders_uncertainty_overlays": true,
+    "uncertainty_overlays_contract_present": true
   },
   "combination_count": 9,
   "fusion_status": "materialized",
@@ -413,7 +417,14 @@
   "missing_layers": [],
   "missing_required_combinations": [],
   "policy": "Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail.",
-  "status": "pass"
+  "status": "pass",
+  "uncertainty_overlay_count": 4,
+  "uncertainty_overlay_gates": [
+    "fusion_claim_cards",
+    "linked_refs",
+    "openalex_topic_coverage",
+    "section_evidence"
+  ]
 }
 ```
 

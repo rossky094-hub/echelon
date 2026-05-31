@@ -168,7 +168,9 @@ def _write_product_sources(root: Path) -> None:
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
         "def _visual_edge_contract(): return visual_edge + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def get_visual_edges(): return _visual_edge_contract\n"
+        "def _build_uncertainty_overlays(): return linked_refs + section_evidence + openalex_topic_coverage + uncertainty_overlay_only + source_audit_uri\n"
         '_build_evidence_map history_main_path_contract recommended_layer_combinations "main_path": { "claim_scope": main_path_contract.get("claim_scope") "evidence_grade": main_path_contract.get("evidence_grade") "evidence_objects": main_path_contract.get("evidence_objects")\n'
+        '"uncertainty_overlays": uncertainty_overlays\n'
         '"branches": [ parent_branch_id lineage_status claim_scope evidence_grade uncertainty_reasons\n'
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
@@ -194,7 +196,8 @@ def _write_product_sources(root: Path) -> None:
         "function renderBottleneckLineage() { return c.can_explain + c.cannot_explain + '不能说明'; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
         "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
-        "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderComboContract('Fusion value'); }\n"
+        "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderUncertaintyOverlays(evidence.uncertainty_overlays) + renderComboContract('Fusion value'); }\n"
+        "function renderUncertaintyOverlays() { return 'Uncertainty overlays' + overlay.claim_scope + overlay.evidence_grade + overlay.uncertainty_reasons + renderEvidenceObjects(overlay.evidence_objects); }\n"
         "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
         "function futureCalibrationCopy() { return 'candidate_score calibrated_candidate_score raw_candidate_score'; }\n"
         "function renderFutureEdges() { return 'Future edge uncertainty' + edge.claim_scope + edge.evidence_grade + edge.required_evidence + edge.uncertainty_reasons + renderEvidenceObjects(edge.evidence_objects); }\n"
@@ -655,10 +658,12 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
     assert evidence_map_gate["checks"]["evidence_map_main_path_contract_present"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_main_path_carries_contract"] is True
+    assert evidence_map_gate["checks"]["api_evidence_map_uncertainty_overlays"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_future_edges_carry_contract"] is True
     assert evidence_map_gate["checks"]["api_evidence_map_branches_carry_contract"] is True
     assert evidence_map_gate["checks"]["api_visual_edges_carry_contract"] is True
     assert evidence_map_gate["checks"]["ui_renders_evidence_map_main_path_contract"] is True
+    assert evidence_map_gate["checks"]["ui_renders_uncertainty_overlays"] is True
     assert evidence_map_gate["checks"]["ui_renders_future_edge_contracts"] is True
     assert evidence_map_gate["checks"]["ui_renders_local_edge_contracts"] is True
     radar_gate = next(g for g in result["gates"] if g["issue"] == "R&D Radar Promotion Contract")
@@ -732,6 +737,8 @@ def test_evolution_evidence_map_contract_exposes_layer_limits_and_fusion_value(t
     assert result["checks"]["combination_contracts_present"] is True
     assert result["checks"]["fusion_value_is_auditable_layer"] is True
     assert result["checks"]["evidence_map_main_path_contract_present"] is True
+    assert result["checks"]["uncertainty_overlays_contract_present"] is True
+    assert result["checks"]["required_uncertainty_overlay_gates_present"] is True
     assert result["missing_required_combinations"] == []
 
 

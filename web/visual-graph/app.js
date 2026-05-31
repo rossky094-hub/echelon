@@ -1436,10 +1436,12 @@ function renderDossierRadar(radar = {}) {
 function renderEvidenceMapSummary(evidence = {}) {
   const combos = evidence.recommended_layer_combinations || [];
   const mainPath = evidence.main_path || {};
+  const uncertaintyOverlays = evidence.uncertainty_overlays || [];
   return `
     <div class="item">
       <div class="paper-meta">Evidence Map</div>
       <p>${esc(evidence.summary || "")}</p>
+      ${renderUncertaintyOverlays(uncertaintyOverlays)}
       ${mainPath.claim_scope || mainPath.evidence_grade ? `
         <div class="combo-card">
           <strong>Main-path evidence boundary</strong>
@@ -1456,6 +1458,30 @@ function renderEvidenceMapSummary(evidence = {}) {
           <small>${esc((combo.layers || []).join(" + "))} / ${esc(combo.use || "")}</small>
           ${renderComboContract(combo)}
         </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderUncertaintyOverlays(overlays = []) {
+  if (!overlays.length) return "";
+  return `
+    <div class="combo-card">
+      <strong>Uncertainty overlays</strong>
+      <p class="mini">These overlays lower claim scope for affected layers; they are not evidence that a claim is false.</p>
+      ${overlays.map((overlay) => `
+        <details open>
+          <summary>${esc(overlay.gate || overlay.overlay_id || "uncertainty")} / ${esc(overlay.severity || "unknown")}</summary>
+          <div class="pill-row">
+            <span class="pill">${esc(overlay.claim_scope || "uncertainty_overlay_only")}</span>
+            <span class="pill">${esc(overlay.evidence_grade || "evidence_gap")}</span>
+            ${(overlay.affected_layers || []).slice(0, 6).map((layer) => `<span class="pill">${esc(layer)}</span>`).join("")}
+          </div>
+          ${(overlay.uncertainty_reasons || []).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+          ${(overlay.cannot_explain || []).length ? `<p class="mini"><strong>不能说明：</strong>${(overlay.cannot_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+          ${(overlay.required_evidence || []).length ? `<p class="mini"><strong>需要：</strong>${(overlay.required_evidence || []).slice(0, 2).map(esc).join(" / ")}</p>` : ""}
+          ${renderEvidenceObjects(overlay.evidence_objects || [], 3)}
+        </details>
       `).join("")}
     </div>
   `;

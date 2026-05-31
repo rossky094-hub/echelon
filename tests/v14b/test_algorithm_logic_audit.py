@@ -192,6 +192,30 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
         ),
         encoding="utf-8",
     )
+    (reports / "value_delivery_audit.json").write_text(
+        json.dumps(
+            {
+                "gates": [
+                    {
+                        "issue": "Evolution Evidence Map Contract",
+                        "uncertainty_overlay_count": 3,
+                        "uncertainty_overlay_gates": [
+                            "linked_refs",
+                            "section_evidence",
+                            "openalex_topic_coverage",
+                        ],
+                        "checks": {
+                            "uncertainty_overlays_contract_present": True,
+                            "required_uncertainty_overlay_gates_present": True,
+                            "api_evidence_map_uncertainty_overlays": True,
+                            "ui_renders_uncertainty_overlays": True,
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
 
     result = run_algorithm_logic_audit(
         db_main=main,
@@ -218,6 +242,9 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     step7 = next(step for step in payload["steps"] if step["step"] == "Step7 mutation")
     assert step7["algorithm_fit"] == "aligned"
     assert "mutation_hypotheses=1" in step7["challenge"]
+    quality = next(step for step in payload["steps"] if step["step"] == "quality audit")
+    assert "Evidence Map overlays" in quality["challenge"]
+    assert payload["metrics"]["evidence_map_uncertainty_overlay_count"] == 3
     assert payload["metrics"]["lineage_completeness_counts"]["resolution_candidate_partial"] == 1
     assert payload["metrics"]["complete_typed_lineage_triples"] == 1
     assert payload["metrics"]["section_atoms"] == 1

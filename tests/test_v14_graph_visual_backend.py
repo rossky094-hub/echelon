@@ -743,6 +743,14 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert "bottleneck_lineage" in data
     assert "rd_radar" in data
     assert "evidence_map" in data
+    overlays = data["evidence_map"]["uncertainty_overlays"]
+    assert overlays
+    assert all(overlay["claim_scope"] == "uncertainty_overlay_only" for overlay in overlays)
+    assert all(overlay["evidence_grade"] for overlay in overlays)
+    assert all(overlay["uncertainty_reasons"] for overlay in overlays)
+    assert all(overlay["cannot_explain"] for overlay in overlays)
+    assert all(overlay["evidence_objects"][0]["type"] == "audit_overlay" for overlay in overlays)
+    assert {"linked_refs", "section_evidence"} <= {overlay["gate"] for overlay in overlays}
     evidence_main = data["evidence_map"]["main_path"]
     assert evidence_main["claim_scope"]
     assert evidence_main["evidence_grade"]

@@ -1966,6 +1966,10 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         if isinstance(combo, dict)
     ]
     map_main_path = evidence_map.get("main_path") or {}
+    uncertainty_overlays = [
+        item for item in (evidence_map.get("uncertainty_overlays") or [])
+        if isinstance(item, dict)
+    ]
     layer_names = set(layers)
     combo_sets = {tuple(combo.get("layers") or []) for combo in combos}
     missing_layers = sorted(REQUIRED_EVIDENCE_MAP_LAYERS - layer_names)
@@ -2006,14 +2010,33 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         and bool(map_main_path.get("can_explain"))
         and bool(map_main_path.get("cannot_explain"))
     )
+    overlay_gates = {str(item.get("gate") or "") for item in uncertainty_overlays}
+    uncertainty_overlay_contract_ok = bool(uncertainty_overlays) and all(
+        item.get("severity")
+        and item.get("affected_layers")
+        and item.get("claim_scope") == "uncertainty_overlay_only"
+        and item.get("evidence_grade")
+        and item.get("uncertainty_reasons")
+        and item.get("required_evidence")
+        and item.get("cannot_explain")
+        and item.get("evidence_objects")
+        for item in uncertainty_overlays
+    )
+    required_overlay_gates_present = {
+        "linked_refs",
+        "section_evidence",
+        "openalex_topic_coverage",
+    } <= overlay_gates
     source_checks = {
         "api_returns_evidence_map": False,
         "api_evidence_map_main_path_carries_contract": False,
+        "api_evidence_map_uncertainty_overlays": False,
         "api_evidence_map_future_edges_carry_contract": False,
         "api_evidence_map_branches_carry_contract": False,
         "api_visual_edges_carry_contract": False,
         "ui_renders_evidence_map_contract": False,
         "ui_renders_evidence_map_main_path_contract": False,
+        "ui_renders_uncertainty_overlays": False,
         "ui_renders_future_edge_contracts": False,
         "ui_renders_local_edge_contracts": False,
         "ui_has_fusion_value_layer_control": False,
@@ -2033,6 +2056,18 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                     '"claim_scope": main_path_contract.get("claim_scope")',
                     '"evidence_grade": main_path_contract.get("evidence_grade")',
                     '"evidence_objects": main_path_contract.get("evidence_objects")',
+                ),
+            ),
+            "api_evidence_map_uncertainty_overlays": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def _build_uncertainty_overlays",
+                    '"uncertainty_overlays": uncertainty_overlays',
+                    "linked_refs",
+                    "section_evidence",
+                    "openalex_topic_coverage",
+                    "uncertainty_overlay_only",
+                    "source_audit_uri",
                 ),
             ),
             "api_evidence_map_future_edges_carry_contract": _source_contains(
@@ -2081,6 +2116,18 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
                     "renderEvidenceObjects(mainPath.evidence_objects",
                 ),
             ),
+            "ui_renders_uncertainty_overlays": _source_contains(
+                repo_root / "web/visual-graph/app.js",
+                (
+                    "renderUncertaintyOverlays",
+                    "uncertainty_overlays",
+                    "Uncertainty overlays",
+                    "overlay.claim_scope",
+                    "overlay.evidence_grade",
+                    "overlay.uncertainty_reasons",
+                    "renderEvidenceObjects(overlay.evidence_objects",
+                ),
+            ),
             "ui_renders_future_edge_contracts": _source_contains(
                 repo_root / "web/visual-graph/app.js",
                 (
@@ -2118,6 +2165,8 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "combination_contracts_present": combo_contracts_ok,
         "fusion_value_is_auditable_layer": fusion_combo_ok,
         "evidence_map_main_path_contract_present": map_main_path_contract_ok,
+        "uncertainty_overlays_contract_present": uncertainty_overlay_contract_ok,
+        "required_uncertainty_overlay_gates_present": required_overlay_gates_present,
         **source_checks,
     }
     return {
@@ -2128,6 +2177,8 @@ def audit_evolution_evidence_map_contract(repo_root: Path | None = None) -> dict
         "missing_required_combinations": missing_combos,
         "layer_count": len(layer_names),
         "combination_count": len(combos),
+        "uncertainty_overlay_count": len(uncertainty_overlays),
+        "uncertainty_overlay_gates": sorted(overlay_gates),
         "fusion_status": model.get("fusion_status"),
         "policy": (
             "Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, "

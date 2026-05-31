@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T08:16:35Z`
+- generated_at: `2026-05-31T08:47:17Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`
@@ -30,6 +30,7 @@
 - mutation_hypotheses_with_evidence_contract: `5`
 - topic_gap_decision_grade_section_rate: `30.4%`
 - failed regression topics: `metasurface holography, photonic crystal cavity, quantum light source`
+- evidence_map_uncertainty_overlays: `4`
 
 ## Policy
 
@@ -43,7 +44,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | OpenAlex / local field-topic backfill | `aligned` | `warn` | Provide field/topic context as an uncertainty-aware enrichment layer, not a product blocker. | OpenAlex W coverage is 64.4%; frontfill status=completed. | Resume conservative OpenAlex repair or strengthen local field-topic fallback before cross-field claims are promoted. |
 | graph-features | `aligned` | `pass` | Compute interpretable structural signals for keystone, branch, and fusion weighting. | Feature semantics are useful only if linked citation coverage remains honest. | Add feature freshness checks per corpus and expose feature-default rates in audits. |
 | embeddings | `aligned` | `pass` | Support semantic retrieval and neighborhood expansion without replacing citation evidence. | embeddings=55,391; papers=55,401. | Keep semantic layer labeled as retrieval/expansion; require citation/section evidence for claims. |
-| quality audit | `aligned` | `warn` | Stop poor coverage from becoming confident product output. | The audit layer exists, but live readiness still depends on citation and section gaps. | Promote quality-audit failures into user-visible uncertainty overlays. |
+| quality audit | `aligned` | `warn` | Stop poor coverage from becoming confident product output. | Quality-audit gaps are exposed as user-visible Evidence Map overlays (4 gates: fusion_claim_cards, linked_refs, openalex_topic_coverage, section_evidence); live readiness still depends on citation and section gaps. | Keep overlays tied to Value/Direction readiness gates while continuing citation and section frontfill. |
 | Step2 main path | `aligned` | `warn` | Extract historical trunk from citation-flow DAG, with SCC cycles audited instead of deleted. | main_path_core_edges=2,775; linked_ref_rate=14.1%. | Keep uncertainty labels on main path and continue exact citation corpus expansion. |
 | Step3 keystone | `aligned` | `pass` | Rank papers as branch/turning-point candidates using structural and temporal signals. | Useful for queue prioritization, risky if interpreted as causal driver by itself. | Add per-feature contribution traces to Topic Dossier driver-paper explanations. |
 | Step4 graph/subgraph evidence | `aligned` | `pass` | Create a bounded expensive-model evidence set while preserving full-graph product scope. | subgraph_nodes=5,000; subgraph_edges=38,538. | Keep Step10 full-graph/LOD path separate from Step4 bounded extraction support. |

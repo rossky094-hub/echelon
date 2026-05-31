@@ -164,6 +164,26 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
         report_dir / "topic_gap_no_target_inspection.json"
     )
     metrics["multi_topic_regression"] = _load_json(report_dir / "multi_topic_regression.json", [])
+    value_delivery = _load_json(report_dir / "value_delivery_audit.json", {})
+    evidence_map_gate: dict[str, Any] = {}
+    for gate in value_delivery.get("gates", []) if isinstance(value_delivery, dict) else []:
+        if isinstance(gate, dict) and gate.get("issue") == "Evolution Evidence Map Contract":
+            evidence_map_gate = gate
+            break
+    evidence_map_checks = evidence_map_gate.get("checks") if isinstance(evidence_map_gate, dict) else {}
+    metrics["evidence_map_uncertainty_overlay_count"] = int(
+        evidence_map_gate.get("uncertainty_overlay_count") or 0
+    )
+    metrics["evidence_map_uncertainty_overlay_gates"] = list(
+        evidence_map_gate.get("uncertainty_overlay_gates") or []
+    )
+    metrics["evidence_map_uncertainty_overlay_contract_pass"] = bool(
+        isinstance(evidence_map_checks, dict)
+        and evidence_map_checks.get("uncertainty_overlays_contract_present")
+        and evidence_map_checks.get("required_uncertainty_overlay_gates_present")
+        and evidence_map_checks.get("api_evidence_map_uncertainty_overlays")
+        and evidence_map_checks.get("ui_renders_uncertainty_overlays")
+    )
     with sqlite3.connect(str(db_main)) as main:
         metrics["embeddings"] = _count(main, "paper_embeddings")
         metrics["section_atoms"] = _count(main, "section_atoms")
@@ -338,6 +358,9 @@ def build_algorithm_logic_audit(
         for row in regression
         if isinstance(row, dict) and row.get("overall_status") == "fail"
     ]
+    uncertainty_overlay_count = int(m.get("evidence_map_uncertainty_overlay_count") or 0)
+    uncertainty_overlay_gates = list(m.get("evidence_map_uncertainty_overlay_gates") or [])
+    uncertainty_overlay_contract_pass = bool(m.get("evidence_map_uncertainty_overlay_contract_pass"))
 
     steps = [
         StepAudit(
@@ -392,8 +415,18 @@ def build_algorithm_logic_audit(
             "Quality audit must fail loudly rather than lowering thresholds.",
             "aligned",
             "warn",
-            "The audit layer exists, but live readiness still depends on citation and section gaps.",
-            "Promote quality-audit failures into user-visible uncertainty overlays.",
+            (
+                "Quality-audit gaps are exposed as user-visible Evidence Map overlays "
+                f"({uncertainty_overlay_count} gates: {', '.join(uncertainty_overlay_gates) or 'none'}); "
+                "live readiness still depends on citation and section gaps."
+                if uncertainty_overlay_contract_pass
+                else "The audit layer exists, but user-visible uncertainty overlays are not yet fully enforced."
+            ),
+            (
+                "Keep overlays tied to Value/Direction readiness gates while continuing citation and section frontfill."
+                if uncertainty_overlay_contract_pass
+                else "Promote quality-audit failures into user-visible uncertainty overlays."
+            ),
         ),
         StepAudit(
             "Step2 main path",
@@ -673,6 +706,9 @@ def build_algorithm_logic_audit(
             "mutation_hypotheses_with_evidence_contract": mutation_hypotheses_with_evidence_contract,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
+            "evidence_map_uncertainty_overlay_count": uncertainty_overlay_count,
+            "evidence_map_uncertainty_overlay_gates": uncertainty_overlay_gates,
+            "evidence_map_uncertainty_overlay_contract_pass": uncertainty_overlay_contract_pass,
         },
         "status_counts": status_counts,
         "steps": [s.__dict__ for s in steps],
@@ -725,6 +761,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- mutation_hypotheses_with_evidence_contract: `{int(result['metrics']['mutation_hypotheses_with_evidence_contract']):,}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
+        f"- evidence_map_uncertainty_overlays: `{int(result['metrics']['evidence_map_uncertainty_overlay_count']):,}`",
         "",
         "## Policy",
         "",

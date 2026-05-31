@@ -5048,6 +5048,180 @@ def _build_topic_dossier(
     }
 
 
+def _uncertainty_overlay(
+    *,
+    overlay_id: str,
+    gate: str,
+    severity: str,
+    affected_layers: list[str],
+    metrics: dict[str, Any],
+    threshold: str,
+    why: str,
+    next_action: str,
+    source_audit_uri: str,
+) -> dict[str, Any]:
+    return {
+        "overlay_id": overlay_id,
+        "gate": gate,
+        "severity": severity,
+        "affected_layers": affected_layers,
+        "metrics": metrics,
+        "threshold": threshold,
+        "claim_scope": "uncertainty_overlay_only",
+        "evidence_grade": f"{severity}_evidence_gap",
+        "can_explain": [
+            "which evidence gate currently limits interpretation",
+            "which graph layers need a lower claim scope",
+            "what upstream repair work should be prioritized next",
+        ],
+        "cannot_explain": [
+            "that an affected claim is false",
+            "that a candidate should be promoted despite missing evidence",
+            "a substitute for reading the source evidence objects",
+        ],
+        "uncertainty_reasons": [why],
+        "required_evidence": [next_action],
+        "evidence_objects": [
+            {
+                "type": "audit_overlay",
+                "id": overlay_id,
+                "source": source_audit_uri,
+                "gate": gate,
+                "severity": severity,
+                "claim_scope": "uncertainty_overlay_only",
+                "evidence_grade": f"{severity}_evidence_gap",
+                "description": why,
+            }
+        ],
+    }
+
+
+def _build_uncertainty_overlays(
+    *,
+    value_model: dict[str, Any],
+    future_growth: list[dict[str, Any]],
+    branch_dossiers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    frontfill = value_model.get("frontfill_status") or {}
+    counts = value_model.get("counts") or {}
+    overlays: list[dict[str, Any]] = []
+    linked_ref_rate = float(frontfill.get("linked_ref_rate") or 0.0)
+    primary_section_papers = int(frontfill.get("primary_section_papers") or 0)
+    primary_section_rate = float(frontfill.get("primary_section_rate") or 0.0)
+    openalex_w_rate = float(frontfill.get("openalex_w_rate") or 0.0)
+    has_calibrated_future = any(_future_edge_has_run_calibration(edge) for edge in future_growth)
+    claim_cards = int(counts.get("claim_cards") or 0)
+    future_directions = int(counts.get("future_directions") or 0)
+    fusion_adequacy = str(counts.get("fusion_adequacy") or "unknown")
+
+    if linked_ref_rate < 0.30:
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:linked_refs",
+                gate="linked_refs",
+                severity="high",
+                affected_layers=["main_path", "citation", "branches"],
+                metrics={
+                    "linked_ref_rate": linked_ref_rate,
+                    "linked_refs": frontfill.get("linked_refs"),
+                    "refs": frontfill.get("refs"),
+                },
+                threshold="linked_ref_rate >= 0.30",
+                why="linked refs below 30%; citation evolution and main-path claims must stay uncertainty-labeled",
+                next_action="Continue exact cited-work backfill and rerun relinking/graph features before raising citation-backed claim scope.",
+                source_audit_uri="reports/v14b_pilot/direction_readiness_audit.json#citation_graph_bone",
+            )
+        )
+    if primary_section_papers < 8000 or primary_section_rate < 0.10:
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:section_evidence",
+                gate="section_evidence",
+                severity="high",
+                affected_layers=["bottleneck", "fusion_value", "future"],
+                metrics={
+                    "primary_section_papers": primary_section_papers,
+                    "primary_section_rate": primary_section_rate,
+                    "section_papers": frontfill.get("section_papers"),
+                    "section_rows": frontfill.get("section_rows"),
+                },
+                threshold="primary_section_papers >= 8000 and primary_section_rate >= 0.10",
+                why="section evidence below decision-grade target; bottleneck, Claim Card, and Radar claims must remain exploratory",
+                next_action="Finish top12000 section ingest and refresh section atoms, typed chains, Step5c, Step6, and Step13.",
+                source_audit_uri="reports/v14b_pilot/direction_readiness_audit.json#section_evidence",
+            )
+        )
+    if openalex_w_rate < 0.70:
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:openalex_topic",
+                gate="openalex_topic_coverage",
+                severity="medium",
+                affected_layers=["topic", "semantic", "branches"],
+                metrics={
+                    "openalex_w_rate": openalex_w_rate,
+                    "openalex_w": frontfill.get("openalex_w"),
+                    "papers": frontfill.get("papers"),
+                    "primary_field_rate": frontfill.get("primary_field_rate"),
+                },
+                threshold="openalex_w_rate >= 0.70",
+                why="OpenAlex W coverage below cross-field target; field/topic interpretation needs uncertainty",
+                next_action="Continue conservative OpenAlex/local field-topic backfill before promoting cross-field branch claims.",
+                source_audit_uri="reports/v14b_pilot/direction_readiness_audit.json#openalex_topic_coverage",
+            )
+        )
+    if future_growth and not has_calibrated_future:
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:future_calibration",
+                gate="future_calibration",
+                severity="high",
+                affected_layers=["future", "fusion_value"],
+                metrics={"future_candidate_edges": len(future_growth), "has_calibrated_future": False},
+                threshold="every Radar-promoted future direction must have rolling held-out-year calibration evidence",
+                why="future candidate edges are present without run-level calibration evidence; they are candidate pool only",
+                next_action="Run or attach Step5b calibration audit and keep raw GNN/VGAE edges out of Radar.",
+                source_audit_uri="reports/v14b_pilot/recover_vgae_calibration_audit.json#future_calibration",
+            )
+        )
+    if future_directions == 0 or claim_cards == 0 or "high_confidence" not in fusion_adequacy:
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:fusion_claim_cards",
+                gate="fusion_claim_cards",
+                severity="medium",
+                affected_layers=["fusion_value", "future", "bottleneck"],
+                metrics={
+                    "future_directions": future_directions,
+                    "claim_cards": claim_cards,
+                    "fusion_adequacy": fusion_adequacy,
+                },
+                threshold="complete Step6/Step13 Claim Cards with high-confidence quality gates",
+                why="fusion/Claim Card layer is not high-confidence; Radar must separate complete cards from candidate-pool hypotheses",
+                next_action="Improve evidence inputs and rerun Step6/Step13 without lowering promotion gates.",
+                source_audit_uri="reports/v14b_pilot/value_delivery_audit.json#claim_card_engine",
+            )
+        )
+    if branch_dossiers and not any(
+        str(branch.get("lineage_status") or "") == "evidence_backed_split"
+        for branch in branch_dossiers
+    ):
+        overlays.append(
+            _uncertainty_overlay(
+                overlay_id="uncertainty:branch_lineage",
+                gate="branch_lineage",
+                severity="medium",
+                affected_layers=["branches", "topic", "main_path"],
+                metrics={"branch_dossiers": len(branch_dossiers), "evidence_backed_splits": 0},
+                threshold="at least one topic-relevant evidence_backed_split for branch-causal narration",
+                why="branch panels are currently layout/topic context; parent-child split reasons need branch lineage evidence",
+                next_action="Use branch_lineages plus driver-paper section evidence before narrating causal split reasons.",
+                source_audit_uri="reports/v14b_pilot/value_delivery_audit.json#branch_lineage_validity",
+            )
+        )
+    return overlays
+
+
 def _build_evidence_map(
     *,
     main_path_edges: list[dict[str, Any]],
@@ -5063,8 +5237,14 @@ def _build_evidence_map(
         broader_context_papers=[],
         value_model=value_model,
     )
+    uncertainty_overlays = _build_uncertainty_overlays(
+        value_model=value_model,
+        future_growth=future_growth,
+        branch_dossiers=branch_dossiers,
+    )
     return {
         "summary": "Evidence Map is for auditing the dossier, not for making users infer value from raw nodes.",
+        "uncertainty_overlays": uncertainty_overlays,
         "main_path": {
             "meaning": value_model.get("layers", {}).get("main_path", {}).get("relationship"),
             "claim_scope": main_path_contract.get("claim_scope"),
