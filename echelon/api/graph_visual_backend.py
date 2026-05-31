@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from echelon.schema.graph_visual_edit import GraphSearchQuery, GraphVisualEdit
+from echelon.schema.graph_visual_edit import EvidenceAtomSearchQuery, GraphSearchQuery, GraphVisualEdit
 from echelon.v14b.config import DB_MAIN, DB_V14
 from echelon.v14b.id_normalization import (
     normalize_arxiv_id,
@@ -36,6 +36,15 @@ from echelon.v14b.evidence_contracts import (
     summarize_primary_section_provenance,
 )
 from echelon.v14b.topic_readiness import build_topic_readiness_preflight
+from echelon.v14b.section_atoms import (
+    EXACT_SEARCH_SEMANTICS,
+    FUZZY_SEARCH_SEMANTICS,
+    GRAPH_EXPANSION_SEMANTICS,
+    HYBRID_SEARCH_SEMANTICS,
+    search_section_atoms,
+    search_section_atoms_fuzzy,
+    search_section_atoms_hybrid,
+)
 
 SCHEMA_VERSION = "V14B.visual.1"
 REQUIRED_VISUAL_TABLES = (
@@ -1097,6 +1106,133 @@ def search_visual_graph(query: GraphSearchQuery) -> dict:
         "ready": True,
         "query_type": query.query_type,
     }
+
+
+def _evidence_atom_search_contract(search_mode: str) -> dict[str, Any]:
+    return {
+        "claim_scope": "retrieval_context_only",
+        "search_mode": search_mode,
+        "exact_semantics": EXACT_SEARCH_SEMANTICS,
+        "fuzzy_semantics": FUZZY_SEARCH_SEMANTICS,
+        "hybrid_semantics": HYBRID_SEARCH_SEMANTICS,
+        "graph_expansion_semantics": GRAPH_EXPANSION_SEMANTICS,
+        "promotion_rule": (
+            "exact and fuzzy atom hits can seed Step5c/Step13 evidence work; "
+            "they cannot become scientific conclusions without typed chains and Claim Card gates"
+        ),
+    }
+
+
+def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
+    """Search traceable section atoms in DB_MAIN with exact/fuzzy semantics."""
+    start = time.perf_counter()
+    conn = _connect_main()
+    if conn is None:
+        return {
+            "query_id": query.query_id,
+            "ready": False,
+            "hits": [],
+            "exact_hits": [],
+            "fuzzy_candidate_hits": [],
+            "total_matches": 0,
+            "elapsed_ms": _elapsed_ms(start),
+            "schema_version": SCHEMA_VERSION,
+            "search_mode": query.search_mode,
+            "search_contract": _evidence_atom_search_contract(query.search_mode),
+            "missing_tables": ["db_main"],
+            "message": "main evidence database is not available",
+        }
+
+    try:
+        missing = [table for table in ("section_atoms",) if not _table_exists(conn, table)]
+        if query.search_mode in {"fuzzy", "hybrid"} and not _table_exists(conn, "section_atom_embeddings"):
+            missing.append("section_atom_embeddings")
+        if missing:
+            return {
+                "query_id": query.query_id,
+                "ready": False,
+                "hits": [],
+                "exact_hits": [],
+                "fuzzy_candidate_hits": [],
+                "total_matches": 0,
+                "elapsed_ms": _elapsed_ms(start),
+                "schema_version": SCHEMA_VERSION,
+                "search_mode": query.search_mode,
+                "search_contract": _evidence_atom_search_contract(query.search_mode),
+                "missing_tables": missing,
+                "message": "section atom search substrate is not materialized; run section-atoms and section-atom-embeddings",
+            }
+
+        if query.search_mode == "exact":
+            hits = search_section_atoms(
+                conn,
+                query.query_text,
+                top_k=query.top_k,
+                filters=query.filters,
+            )
+            exact_hits = hits
+            fuzzy_hits: list[dict[str, Any]] = []
+            contract = _evidence_atom_search_contract("exact")
+        elif query.search_mode == "fuzzy":
+            hits = search_section_atoms_fuzzy(
+                conn,
+                query.query_text,
+                top_k=query.top_k,
+                filters=query.filters,
+                embedding_model=query.embedding_model,
+                embedding_dim=query.embedding_dim,
+                min_score=query.min_fuzzy_score,
+            )
+            exact_hits = []
+            fuzzy_hits = hits
+            contract = _evidence_atom_search_contract("fuzzy")
+        else:
+            result = search_section_atoms_hybrid(
+                conn,
+                query.query_text,
+                top_k=query.top_k,
+                filters=query.filters,
+                exact_top_k=query.exact_top_k,
+                fuzzy_top_k=query.fuzzy_top_k,
+                embedding_model=query.embedding_model,
+                embedding_dim=query.embedding_dim,
+                min_fuzzy_score=query.min_fuzzy_score,
+            )
+            hits = result["merged_hits"]
+            exact_hits = result["exact_hits"]
+            fuzzy_hits = result["fuzzy_candidate_hits"]
+            contract = result["search_contract"]
+            contract["promotion_rule"] = _evidence_atom_search_contract("hybrid")["promotion_rule"]
+
+        return {
+            "query_id": query.query_id,
+            "ready": True,
+            "hits": hits,
+            "exact_hits": exact_hits,
+            "fuzzy_candidate_hits": fuzzy_hits,
+            "total_matches": len(hits),
+            "elapsed_ms": _elapsed_ms(start),
+            "schema_version": SCHEMA_VERSION,
+            "search_mode": query.search_mode,
+            "filters": dict(query.filters or {}),
+            "search_contract": contract,
+        }
+    except sqlite3.OperationalError as exc:
+        return {
+            "query_id": query.query_id,
+            "ready": False,
+            "hits": [],
+            "exact_hits": [],
+            "fuzzy_candidate_hits": [],
+            "total_matches": 0,
+            "elapsed_ms": _elapsed_ms(start),
+            "schema_version": SCHEMA_VERSION,
+            "search_mode": query.search_mode,
+            "search_contract": _evidence_atom_search_contract(query.search_mode),
+            "message": f"section atom search is temporarily unavailable: {exc}",
+        }
+    finally:
+        conn.close()
 
 
 def _token_set(text: str) -> set[str]:

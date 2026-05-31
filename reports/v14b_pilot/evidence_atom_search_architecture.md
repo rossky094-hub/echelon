@@ -77,6 +77,7 @@ Current implementation:
 - `make section-atoms` materializes the atom table and exact FTS/BM25 index.
 - `make section-atom-embeddings` materializes deterministic atom vectors for fuzzy candidate recall.
 - `search_section_atoms_hybrid()` returns exact hits and fuzzy candidates under one retrieval contract.
+- `POST /graph/visual/evidence-atoms/search` exposes exact, fuzzy, and hybrid atom retrieval to API clients.
 - `echelon.v14b.section_atom_chains` assembles co-located atoms into typed bottleneck-chain evidence candidates.
 - `make section-atom-chains` materializes `section_atom_chains` with explicit missing stages.
 - Search hits carry `claim_scope=retrieval_context_only`; they are retrieval context, not product claims.
@@ -86,12 +87,15 @@ Execution snapshot:
 
 - DB: `db/echelon_library.sqlite3`
 - Raw PDF external store: `/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs`
-- `paper_sections`: 5,555
+- Live raw PDF full download: running in `v14b_raw_pdf_full`, 3,400/55,380 attempted with 3,358 successes at the latest log read.
+- Live section ingest: running in `v14b_section_v3`; do not rebuild atoms while this writer is active.
+- `paper_sections`: 5,558
 - `section_atoms`: 61,708
 - `section_atom_embeddings`: 61,708 using `deterministic_hashing_atom_embedding_v1`, dim 256
 - `section_atom_chains`: 4,494
 - Full typed chains: 6
 - Exact FTS smoke check for `fabrication/loss`: 2,225 atom hits
+- API hybrid smoke check for `fabrication loss thermal instability`: exact hits and fuzzy candidates both return `retrieval_context_only`; no embedding payload is exposed.
 
 Pipeline entry:
 
@@ -105,5 +109,6 @@ Pipeline entry:
 
 Remaining layer:
 
+- After the current section ingest process reaches a safe checkpoint, refresh `section-atoms`, `section-atom-embeddings`, and `section-atom-chains`.
 - Wire fuzzy candidates and typed chains into Step5c/Step13 only through evidence-chain contracts.
 - Keep GNN outputs labeled as candidate expansion or `retrieval_context_only`, never as atom generation.

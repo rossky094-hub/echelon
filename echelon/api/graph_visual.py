@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from echelon.schema.graph_visual_edit import GraphSearchQuery, GraphVisualEdit
+from echelon.schema.graph_visual_edit import EvidenceAtomSearchQuery, GraphSearchQuery, GraphVisualEdit
 from echelon.api.graph_visual_backend import (
     get_visual_clusters,
     get_visual_edges,
@@ -23,6 +23,7 @@ from echelon.api.graph_visual_backend import (
     get_topic_lens,
     get_visual_story_steps,
     get_visual_tiles,
+    search_evidence_atoms,
     search_visual_graph,
     submit_visual_edit,
 )
@@ -261,6 +262,33 @@ async def search_graph(
 ) -> dict:
     """Run V14B hybrid visual-graph search."""
     return search_visual_graph(query)
+
+
+# ---------------------------------------------------------------------------
+# POST /graph/visual/evidence-atoms/search — EvidenceAtomSearchQuery (Viewer+)
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/evidence-atoms/search",
+    response_model=dict,
+    summary="[V14B] Evidence atom exact/fuzzy search",
+    description=(
+        "在 section_atoms 上执行精准 FTS/BM25、atom embedding 模糊召回或 hybrid 检索。\n\n"
+        "所有返回结果都保持 `retrieval_context_only`；GNN/graph expansion 只能作为候选扩展，"
+        "不能直接生成 section atom 或晋升为 Step13 结论。"
+    ),
+    responses={
+        200: {"description": "Evidence atom retrieval result"},
+        401: {"description": "Unauthorized — 缺少或无效 token"},
+        403: {"description": "Forbidden — 角色权限不足 (需要 viewer)"},
+    },
+)
+async def search_evidence_atom_layer(
+    query: EvidenceAtomSearchQuery,
+    _role: str = Depends(_require_viewer),
+) -> dict:
+    """Run traceable section atom retrieval with exact/fuzzy contracts."""
+    return search_evidence_atoms(query)
 
 
 # ---------------------------------------------------------------------------

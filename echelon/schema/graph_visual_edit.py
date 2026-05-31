@@ -200,6 +200,55 @@ class GraphSearchQuery(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# EvidenceAtomSearchQuery
+# ---------------------------------------------------------------------------
+
+class EvidenceAtomSearchQuery(BaseModel):
+    """Traceable section-atom retrieval query.
+
+    This query is intentionally evidence-scoped: exact hits and fuzzy vector
+    recalls are retrieval context only.  Step5c/Step13 promotion must attach
+    evidence-chain contracts before any scientific claim is upgraded.
+    """
+
+    query_id: ULIDStr = Field(default_factory=ulid_new, description="查询唯一 ULID")
+    query_text: str = Field(min_length=1, max_length=1000, description="section atom 检索文本")
+    search_mode: Literal["exact", "fuzzy", "hybrid"] = Field(
+        default="hybrid",
+        description="exact=FTS/BM25; fuzzy=atom vector recall; hybrid=exact first, fuzzy candidates second",
+    )
+    filters: dict = Field(default_factory=dict, description="paper_id/atom_type/section_name 等过滤条件")
+    top_k: int = Field(default=50, ge=1, le=200, description="返回结果上限")
+    exact_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid exact 分支上限")
+    fuzzy_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid fuzzy 分支上限")
+    min_fuzzy_score: float = Field(default=0.0, ge=0.0, le=1.0, description="fuzzy 召回最低分")
+    embedding_model: str = Field(
+        default="deterministic_hashing_atom_embedding_v1",
+        max_length=200,
+        description="atom embedding 模型标识",
+    )
+    embedding_dim: int = Field(default=256, ge=1, le=4096, description="atom embedding 维度")
+    expert_id: Optional[str] = Field(
+        default=None, pattern=r"^[a-zA-Z0-9_-]+$", description="发起查询的专家 ID"
+    )
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="查询时间戳 (UTC)")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "query_text": "fabrication loss thermal instability",
+                    "search_mode": "hybrid",
+                    "filters": {"section_name": "Discussion"},
+                    "top_k": 20,
+                    "expert_id": "expert_alice",
+                }
+            ]
+        }
+    }
+
+
+# ---------------------------------------------------------------------------
 # GraphSearchResult
 # ---------------------------------------------------------------------------
 

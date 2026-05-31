@@ -6,6 +6,8 @@ import sqlite3
 from fastapi.testclient import TestClient
 
 from echelon.api.main import app
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
+from echelon.v14b.section_atoms import build_section_atom_embeddings, build_section_atoms
 
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -336,6 +338,68 @@ def _make_visual_db(path):
     conn.close()
 
 
+def _make_section_atom_db(path):
+    conn = sqlite3.connect(str(path))
+    conn.executescript(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            title TEXT
+        );
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            source_url TEXT,
+            section_pages_json TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    meta = {
+        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+        "extraction_strategies": ["explicit_heading"],
+        "source_storage_uri": "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
+        "source_delivery": "local_raw_pdf",
+    }
+    conn.execute("INSERT INTO papers VALUES ('p1', 'Thermal fabrication loss in photonic cavities')")
+    conn.execute("INSERT INTO papers VALUES ('p2', 'Low loss process window for integrated optics')")
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "Discussion",
+            (
+                "Fabrication loss and thermal instability remain the main constraints for scaling. "
+                "The measured device shows excess coupling loss after repeated thermal cycling, "
+                "which creates a bottleneck for reliable integrated photonic deployment."
+            ),
+            "https://example.org/p1",
+            json.dumps([4, 5]),
+            json.dumps(meta),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p2",
+            "Methods",
+            (
+                "We used a low temperature fabrication method and validation setup to reduce loss. "
+                "The approach improves repeatability, but the process still requires tighter control "
+                "of etch roughness and wafer-scale manufacturing yield."
+            ),
+            "https://example.org/p2",
+            json.dumps([2]),
+            json.dumps({**meta, "source_storage_uri": "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p2.pdf"}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    build_section_atoms(path, max_atoms_per_section=6)
+    build_section_atom_embeddings(path, rebuild=True, embedding_dim=64)
+
+
 def test_visual_search_uses_materialized_tables(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)
@@ -358,6 +422,38 @@ def test_visual_search_uses_materialized_tables(tmp_path, monkeypatch):
     assert hit["uncertainty_reasons"]
     assert hit["required_evidence"]
     assert hit["evidence_objects"][0]["type"] == "paper"
+
+
+def test_evidence_atom_search_endpoint_returns_exact_and_fuzzy_contracts(tmp_path, monkeypatch):
+    db_path = tmp_path / "echelon_library.sqlite3"
+    _make_section_atom_db(db_path)
+    monkeypatch.setenv("V14B_DB_MAIN", str(db_path))
+
+    resp = client.post(
+        "/graph/visual/evidence-atoms/search",
+        headers=VIEWER_HEADERS,
+        json={
+            "query_text": "fabrication loss thermal instability",
+            "search_mode": "hybrid",
+            "top_k": 5,
+            "embedding_dim": 64,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is True
+    assert data["search_mode"] == "hybrid"
+    assert data["search_contract"]["claim_scope"] == "retrieval_context_only"
+    assert "graph/GNN expansion may rank" in data["search_contract"]["graph_expansion_semantics"]
+    assert "Step5c/Step13" in data["search_contract"]["promotion_rule"]
+    assert data["exact_hits"]
+    assert data["fuzzy_candidate_hits"]
+    assert data["hits"]
+    assert any("exact_fts_bm25" in hit.get("retrieval_channels", []) for hit in data["hits"])
+    assert all(hit["claim_scope"] == "retrieval_context_only" for hit in data["hits"])
+    assert all("embedding_json" not in hit for hit in data["hits"])
+    assert data["hits"][0]["source_storage_uri"].endswith("/p1.pdf")
 
 
 def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
