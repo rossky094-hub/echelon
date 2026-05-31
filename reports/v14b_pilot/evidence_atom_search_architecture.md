@@ -75,11 +75,13 @@ Current implementation:
 
 - `echelon.v14b.section_atoms` builds `section_atoms` from `paper_sections`.
 - `make section-atoms` materializes the atom table and exact FTS/BM25 index.
+- `echelon.v14b.section_atom_chains` assembles co-located atoms into typed bottleneck-chain evidence candidates.
+- `make section-atom-chains` materializes `section_atom_chains` with explicit missing stages.
 - Search hits carry `claim_scope=retrieval_context_only`; they are retrieval context, not product claims.
-- `algorithm_logic_audit` now reports `section_atoms`, decision-grade atom count, and whether exact atom FTS is present.
+- `algorithm_logic_audit` now reports `section_atoms`, decision-grade atom count, exact atom FTS, and typed chain coverage.
 
 Next layer:
 
 - Add atom-level embeddings for fuzzy search.
 - Add hybrid retrieval: exact filters -> atom vectors -> graph/GNN expansion.
-- Wire Step5c/Step13 to consume atom hits through typed evidence-chain contracts.
+- Wire Step5c/Step13 to consume typed atom chains through evidence-chain contracts.

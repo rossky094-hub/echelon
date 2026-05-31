@@ -131,6 +131,19 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
             "evidence_grade = 'section_atom_decision_grade'",
         )
         metrics["section_atoms_fts"] = 1 if table_exists(main, "section_atoms_fts") else 0
+        metrics["section_atom_chains"] = _count(main, "section_atom_chains")
+        metrics["section_atom_chain_full"] = _count_when_columns(
+            main,
+            "section_atom_chains",
+            {"typed_chain_complete"},
+            "typed_chain_complete = 1",
+        )
+        metrics["section_atom_chain_decision_grade"] = _count_when_columns(
+            main,
+            "section_atom_chains",
+            {"evidence_grade"},
+            "evidence_grade IN ('typed_section_lineage', 'typed_section_lineage_traced')",
+        )
     with sqlite3.connect(str(db_v14)) as v14:
         metrics["main_path_edges"] = _count(v14, "main_path_edges")
         metrics["main_path_core_edges"] = _count(v14, "main_path_edges", "is_main_path=1")
@@ -175,6 +188,9 @@ def build_algorithm_logic_audit(
     section_atoms = int(m.get("section_atoms") or 0)
     section_atom_decision_grade = int(m.get("section_atom_decision_grade") or 0)
     section_atoms_fts = int(m.get("section_atoms_fts") or 0)
+    section_atom_chains = int(m.get("section_atom_chains") or 0)
+    section_atom_chain_full = int(m.get("section_atom_chain_full") or 0)
+    section_atom_chain_decision_grade = int(m.get("section_atom_chain_decision_grade") or 0)
     limitation_atoms = int(m.get("limitation_atoms") or 0)
     limitation_exact_section_atoms = int(m.get("limitation_exact_section_atoms") or 0)
     limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
@@ -332,6 +348,20 @@ def build_algorithm_logic_audit(
             "Add atom embeddings for fuzzy search, then let Step5c/Step13 consume atoms through evidence contracts instead of re-parsing ad hoc text.",
         ),
         StepAudit(
+            "Step5s-b section atom typed chains",
+            "Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning.",
+            "section_atoms with atom_type, section order, parser contract, pages, and source URI.",
+            "section_atom_chains carrying typed_chain_completeness, evidence objects, claim_scope, and uncertainty reasons.",
+            "Partial chains are exploratory context only; full chains still require Step13 Claim Card promotion.",
+            "aligned",
+            "fail" if not section_atom_chains else ("warn" if not section_atom_chain_full else "pass"),
+            (
+                f"section_atom_chains={section_atom_chains:,}; full_chains={section_atom_chain_full:,}; "
+                f"decision_grade_chains={section_atom_chain_decision_grade:,}; these chains are evidence substrate, not conclusions."
+            ),
+            "Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages.",
+        ),
+        StepAudit(
             "Step5c limitation / resolution extraction",
             "Extract unresolved constraints and resolution attempts from trusted sections.",
             "Decision-grade sections first, weak abstract metadata only as scoped fallback.",
@@ -460,6 +490,9 @@ def build_algorithm_logic_audit(
             "section_atoms": section_atoms,
             "section_atom_decision_grade": section_atom_decision_grade,
             "section_atoms_fts": section_atoms_fts,
+            "section_atom_chains": section_atom_chains,
+            "section_atom_chain_full": section_atom_chain_full,
+            "section_atom_chain_decision_grade": section_atom_chain_decision_grade,
             "limitation_atoms": limitation_atoms,
             "limitation_exact_section_atoms": limitation_exact_section_atoms,
             "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
@@ -497,6 +530,9 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- section_atoms: `{int(result['metrics']['section_atoms']):,}`",
         f"- section_atom_decision_grade: `{int(result['metrics']['section_atom_decision_grade']):,}`",
         f"- section_atoms_fts: `{'yes' if int(result['metrics']['section_atoms_fts']) else 'no'}`",
+        f"- section_atom_chains: `{int(result['metrics']['section_atom_chains']):,}`",
+        f"- section_atom_chain_full: `{int(result['metrics']['section_atom_chain_full']):,}`",
+        f"- section_atom_chain_decision_grade: `{int(result['metrics']['section_atom_chain_decision_grade']):,}`",
         f"- limitation_exact_section_atoms: `{int(result['metrics']['limitation_exact_section_atoms']):,}`",
         f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
         f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
