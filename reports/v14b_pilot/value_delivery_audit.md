@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T00:16:52Z`
+- generated_at: `2026-05-31T00:22:44Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -33,30 +33,30 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
-    "cited_work_backfill_inserted_or_updated": 4,
+    "cited_work_backfill_inserted_or_updated": 6,
     "cited_work_backfill_provider_counts": {
       "arxiv": 1,
-      "doi": 902,
-      "openalex": 1054,
-      "s2": 43
+      "doi": 903,
+      "openalex": 1051,
+      "s2": 45
     },
     "cited_work_backfill_queue_rows": 2000,
     "cited_work_backfill_queue_status": "ready",
-    "cited_work_backfill_run_processed": 5,
+    "cited_work_backfill_run_processed": 10,
     "cited_work_backfill_run_status": "ran",
     "cited_work_backfill_run_status_counts": {
-      "fetch_failed": 1,
-      "inserted": 4
+      "inserted": 6,
+      "skip_existing_local_work": 4
     },
-    "linked_ref_rate": 0.13965540298878815,
+    "linked_ref_rate": 0.14053555301792017,
     "openalex_frontfill_cooldown_remaining_s": 0,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "stalled_after_cooldown",
     "openalex_frontfill_total": 22643,
-    "openalex_w_rate": 0.6438667749796914,
+    "openalex_w_rate": 0.6439053446688688,
     "primary_section_papers": 3020,
     "reference_relink_exact_linkable_refs": 0,
-    "reference_relink_no_local_match_refs": 2766309,
+    "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
     "section_frontfill_done": 310,
     "section_frontfill_no_evidence_delta": 0,

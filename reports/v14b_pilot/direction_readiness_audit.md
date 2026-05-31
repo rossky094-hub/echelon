@@ -1,15 +1,15 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-31T00:16:50Z`
+- generated_at: `2026-05-31T00:22:43Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
-- linked refs: 449,041 / 3,215,350 (14.0%)
-- reference relink audit: `local_corpus_gap_dominates`; exact-linkable=0; no-local-match=2,766,309
-- cited-work backfill queue: `ready`; targets=2,000; providers={"arxiv": 1, "doi": 902, "openalex": 1054, "s2": 43}
-- cited-work backfill run: `ran`; processed=5; inserted_or_updated=4
-- OpenAlex W IDs: 35,667 (64.4%)
+- linked refs: 451,905 / 3,215,592 (14.1%)
+- reference relink audit: `local_corpus_gap_dominates`; exact-linkable=0; no-local-match=2,763,687
+- cited-work backfill queue: `ready`; targets=2,000; providers={"arxiv": 1, "doi": 903, "openalex": 1051, "s2": 45}
+- cited-work backfill run: `ran`; processed=10; inserted_or_updated=6
+- OpenAlex W IDs: 35,673 (64.4%)
 - OpenAlex frontfill health: stalled_after_cooldown [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=0.0)
 - section evidence: 5,429 rows / 3,020 papers
 - primary section evidence: 3,020 papers (5.5%)
@@ -17,7 +17,7 @@
 - current section parser contract: 284 papers (9.4%)
 - section parser contracts: legacy_unknown_contract:4,784, v14b_section_parser_contract_v3_toc_guard:645
 - multi-topic evidence-gap queue: 0 / 31 decision-grade section covered (0.0%); raw primary=6 (19.4%)
-- section frontfill health: running_or_unknown [section_delta] (done=310/8592, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=257, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
+- section frontfill health: running_or_unknown [section_delta] (done=310/8592, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=284, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
 - future candidate edges: 1,000
 - visual future edges: 1,000
 - future directions: 5
@@ -25,7 +25,7 @@
 
 ## Blockers
 
-- **citation_graph_bone** (high): linked refs are 14.0%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,766,309 no-local-match. Next: Continue processing the remaining cited-work queue in small exact-ID batches; rerun exact relink and graph features after each applied batch.
+- **citation_graph_bone** (high): linked refs are 14.1%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,763,687 no-local-match. Next: Continue processing the remaining cited-work queue in small exact-ID batches; rerun exact relink and graph features after each applied batch.
 - **section_evidence** (high): primary section evidence covers only 3,020 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
 - **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 1,040 papers have strong/moderate parser provenance; weak-only rate is 65.6%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
 - **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 284/3,020 papers (9.4%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.

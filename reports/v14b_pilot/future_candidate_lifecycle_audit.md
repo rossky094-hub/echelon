@@ -1,6 +1,6 @@
 # Future Candidate Lifecycle Audit
 
-- generated_at: `2026-05-31T00:16:50Z`
+- generated_at: `2026-05-31T00:22:42Z`
 - total candidates: 1,000
 - radar eligible Claim Cards: 0
 - raw edge rows eligible for Radar main view: 0

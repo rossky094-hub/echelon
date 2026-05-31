@@ -1,41 +1,41 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-31T00:16:49Z`
+- generated_at: `2026-05-31T00:22:38Z`
 
 ## Reference Linkage
 
-- linked refs: 449,041 / 3,215,350 (14.0%)
-- unlinked refs: 2,766,309
+- linked refs: 451,905 / 3,215,592 (14.1%)
+- unlinked refs: 2,763,687
 
 | unlinked kind | count |
 | --- | ---: |
-| doi_unlinked | 1,410,283 |
-| openalex_unlinked | 1,292,604 |
+| doi_unlinked | 1,408,749 |
+| openalex_unlinked | 1,291,516 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
 ### Reference Relink Diagnosis
 
 - status: `local_corpus_gap_dominates`
-- scanned unlinked refs: 2,766,309
+- scanned unlinked refs: 2,763,687
 - exact-linkable refs: 0
-- no-local-match refs: 2,766,309
+- no-local-match refs: 2,763,687
 - next action: Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
 
 ### Cited Work Backfill Queue
 
 - status: `ready`
 - queued exact provider-ID targets: 2,000
-- provider mix: `{"arxiv": 1, "doi": 902, "openalex": 1054, "s2": 43}`
+- provider mix: `{"arxiv": 1, "doi": 903, "openalex": 1051, "s2": 45}`
 - path: `data/v14b/cited_work_backfill_queue.csv`
 
 ### Cited Work Backfill Run
 
 - status: `ran`
-- processed targets: 5
-- inserted/updated local works: 4
-- status counts: `{"fetch_failed": 1, "inserted": 4}`
-- relink updates applied: `3084`
+- processed targets: 10
+- inserted/updated local works: 6
+- status counts: `{"inserted": 6, "skip_existing_local_work": 4}`
+- relink updates applied: `2864`
 
 ## Section Evidence
 
