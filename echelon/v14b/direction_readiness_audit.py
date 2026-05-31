@@ -31,6 +31,15 @@ WEAK_SECTION_STRATEGIES = {
     "parser_hint",
     "legacy_unknown_strategy",
 }
+REPORT_TOPIC_GAP_QUEUE = Path("reports/v14b_pilot/multi_topic_evidence_gap_queue.csv")
+LEGACY_TOPIC_GAP_QUEUE = Path("data/v14b/topic_evidence_gap_delta_queue.csv")
+
+
+def default_topic_gap_queue(repo_root: Path = Path(".")) -> Path:
+    report_queue = repo_root / REPORT_TOPIC_GAP_QUEUE
+    if report_queue.exists():
+        return report_queue
+    return repo_root / LEGACY_TOPIC_GAP_QUEUE
 
 
 def table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -649,7 +658,7 @@ def collect_metrics(
     db_v14: Path,
     topic_gap_queue: Path | None = None,
 ) -> dict[str, Any]:
-    topic_gap_queue = topic_gap_queue or Path("data/v14b/topic_evidence_gap_delta_queue.csv")
+    topic_gap_queue = topic_gap_queue or default_topic_gap_queue()
     main = sqlite3.connect(str(db_main))
     try:
         papers = int(scalar(main, "SELECT COUNT(*) FROM papers") or 0)
@@ -1234,9 +1243,10 @@ def main() -> None:
     parser.add_argument("--db", default="db/echelon_library.sqlite3")
     parser.add_argument("--db-v14", default="db/v14_pilot.sqlite3")
     parser.add_argument("--out-dir", default="reports/v14b_pilot")
-    parser.add_argument("--topic-gap-queue", default="data/v14b/topic_evidence_gap_delta_queue.csv")
+    parser.add_argument("--topic-gap-queue", default=None)
     args = parser.parse_args()
-    result = run_audit(Path(args.db), Path(args.db_v14), Path(args.out_dir), topic_gap_queue=Path(args.topic_gap_queue))
+    topic_gap_queue = Path(args.topic_gap_queue) if args.topic_gap_queue else None
+    result = run_audit(Path(args.db), Path(args.db_v14), Path(args.out_dir), topic_gap_queue=topic_gap_queue)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

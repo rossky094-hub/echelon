@@ -328,7 +328,7 @@ section-evidence-topic-gaps:
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_TOPIC_GAP_SECTION_TOP_N:-1000} \
-		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
+		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-reports/v14b_pilot/multi_topic_evidence_gap_queue.csv} \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
@@ -376,7 +376,7 @@ topic-gap-section-audit:
 	@echo ">>> Topic-gap section evidence audit: classify benchmark-topic section blockers..."
 	$(PYTHON) -m echelon.v14b.topic_gap_section_evidence_audit \
 		--db $(DB_MAIN) \
-		--topic-gap-queue $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
+		--topic-gap-queue $${V14B_TOPIC_GAP_SECTION_QUEUE:-reports/v14b_pilot/multi_topic_evidence_gap_queue.csv} \
 		--out-dir reports/v14b_pilot
 
 ## Topic-gap no-target inspect: 只读检查当前 parser no-target PDF 是否真有目标 heading

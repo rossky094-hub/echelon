@@ -19,6 +19,7 @@ from typing import Any
 from echelon.v14b.config import DB_MAIN, DB_V14, REPORT_DIR
 from echelon.v14b.direction_readiness_audit import (
     collect_metrics,
+    default_topic_gap_queue,
     select_openalex_frontfill_state,
     select_reference_relink_state,
     select_section_frontfill_state,
@@ -110,7 +111,7 @@ def _load_json(path: Path, default: Any) -> Any:
 
 
 def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: Path) -> dict[str, Any]:
-    metrics = collect_metrics(db_main, db_v14, topic_gap_queue=repo_root / "data/v14b/topic_evidence_gap_delta_queue.csv")
+    metrics = collect_metrics(db_main, db_v14, topic_gap_queue=default_topic_gap_queue(repo_root))
     metrics["section_frontfill_state"] = select_section_frontfill_state(repo_root)
     metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(repo_root)
     metrics["reference_relink_state"] = select_reference_relink_state(repo_root, report_dir)

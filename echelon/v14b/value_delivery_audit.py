@@ -18,6 +18,7 @@ from typing import Any
 
 from echelon.v14b.direction_readiness_audit import (
     collect_metrics,
+    default_topic_gap_queue,
     scalar,
     select_openalex_frontfill_state,
     select_reference_relink_state,
@@ -2796,15 +2797,15 @@ def audit_quarterly_multi_corpus(db_main: Path, repo_root: Path) -> dict[str, An
 
 
 def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir: Path | None = None) -> dict[str, Any]:
+    if report_dir is None:
+        report_dir = repo_root / "reports/v14b_pilot"
     metrics = collect_metrics(
         db_main,
         db_v14,
-        topic_gap_queue=repo_root / "data/v14b/topic_evidence_gap_delta_queue.csv",
+        topic_gap_queue=default_topic_gap_queue(repo_root),
     )
     metrics["section_frontfill_state"] = select_section_frontfill_state(repo_root)
     metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(repo_root)
-    if report_dir is None:
-        report_dir = repo_root / "reports/v14b_pilot"
     metrics["reference_relink_state"] = select_reference_relink_state(repo_root, report_dir)
     metrics["cited_work_backfill_queue_state"] = load_cited_work_backfill_state(
         repo_root / "data/v14b/cited_work_backfill_queue.csv"

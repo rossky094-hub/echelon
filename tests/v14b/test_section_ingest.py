@@ -377,6 +377,25 @@ def test_read_candidate_file_accepts_delta_queue_csv(tmp_path):
     assert read_candidate_file(queue, limit=1) == ["p1"]
 
 
+def test_read_candidate_file_expands_multi_topic_gap_queue_by_priority(tmp_path):
+    queue = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    queue.write_text(
+        "\n".join(
+            [
+                "topic,gap_type,bottleneck,priority,candidate_paper_ids,frontfill_query,required_sections,why",
+                "metalens,future_candidates_missing_claim_card,,85,p_low;p_shared,metalens,limitation,claim",
+                "metalens,bottleneck_lineage_missing_topic_specific_typed_chain,efficiency,97,p_high;p_shared,metalens efficiency,limitation,chain",
+                "metalens,missing_bottleneck_section_evidence,cost,100,p_top,metalens cost,limitation,bottleneck",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert read_candidate_file(queue) == ["p_top", "p_high", "p_shared", "p_low"]
+    assert read_candidate_file(queue, limit=2) == ["p_top", "p_high"]
+
+
 def test_load_candidates_preserves_evidence_budget_order():
     conn_main = sqlite3.connect(":memory:")
     conn_main.row_factory = sqlite3.Row

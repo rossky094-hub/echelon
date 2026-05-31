@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T03:35:36Z`
+- generated_at: `2026-05-31T03:44:48Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,024`
@@ -15,7 +15,7 @@
 - complete_typed_lineage_triples: `20`
 - partial_typed_lineage_triples: `22,064`
 - lineage_completeness_counts: `{"attempted_path_partial": 1368, "constraint_failure_only": 5308, "full": 20, "local_fix_partial": 272, "resolution_candidate_partial": 1988, "sparse_stage_partial": 13128}`
-- topic_gap_decision_grade_section_rate: `29.0%`
+- topic_gap_decision_grade_section_rate: `48.9%`
 - failed regression topics: `metalens, metasurface holography, photonic crystal cavity, quantum light source`
 
 ## Policy
@@ -36,7 +36,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step4 graph/subgraph evidence | `aligned` | `pass` | Create a bounded expensive-model evidence set while preserving full-graph product scope. | subgraph_nodes=5,000; subgraph_edges=38,538. | Keep Step10 full-graph/LOD path separate from Step4 bounded extraction support. |
 | Step5a citation function | `aligned` | `warn` | Label citation roles as weak/moderate evidence for fusion, not ground truth. | citation_function_edges=38,538; evidence remains weak without citation sentences. | Prefer deterministic weak labels now; add citation-context extraction before increasing weights. |
 | Step5b calibrated future candidate generator | `aligned` | `pass` | Generate future candidates from temporal evidence; never produce conclusions directly. | future_candidate_edges=1,000; calibration_audits=1. | Continue rolling held-out-year calibration and stratified external audit; do not expose VGAE as Radar claims. |
-| Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,024; topic_gap_decision_grade=29.0%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
+| Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,024; topic_gap_decision_grade=48.9%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
 | Step5s-a section atom search | `aligned` | `pass` | Split trusted sections into span-bound retrieval atoms with exact search; keep GNN/VGAE as ranking or expansion only. | section_atoms=61,083; decision_grade_atoms=9,052; exact_atom_fts=yes; GNN/VGAE must not atomize sections. | Add atom embeddings for fuzzy search, then let Step5c/Step13 consume atoms through evidence contracts instead of re-parsing ad hoc text. |
 | Step5s-b section atom typed chains | `aligned` | `pass` | Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning. | section_atom_chains=4,448; full_chains=5; decision_grade_chains=2; these chains are evidence substrate, not conclusions. | Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages. |
 | Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,073; exact_section_atoms=1,073; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |

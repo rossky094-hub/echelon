@@ -533,6 +533,23 @@ def load_candidates(
     return papers
 
 
+def _candidate_priority(row: dict[str, Any]) -> float:
+    for key in ("priority", "priority_score"):
+        try:
+            return float(row.get(key) or 0.0)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def _split_candidate_paper_ids(raw: Any) -> list[str]:
+    return [
+        value.strip()
+        for value in re.split(r"[;,]", str(raw or ""))
+        if value.strip()
+    ]
+
+
 def read_candidate_file(path: Path | None, limit: int | None = None) -> list[str] | None:
     if not path:
         return None
@@ -542,9 +559,25 @@ def read_candidate_file(path: Path | None, limit: int | None = None) -> list[str
         sample = f.read(4096)
         f.seek(0)
         first_line = sample.splitlines()[0] if sample.splitlines() else ""
-        if "paper_id" in first_line:
+        if "," in first_line:
             reader = csv.DictReader(f)
-            raw_values = (row.get("paper_id") for row in reader)
+            fieldnames = set(reader.fieldnames or [])
+            if "candidate_paper_ids" in fieldnames:
+                rows = list(enumerate(reader))
+                rows.sort(key=lambda item: (-_candidate_priority(item[1]), item[0]))
+                raw_values = (
+                    pid
+                    for _, row in rows
+                    for pid in (
+                        _split_candidate_paper_ids(row.get("candidate_paper_ids"))
+                        or _split_candidate_paper_ids(row.get("paper_id"))
+                    )
+                )
+            elif "paper_id" in fieldnames:
+                raw_values = (row.get("paper_id") for row in reader)
+            else:
+                f.seek(0)
+                raw_values = (line.split(",")[0] for line in f)
         else:
             raw_values = (line.split(",")[0] for line in f)
         for raw in raw_values:
@@ -1380,7 +1413,10 @@ def main(argv=None) -> None:
         "--candidate-file",
         type=Path,
         default=None,
-        help="Optional CSV/text file with paper_id column or one paper id per line; used for delta evidence queues.",
+        help=(
+            "Optional CSV/text file with paper_id or candidate_paper_ids column, "
+            "or one paper id per line; used for delta evidence queues."
+        ),
     )
     args = parser.parse_args(argv)
 

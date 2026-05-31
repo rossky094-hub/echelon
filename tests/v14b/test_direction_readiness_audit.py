@@ -10,6 +10,7 @@ from echelon.v14b.direction_readiness_audit import (
     _public_latest_fusion_audit,
     classify_blockers,
     collect_metrics,
+    default_topic_gap_queue,
     load_reference_relink_state,
     load_openalex_frontfill_state,
     load_section_frontfill_state,
@@ -194,6 +195,20 @@ def test_direction_readiness_reads_regression_candidate_gap_queue(tmp_path):
     assert metrics["topic_gap_queue_papers"] == 2
     assert metrics["topic_gap_primary_section_papers"] == 1
     assert metrics["topic_gap_decision_grade_section_papers"] == 0
+
+
+def test_default_topic_gap_queue_prefers_current_regression_output(tmp_path):
+    data_queue = tmp_path / "data/v14b/topic_evidence_gap_delta_queue.csv"
+    report_queue = tmp_path / "reports/v14b_pilot/multi_topic_evidence_gap_queue.csv"
+    data_queue.parent.mkdir(parents=True)
+    report_queue.parent.mkdir(parents=True)
+    data_queue.write_text("paper_id\nlegacy\n", encoding="utf-8")
+
+    assert default_topic_gap_queue(tmp_path) == data_queue
+
+    report_queue.write_text("topic,gap_type,candidate_paper_ids\nmetalens,gap,current\n", encoding="utf-8")
+
+    assert default_topic_gap_queue(tmp_path) == report_queue
 
 
 def test_direction_readiness_counts_only_current_contract_gap_sections(tmp_path):
