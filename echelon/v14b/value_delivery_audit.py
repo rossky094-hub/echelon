@@ -1684,6 +1684,8 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "def _paper_hit_contract",
                     "_hydrate_hits",
                     "visual_search_hit",
+                    "reason.get(\"claim_scope\")",
+                    "reason.get(\"evidence_objects\")",
                     "retrieval_context_only",
                     "claim_scope",
                     "evidence_grade",

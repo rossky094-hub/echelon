@@ -2019,6 +2019,54 @@ def _paper_hit_contract(paper: dict[str, Any]) -> dict[str, Any]:
     has_traced_section = _paper_has_decision_grade_primary_evidence(paper)
     has_primary_section = _paper_has_primary_evidence(paper)
 
+    if reason.get("claim_scope") and reason.get("evidence_grade"):
+        claim_scope = str(reason.get("claim_scope"))
+        evidence_grade = str(reason.get("evidence_grade"))
+        uncertainty = [
+            str(item)
+            for item in (reason.get("uncertainty_reasons") or [])
+            if str(item).strip()
+        ] or [
+            "recommendation hit carries a candidate evidence contract, not a standalone conclusion",
+        ]
+        if not has_traced_section:
+            uncertainty.append("paper hit lacks strong/moderate local primary section evidence in this list view")
+        required_evidence = [
+            str(item)
+            for item in (reason.get("required_evidence") or [])
+            if str(item).strip()
+        ] or [
+            "Topic Dossier synthesis before treating this list hit as a topic conclusion",
+            "paper detail with local primary section evidence",
+            "complete Step13 Claim Card before promotion to Radar",
+        ]
+        evidence_object = _paper_evidence_object(
+            paper,
+            role="visual_search_hit",
+            source="visual_search_or_topic_list",
+            why=reason.get("why") or "retrieved visual paper hit",
+        )
+        if evidence_object:
+            evidence_object.update(
+                {
+                    "claim_scope": claim_scope,
+                    "evidence_grade": evidence_grade,
+                }
+            )
+        return {
+            "claim_scope": claim_scope,
+            "evidence_grade": evidence_grade,
+            "uncertainty_reasons": sorted(set(uncertainty)),
+            "required_evidence": required_evidence,
+            "evidence_objects": _compact_evidence_objects(
+                [
+                    *(reason.get("evidence_objects") or []),
+                    evidence_object,
+                ],
+                limit=6,
+            ),
+        }
+
     if visual_role == "future_anchor":
         claim_scope = "candidate_pool_only"
         evidence_grade = "graph_future_anchor_context"

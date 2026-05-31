@@ -385,6 +385,61 @@ def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
     assert bottleneck["hits"][0]["uncertainty_reasons"]
 
 
+def test_future_recommendation_search_preserves_candidate_contract(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        INSERT INTO visual_recommendations
+            (mode, rank, paper_id, score, reason_json)
+        VALUES ('future', 1, 'p2', 0.72, ?)
+        """,
+        (
+            json.dumps(
+                {
+                    "why": "future candidate generator support",
+                    "claim_scope": "candidate_pool_only",
+                    "evidence_grade": "calibrated_candidate_generator",
+                    "uncertainty_reasons": [
+                        "future edge cannot be promoted without Step6 fusion and a complete Step13 Claim Card"
+                    ],
+                    "required_evidence": [
+                        "Step6 fusion evidence",
+                        "Step13 five-question Claim Card",
+                    ],
+                    "evidence_objects": [
+                        {
+                            "type": "future_candidate",
+                            "source_paper_id": "p1",
+                            "target_paper_id": "p2",
+                            "candidate_score": 0.72,
+                        }
+                    ],
+                    "candidate_score": 0.72,
+                }
+            ),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    future = client.post(
+        "/graph/visual/search",
+        headers=VIEWER_HEADERS,
+        json={"query_type": "lifecycle", "query_text": "future", "top_k": 5},
+    ).json()
+
+    hit = future["hits"][0]
+    assert hit["paper_id"] == "p2"
+    assert hit["claim_scope"] == "candidate_pool_only"
+    assert hit["evidence_grade"] == "calibrated_candidate_generator"
+    assert "Step13 five-question Claim Card" in hit["required_evidence"]
+    assert hit["evidence_objects"][0]["type"] == "future_candidate"
+    assert hit["reason"]["why"] == "future candidate generator support"
+
+
 def test_visual_paper_detail_paper_role_carries_evidence_contract(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)
