@@ -132,25 +132,25 @@ def assemble_chains_for_section(
     chains: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()
     for chain_index, start in enumerate(starts):
-        selected = _select_stage_atoms(stage_atoms, start)
+        selected, selection_strategy = _select_stage_atoms(stage_atoms, start)
         if len(selected) < 2:
             continue
         key = tuple(str((selected.get(stage) or {}).get("atom_id") or "") for stage in CHAIN_STAGES)
         if key in seen:
             continue
         seen.add(key)
-        chains.append(_chain_row(selected, chain_index=chain_index))
+        chains.append(_chain_row(selected, chain_index=chain_index, selection_strategy=selection_strategy))
     return chains
 
 
 def _select_stage_atoms(
     stage_atoms: dict[str, list[dict[str, Any]]],
     start: dict[str, Any],
-) -> dict[str, dict[str, Any]]:
+) -> tuple[dict[str, dict[str, Any]], str]:
     selected: dict[str, dict[str, Any]] = {}
     start_stage = str(start.get("atom_type") or "")
     if start_stage not in CHAIN_ATOM_TYPES:
-        return selected
+        return selected, "ordered_text_span"
 
     start_index = int(start.get("atom_index") or 0)
     if start_stage == "failure_mechanism":
@@ -174,7 +174,35 @@ def _select_stage_atoms(
 
     if "constraint" not in selected and stage_atoms.get("constraint"):
         selected["constraint"] = stage_atoms["constraint"][0]
-    return selected
+    strategy = "ordered_text_span"
+    if any(stage not in selected and stage_atoms.get(stage) for stage in CHAIN_STAGES):
+        selected = _fill_missing_unordered_stage_atoms(stage_atoms, selected)
+        strategy = "unordered_same_section_stage_fill"
+    return selected, strategy
+
+
+def _fill_missing_unordered_stage_atoms(
+    stage_atoms: dict[str, list[dict[str, Any]]],
+    selected: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    out = dict(selected)
+    for stage in CHAIN_STAGES:
+        if stage in out or not stage_atoms.get(stage):
+            continue
+        out[stage] = _nearest_stage_atom(stage_atoms[stage], out)
+    return out
+
+
+def _nearest_stage_atom(
+    atoms: list[dict[str, Any]],
+    selected: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    selected_indices = [int(atom.get("atom_index") or 0) for atom in selected.values()]
+    target = sum(selected_indices) / len(selected_indices) if selected_indices else 0.0
+    return sorted(
+        atoms,
+        key=lambda atom: (abs(int(atom.get("atom_index") or 0) - target), int(atom.get("atom_index") or 0)),
+    )[0]
 
 
 def _first_at_or_after(atoms: list[dict[str, Any]], atom_index: int) -> dict[str, Any] | None:
@@ -184,7 +212,12 @@ def _first_at_or_after(atoms: list[dict[str, Any]], atom_index: int) -> dict[str
     return None
 
 
-def _chain_row(selected: dict[str, dict[str, Any]], *, chain_index: int) -> dict[str, Any]:
+def _chain_row(
+    selected: dict[str, dict[str, Any]],
+    *,
+    chain_index: int,
+    selection_strategy: str = "ordered_text_span",
+) -> dict[str, Any]:
     paper_id = str(next(iter(selected.values())).get("paper_id") or "")
     section_name = str(next(iter(selected.values())).get("section_name") or "")
     section_key = str(next(iter(selected.values())).get("section_key") or "")
@@ -192,10 +225,10 @@ def _chain_row(selected: dict[str, dict[str, Any]], *, chain_index: int) -> dict
     chain_id = _chain_id(paper_id, section_key, atom_ids)
     missing = [stage for stage in CHAIN_STAGES if stage not in selected]
     complete = not missing
-    relation_edges = _relation_edges(selected)
-    grade = _evidence_grade(selected, complete=complete)
+    relation_edges = _relation_edges(selected, selection_strategy=selection_strategy)
+    grade = _evidence_grade(selected, complete=complete, selection_strategy=selection_strategy)
     claim_scope = "bottleneck_lineage_evidence" if complete and not grade.startswith("weak") else "exploratory_bottleneck_lineage"
-    uncertainty_reasons = _uncertainty_reasons(selected, missing)
+    uncertainty_reasons = _uncertainty_reasons(selected, missing, selection_strategy=selection_strategy)
     evidence_objects = _evidence_objects(selected)
     repair_contracts = _repair_contracts(selected)
     out: dict[str, Any] = {
@@ -222,8 +255,13 @@ def _chain_row(selected: dict[str, dict[str, Any]], *, chain_index: int) -> dict
     return out
 
 
-def _relation_edges(selected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+def _relation_edges(
+    selected: dict[str, dict[str, Any]],
+    *,
+    selection_strategy: str = "ordered_text_span",
+) -> list[dict[str, Any]]:
     edges = []
+    inferred_order = selection_strategy != "ordered_text_span"
     for source_stage, target_stage, relation in CHAIN_RELATIONS:
         source = selected.get(source_stage)
         target = selected.get(target_stage)
@@ -236,15 +274,24 @@ def _relation_edges(selected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]
                 "target_atom_id": target.get("atom_id") if target else None,
                 "source_stage_is_placeholder": source is None,
                 "target_stage_is_placeholder": target is None,
+                "selection_strategy": selection_strategy,
+                "stage_order_inferred_from_atom_types": inferred_order,
             }
         )
     return edges
 
 
-def _evidence_grade(selected: dict[str, dict[str, Any]], *, complete: bool) -> str:
+def _evidence_grade(
+    selected: dict[str, dict[str, Any]],
+    *,
+    complete: bool,
+    selection_strategy: str = "ordered_text_span",
+) -> str:
     grades = {str(atom.get("evidence_grade") or "") for atom in selected.values()}
     traced = grades <= {"section_atom_decision_grade", "section_atom_traced"}
     decision = grades == {"section_atom_decision_grade"}
+    if complete and selection_strategy != "ordered_text_span" and traced:
+        return "typed_section_lineage_inferred_order"
     if complete and decision:
         return "typed_section_lineage"
     if complete and traced:
@@ -268,8 +315,15 @@ def _typed_chain_completeness(present: set[str], *, complete: bool) -> str:
     return "sparse_stage_partial"
 
 
-def _uncertainty_reasons(selected: dict[str, dict[str, Any]], missing: list[str]) -> list[str]:
+def _uncertainty_reasons(
+    selected: dict[str, dict[str, Any]],
+    missing: list[str],
+    *,
+    selection_strategy: str = "ordered_text_span",
+) -> list[str]:
     reasons = ["typed chain assembled deterministically from co-located section atoms"]
+    if selection_strategy != "ordered_text_span":
+        reasons.append("chain stage order is inferred from atom types because text span order is non-linear")
     if missing:
         reasons.append("typed lineage is partial; missing stages: " + ", ".join(missing))
     if any(str(atom.get("evidence_grade") or "").endswith("_weak") for atom in selected.values()):

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T10:52:44Z`
+- generated_at: `2026-05-31T11:04:52Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 485,
+    "section_frontfill_done": 489,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 485,
+    "section_frontfill_progress_done": 489,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 685,
-      "current_contract_rate": 0.22607260726072606,
-      "decision_grade_papers": 681,
-      "decision_grade_rate": 0.22475247524752476,
+      "current_contract_papers": 689,
+      "current_contract_rate": 0.2273927392739274,
+      "decision_grade_papers": 685,
+      "decision_grade_rate": 0.22607260726072606,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1402,
-        "weak": 1628
+        "strong": 1406,
+        "weak": 1624
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4115,
-        "v14b_section_parser_contract_v3_toc_guard": 1546
+        "legacy_unknown_contract": 4108,
+        "v14b_section_parser_contract_v3_toc_guard": 1557
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4115,
-        "v14b_section_ingest_v3": 1546
+        "v14b_section_ingest_v2": 4108,
+        "v14b_section_ingest_v3": 1557
       },
       "primary_section_papers": 3030,
-      "primary_section_rows": 5661,
+      "primary_section_rows": 5665,
       "strategy_counts": {
         "embedded_heading": 57,
-        "explicit_heading": 2162,
-        "heading_continuation": 2763,
-        "inline_heading": 805,
-        "legacy_unknown_strategy": 2808,
+        "explicit_heading": 2172,
+        "heading_continuation": 2774,
+        "inline_heading": 808,
+        "legacy_unknown_strategy": 2801,
         "loose_inline_heading": 44,
         "parser_hint": 67,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1402,
-      "weak_only_papers": 1628,
-      "weak_only_rate": 0.5372937293729373
+      "strong_or_moderate_papers": 1406,
+      "weak_only_papers": 1624,
+      "weak_only_rate": 0.5359735973597359
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -641,6 +641,7 @@
     "live_results_have_fixture_contract": true,
     "makefile_product_baseline_defaults_to_suite": true,
     "product_baseline_defaults_to_suite": true,
+    "section_atom_chain_assembler_marks_inferred_order": true,
     "section_atom_layer_preserves_repair_contract_provenance": true,
     "section_atom_layer_prioritizes_typed_chain_stage_cues": true,
     "section_ingest_preserves_repair_contract_provenance": true,

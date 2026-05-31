@@ -2880,6 +2880,7 @@ def audit_multi_topic_regression(
     section_ingest_preserves_repair_contract_provenance = True
     section_atom_layer_preserves_repair_contract_provenance = True
     section_atom_layer_prioritizes_typed_chain_stage_cues = True
+    section_atom_chain_assembler_marks_inferred_order = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
     topic_gap_stage_candidate_recall_available = True
@@ -3017,6 +3018,15 @@ def audit_multi_topic_regression(
                 "local_fix",
             ),
         )
+        section_atom_chain_assembler_marks_inferred_order = _source_contains(
+            section_atom_chains_source,
+            (
+                "_fill_missing_unordered_stage_atoms",
+                "typed_section_lineage_inferred_order",
+                "stage_order_inferred_from_atom_types",
+                "chain stage order is inferred from atom types",
+            ),
+        )
         topic_gap_repair_plan_uses_closure_states = (
             _source_contains(
                 topic_gap_repair_plan_source,
@@ -3099,6 +3109,7 @@ def audit_multi_topic_regression(
         and section_ingest_preserves_repair_contract_provenance
         and section_atom_layer_preserves_repair_contract_provenance
         and section_atom_layer_prioritizes_typed_chain_stage_cues
+        and section_atom_chain_assembler_marks_inferred_order
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
         and topic_gap_stage_candidate_recall_available
@@ -3136,6 +3147,7 @@ def audit_multi_topic_regression(
             "section_ingest_preserves_repair_contract_provenance": section_ingest_preserves_repair_contract_provenance,
             "section_atom_layer_preserves_repair_contract_provenance": section_atom_layer_preserves_repair_contract_provenance,
             "section_atom_layer_prioritizes_typed_chain_stage_cues": section_atom_layer_prioritizes_typed_chain_stage_cues,
+            "section_atom_chain_assembler_marks_inferred_order": section_atom_chain_assembler_marks_inferred_order,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_stage_candidate_recall_available": topic_gap_stage_candidate_recall_available,

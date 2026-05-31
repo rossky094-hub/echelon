@@ -272,7 +272,9 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "section_atom_chains.py").write_text(
         'def _repair_contracts(selected): return selected\n'
-        'evidence_objects_json = {"repair_contracts": [], "repair_contracts_json": "[]"}\n',
+        'evidence_objects_json = {"repair_contracts": [], "repair_contracts_json": "[]"}\n'
+        "_fill_missing_unordered_stage_atoms typed_section_lineage_inferred_order "
+        "stage_order_inferred_from_atom_types chain stage order is inferred from atom types\n",
         encoding="utf-8",
     )
     (v14 / "direction_readiness_audit.py").write_text(

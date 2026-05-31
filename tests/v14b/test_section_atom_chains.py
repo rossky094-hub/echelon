@@ -97,6 +97,27 @@ def test_assemble_chains_for_section_marks_partial_chains_as_exploratory():
     assert any("typed lineage is partial" in reason for reason in json.loads(chain["uncertainty_reasons_json"]))
 
 
+def test_assemble_chains_for_section_can_infer_non_linear_stage_order_with_uncertainty():
+    chain = assemble_chains_for_section(
+        [
+            _atom(1, "constraint", "Fabrication tolerance is the root constraint."),
+            _atom(2, "new_constraint", "However packaging stability remains open."),
+            _atom(3, "failure_mechanism", "Mismatch creates optical loss."),
+            _atom(4, "local_fix", "Calibration mitigates mismatch."),
+            _atom(5, "attempted_path", "The paper uses a calibration design."),
+        ]
+    )[0]
+
+    assert chain["typed_chain_complete"] == 1
+    assert chain["typed_chain_completeness"] == "full"
+    assert chain["evidence_grade"] == "typed_section_lineage_inferred_order"
+    reasons = json.loads(chain["uncertainty_reasons_json"])
+    assert any("stage order is inferred from atom types" in reason for reason in reasons)
+    edges = json.loads(chain["relation_edges_json"])
+    assert all(edge["selection_strategy"] == "unordered_same_section_stage_fill" for edge in edges)
+    assert all(edge["stage_order_inferred_from_atom_types"] for edge in edges)
+
+
 def test_assemble_chains_for_section_keeps_weak_contract_uncertainty():
     chain = assemble_chains_for_section(
         [
