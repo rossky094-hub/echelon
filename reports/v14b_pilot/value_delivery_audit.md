@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T23:42:26Z`
+- generated_at: `2026-05-30T23:58:41Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -33,8 +33,16 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
+    "cited_work_backfill_provider_counts": {
+      "arxiv": 1,
+      "doi": 899,
+      "openalex": 1057,
+      "s2": 43
+    },
+    "cited_work_backfill_queue_rows": 2000,
+    "cited_work_backfill_queue_status": "ready",
     "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 1053,
+    "openalex_frontfill_cooldown_remaining_s": 78,
     "openalex_frontfill_processed": 3000,
     "openalex_frontfill_status": "cooling_down_or_stopped",
     "openalex_frontfill_total": 22643,
@@ -89,7 +97,7 @@
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
     "OpenAlex frontfill cooling_down_or_stopped; field/topic claims need local fallback and uncertainty",
-    "reference relink audit shows no-local-match refs dominate; citation backbone needs cited-work backfill, not fuzzy relinking",
+    "reference relink audit shows no-local-match refs dominate; cited-work backfill queue is ready but must be ingested before citation claims strengthen",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
 }
@@ -528,6 +536,7 @@
   "decision_audit_required_targets": [
     "topic-regression",
     "section-queue-audit",
+    "cited-work-backfill-queue",
     "direction-readiness-audit",
     "value-delivery-audit"
   ],

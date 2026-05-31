@@ -1,6 +1,6 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T23:42:21Z`
+- generated_at: `2026-05-30T23:58:16Z`
 
 ## Reference Linkage
 
@@ -21,6 +21,13 @@
 - exact-linkable refs: 4
 - no-local-match refs: 2,769,169
 - next action: Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
+
+### Cited Work Backfill Queue
+
+- status: `ready`
+- queued exact provider-ID targets: 2,000
+- provider mix: `{"arxiv": 1, "doi": 899, "openalex": 1057, "s2": 43}`
+- path: `data/v14b/cited_work_backfill_queue.csv`
 
 ## Section Evidence
 
@@ -84,7 +91,7 @@
 
 ## Recommended Next Actions
 
-- Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
+- Process the high-value cited-work backfill queue, then rerun reference-relink-apply and graph features.
 - Use DOI refs as exact cited-work backfill targets; avoid fuzzy title matching for citation evidence.
 - Continue OpenAlex W cited-work backfill and rerun exact relink after each successful batch.
 - Normalize arXiv version/category variants, then ingest high-value missing arXiv cited works.

@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -80,6 +80,16 @@ reference-relink-apply:
 		--apply \
 		--chunk-size $${V14B_REFERENCE_RELINK_CHUNK_SIZE:-5000} \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Cited-work backfill queue: high-value missing referenced works
+cited-work-backfill-queue:
+	@echo ">>> Cited-work backfill queue: exact provider-ID missing cited works..."
+	$(PYTHON) -m echelon.v14b.cited_work_backfill_queue \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--queue data/v14b/cited_work_backfill_queue.csv \
+		--limit $${V14B_CITED_WORK_QUEUE_LIMIT:-2000}
 
 ## Step 0.25: OpenAlex Field/Topic backfill
 openalex-backfill:
@@ -197,6 +207,7 @@ decision-audit:
 	@echo ">>> Decision audit: benchmark regression -> gap queue -> readiness -> value delivery..."
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
+	$(MAKE) cited-work-backfill-queue
 	$(MAKE) direction-readiness-audit
 	$(MAKE) value-delivery-audit
 
@@ -589,6 +600,7 @@ help:
 	@echo "  make post-frontfill-chain      # section/frontfill 完成后的断点推进"
 	@echo "  make decision-audit            # 当前验收闭环: regression/gap/readiness/value"
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
+	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"
 	@echo ""
 	@echo "Legacy compatibility (not current acceptance path):"

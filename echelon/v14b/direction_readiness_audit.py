@@ -20,6 +20,7 @@ from echelon.v14b.evidence_contracts import (
     SECTION_PARSER_CONTRACT_VERSION,
     section_strategy_quality,
 )
+from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
 
 WEAK_SECTION_STRATEGIES = {
@@ -751,6 +752,7 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
     future_candidate_edges = int(m.get("future_candidate_edges") or m.get("predicted_future_edges") or 0)
     if m["linked_ref_rate"] < 0.30:
         relink = m.get("reference_relink_state") or {}
+        cited_work_queue = m.get("cited_work_backfill_queue_state") or {}
         relink_detail = ""
         next_action = "Continue provider ID repair and reference relinking after OpenAlex/S2 identifiers stabilize."
         if relink.get("available"):
@@ -759,6 +761,15 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 f"{int(relink.get('no_local_match_refs') or 0):,} no-local-match."
             )
             next_action = str(relink.get("next_action") or next_action)
+            if (
+                relink.get("status") == "local_corpus_gap_dominates"
+                and cited_work_queue.get("available")
+                and int(cited_work_queue.get("queue_rows") or 0)
+            ):
+                next_action = (
+                    "Process the high-value cited-work backfill queue, then rerun reference-relink-apply, "
+                    "graph features, and downstream audits."
+                )
         blockers.append(
             {
                 "gate": "citation_graph_bone",
@@ -1028,6 +1039,15 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             if (metrics.get("reference_relink_state") or {}).get("available")
             else []
         ),
+        *(
+            [
+                f"- cited-work backfill queue: `{(metrics.get('cited_work_backfill_queue_state') or {}).get('status')}`; "
+                f"targets={(int((metrics.get('cited_work_backfill_queue_state') or {}).get('queue_rows') or 0)):,}; "
+                f"providers={json.dumps((metrics.get('cited_work_backfill_queue_state') or {}).get('provider_counts') or {}, ensure_ascii=False, sort_keys=True)}"
+            ]
+            if (metrics.get("cited_work_backfill_queue_state") or {}).get("available")
+            else []
+        ),
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
         *openalex_frontfill_line,
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
@@ -1111,6 +1131,9 @@ def run_audit(
     metrics["section_frontfill_state"] = select_section_frontfill_state(Path("."))
     metrics["openalex_frontfill_state"] = select_openalex_frontfill_state(Path("."))
     metrics["reference_relink_state"] = select_reference_relink_state(Path("."), out_dir)
+    metrics["cited_work_backfill_queue_state"] = load_cited_work_backfill_state(
+        Path("data/v14b/cited_work_backfill_queue.csv")
+    )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
     out_dir.mkdir(parents=True, exist_ok=True)

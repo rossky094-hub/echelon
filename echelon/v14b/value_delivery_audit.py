@@ -24,6 +24,7 @@ from echelon.v14b.direction_readiness_audit import (
     select_section_frontfill_state,
     table_exists,
 )
+from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.evidence_grade import (
     claim_scope_policy,
     coverage_grade,
@@ -177,10 +178,16 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             f"OpenAlex frontfill {openalex_frontfill.get('status')}; field/topic claims need local fallback and uncertainty"
         )
     relink = metrics.get("reference_relink_state") or {}
+    cited_work_queue = metrics.get("cited_work_backfill_queue_state") or {}
     if relink.get("status") == "local_corpus_gap_dominates":
-        reasons.append(
-            "reference relink audit shows no-local-match refs dominate; citation backbone needs cited-work backfill, not fuzzy relinking"
-        )
+        if cited_work_queue.get("available") and int(cited_work_queue.get("queue_rows") or 0):
+            reasons.append(
+                "reference relink audit shows no-local-match refs dominate; cited-work backfill queue is ready but must be ingested before citation claims strengthen"
+            )
+        else:
+            reasons.append(
+                "reference relink audit shows no-local-match refs dominate; citation backbone needs a cited-work backfill queue, not fuzzy relinking"
+            )
     section_quality = metrics.get("section_evidence_quality") or {}
     weak_only_rate = float(section_quality.get("weak_only_rate") or 0.0)
     strong_or_moderate = int(section_quality.get("strong_or_moderate_papers") or 0)
@@ -217,6 +224,9 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "reference_relink_status": relink.get("status"),
             "reference_relink_exact_linkable_refs": relink.get("exact_linkable_refs"),
             "reference_relink_no_local_match_refs": relink.get("no_local_match_refs"),
+            "cited_work_backfill_queue_status": cited_work_queue.get("status"),
+            "cited_work_backfill_queue_rows": cited_work_queue.get("queue_rows"),
+            "cited_work_backfill_provider_counts": cited_work_queue.get("provider_counts"),
             "section_provenance": section_quality,
         },
         "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -2444,6 +2454,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     decision_audit_targets = (
         "topic-regression",
         "section-queue-audit",
+        "cited-work-backfill-queue",
         "direction-readiness-audit",
         "value-delivery-audit",
     )
@@ -2752,6 +2763,9 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
     if report_dir is None:
         report_dir = repo_root / "reports/v14b_pilot"
     metrics["reference_relink_state"] = select_reference_relink_state(repo_root, report_dir)
+    metrics["cited_work_backfill_queue_state"] = load_cited_work_backfill_state(
+        repo_root / "data/v14b/cited_work_backfill_queue.csv"
+    )
     with sqlite3.connect(str(db_v14)) as conn_v14:
         metrics["vgae_calibration_audit"] = (
             int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0)

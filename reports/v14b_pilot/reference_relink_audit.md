@@ -1,6 +1,6 @@
 # V14B Reference Relink Audit
 
-- generated_at: `2026-05-30T23:42:06Z`
+- generated_at: `2026-05-30T23:58:01Z`
 - mode: `dry_run`
 - scanned unlinked refs: 2,769,173
 - exact linkable refs: 4

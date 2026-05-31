@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, DB_V14
+from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.direction_readiness_audit import (
     PRIMARY_SECTION_NAMES,
     load_reference_relink_state,
@@ -165,13 +166,22 @@ def reference_taxonomy(conn: sqlite3.Connection, *, sample_limit: int = 8) -> di
 def _reference_next_actions(
     grouped: list[dict[str, Any]],
     relink: dict[str, Any] | None = None,
+    cited_work_queue: dict[str, Any] | None = None,
 ) -> list[str]:
     counts = {str(r["kind"]): int(r["n"] or 0) for r in grouped}
     actions: list[str] = []
     relink = relink or {}
+    cited_work_queue = cited_work_queue or {}
     if relink.get("available"):
         if relink.get("status") == "local_corpus_gap_dominates":
-            actions.append(str(relink.get("next_action")))
+            if cited_work_queue.get("available") and int(cited_work_queue.get("queue_rows") or 0):
+                actions.append(
+                    "Process the high-value cited-work backfill queue, then rerun reference-relink-apply and graph features."
+                )
+            else:
+                actions.append(
+                    "Run make cited-work-backfill-queue to materialize cited-work backfill targets with exact DOI/OpenAlex/S2/arXiv IDs."
+                )
         elif int(relink.get("exact_linkable_refs") or 0):
             actions.append(str(relink.get("next_action")))
     if counts.get("doi_unlinked", 0):
@@ -646,6 +656,7 @@ def collect_audit(
     watchdog_state: Path,
     openalex_log: Path,
     reference_relink_audit: Path | None = None,
+    cited_work_backfill_queue: Path | None = Path("data/v14b/cited_work_backfill_queue.csv"),
 ) -> dict[str, Any]:
     with connect(db_main) as conn_main, connect(db_v14) as conn_v14:
         refs = reference_taxonomy(conn_main)
@@ -657,7 +668,13 @@ def collect_audit(
     )
     if relink.get("available"):
         refs["reference_relink_diagnosis"] = relink
-        refs["next_actions"] = _reference_next_actions(refs.get("taxonomy") or [], relink)
+    cited_work_queue = (
+        load_cited_work_backfill_state(cited_work_backfill_queue)
+        if cited_work_backfill_queue is not None
+        else {"available": False}
+    )
+    refs["cited_work_backfill_queue"] = cited_work_queue
+    refs["next_actions"] = _reference_next_actions(refs.get("taxonomy") or [], relink, cited_work_queue)
     logs = section_log_taxonomy([section_log, watchdog_log, openalex_log])
     logs["source"] = {
         "section_log": str(section_log),
@@ -670,6 +687,7 @@ def collect_audit(
         "generated_at": utc_now(),
         "reference_taxonomy": refs,
         "reference_relink_diagnosis": relink,
+        "cited_work_backfill_queue": cited_work_queue,
         "section_coverage": sections,
         "frontfill_log_taxonomy": logs,
         "frontfill_health": health,
@@ -718,6 +736,28 @@ def render_markdown(result: dict[str, Any]) -> str:
                     f"- exact-linkable refs: {int(relink.get('exact_linkable_refs') or 0):,}",
                     f"- no-local-match refs: {int(relink.get('no_local_match_refs') or 0):,}",
                     f"- next action: {relink.get('next_action')}",
+                ]
+            )
+        cited_work_queue = refs.get("cited_work_backfill_queue") or {}
+        if cited_work_queue.get("available"):
+            lines.extend(
+                [
+                    "",
+                    "### Cited Work Backfill Queue",
+                    "",
+                    f"- status: `{cited_work_queue.get('status')}`",
+                    f"- queued exact provider-ID targets: {int(cited_work_queue.get('queue_rows') or 0):,}",
+                    f"- provider mix: `{json.dumps(cited_work_queue.get('provider_counts') or {}, ensure_ascii=False, sort_keys=True)}`",
+                    f"- path: `{cited_work_queue.get('path')}`",
+                ]
+            )
+        elif relink.get("status") == "local_corpus_gap_dominates":
+            lines.extend(
+                [
+                    "",
+                    "### Cited Work Backfill Queue",
+                    "",
+                    "- unavailable: run `make cited-work-backfill-queue` to convert no-local-match references into exact-ID ingestion targets.",
                 ]
             )
     else:
@@ -826,6 +866,7 @@ def run_audit(
     watchdog_log: Path | None = None,
     watchdog_state: Path | None = None,
     openalex_log: Path = Path("logs/v14b/openalex_backfill_current.log"),
+    cited_work_backfill_queue: Path = Path("data/v14b/cited_work_backfill_queue.csv"),
 ) -> dict[str, Any]:
     if section_log is None or watchdog_log is None or watchdog_state is None:
         default_section, default_watchdog, default_state = _default_frontfill_paths()
@@ -840,6 +881,7 @@ def run_audit(
         watchdog_state=watchdog_state,
         openalex_log=openalex_log,
         reference_relink_audit=out_dir / "reference_relink_audit.json",
+        cited_work_backfill_queue=cited_work_backfill_queue,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     md_path = out_dir / "evidence_bone_audit.md"
@@ -858,6 +900,7 @@ def main() -> None:
     parser.add_argument("--watchdog-log", default=None)
     parser.add_argument("--watchdog-state", default=None)
     parser.add_argument("--openalex-log", default="logs/v14b/openalex_backfill_current.log")
+    parser.add_argument("--cited-work-backfill-queue", default="data/v14b/cited_work_backfill_queue.csv")
     args = parser.parse_args()
     result = run_audit(
         db_main=Path(args.db),
@@ -867,6 +910,7 @@ def main() -> None:
         watchdog_log=Path(args.watchdog_log) if args.watchdog_log else None,
         watchdog_state=Path(args.watchdog_state) if args.watchdog_state else None,
         openalex_log=Path(args.openalex_log),
+        cited_work_backfill_queue=Path(args.cited_work_backfill_queue),
     )
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
 
