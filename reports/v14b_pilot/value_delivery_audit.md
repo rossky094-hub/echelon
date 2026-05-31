@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T12:09:35Z`
+- generated_at: `2026-05-31T12:25:34Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -20,7 +20,7 @@
 | 10 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
 | 11 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 12 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. The loop must include a first-principles path-challenge audit before release readiness so the current route is challenged, not merely executed. Release readiness must summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. The loop must include a first-principles path-challenge audit and evidence-repair priority report before release readiness so the current route is challenged, not merely executed. Release readiness must summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
 | 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened. |
 | 15 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
@@ -35,10 +35,10 @@
   "metrics": {
     "cited_work_backfill_inserted_or_updated": 6,
     "cited_work_backfill_provider_counts": {
-      "arxiv": 1,
-      "doi": 903,
-      "openalex": 1051,
-      "s2": 45
+      "arxiv": 5,
+      "doi": 1067,
+      "openalex": 876,
+      "s2": 52
     },
     "cited_work_backfill_queue_rows": 2000,
     "cited_work_backfill_queue_status": "ready",
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 516,
+    "section_frontfill_done": 522,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 516,
+    "section_frontfill_progress_done": 522,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 716,
-      "current_contract_rate": 0.2363036303630363,
-      "decision_grade_papers": 712,
-      "decision_grade_rate": 0.23498349834983498,
+      "current_contract_papers": 722,
+      "current_contract_rate": 0.2382838283828383,
+      "decision_grade_papers": 718,
+      "decision_grade_rate": 0.23696369636963696,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1432,
-        "weak": 1598
+        "strong": 1438,
+        "weak": 1592
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4064,
-        "v14b_section_parser_contract_v3_toc_guard": 1619
+        "legacy_unknown_contract": 4047,
+        "v14b_section_parser_contract_v3_toc_guard": 1636
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4064,
-        "v14b_section_ingest_v3": 1619
+        "v14b_section_ingest_v2": 4047,
+        "v14b_section_ingest_v3": 1636
       },
       "primary_section_papers": 3030,
       "primary_section_rows": 5683,
       "strategy_counts": {
-        "embedded_heading": 57,
-        "explicit_heading": 2226,
-        "heading_continuation": 2835,
+        "embedded_heading": 58,
+        "explicit_heading": 2241,
+        "heading_continuation": 2850,
         "inline_heading": 825,
-        "legacy_unknown_strategy": 2758,
+        "legacy_unknown_strategy": 2741,
         "loose_inline_heading": 45,
-        "parser_hint": 69,
+        "parser_hint": 72,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1432,
-      "weak_only_papers": 1598,
-      "weak_only_rate": 0.5273927392739274
+      "strong_or_moderate_papers": 1438,
+      "weak_only_papers": 1592,
+      "weak_only_rate": 0.5254125412541254
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -586,6 +586,7 @@
     "algorithm-logic-audit",
     "value-delivery-audit",
     "path-challenge-audit",
+    "evidence-repair-priority",
     "release-readiness"
   ],
   "disallowed_current_deps": {},
@@ -606,7 +607,7 @@
     "pilot-graph",
     "pilot-visual"
   ],
-  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. The loop must include a first-principles path-challenge audit before release readiness so the current route is challenged, not merely executed. Release readiness must summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
+  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. The loop must include a first-principles path-challenge audit and evidence-repair priority report before release readiness so the current route is challenged, not merely executed. Release readiness must summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
   "status": "pass",
   "topic_gap_repair_required_targets": [
     "topic-regression",

@@ -475,7 +475,10 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) algorithm-logic-audit\n"
         "\t$(MAKE) value-delivery-audit\n"
         "\t$(MAKE) path-challenge-audit\n"
+        "\t$(MAKE) evidence-repair-priority\n"
         "\t$(MAKE) release-readiness\n"
+        "evidence-repair-priority:\n"
+        "\tpython -m echelon.v14b.evidence_repair_priority --db db/echelon_library.sqlite3 --db-v14 db/v14_pilot.sqlite3\n"
         "topic-gap-repair:\n"
         "\tpython scripts/guard_topic_gap_repair.py\n"
         "\t$(MAKE) topic-regression\n"
@@ -918,6 +921,7 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["decision_audit_runs_regression_gap_readiness_value"] is True
     assert "path-challenge-audit" in result["decision_audit_required_targets"]
     assert "release-readiness" in result["decision_audit_required_targets"]
+    assert "evidence-repair-priority" in result["decision_audit_required_targets"]
     assert result["checks"]["topic_gap_repair_refreshes_queue_ingests_and_reaudits"] is True
     assert result["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True

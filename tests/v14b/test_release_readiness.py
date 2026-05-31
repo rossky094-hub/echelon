@@ -86,6 +86,25 @@ def _write_audit_reports(report_dir, *, all_pass=False):
             "verdict_counts": {"aligned": 1} if all_pass else {"hold": 2, "redirect": 1},
         },
     )
+    _write_json(
+        report_dir / "evidence_repair_priority.json",
+        {
+            "overall_status": "no_blocking_repair" if all_pass else "evidence_first_repair_required",
+            "summary": {"items": 0 if all_pass else 2, "blocking_p0": 0 if all_pass else 2},
+            "priority_items": []
+            if all_pass
+            else [
+                {
+                    "rank": 1,
+                    "priority": "P0",
+                    "action_id": "topic_gap_evidence_repair",
+                    "command": "make topic-gap-repair",
+                    "requires_db_writer_boundary": True,
+                    "can_run_while_broad_ingest_active": False,
+                }
+            ],
+        },
+    )
     _write_json(report_dir / "raw_pdf_store_audit.json", {"status": "pass"})
     _write_json(
         report_dir / "multi_topic_regression.json",
@@ -107,6 +126,8 @@ def test_release_readiness_holds_when_section_embeddings_and_multi_topic_gate_ar
     assert result["checks"]["multi_topic_regression_passed"] is False
     assert result["checks"]["path_challenge_audit_available"] is True
     assert result["path_challenge_status"] == "redirect_evidence_first"
+    assert result["evidence_repair_priority_status"] == "evidence_first_repair_required"
+    assert result["evidence_repair_top_actions"][0]["action_id"] == "topic_gap_evidence_repair"
     commands = {item["command"] for item in result["next_actions"]}
     assert "make post-frontfill-chain" in commands
     assert "make topic-gap-repair" in commands
@@ -123,7 +144,9 @@ def test_release_readiness_can_be_decision_grade_when_all_current_gates_are_clos
     assert result["release_status"] == "decision_grade_release_candidate"
     assert result["acceptance_ready"] is True
     assert result["path_challenge_status"] == "path_aligned"
+    assert result["evidence_repair_priority_status"] == "no_blocking_repair"
     assert (report_dir / "release_readiness.json").exists()
     md = (report_dir / "release_readiness.md").read_text(encoding="utf-8")
+    assert "Evidence Repair Priority" in md
     assert "Product Boundary" in md
     assert "graph renderability" in md

@@ -163,6 +163,7 @@ def build_release_readiness(
     direction_readiness = _load_json(report_dir / "direction_readiness_audit.json", {})
     algorithm_logic = _load_json(report_dir / "algorithm_logic_audit.json", {})
     path_challenge = _load_json(report_dir / "path_challenge_audit.json", {})
+    evidence_repair_priority = _load_json(report_dir / "evidence_repair_priority.json", {})
     raw_pdf = _load_json(report_dir / "raw_pdf_store_audit.json", {})
     multi_topic = _load_json(report_dir / "multi_topic_regression.json", [])
 
@@ -211,6 +212,20 @@ def build_release_readiness(
         "algorithm_logic_status_counts": algorithm_logic.get("status_counts") or {},
         "path_challenge_status": path_challenge.get("overall_status") or "missing",
         "path_challenge_verdict_counts": path_challenge.get("verdict_counts") or {},
+        "evidence_repair_priority_status": evidence_repair_priority.get("overall_status") or "missing",
+        "evidence_repair_priority_summary": evidence_repair_priority.get("summary") or {},
+        "evidence_repair_top_actions": [
+            {
+                "rank": item.get("rank"),
+                "priority": item.get("priority"),
+                "action_id": item.get("action_id"),
+                "command": item.get("command"),
+                "requires_db_writer_boundary": item.get("requires_db_writer_boundary"),
+                "can_run_while_broad_ingest_active": item.get("can_run_while_broad_ingest_active"),
+            }
+            for item in (evidence_repair_priority.get("priority_items") or [])[:5]
+            if isinstance(item, dict)
+        ],
         "multi_topic_status_counts": multi_topic_counts,
         "frontfill_snapshot": {
             "section_frontfill_status": section_frontfill.get("status") or value_metrics.get("section_frontfill_status"),
@@ -312,6 +327,24 @@ def render_markdown(result: dict[str, Any]) -> str:
         lines.append(
             f"- **{action.get('priority')}** {action.get('action')} "
             f"Why: {action.get('why')} Command: `{action.get('command')}`"
+        )
+    lines.extend(
+        [
+            "",
+            "## Evidence Repair Priority",
+            "",
+            f"- status: `{result.get('evidence_repair_priority_status')}`",
+            f"- summary: `{json.dumps(result.get('evidence_repair_priority_summary') or {}, ensure_ascii=False, sort_keys=True)}`",
+        ]
+    )
+    top_actions = result.get("evidence_repair_top_actions") or []
+    if not top_actions:
+        lines.append("- top_actions: none")
+    for action in top_actions:
+        lines.append(
+            f"- **{action.get('priority')}** `{action.get('action_id')}` "
+            f"command: `{action.get('command')}` "
+            f"db_writer_boundary: `{action.get('requires_db_writer_boundary')}`"
         )
     lines.extend(
         [

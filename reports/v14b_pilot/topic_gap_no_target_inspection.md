@@ -1,6 +1,6 @@
 # Topic-Gap No-Target PDF Inspection
 
-- audit_ts: `2026-05-31T09:11:21Z`
+- audit_ts: `2026-05-31T12:22:10Z`
 - triage_json: `reports/v14b_pilot/topic_gap_section_evidence_audit.json`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `pass`

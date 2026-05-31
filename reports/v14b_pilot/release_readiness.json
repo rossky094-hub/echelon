@@ -23,6 +23,62 @@
   },
   "direction_readiness_level": "actionable_but_not_high_confidence",
   "evidence_policy": "insufficient_evidence",
+  "evidence_repair_priority_status": "evidence_first_repair_required",
+  "evidence_repair_priority_summary": {
+    "blocking_p0": 3,
+    "can_run_while_broad_ingest_active": 2,
+    "counts_by_priority": {
+      "P0": 3,
+      "P1": 1,
+      "P2": 2
+    },
+    "items": 6,
+    "requires_db_writer_boundary": 4,
+    "top_action_id": "topic_gap_evidence_repair",
+    "top_command": "make topic-gap-repair"
+  },
+  "evidence_repair_top_actions": [
+    {
+      "action_id": "topic_gap_evidence_repair",
+      "can_run_while_broad_ingest_active": false,
+      "command": "make topic-gap-repair",
+      "priority": "P0",
+      "rank": 1,
+      "requires_db_writer_boundary": true
+    },
+    {
+      "action_id": "post_frontfill_retrieval_rebuild",
+      "can_run_while_broad_ingest_active": false,
+      "command": "make post-frontfill-chain",
+      "priority": "P0",
+      "rank": 2,
+      "requires_db_writer_boundary": true
+    },
+    {
+      "action_id": "typed_stage_candidate_review",
+      "can_run_while_broad_ingest_active": true,
+      "command": "make topic-gap-stage-candidate-recall",
+      "priority": "P0",
+      "rank": 3,
+      "requires_db_writer_boundary": false
+    },
+    {
+      "action_id": "exact_cited_work_backfill",
+      "can_run_while_broad_ingest_active": false,
+      "command": "make cited-work-backfill && make reference-relink-apply && make graph-features",
+      "priority": "P1",
+      "rank": 4,
+      "requires_db_writer_boundary": true
+    },
+    {
+      "action_id": "openalex_field_topic_repair",
+      "can_run_while_broad_ingest_active": false,
+      "command": "make openalex-backfill",
+      "priority": "P2",
+      "rank": 5,
+      "requires_db_writer_boundary": true
+    }
+  ],
   "frontfill_snapshot": {
     "direction_claim_cards": 5,
     "high_confidence_claim_cards": 0,
@@ -30,9 +86,9 @@
     "raw_pdf_store_status": "pass",
     "section_atom_embeddings": 61708,
     "section_atoms": 61708,
-    "section_current_contract_primary": 705,
+    "section_current_contract_primary": 722,
     "section_embeddings": null,
-    "section_frontfill_done": 516,
+    "section_frontfill_done": 522,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373
   },
@@ -48,7 +104,7 @@
       "status": "fail"
     }
   ],
-  "generated_at": "2026-05-31T12:09:37Z",
+  "generated_at": "2026-05-31T12:25:35Z",
   "live_blockers": [
     {
       "gate": "citation_graph_bone",
@@ -66,13 +122,13 @@
       "gate": "section_evidence_provenance",
       "next_action": "Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.",
       "severity": "medium",
-      "why": "primary section evidence quality is still fragile: 1,432 papers have strong/moderate parser provenance; weak-only rate is 52.7%."
+      "why": "primary section evidence quality is still fragile: 1,438 papers have strong/moderate parser provenance; weak-only rate is 52.5%."
     },
     {
       "gate": "section_parser_contract_coverage",
       "next_action": "Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.",
       "severity": "medium",
-      "why": "primary section evidence has current parser-contract coverage for only 716/3,030 papers (23.6%); legacy parser-contract sections may predate TOC/fragment guards."
+      "why": "primary section evidence has current parser-contract coverage for only 722/3,030 papers (23.8%); legacy parser-contract sections may predate TOC/fragment guards."
     },
     {
       "gate": "multi_topic_evidence_gap",

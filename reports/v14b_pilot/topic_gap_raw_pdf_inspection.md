@@ -1,22 +1,22 @@
 # Topic-Gap Raw PDF Parser Inspection
 
-- audit_ts: `2026-05-31T09:13:09Z`
+- audit_ts: `2026-05-31T12:25:23Z`
 - triage_json: `reports/v14b_pilot/topic_gap_section_evidence_audit.json`
 - store_root: `/Volumes/LaCie/Echelon_Paper_Raw_Data`
-- manifest: ``
+- manifest: `/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `pass`
 
 ## Summary
 
 - triage papers: 78
-- local PDF available papers: 14
-- skipped no local PDF: 64
-- parser primary-ready papers: 4
+- local PDF available papers: 18
+- skipped no local PDF: 60
+- parser primary-ready papers: 5
 - parser weak-primary papers: 4
 - parser primary-ready repair candidates: 2
-- parser primary-ready already covered: 2
-- parser no-target papers: 6
+- parser primary-ready already covered: 3
+- parser no-target papers: 9
 - parser no-target repair-signal papers: 0
 - parser no-target subthreshold-signal papers: 0
 - parser exception papers: 0
@@ -25,26 +25,26 @@
 
 | classification | papers |
 |---|---:|
-| parser_no_target_sections | 6 |
-| parser_success_primary | 4 |
+| parser_no_target_sections | 9 |
+| parser_success_primary | 5 |
 | parser_success_weak_primary | 4 |
 
 ## Recommended Action Counts
 
 | action | papers |
 |---|---:|
-| weak_fulltext_or_metadata_only | 5 |
+| weak_fulltext_or_metadata_only | 7 |
 | weak_primary_context_only | 4 |
+| already_covered_parser_control | 3 |
 | local_cache_ingest_candidate | 2 |
-| already_covered_parser_control | 2 |
-| heading_taxonomy_review | 1 |
+| heading_taxonomy_review | 2 |
 
 ## No-Target Shape Counts
 
 | no_target_classification | papers |
 |---|---:|
-| sectionless_or_non_target_heading_format | 5 |
-| heading_like_but_not_target_section | 1 |
+| sectionless_or_non_target_heading_format | 7 |
+| heading_like_but_not_target_section | 2 |
 
 ## Local PDF Rows
 
@@ -62,8 +62,12 @@
 | `01KS5KWR5AT8TAC98X5WRJNYT1` | photonic crystal cavity | `no_target_sections_unknown_contract` | `parser_success_weak_primary` | `` | `weak_primary_context_only` |  | conclusion | conclusion:terminal_cue_summary | Unidirectional light emission from high-Q modes in optical microcavities |
 | `01KS6F6CER6Q6DCD2526C5P0F2` | photonic crystal cavity | `no_target_sections_unknown_contract` | `parser_success_weak_primary` | `` | `weak_primary_context_only` |  | conclusion | conclusion:terminal_cue_summary | Combining directional light output and ultralow loss in deformed microdisks |
 | `01KS6F8QEVEAK2PYN62JJKAZVX` | metasurface holography | `unattempted_pdf_available` | `parser_no_target_sections` | `heading_like_but_not_target_section` | `heading_taxonomy_review` | Digital holography with ultimate sensitivity; We propose a variant of the heterodyne holography scheme, which combines the properties of |  |  | Digital holography with ultimate sensitivity |
+| `01KS6FM0NPYW5AARJ2CBTGCY1Y` | quantum light source | `no_target_sections_unknown_contract` | `parser_no_target_sections` | `sectionless_or_non_target_heading_format` | `weak_fulltext_or_metadata_only` | Multi-scale Optics for Enhanced Light Collection from a Point Source; CompiledJuly13,2021 |  |  | Multi-scale Optics for Enhanced Light Collection from a Point Source |
+| `01KS6FQ0QWZMENZ0PDQJ2KMXC3` | photonic crystal cavity | `unattempted_pdf_available` | `parser_no_target_sections` | `heading_like_but_not_target_section` | `heading_taxonomy_review` | Deterministic integrated tuning of multi-cavity resonances and phase; 1Optical Nanostructures Laboratory, Center for Integrated Science and Engineering, |  |  | Deterministic integrated tuning of multi-cavity resonances and phase for slow-light in coupled photonic crystal cavities |
+| `01KS6FQ18T1VR46Z69BXKVAYYJ` | metasurface holography | `no_target_sections_after_current_parser` | `parser_no_target_sections` | `sectionless_or_non_target_heading_format` | `weak_fulltext_or_metadata_only` | Specular holography; MatthewBrand |  |  | Specular holography |
 | `01KS6F5Z1F33SR77NWE7BDK2J0` | metalens, metasurface holography, quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | results | results:heading_continuation,inline_heading | Optical frequency comb generation from a monolithic microresonator |
 | `01KS6F6SPEAWZCWHA3N8ZP4R4F` | quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | experiments | experiments:heading_continuation,inline_heading | Coherent, multi-heterodyne spectroscopy using stabilized optical frequency combs |
+| `01KS6G8NM22XMZXQP6ADT1BKTB` | quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | method | method:explicit_heading,heading_continuation | Generation of Ultrastable Microwaves via Optical Frequency Division |
 
 ## Policy
 
