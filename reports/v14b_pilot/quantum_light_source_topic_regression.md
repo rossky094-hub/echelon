@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-31T05:03:24Z`
+- Audit: `2026-05-31T05:17:07Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -62,4 +62,4 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| future_candidates_missing_claim_card |  | 85 | 12 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. missing five-question gates: historical attempts and failure evidence=1; missing high-confidence gates: complete five-question Claim Card=1, triangulated Step6 fusion evidence=1; incomplete direction ids: 83; complete Claim Cards found only as weak topic context: 82,84,85,86 |
+| future_candidates_missing_claim_card |  | 85 | 12 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 92,93,94,95,96 |

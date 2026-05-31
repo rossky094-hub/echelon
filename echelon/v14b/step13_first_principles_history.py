@@ -1826,6 +1826,14 @@ def _chains_for_direction(
     direction: dict[str, Any],
     chains: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    evidence_json = _safe_json_loads(direction.get("evidence_json") or "{}", {})
+    fused_chain_ids = set()
+    if isinstance(evidence_json, dict):
+        fused_chain_ids = {
+            str(chain_id)
+            for chain_id in (evidence_json.get("section_atom_chain_ids") or [])
+            if str(chain_id)
+        }
     pids = _safe_json_loads(direction.get("paper_ids_json") or "[]", [])
     if not isinstance(pids, list):
         pids = []
@@ -1839,13 +1847,14 @@ def _chains_for_direction(
     }
     matches: list[tuple[int, float, dict[str, Any]]] = []
     for chain in chains:
+        fused_match = str(chain.get("chain_id") or "") in fused_chain_ids
         text_tokens = {
             token
             for token in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", _chain_text(chain).lower())
         }
         paper_match = str(chain.get("paper_id") or "") in pid_set
         token_overlap = len(direction_tokens & text_tokens)
-        if not paper_match and token_overlap < 2:
+        if not fused_match and not paper_match and token_overlap < 2:
             continue
         completeness_bonus = 2 if int(chain.get("typed_chain_complete") or 0) else 0
         grade_bonus = {
@@ -1853,7 +1862,13 @@ def _chains_for_direction(
             "typed_section_lineage_traced": 2,
             "partial_typed_section_lineage": 1,
         }.get(str(chain.get("evidence_grade") or ""), 0)
-        matches.append((int(paper_match), float(completeness_bonus + grade_bonus + token_overlap), chain))
+        matches.append(
+            (
+                int(fused_match),
+                float((3 * int(paper_match)) + completeness_bonus + grade_bonus + token_overlap),
+                chain,
+            )
+        )
     matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [item[2] for item in matches[:12]]
 

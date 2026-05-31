@@ -23,11 +23,12 @@ import argparse
 import json
 import logging
 import os
+import re
 import sqlite3
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Set
+from typing import Any, Optional, List, Dict, Set
 
 from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
@@ -333,6 +334,141 @@ def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'virtual table') AND name = ?",
+        (table,),
+    ).fetchone() is not None
+
+
+def _safe_json_loads(raw: Any, default: Any) -> Any:
+    try:
+        return json.loads(str(raw))
+    except Exception:
+        return default
+
+
+def load_section_atom_chains(
+    conn_main: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> list[dict]:
+    """Load typed section chains as Step6 section-lineage evidence context."""
+    if not _table_exists(conn_main, "section_atom_chains"):
+        return []
+    scope_sql = (
+        "WHERE c.paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    rows = conn_main.execute(
+        f"""
+        SELECT
+            c.*,
+            COALESCE(p.title, '') AS paper_title,
+            COALESCE(p.publication_year, 0) AS publication_year
+        FROM section_atom_chains c
+        LEFT JOIN papers p ON p.id = c.paper_id
+        {scope_sql}
+        """
+    ).fetchall()
+    chains: list[dict] = []
+    for row in rows:
+        chain = dict(row)
+        chain["missing_stages"] = _safe_json_loads(chain.get("missing_stages_json") or "[]", [])
+        chain["evidence_objects"] = _safe_json_loads(chain.get("evidence_objects_json") or "[]", [])
+        chains.append(chain)
+    return chains
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", (text or "").lower())
+    }
+
+
+def _chain_text(chain: dict[str, Any]) -> str:
+    return " ".join(
+        str(chain.get(key) or "")
+        for key in (
+            "paper_title",
+            "section_name",
+            "constraint_text",
+            "failure_mechanism_text",
+            "attempted_path_text",
+            "local_fix_text",
+            "new_constraint_text",
+        )
+        if str(chain.get(key) or "").strip()
+    )
+
+
+def _chain_evidence_weight(chain: dict[str, Any]) -> float:
+    evidence_grade = str(chain.get("evidence_grade") or "")
+    typed_chain_complete = bool(int(chain.get("typed_chain_complete") or 0))
+    if evidence_grade == "typed_section_lineage":
+        return 0.92
+    if evidence_grade == "typed_section_lineage_traced":
+        return 0.85
+    if typed_chain_complete:
+        return 0.70
+    if evidence_grade == "partial_typed_section_lineage":
+        return 0.68
+    return 0.45
+
+
+def _section_chain_support_summary(chains: list[dict]) -> dict[str, Any]:
+    by_grade = Counter(str(chain.get("evidence_grade") or "unknown") for chain in chains)
+    by_completeness = Counter(str(chain.get("typed_chain_completeness") or "unknown") for chain in chains)
+    full_decision_grade = sum(
+        1
+        for chain in chains
+        if int(chain.get("typed_chain_complete") or 0) == 1
+        and str(chain.get("evidence_grade") or "") == "typed_section_lineage"
+    )
+    full_traced = sum(
+        1
+        for chain in chains
+        if int(chain.get("typed_chain_complete") or 0) == 1
+        and str(chain.get("evidence_grade") or "") in {"typed_section_lineage", "typed_section_lineage_traced"}
+    )
+    return {
+        "total": len(chains),
+        "full": int(by_completeness.get("full", 0)),
+        "full_decision_grade": full_decision_grade,
+        "full_traced_or_decision_grade": full_traced,
+        "partial": sum(1 for chain in chains if int(chain.get("typed_chain_complete") or 0) == 0),
+        "by_evidence_grade": dict(sorted(by_grade.items())),
+        "by_completeness": dict(sorted(by_completeness.items())),
+    }
+
+
+def _matching_section_atom_chains(
+    *,
+    chains: list[dict],
+    src_id: str,
+    dst_id: str,
+    target_text: str,
+) -> list[dict]:
+    target_tokens = _tokens(target_text)
+    matches: list[tuple[int, float, dict]] = []
+    for chain in chains:
+        paper_match = str(chain.get("paper_id") or "") in {src_id, dst_id}
+        token_overlap = len(_tokens(_chain_text(chain)) & target_tokens)
+        if not paper_match and token_overlap < 2:
+            continue
+        score = (
+            3 * int(paper_match)
+            + 2 * int(int(chain.get("typed_chain_complete") or 0) == 1)
+            + _chain_evidence_weight(chain)
+            + min(token_overlap, 6) / 10.0
+        )
+        matches.append((int(paper_match), score, chain))
+    matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [item[2] for item in matches[:12]]
+
+
 # ---------------------------------------------------------------------------
 # 融合逻辑
 # ---------------------------------------------------------------------------
@@ -343,6 +479,7 @@ def compute_direction_clusters(
     unresolved: List[dict],
     conn_main: sqlite3.Connection,
     calibration_context: dict | None = None,
+    section_atom_chains: list[dict] | None = None,
 ) -> List[dict]:
     """
     三路融合:将不同信号聚合为 future direction clusters。
@@ -356,6 +493,7 @@ def compute_direction_clusters(
     """
     # 主干道末端 paper_ids
     terminal_ids: Set[str] = {str(t["paper_id"]) for t in terminals}
+    section_atom_chains = section_atom_chains or []
 
     # 未解决 limitation keywords
     unresolved = attach_limitation_section_contracts(unresolved, conn_main)
@@ -472,14 +610,45 @@ def compute_direction_clusters(
             decision_grade_section_count = 0
             limitation_contract_versions = []
 
+        matched_chains = _matching_section_atom_chains(
+            chains=section_atom_chains,
+            src_id=src_id,
+            dst_id=dst_id,
+            target_text=f"{dst_title} {dst_abstract}",
+        )
+        chain_support = _section_chain_support_summary(matched_chains)
+        chain_lineage_counts_as_path = int(chain_support.get("full_traced_or_decision_grade") or 0) > 0
+        chain_decision_grade_count = int(chain_support.get("full_decision_grade") or 0)
+        if chain_lineage_counts_as_path:
+            evidence_paths += 1
+        chain_weight = max([_chain_evidence_weight(chain) for chain in matched_chains] or [0.0])
+        if matched_chains:
+            chain_evidence = (
+                "typed section atom chains: "
+                f"total={chain_support['total']}, full={chain_support['full']}, "
+                f"full_decision_grade={chain_support['full_decision_grade']}, "
+                f"partial={chain_support['partial']}"
+            )
+            limitation_evidence = (
+                f"{limitation_evidence}; {chain_evidence}"
+                if limitation_evidence
+                else chain_evidence
+            )
+            limitation_weight = max(limitation_weight, chain_weight)
+
         if evidence_paths >= FUSION_MIN_EVIDENCE_PATHS:
+            section_qualities = list(qualities)
+            if chain_lineage_counts_as_path:
+                section_qualities.append("section_level")
             evidence_tier = direction_evidence_tier(
                 evidence_paths=evidence_paths,
-                limitation_quality=qualities,
+                limitation_quality=section_qualities,
                 prediction_confidence=prediction_confidence,
                 has_main_path=bool(main_path_evidence),
                 calibrated_for_fusion=calibrated_for_fusion,
-                has_decision_grade_section_evidence=decision_grade_section_count > 0,
+                has_decision_grade_section_evidence=(
+                    decision_grade_section_count > 0 or chain_decision_grade_count > 0
+                ),
             )
             missing_gates = (
                 []
@@ -488,6 +657,8 @@ def compute_direction_clusters(
             )
             if "section_level" in set(qualities) and decision_grade_section_count <= 0:
                 missing_gates.append("current parser-contract decision-grade limitation section evidence")
+            if int(chain_support.get("total") or 0) > 0 and chain_decision_grade_count <= 0:
+                missing_gates.append("current parser-contract decision-grade typed-chain section evidence")
             direction_candidates.append({
                 "anchor_paper_id": dst_id,
                 "anchor_title": dst_title,
@@ -513,8 +684,16 @@ def compute_direction_clusters(
                 "vgae_evidence": vgae_evidence,
                 "limitation_evidence": limitation_evidence,
                 "limitation_evidence_weight": limitation_weight,
-                "limitation_evidence_quality": qualities,
+                "limitation_evidence_quality": section_qualities,
                 "limitation_decision_grade_section_count": decision_grade_section_count,
+                "section_atom_chain_support": chain_support,
+                "section_atom_chain_ids": [
+                    str(chain.get("chain_id") or "")
+                    for chain in matched_chains
+                    if str(chain.get("chain_id") or "")
+                ],
+                "section_atom_chain_decision_grade_count": chain_decision_grade_count,
+                "section_atom_chain_evidence_weight": chain_weight,
                 "limitation_section_contract_versions": limitation_contract_versions,
                 "field_id": dst_paper.get("primary_field_id"),
                 "src_ids": [src_id],
@@ -567,6 +746,23 @@ def compute_direction_clusters(
                 int(existing.get("limitation_decision_grade_section_count") or 0),
                 int(cand.get("limitation_decision_grade_section_count") or 0),
             )
+            existing["section_atom_chain_decision_grade_count"] = max(
+                int(existing.get("section_atom_chain_decision_grade_count") or 0),
+                int(cand.get("section_atom_chain_decision_grade_count") or 0),
+            )
+            existing["section_atom_chain_evidence_weight"] = max(
+                float(existing.get("section_atom_chain_evidence_weight") or 0.0),
+                float(cand.get("section_atom_chain_evidence_weight") or 0.0),
+            )
+            if int((cand.get("section_atom_chain_support") or {}).get("total") or 0) > int(
+                (existing.get("section_atom_chain_support") or {}).get("total") or 0
+            ):
+                existing["section_atom_chain_support"] = cand.get("section_atom_chain_support") or {}
+            existing_chain_ids = list(existing.get("section_atom_chain_ids") or [])
+            for chain_id in cand.get("section_atom_chain_ids") or []:
+                if chain_id not in existing_chain_ids:
+                    existing_chain_ids.append(chain_id)
+            existing["section_atom_chain_ids"] = existing_chain_ids[:24]
             contracts = set(existing.get("limitation_section_contract_versions") or [])
             contracts.update(cand.get("limitation_section_contract_versions") or [])
             existing["limitation_section_contract_versions"] = sorted(contracts)
@@ -731,6 +927,10 @@ def name_directions(
                     "limitation_evidence_quality": cand.get("limitation_evidence_quality"),
                     "limitation_evidence_weight": cand.get("limitation_evidence_weight"),
                     "limitation_decision_grade_section_count": cand.get("limitation_decision_grade_section_count"),
+                    "section_atom_chain_support": cand.get("section_atom_chain_support") or {},
+                    "section_atom_chain_ids": cand.get("section_atom_chain_ids") or [],
+                    "section_atom_chain_decision_grade_count": cand.get("section_atom_chain_decision_grade_count") or 0,
+                    "section_atom_chain_evidence_weight": cand.get("section_atom_chain_evidence_weight") or 0.0,
                     "limitation_section_contract_versions": cand.get("limitation_section_contract_versions") or [],
                     "claim_scope": cand.get("claim_scope"),
                 },
@@ -789,6 +989,16 @@ def write_fusion_evidence_audit(
         for atom in unresolved
     )
     decision_grade_limitations = sum(1 for atom in unresolved if atom.get("section_decision_grade"))
+    chain_supported_candidates = sum(
+        1
+        for candidate in candidates
+        if int((candidate.get("section_atom_chain_support") or {}).get("total") or 0) > 0
+    )
+    decision_grade_chain_candidates = sum(
+        1
+        for candidate in candidates
+        if int((candidate.get("section_atom_chain_support") or {}).get("full_decision_grade") or 0) > 0
+    )
     path_counts = Counter(int(c.get("evidence_paths") or 0) for c in candidates)
     tier_counts = Counter(c.get("evidence_tier") or "unknown" for c in candidates)
     calibration_counts = Counter(c.get("calibration_label") or "legacy_raw" for c in candidates)
@@ -833,6 +1043,8 @@ def write_fusion_evidence_audit(
                 "min_vgae_confidence": FUSION_MIN_VGAE_CONFIDENCE,
                 "vgae_top_n": FUSION_VGAE_TOP_N,
                 "decision_grade_limitation_sections": decision_grade_limitations,
+                "chain_supported_candidates": chain_supported_candidates,
+                "decision_grade_section_atom_chain_candidates": decision_grade_chain_candidates,
             },
             ensure_ascii=False,
         ),
@@ -934,6 +1146,8 @@ def run_fusion(
     unresolved = load_unresolved_limitations(conn_v14)
     unresolved = attach_limitation_section_contracts(unresolved, conn_main)
     logger.info("未解决 limitations: %d", len(unresolved))
+    section_atom_chains = load_section_atom_chains(conn_main, corpus_id=corpus_id)
+    logger.info("typed section atom chains: %d", len(section_atom_chains))
 
     # 三路融合
     candidates = compute_direction_clusters(
@@ -942,6 +1156,7 @@ def run_fusion(
         unresolved,
         conn_main,
         calibration_context=calibration_context,
+        section_atom_chains=section_atom_chains,
     )
     logger.info("融合候选方向: %d", len(candidates))
 
@@ -980,6 +1195,7 @@ def run_fusion(
         "n_terminals": len(terminals),
         "n_vgae_preds": len(vgae_preds),
         "n_unresolved": len(unresolved),
+        "n_section_atom_chains": len(section_atom_chains),
         "corpus_id": corpus_id,
         "scoped_papers": scoped_count if corpus_id else None,
         "fusion_audit": audit,

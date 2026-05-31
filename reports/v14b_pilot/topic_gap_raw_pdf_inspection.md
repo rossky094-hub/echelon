@@ -1,6 +1,6 @@
 # Topic-Gap Raw PDF Parser Inspection
 
-- audit_ts: `2026-05-31T04:49:55Z`
+- audit_ts: `2026-05-31T05:18:42Z`
 - triage_json: `reports/v14b_pilot/topic_gap_section_evidence_audit.json`
 - store_root: `/Volumes/LaCie/Echelon_Paper_Raw_Data`
 - manifest: `/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3`
@@ -9,9 +9,9 @@
 
 ## Summary
 
-- triage papers: 47
+- triage papers: 38
 - local PDF available papers: 7
-- skipped no local PDF: 40
+- skipped no local PDF: 31
 - parser primary-ready papers: 2
 - parser primary-ready repair candidates: 0
 - parser primary-ready already covered: 2
@@ -51,8 +51,8 @@
 | `01KS5KMDAC6220S2FEJCB6XVTB` | photonic crystal cavity | `no_target_sections_after_current_parser` | `parser_no_target_sections` | `sectionless_or_non_target_heading_format` | `weak_fulltext_or_metadata_only` | Silicon-based photonic crystal nanocavity light emitters; Maria Makarova, Jelena Vuckovic, Hiroyuki Sanda, Yoshio Nishi |  |  | Silicon-based photonic crystal nanocavity light emitters |
 | `01KS5KW8C34R9WN637BH5ABW1R` | quantum light source | `no_target_sections_after_current_parser` | `parser_no_target_sections` | `heading_like_but_not_target_section` | `heading_taxonomy_review` | Ultra-bright source of polarization-entangled photons; 1Physics Division, P-23, Los Alamos National Laboratory, Los Alamos, New Mexico 87545 |  |  | Ultra-bright source of polarization-entangled photons |
 | `01KS5KWKMCV3DHKBFJH2Z0JN6A` | photonic crystal cavity | `no_target_sections_after_current_parser` | `parser_no_target_sections` | `heading_like_but_not_target_section` | `heading_taxonomy_review` | Fabrication-toleranthighquality factor photoniccrystal microcavities; Two-dimensional photonic crystal (PC) slab waveguide |  |  | Fabrication-tolerant high quality factor photonic crystal microcavities |
-| `01KS6F5Z1F33SR77NWE7BDK2J0` | metalens, metasurface holography, photonic crystal cavity, quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | results | results:heading_continuation,inline_heading | Optical frequency comb generation from a monolithic microresonator |
-| `01KS6F6SPEAWZCWHA3N8ZP4R4F` | photonic crystal cavity, quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | experiments | experiments:heading_continuation,inline_heading | Coherent, multi-heterodyne spectroscopy using stabilized optical frequency combs |
+| `01KS6F5Z1F33SR77NWE7BDK2J0` | metalens, metasurface holography, quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | results | results:heading_continuation,inline_heading | Optical frequency comb generation from a monolithic microresonator |
+| `01KS6F6SPEAWZCWHA3N8ZP4R4F` | quantum light source | `decision_grade_current_contract` | `parser_success_primary` | `` | `already_covered_parser_control` |  | experiments | experiments:heading_continuation,inline_heading | Coherent, multi-heterodyne spectroscopy using stabilized optical frequency combs |
 
 ## Policy
 

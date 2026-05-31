@@ -777,6 +777,53 @@ def test_step13_claim_cards_consume_full_section_atom_chains_as_five_question_ev
     assert updates[0]["high_confidence_eligible"] == 1
 
 
+def test_step13_prefers_step6_fused_section_atom_chain_ids():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    chain = {
+        "chain_id": "sac_fused",
+        "paper_id": "p_chain",
+        "paper_title": "Fused chain source",
+        "publication_year": 2025,
+        "section_name": "discussion",
+        "section_key": "discussion",
+        "constraint_text": "Thermal packaging drift is the root physical constraint.",
+        "failure_mechanism_text": "Heat accumulation creates optical phase loss.",
+        "attempted_path_text": "The authors attempted active cooling.",
+        "local_fix_text": "Active cooling stabilizes the prototype.",
+        "new_constraint_text": "Power overhead remains unresolved.",
+        "typed_chain_complete": 1,
+        "typed_chain_completeness": "full",
+        "evidence_grade": "typed_section_lineage",
+        "claim_scope": "bottleneck_lineage_evidence",
+    }
+
+    cards, _ = build_direction_claim_cards(
+        atoms=[],
+        section_atom_chains=[chain],
+        future_directions=[
+            {
+                "direction_id": 44,
+                "direction_name": "Device reliability direction",
+                "paper_ids_json": '["p_other"]',
+                "evidence_json": json.dumps({"section_atom_chain_ids": ["sac_fused"]}),
+                "confidence": 0.84,
+                "evidence_tier": "triangulated_strong",
+                "calibration_label": "calibrated_temporal_holdout",
+            }
+        ],
+        principle_rows=[],
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    attempts = json.loads(cards[0]["attempts_last_10y_json"])
+    gate = json.loads(cards[0]["quality_gate_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert attempts[0]["section_atom_chain_id"] == "sac_fused"
+    assert attempts[0]["source"] == "section_atom_chain"
+    assert gate["section_atom_chain_support"]["full_decision_grade"] == 1
+
+
 def test_step13_partial_section_atom_chains_complete_card_but_block_high_confidence():
     from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
 

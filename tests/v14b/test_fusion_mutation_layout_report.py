@@ -401,6 +401,104 @@ class TestFusion:
         assert candidates[0]["limitation_decision_grade_section_count"] == 1
         assert SECTION_PARSER_CONTRACT_VERSION in candidates[0]["limitation_section_contract_versions"]
 
+    def test_step6_uses_full_typed_chain_as_strong_section_lineage(self, tmp_path):
+        from echelon.v14b.step6_fusion import compute_direction_clusters, name_directions
+
+        _, conn_main = create_main_db(tmp_path)
+        candidates = compute_direction_clusters(
+            terminals=[{"paper_id": "4", "publication_year": 2024}],
+            vgae_preds=[
+                {
+                    "src_paper_id": "4",
+                    "dst_paper_id": "5",
+                    "predicted_prob": 0.85,
+                    "raw_predicted_prob": 0.9,
+                    "calibrated_prob": 0.82,
+                    "prediction_confidence": 0.78,
+                    "calibration_label": "calibrated_temporal_holdout",
+                    "is_cross_field": 1,
+                }
+            ],
+            unresolved=[],
+            conn_main=conn_main,
+            calibration_context={"has_run_audit": True, "avg_calibrated_auc": 0.84},
+            section_atom_chains=[
+                {
+                    "chain_id": "sac_full",
+                    "paper_id": "4",
+                    "paper_title": "Fresh main-path anchor",
+                    "section_name": "discussion",
+                    "section_key": "discussion",
+                    "constraint_text": "Fabrication tolerance is the root physical constraint.",
+                    "failure_mechanism_text": "Overlay mismatch creates phase loss.",
+                    "attempted_path_text": "Calibration and inverse design were attempted.",
+                    "local_fix_text": "Calibration mitigates mismatch in the prototype.",
+                    "new_constraint_text": "Packaging drift remains unresolved.",
+                    "typed_chain_complete": 1,
+                    "typed_chain_completeness": "full",
+                    "evidence_grade": "typed_section_lineage",
+                    "claim_scope": "bottleneck_lineage_evidence",
+                }
+            ],
+        )
+        directions = name_directions(candidates, conn_main)
+        conn_main.close()
+
+        assert candidates
+        assert candidates[0]["evidence_paths"] == 3
+        assert candidates[0]["evidence_tier"] == "triangulated_strong"
+        assert candidates[0]["section_atom_chain_decision_grade_count"] == 1
+        assert candidates[0]["section_atom_chain_support"]["full_decision_grade"] == 1
+        assert "typed section atom chains" in candidates[0]["limitation_evidence"]
+        assert "sac_full" in json.loads(directions[0]["evidence_json"])["section_atom_chain_ids"]
+
+    def test_step6_keeps_partial_typed_chain_exploratory_context_only(self, tmp_path):
+        from echelon.v14b.step6_fusion import compute_direction_clusters
+
+        _, conn_main = create_main_db(tmp_path)
+        candidates = compute_direction_clusters(
+            terminals=[{"paper_id": "4", "publication_year": 2024}],
+            vgae_preds=[
+                {
+                    "src_paper_id": "4",
+                    "dst_paper_id": "5",
+                    "predicted_prob": 0.85,
+                    "raw_predicted_prob": 0.9,
+                    "calibrated_prob": 0.82,
+                    "prediction_confidence": 0.78,
+                    "calibration_label": "calibrated_temporal_holdout",
+                    "is_cross_field": 1,
+                }
+            ],
+            unresolved=[],
+            conn_main=conn_main,
+            calibration_context={"has_run_audit": True, "avg_calibrated_auc": 0.84},
+            section_atom_chains=[
+                {
+                    "chain_id": "sac_partial",
+                    "paper_id": "4",
+                    "paper_title": "Fresh main-path anchor",
+                    "section_name": "results",
+                    "section_key": "results",
+                    "constraint_text": "Efficiency remains limited.",
+                    "failure_mechanism_text": "Coupling loss dominates.",
+                    "attempted_path_text": "A grating coupler was attempted.",
+                    "typed_chain_complete": 0,
+                    "typed_chain_completeness": "attempted_path_partial",
+                    "evidence_grade": "partial_typed_section_lineage",
+                    "claim_scope": "exploratory_bottleneck_lineage",
+                }
+            ],
+        )
+        conn_main.close()
+
+        assert candidates
+        assert candidates[0]["evidence_paths"] == 2
+        assert candidates[0]["evidence_tier"] == "exploratory_weak_limitation"
+        assert candidates[0]["section_atom_chain_decision_grade_count"] == 0
+        assert candidates[0]["section_atom_chain_support"]["partial"] == 1
+        assert "typed section atom chains" in candidates[0]["limitation_evidence"]
+
     def test_step6_rejects_aggregate_section_name_as_decision_grade(self, tmp_path):
         from echelon.v14b.step6_fusion import attach_limitation_section_contracts
 
