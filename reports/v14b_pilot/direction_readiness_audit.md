@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-31T06:43:54Z`
+- generated_at: `2026-05-31T06:58:31Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
@@ -19,7 +19,7 @@
 - multi-topic evidence-gap queue: 15 / 35 decision-grade section covered (42.9%); raw primary=18 (51.4%)
 - topic-gap section triage: `fail`; current-parser no-target=18; stale-contract=0; unattempted-PDF=0
 - topic-gap no-target inspection: `pass`; parser-target-signal=0; subthreshold-target-signal=2; sectionless/non-target-heading=11
-- section frontfill health: running_or_unknown [section_delta] (done=312/8373, no_evidence_delta=19, no_evidence_hours=0.5, current_contract_primary=506, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
+- section frontfill health: running_or_unknown [section_delta] (done=312/8373, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=514, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
 - raw PDF store: `pass`; success=2,679; probable_pdf_rate=100.0%; section_cache_papers=6; topic_gap_local_pdf=7/38
 - topic-gap raw PDF parser dry run: `warn`; local=7; primary-ready=2; repair-ready=0; no-target=1; parser-exception=0; no-target-shapes=sectionless_or_non_target_heading_format:1; actions=weak_primary_context_only:4, already_covered_parser_control:2, weak_fulltext_or_metadata_only:1
 - future candidate edges: 1,000

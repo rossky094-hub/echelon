@@ -1392,6 +1392,88 @@ def edge_id(edge_type: str, src: str, dst: str) -> str:
     return f"{edge_type}:{src}:{dst}"
 
 
+def future_candidate_calibration_status(pred: dict) -> str:
+    status = pred.get("lifecycle_calibration_status") or pred.get("calibration_status")
+    if status:
+        return str(status)
+    if (
+        pred.get("calibration_label")
+        or pred.get("calibration_method")
+        or pred.get("calibrated_candidate_score") is not None
+    ):
+        return "edge_calibrated_run_audit_unknown"
+    return "not_calibrated"
+
+
+def future_candidate_visual_contract(
+    pred: dict,
+    *,
+    source_paper_id: str,
+    target_paper_id: str,
+    candidate_score: float,
+) -> dict:
+    calibration_status = future_candidate_calibration_status(pred)
+    evidence_grade = (
+        "calibrated_candidate_generator"
+        if calibration_status == "calibrated_with_run_audit"
+        else "uncalibrated_candidate_generator"
+    )
+    missing_gates = jloads(pred.get("missing_gates_json"), [])
+    missing_high_confidence = jloads(pred.get("missing_high_confidence_gates_json"), [])
+    upstream_uncertainty = jloads(pred.get("uncertainty_reasons_json"), [])
+    uncertainty = sorted(
+        set(
+            [
+                "GNN/VGAE is a future candidate generator, not a conclusion generator",
+                "future edge cannot be promoted without Step6 fusion and a complete Step13 Claim Card",
+                *(
+                    []
+                    if calibration_status == "calibrated_with_run_audit"
+                    else [calibration_status.replace("_", " ")]
+                ),
+                *[str(reason) for reason in upstream_uncertainty if str(reason).strip()],
+            ]
+        )
+    )
+    required_evidence = [
+        "rolling held-out-year calibration audit",
+        "Step6 fusion evidence",
+        "Step13 five-question Claim Card",
+        "section-level bottleneck evidence",
+    ]
+    return {
+        "claim_scope": "candidate_pool_only",
+        "evidence_grade": evidence_grade,
+        "required_evidence": required_evidence,
+        "uncertainty_reasons": uncertainty,
+        "can_explain": [
+            "candidate bridge suggested by calibrated future-candidate generator",
+            "which papers should enter fusion and Claim Card inspection next",
+        ],
+        "cannot_explain": [
+            "that the direction is validated",
+            "that the edge is a user-facing R&D Radar recommendation",
+        ],
+        "calibration_status": calibration_status,
+        "missing_gates": missing_gates,
+        "missing_high_confidence_gates": missing_high_confidence,
+        "evidence_objects": [
+            {
+                "type": "future_candidate",
+                "source": "Step5b VGAE candidate generator",
+                "source_paper_id": source_paper_id,
+                "target_paper_id": target_paper_id,
+                "claim_scope": "candidate_pool_only",
+                "evidence_grade": evidence_grade,
+                "candidate_score": candidate_score,
+                "calibrated_candidate_score": pred.get("calibrated_candidate_score"),
+                "raw_candidate_score": pred.get("raw_candidate_score"),
+                "calibration_status": calibration_status,
+            }
+        ],
+    }
+
+
 def write_visual_edges(
     conn_v14: sqlite3.Connection,
     citation_edges: list[tuple[str, str]],
@@ -1474,9 +1556,12 @@ def write_visual_edges(
         confidence = float(pred.get("candidate_score") or calibrated)
         lifecycle_state = pred.get("lifecycle_state") or "future_candidate_unassessed"
         radar_eligible = int(pred.get("radar_eligible") or 0)
-        missing_gates = jloads(pred.get("missing_gates_json"), [])
-        missing_high_confidence = jloads(pred.get("missing_high_confidence_gates_json"), [])
-        uncertainty = jloads(pred.get("uncertainty_reasons_json"), [])
+        contract = future_candidate_visual_contract(
+            pred,
+            source_paper_id=src,
+            target_paper_id=dst,
+            candidate_score=confidence,
+        )
         add_row(
             (
                 edge_id("future", src, dst),
@@ -1492,13 +1577,10 @@ def write_visual_edges(
                 jdumps({"stroke": "future", "dash": True, "glow": True}),
                 jdumps({
                     **pred,
+                    **contract,
                     "lifecycle_state": lifecycle_state,
                     "radar_eligible": bool(radar_eligible),
                     "candidate_pool_reason": pred.get("candidate_pool_reason"),
-                    "calibration_status": pred.get("lifecycle_calibration_status") or pred.get("calibration_status"),
-                    "missing_gates": missing_gates,
-                    "missing_high_confidence_gates": missing_high_confidence,
-                    "uncertainty_reasons": uncertainty,
                     "why": "Calibrated GNN/VGAE future candidate",
                     "product_rule": (
                         "Future edge is an inspection candidate until Step6 fusion and "

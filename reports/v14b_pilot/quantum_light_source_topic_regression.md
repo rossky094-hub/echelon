@@ -1,8 +1,8 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-31T06:44:03Z`
+- Audit: `2026-05-31T06:58:35Z`
 - Topic: `quantum light source`
-- Overall status: **warn**
+- Overall status: **fail**
 
 ## Gates
 
@@ -10,12 +10,12 @@
 | --- | ---: | ---: | --- |
 | expected branches found | 1.00 | 1.0 | pass |
 | branches with driver papers | 4 | 3 | pass |
-| expected bottlenecks evidenced | 5 | 5 | pass |
-| key turning papers | 10 | 4 | pass |
-| turning papers with access links | 10 | 3 | pass |
-| turning papers with primary sections | 7 | 2 | pass |
-| turning papers with strong/moderate section provenance | 7 | 2 | pass |
-| turning papers with decision-grade section evidence | 7 | 2 | pass |
+| expected bottlenecks evidenced | 4 | 5 | fail |
+| key turning papers | 13 | 4 | pass |
+| turning papers with access links | 13 | 3 | pass |
+| turning papers with primary sections | 6 | 2 | pass |
+| turning papers with strong/moderate section provenance | 5 | 2 | pass |
+| turning papers with decision-grade section evidence | 5 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 1 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -25,7 +25,7 @@
 
 | Branch | Drivers | Bottleneck | Enabler | Status |
 | --- | ---: | --- | --- | --- |
-| Single-photon emitters | 3 | True | True | pass |
+| Single-photon emitters | 2 | True | True | pass |
 | Entangled photon-pair sources | 3 | True | True | pass |
 | Integrated quantum photonics | 3 | True | True | pass |
 | Deterministic coupling and collection | 3 | True | True | pass |
@@ -34,7 +34,7 @@
 
 | Bottleneck | Evidence | Branch Hypothesis | Candidate Papers | Status |
 | --- | --- | --- | ---: | --- |
-| brightness | True | True | 5 | pass |
+| brightness | False | True | 5 | fail |
 | indistinguishability | True | True | 5 | pass |
 | collection efficiency | True | True | 5 | pass |
 | scalability | True | True | 3 | pass |
@@ -42,7 +42,7 @@
 
 ## Interpretation
 
-- Key turning papers: 10 total, 10 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance, 7 with decision-grade current-contract evidence.
+- Key turning papers: 13 total, 13 with access links, 6 with primary local sections, 5 with strong/moderate parser provenance, 5 with decision-grade current-contract evidence.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: full=1, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
@@ -58,6 +58,12 @@
 
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
+| missing_bottleneck_section_evidence | brightness | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

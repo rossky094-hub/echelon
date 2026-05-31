@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-31T06:44:02Z`
+- Audit: `2026-05-31T06:58:34Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -11,9 +11,9 @@
 | expected branches found | 1.00 | 1.0 | pass |
 | branches with driver papers | 4 | 3 | pass |
 | expected bottlenecks evidenced | 3 | 5 | fail |
-| key turning papers | 9 | 4 | pass |
-| turning papers with access links | 9 | 3 | pass |
-| turning papers with primary sections | 6 | 2 | pass |
+| key turning papers | 11 | 4 | pass |
+| turning papers with access links | 11 | 3 | pass |
+| turning papers with primary sections | 3 | 2 | pass |
 | turning papers with strong/moderate section provenance | 3 | 2 | pass |
 | turning papers with decision-grade section evidence | 3 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
@@ -42,7 +42,7 @@
 
 ## Interpretation
 
-- Key turning papers: 9 total, 9 with access links, 6 with primary local sections, 3 with strong/moderate parser provenance, 3 with decision-grade current-contract evidence.
+- Key turning papers: 11 total, 11 with access links, 3 with primary local sections, 3 with strong/moderate parser provenance, 3 with decision-grade current-contract evidence.
 - Future candidates: 320 graph candidates, 1 Radar cards, 1 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: full=0, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
@@ -56,9 +56,11 @@
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | mode volume | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
 | missing_bottleneck_section_evidence | thermal stability | 100 | 3 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
-| key_turning_paper_weak_section_provenance |  | 90 | 1 | key turning paper has only weak section parser provenance |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

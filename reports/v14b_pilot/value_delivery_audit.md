@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T06:43:55Z`
+- generated_at: `2026-05-31T06:58:30Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -59,7 +59,7 @@
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
     "section_frontfill_done": 312,
-    "section_frontfill_no_evidence_delta": 19,
+    "section_frontfill_no_evidence_delta": 0,
     "section_frontfill_progress_done": 312,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
@@ -157,7 +157,7 @@
 
 ```json
 {
-  "branches": 5278,
+  "branches": 5276,
   "checks": {
     "api_visual_clusters_carry_lineage_contract": true,
     "branch_lineage_columns_present": true,
@@ -170,9 +170,9 @@
   "policy": "Only evidence_backed_split can be narrated as scientific branch evolution; weak_split_candidate and layout_cluster_only must be labeled as such, and graph cluster panels must render the same evidence contract.",
   "status": "pass",
   "status_counts": {
-    "evidence_backed_split": 53,
-    "layout_cluster_only": 4934,
-    "weak_split_candidate": 291
+    "evidence_backed_split": 56,
+    "layout_cluster_only": 4923,
+    "weak_split_candidate": 297
   }
 }
 ```
@@ -201,7 +201,8 @@
     "step6_strong_fusion_requires_decision_grade_sections": true,
     "step9_vgae_language_is_candidate_generator": true,
     "topic_dossier_builders_use_candidate_edges_contract": true,
-    "ui_future_calibration_copy_uses_candidate_score_labels": true
+    "ui_future_calibration_copy_uses_candidate_score_labels": true,
+    "visual_future_edges_carry_contract": true
   },
   "edge_calibrated_candidates": 1000,
   "edge_calibration_labels": {
@@ -223,6 +224,12 @@
     "exploratory_with_claim_card": 5
   },
   "future_directions": 5,
+  "future_visual_edge_contract": {
+    "bad_contract_edges": 0,
+    "checked": true,
+    "examples": [],
+    "future_edges": 1000
+  },
   "issue": "Future Growth Calibration",
   "policy": "VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card.",
   "radar_eligible_candidates": 0,
@@ -364,8 +371,8 @@
   },
   "policy": "Topic Lens first screen must answer branches, bottlenecks, turning papers, and validation candidates before raw graph exploration.",
   "status": "pass",
-  "visual_edges": 775406,
-  "visual_nodes": 55391
+  "visual_edges": 780876,
+  "visual_nodes": 55401
 }
 ```
 

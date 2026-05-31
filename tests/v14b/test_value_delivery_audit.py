@@ -1445,6 +1445,35 @@ def test_future_growth_audit_rejects_public_model_probability_keys(tmp_path):
     assert result["checks"]["public_future_model_evidence_uses_candidate_score_labels"] is False
 
 
+def test_future_growth_audit_rejects_visual_future_edges_without_contract(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    conn = sqlite3.connect(str(v14))
+    conn.executescript(
+        """
+        DROP TABLE visual_edges;
+        CREATE TABLE visual_edges (
+            edge_type TEXT,
+            layer TEXT,
+            evidence_json TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO visual_edges VALUES (?, ?, ?)",
+        ("future_growth", "future", json.dumps({"candidate_score": 0.72})),
+    )
+    conn.commit()
+
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["visual_future_edges_carry_contract"] is False
+    assert result["future_visual_edge_contract"]["bad_contract_edges"] == 1
+
+
 def test_future_growth_audit_rejects_ui_future_calibration_probability_copy(tmp_path):
     _write_product_sources(tmp_path)
     v14 = tmp_path / "v14.sqlite3"

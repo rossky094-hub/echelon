@@ -220,6 +220,45 @@ class TestFusion:
         conn_v14.close()
         assert n == 1
 
+    def test_visual_future_edges_carry_candidate_pool_contract(self, tmp_path):
+        from echelon.v14b.step10_visual_graph_builder import ensure_visual_schema, write_visual_edges
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        ensure_visual_schema(conn_v14)
+
+        write_visual_edges(
+            conn_v14,
+            citation_edges=[],
+            main_edges={},
+            cocitation_edges=[],
+            semantic_edges=[],
+            future_predictions=[
+                {
+                    "src_paper_id": "p1",
+                    "dst_paper_id": "p2",
+                    "candidate_score": 0.72,
+                    "raw_candidate_score": 0.81,
+                    "calibrated_candidate_score": 0.76,
+                    "lifecycle_calibration_status": "calibrated_with_run_audit",
+                    "missing_gates_json": json.dumps(["Step6 fusion direction"]),
+                    "uncertainty_reasons_json": json.dumps(["linked refs below target"]),
+                }
+            ],
+        )
+
+        row = conn_v14.execute(
+            "SELECT evidence_json FROM visual_edges WHERE edge_type='future_growth'"
+        ).fetchone()
+        conn_v14.close()
+        evidence = json.loads(row[0])
+        assert evidence["claim_scope"] == "candidate_pool_only"
+        assert evidence["evidence_grade"] == "calibrated_candidate_generator"
+        assert "Step13 five-question Claim Card" in evidence["required_evidence"]
+        assert any("candidate generator" in reason for reason in evidence["uncertainty_reasons"])
+        assert evidence["evidence_objects"][0]["type"] == "future_candidate"
+        assert evidence["evidence_objects"][0]["candidate_score"] == 0.72
+        assert "confidence" not in evidence["evidence_objects"][0]
+
     def test_write_fusion_evidence_audit_marks_limited_output(self, tmp_path):
         from echelon.v14b.step6_fusion import write_fusion_evidence_audit
 

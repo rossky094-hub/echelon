@@ -1,6 +1,6 @@
 # Metasurface Holography Topic Regression
 
-- Audit: `2026-05-31T06:44:01Z`
+- Audit: `2026-05-31T06:58:33Z`
 - Topic: `metasurface holography`
 - Overall status: **fail**
 
@@ -13,9 +13,9 @@
 | expected bottlenecks evidenced | 3 | 5 | fail |
 | key turning papers | 8 | 4 | pass |
 | turning papers with access links | 8 | 3 | pass |
-| turning papers with primary sections | 4 | 2 | pass |
-| turning papers with strong/moderate section provenance | 4 | 2 | pass |
-| turning papers with decision-grade section evidence | 4 | 2 | pass |
+| turning papers with primary sections | 2 | 2 | pass |
+| turning papers with strong/moderate section provenance | 2 | 2 | pass |
+| turning papers with decision-grade section evidence | 2 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
 | bottleneck lineage typed contracts | 1 | 1 | pass |
 | auditable reading path | 5 | 4 | pass |
@@ -27,7 +27,7 @@
 | --- | ---: | --- | --- | --- |
 | High-efficiency visible holography | 3 | True | True | pass |
 | Large field-of-view holography | 3 | True | True | pass |
-| Multiplexed and dynamic holography | 3 | True | True | pass |
+| Multiplexed and dynamic holography | 2 | True | True | pass |
 | Fabrication-tolerant metasurface design | 2 | True | True | pass |
 
 ## Expected Bottlenecks
@@ -37,13 +37,13 @@
 | efficiency | True | True | 3 | pass |
 | speckle | False | True | 3 | fail |
 | field of view | True | True | 3 | pass |
-| crosstalk | False | True | 3 | fail |
+| crosstalk | False | True | 2 | fail |
 | fabrication tolerance | True | True | 2 | pass |
 
 ## Interpretation
 
-- Key turning papers: 8 total, 8 with access links, 4 with primary local sections, 4 with strong/moderate parser provenance, 4 with decision-grade current-contract evidence.
-- Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
+- Key turning papers: 8 total, 8 with access links, 2 with primary local sections, 2 with strong/moderate parser provenance, 2 with decision-grade current-contract evidence.
+- Future candidates: 4 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: full=1, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
 - Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
@@ -59,7 +59,9 @@
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | speckle | 100 | 3 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
-| missing_bottleneck_section_evidence | crosstalk | 100 | 3 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
+| missing_bottleneck_section_evidence | crosstalk | 100 | 2 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
+| key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

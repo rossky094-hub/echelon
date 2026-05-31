@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T06:43:57Z`
+- generated_at: `2026-05-31T07:01:22Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`
@@ -20,8 +20,8 @@
 - claim_cards_with_section_atom_chain_support: `5`
 - complete_claim_cards_with_section_atom_chain_support: `5`
 - claim_cards_with_full_decision_grade_chain: `5`
-- topic_gap_decision_grade_section_rate: `42.9%`
-- failed regression topics: `metasurface holography, photonic crystal cavity`
+- topic_gap_decision_grade_section_rate: `30.4%`
+- failed regression topics: `metasurface holography, photonic crystal cavity, quantum light source`
 
 ## Policy
 
@@ -41,16 +41,16 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step4 graph/subgraph evidence | `aligned` | `pass` | Create a bounded expensive-model evidence set while preserving full-graph product scope. | subgraph_nodes=5,000; subgraph_edges=38,538. | Keep Step10 full-graph/LOD path separate from Step4 bounded extraction support. |
 | Step5a citation function | `aligned` | `warn` | Label citation roles as weak/moderate evidence for fusion, not ground truth. | citation_function_edges=38,538; evidence remains weak without citation sentences. | Prefer deterministic weak labels now; add citation-context extraction before increasing weights. |
 | Step5b calibrated future candidate generator | `aligned` | `pass` | Generate future candidates from temporal evidence; never produce conclusions directly. | future_candidate_edges=1,000; calibration_audits=1. | Continue rolling held-out-year calibration and stratified external audit; do not expose VGAE as Radar claims. |
-| Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,029; topic_gap_decision_grade=42.9%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
+| Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,029; topic_gap_decision_grade=30.4%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
 | Step5s-a section atom search | `aligned` | `pass` | Split trusted sections into span-bound retrieval atoms with exact hard-evidence search and fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only. | section_atoms=61,708; decision_grade_atoms=11,505; exact_atom_fts=yes; fuzzy_atom_embeddings=61,708; retrieval_only_embeddings=61,708; GNN/VGAE must not atomize sections. | Feed exact hits and fuzzy candidate recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text. |
 | Step5s-b section atom typed chains | `aligned` | `pass` | Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning. | section_atom_chains=4,494; full_chains=6; decision_grade_chains=3; these chains are evidence substrate, not conclusions. | Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages. |
 | Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,462; exact_section_atoms=1,462; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
 | Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=5; high_confidence=0; chain_supported_cards=5; complete_chain_supported_cards=5; full_decision_grade_chain_cards=5; complete_typed_lineage_triples=24; partial_typed_lineage_triples=23,800; lineage_completeness={'sparse_stage_partial': 13232, 'constraint_failure_only': 6924, 'attempted_path_partial': 1372, 'local_fix_partial': 284, 'full': 24, 'resolution_candidate_partial': 1988}. | Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards can progress beyond exploratory status without weakening gates. |
 | Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |
-| Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,391; branch_lineages=5,278. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
+| Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,401; branch_lineages=5,276. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |
-| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=metasurface holography, photonic crystal cavity. | Prioritize multi-topic dossier failures over single-topic polish. |
+| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=metasurface holography, photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
 | Step12 / value delivery audit | `aligned` | `fail` | Enforce acceptance gates and keep weak evidence from becoming product claims. | evidence_policy depends on linked refs, topic-gap sections, calibration, Claim Cards, and multi-corpus gates. | Use this audit as the release stop/go gate; do not redefine success around passing subsets. |
 | quarterly / multi-corpus | `aligned` | `pass` | Preserve corpus-specific builds before cross-corpus bridge graph. | corpus_registry=1; corpus_snapshots=0. | Add per-corpus algorithm-logic audit before building cross-corpus bridge claims. |
 

@@ -432,6 +432,71 @@ def audit_branch_lineage(conn_v14: sqlite3.Connection, repo_root: Path | None = 
     }
 
 
+def future_visual_edge_contract_stats(conn_v14: sqlite3.Connection) -> dict[str, Any]:
+    if not table_exists(conn_v14, "visual_edges"):
+        return {"future_edges": 0, "bad_contract_edges": 0, "checked": False}
+    edge_cols = columns(conn_v14, "visual_edges")
+    if "edge_type" in edge_cols and "layer" in edge_cols:
+        where = "(edge_type = 'future_growth' OR layer = 'future')"
+    elif "edge_type" in edge_cols:
+        where = "edge_type = 'future_growth'"
+    elif "layer" in edge_cols:
+        where = "layer = 'future'"
+    else:
+        return {"future_edges": 0, "bad_contract_edges": 0, "checked": False}
+
+    future_edges = int(scalar(conn_v14, f"SELECT COUNT(*) FROM visual_edges WHERE {where}") or 0)
+    if future_edges <= 0:
+        return {"future_edges": 0, "bad_contract_edges": 0, "checked": True}
+    if "evidence_json" not in edge_cols:
+        return {"future_edges": future_edges, "bad_contract_edges": 0, "checked": False}
+
+    rows = conn_v14.execute(
+        f"""
+        SELECT evidence_json
+        FROM visual_edges
+        WHERE {where}
+        LIMIT 5000
+        """
+    ).fetchall()
+    bad = 0
+    examples: list[dict[str, Any]] = []
+    for row in rows:
+        evidence = _loads(row[0], {})
+        reasons = evidence.get("uncertainty_reasons")
+        required = evidence.get("required_evidence")
+        objects = evidence.get("evidence_objects")
+        bad_contract = (
+            evidence.get("claim_scope") != "candidate_pool_only"
+            or not evidence.get("evidence_grade")
+            or not isinstance(reasons, list)
+            or not required
+            or not objects
+            or evidence.get("candidate_score") is None
+            or bool(evidence.get("radar_eligible"))
+        )
+        if bad_contract:
+            bad += 1
+            if len(examples) < 5:
+                examples.append(
+                    {
+                        "claim_scope": evidence.get("claim_scope"),
+                        "evidence_grade": evidence.get("evidence_grade"),
+                        "has_uncertainty_reasons": isinstance(reasons, list),
+                        "has_required_evidence": bool(required),
+                        "has_evidence_objects": bool(objects),
+                        "has_candidate_score": evidence.get("candidate_score") is not None,
+                        "radar_eligible": bool(evidence.get("radar_eligible")),
+                    }
+                )
+    return {
+        "future_edges": future_edges,
+        "bad_contract_edges": bad,
+        "checked": True,
+        "examples": examples,
+    }
+
+
 def audit_future_growth(
     conn_v14: sqlite3.Connection,
     repo_root: Path | None = None,
@@ -440,6 +505,7 @@ def audit_future_growth(
     predicted = int(scalar(conn_v14, "SELECT COUNT(*) FROM predicted_future_edges") or 0) if table_exists(conn_v14, "predicted_future_edges") else 0
     calibration = int(scalar(conn_v14, "SELECT COUNT(*) FROM vgae_calibration_audit") or 0) if table_exists(conn_v14, "vgae_calibration_audit") else 0
     edge_calibration = future_edge_calibration_context(conn_v14)
+    future_visual_contract = future_visual_edge_contract_stats(conn_v14)
     lifecycle_counts: dict[str, int] = {}
     future_direction_count = 0
     future_direction_scope_counts: dict[str, int] = {}
@@ -820,7 +886,12 @@ def audit_future_growth(
             )
         ),
     }
-    if uncalibrated_promoted_directions or radar_eligible > 0 or not all(source_checks.values()):
+    if (
+        uncalibrated_promoted_directions
+        or radar_eligible > 0
+        or int(future_visual_contract.get("bad_contract_edges") or 0) > 0
+        or not all(source_checks.values())
+    ):
         status = "fail"
     elif calibration > 0 and high_conf_bad == 0:
         status = "pass"
@@ -849,10 +920,12 @@ def audit_future_growth(
         "uncalibrated_promoted_direction_claims": len(uncalibrated_promoted_directions),
         "uncalibrated_promoted_examples": uncalibrated_promoted_directions[:5],
         "radar_eligible_candidates": radar_eligible,
+        "future_visual_edge_contract": future_visual_contract,
         "bad_high_confidence_cards": high_conf_bad,
         "checks": {
             "run_level_calibration_required_for_direction_claims": not uncalibrated_promoted_directions,
             "raw_future_edges_not_radar_eligible": radar_eligible == 0,
+            "visual_future_edges_carry_contract": int(future_visual_contract.get("bad_contract_edges") or 0) == 0,
             "edge_level_calibration_not_confused_with_run_audit": not (
                 predicted > 0
                 and edge_calibration.get("edge_calibrated_candidates", 0) > 0

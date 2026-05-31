@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-31T06:44:00Z`
+- Audit: `2026-05-31T06:58:33Z`
 - Topic: `metalens`
 - Overall status: **warn**
 
@@ -46,7 +46,7 @@
 ## Interpretation
 
 - Key turning papers: 13 total, 13 with access links, 8 with primary local sections, 8 with strong/moderate parser provenance, 8 with decision-grade current-contract evidence.
-- Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
+- Future candidates: 4 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
 - Bottleneck lineage contracts: full=1, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
 - Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
@@ -66,4 +66,4 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| future_candidates_missing_claim_card |  | 85 | 4 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 122,123,124,125,126 |
+| future_candidates_missing_claim_card |  | 85 | 5 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 122,123,124,125,126 |
