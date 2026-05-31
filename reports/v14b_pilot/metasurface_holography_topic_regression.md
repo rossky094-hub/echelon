@@ -1,6 +1,6 @@
 # Metasurface Holography Topic Regression
 
-- Audit: `2026-05-31T08:03:57Z`
+- Audit: `2026-05-31T08:16:32Z`
 - Topic: `metasurface holography`
 - Overall status: **fail**
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | expected branches found | 1.00 | 1.0 | pass |
 | branches with driver papers | 4 | 3 | pass |
-| expected bottlenecks evidenced | 3 | 5 | fail |
+| expected bottlenecks evidenced | 4 | 5 | fail |
 | key turning papers | 8 | 4 | pass |
 | turning papers with access links | 8 | 3 | pass |
 | turning papers with primary sections | 2 | 2 | pass |
@@ -35,7 +35,7 @@
 | Bottleneck | Evidence | Branch Hypothesis | Candidate Papers | Status |
 | --- | --- | --- | ---: | --- |
 | efficiency | True | True | 3 | pass |
-| speckle | False | True | 3 | fail |
+| speckle | True | True | 3 | pass |
 | field of view | True | True | 3 | pass |
 | crosstalk | False | True | 2 | fail |
 | fabrication tolerance | True | True | 2 | pass |
@@ -58,7 +58,6 @@
 
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
-| missing_bottleneck_section_evidence | speckle | 100 | 3 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
 | missing_bottleneck_section_evidence | crosstalk | 100 | 2 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
@@ -66,4 +65,4 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| future_candidates_missing_claim_card |  | 85 | 4 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 122,123,124,125,126 |
+| future_candidates_missing_claim_card |  | 85 | 4 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 127,128,129,130,131 |

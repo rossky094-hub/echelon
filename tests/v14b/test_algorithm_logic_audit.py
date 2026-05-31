@@ -75,7 +75,14 @@ def _make_v14(path: Path) -> None:
         CREATE TABLE subgraph_edges (citation_function TEXT);
         CREATE TABLE predicted_future_edges (src_paper_id TEXT, dst_paper_id TEXT);
         CREATE TABLE vgae_calibration_audit (method TEXT);
-        CREATE TABLE limitation_atoms (paper_id TEXT);
+        CREATE TABLE limitation_atoms (
+            paper_id TEXT,
+            source_section_name TEXT,
+            source_section_atom_id TEXT,
+            source_parser_contract_version TEXT,
+            source_section_atom_chain_id TEXT,
+            evidence_quality TEXT
+        );
         CREATE TABLE limitation_resolutions (atom_id INTEGER);
         CREATE TABLE fusion_evidence_audit (run_id TEXT);
         CREATE TABLE future_directions (direction_id INTEGER);
@@ -106,7 +113,17 @@ def _make_v14(path: Path) -> None:
     conn.execute("INSERT INTO subgraph_edges VALUES ('background')")
     conn.execute("INSERT INTO predicted_future_edges VALUES ('p1', 'p2')")
     conn.execute("INSERT INTO vgae_calibration_audit VALUES ('rolling')")
-    conn.execute("INSERT INTO limitation_atoms VALUES ('p1')")
+    conn.execute(
+        "INSERT INTO limitation_atoms VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "discussion",
+            "sa1",
+            "v14b_section_parser_contract_v3_toc_guard",
+            "sac1",
+            "section_level",
+        ),
+    )
     conn.execute("INSERT INTO future_directions VALUES (1)")
     conn.execute(
         "INSERT INTO direction_claim_cards VALUES (?, ?, ?)",
@@ -195,6 +212,9 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert "Do not loosen parser" in md
     assert "resolution_candidate_partial" in md
     payload = json.loads((reports / "algorithm_logic_audit.json").read_text(encoding="utf-8"))
+    step5c = next(step for step in payload["steps"] if step["step"] == "Step5c limitation / resolution extraction")
+    assert step5c["algorithm_fit"] == "aligned"
+    assert "current_contract_typed_chain_atoms=1" in step5c["challenge"]
     step7 = next(step for step in payload["steps"] if step["step"] == "Step7 mutation")
     assert step7["algorithm_fit"] == "aligned"
     assert "mutation_hypotheses=1" in step7["challenge"]
@@ -211,6 +231,11 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert payload["metrics"]["claim_cards_with_section_atom_chain_support"] == 1
     assert payload["metrics"]["complete_claim_cards_with_section_atom_chain_support"] == 1
     assert payload["metrics"]["claim_cards_with_full_decision_grade_chain"] == 1
+    assert payload["metrics"]["limitation_section_atom_bridge_atoms"] == 1
+    assert payload["metrics"]["limitation_current_contract_atoms"] == 1
+    assert payload["metrics"]["limitation_typed_chain_atoms"] == 1
+    assert payload["metrics"]["limitation_current_contract_typed_chain_atoms"] == 1
+    assert payload["metrics"]["limitation_abstract_atoms"] == 0
     assert payload["metrics"]["mutation_hypotheses"] == 1
     assert payload["metrics"]["mutation_hypotheses_with_falsification"] == 1
     assert payload["metrics"]["mutation_hypotheses_with_evidence_contract"] == 1

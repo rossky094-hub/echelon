@@ -237,6 +237,21 @@ class TestExtractLimitationAtoms:
                 parser_contract_version TEXT,
                 source_delivery TEXT
             );
+            CREATE TABLE section_atom_chains (
+                chain_id TEXT PRIMARY KEY,
+                paper_id TEXT,
+                section_name TEXT,
+                section_key TEXT,
+                constraint_atom_id TEXT,
+                failure_mechanism_atom_id TEXT,
+                attempted_path_atom_id TEXT,
+                local_fix_atom_id TEXT,
+                new_constraint_atom_id TEXT,
+                typed_chain_complete INTEGER,
+                typed_chain_completeness TEXT,
+                evidence_grade TEXT,
+                claim_scope TEXT
+            );
             """
         )
         conn_main.execute(
@@ -260,6 +275,24 @@ class TestExtractLimitationAtoms:
                 "local_raw_pdf_cache",
             ),
         )
+        conn_main.execute(
+            "INSERT INTO section_atom_chains VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "sac1",
+                "p1",
+                "Discussion",
+                "discussion",
+                "sa1",
+                "sa_failure",
+                "sa_attempt",
+                None,
+                None,
+                0,
+                "attempted_path_partial",
+                "partial_typed_section_lineage",
+                "exploratory_bottleneck_lineage",
+            ),
+        )
         conn_main.commit()
 
         conn_v14 = sqlite3.connect(":memory:")
@@ -281,6 +314,9 @@ class TestExtractLimitationAtoms:
         assert atoms[0]["extractor_method"] == "section_atom_bridge"
         assert atoms[0]["source_section_atom_id"] == "sa1"
         assert atoms[0]["source_section_atom_evidence_grade"] == "section_atom_decision_grade"
+        assert atoms[0]["source_section_atom_chain_id"] == "sac1"
+        assert atoms[0]["source_typed_chain_completeness"] == "attempted_path_partial"
+        assert atoms[0]["source_typed_chain_evidence_grade"] == "partial_typed_section_lineage"
         assert atoms[0]["source_storage_uri"].endswith("/p1.pdf")
         assert atoms[0]["source_page_start"] == 4
         assert atoms[0]["evidence_quality"] == "section_level"

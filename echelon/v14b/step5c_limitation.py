@@ -40,6 +40,7 @@ from echelon.v14b.config import (
     LIMIT,
 )
 from echelon.v14b.db_schema import get_v14b_conn, upsert_step_meta
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 from echelon.v14b.llm_client import LLMClient
 from echelon.v14b.utils import (
     setup_logging, Checkpoint, add_common_args, make_progress
@@ -65,7 +66,23 @@ SECTION_ATOM_GRADE_WEIGHT = {
     "section_atom_weak": 0.52,
 }
 
-SECTION_ATOM_BRIDGE_VERSION = "section_atom_bridge_v6_strict_attach_filter"
+SECTION_ATOM_BRIDGE_VERSION = "section_atom_bridge_v7_chain_aware"
+
+MODERATE_PARTIAL_CHAIN_COMPLETENESS = {
+    "constraint_failure_only",
+    "attempted_path_partial",
+    "local_fix_partial",
+    "resolution_candidate_partial",
+    "validated_resolution_partial",
+}
+
+SECTION_ATOM_CHAIN_ID_COLUMNS = (
+    "constraint_atom_id",
+    "failure_mechanism_atom_id",
+    "attempted_path_atom_id",
+    "local_fix_atom_id",
+    "new_constraint_atom_id",
+)
 
 SECTION_ATOM_BRIDGE_TERMS = re.compile(
     r"\b(limitations?|limited|limits|limiting|challenge[sd]?|bottleneck|drawback|constraint|"
@@ -97,6 +114,11 @@ LIMITATION_ATOM_PROVENANCE_COLUMNS = {
     "source_section_atom_id": "TEXT",
     "source_section_atom_type": "TEXT",
     "source_section_atom_evidence_grade": "TEXT",
+    "source_section_atom_chain_id": "TEXT",
+    "source_typed_chain_complete": "INTEGER",
+    "source_typed_chain_completeness": "TEXT",
+    "source_typed_chain_evidence_grade": "TEXT",
+    "source_typed_chain_claim_scope": "TEXT",
     "source_storage_uri": "TEXT",
     "source_page_start": "INTEGER",
     "source_page_end": "INTEGER",
@@ -170,6 +192,12 @@ def ensure_limitation_atom_provenance_schema(conn_v14: sqlite3.Connection) -> No
         """
         CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
         ON limitation_atoms (source_section_atom_id)
+        """
+    )
+    conn_v14.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom_chain
+        ON limitation_atoms (source_section_atom_chain_id)
         """
     )
     conn_v14.commit()
@@ -403,6 +431,7 @@ def _attach_section_atom_limitations(conn_main: sqlite3.Connection, papers: list
         (*ids, *sorted(SECTION_ATOM_LIMITATION_TYPES)),
     ).fetchall()
     by_paper: dict[str, list[dict[str, Any]]] = {}
+    chain_by_atom = _section_atom_chain_lookup(conn_main, ids)
     for row in rows:
         atom_text = re.sub(r"\s+", " ", str(row["atom_text"] or "")).strip()
         if not _is_section_atom_bridge_candidate(atom_text):
@@ -413,6 +442,9 @@ def _attach_section_atom_limitations(conn_main: sqlite3.Connection, papers: list
             continue
         item = dict(row)
         item["atom_text"] = atom_text
+        chain_meta = chain_by_atom.get(str(item.get("atom_id") or ""))
+        if chain_meta:
+            item.update(chain_meta)
         bucket.append(item)
     for paper in papers:
         atoms = by_paper.get(str(paper.get("id") or ""))
@@ -425,6 +457,79 @@ def _attach_section_atom_limitations(conn_main: sqlite3.Connection, papers: list
             SECTION_ATOM_GRADE_WEIGHT.get(str(atom.get("evidence_grade") or ""), 0.52)
             for atom in atoms
         )
+
+
+def _section_atom_chain_lookup(
+    conn_main: sqlite3.Connection,
+    paper_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    if not paper_ids or not _table_exists(conn_main, "section_atom_chains"):
+        return {}
+    cols = _columns(conn_main, "section_atom_chains")
+    required = {
+        "chain_id",
+        "paper_id",
+        "typed_chain_complete",
+        "typed_chain_completeness",
+        "evidence_grade",
+        "claim_scope",
+    }
+    stage_cols = [col for col in SECTION_ATOM_CHAIN_ID_COLUMNS if col in cols]
+    if not required <= cols or not stage_cols:
+        return {}
+    placeholders = ",".join("?" * len(paper_ids))
+    rows = conn_main.execute(
+        f"""
+        SELECT chain_id, paper_id, typed_chain_complete,
+               typed_chain_completeness, evidence_grade, claim_scope,
+               {", ".join(stage_cols)}
+        FROM section_atom_chains
+        WHERE paper_id IN ({placeholders})
+        """,
+        paper_ids,
+    ).fetchall()
+    out: dict[str, dict[str, Any]] = {}
+    priorities: dict[str, tuple[int, int]] = {}
+    for row in rows:
+        meta = dict(row)
+        chain_meta = {
+            "source_section_atom_chain_id": str(meta.get("chain_id") or ""),
+            "source_typed_chain_complete": int(meta.get("typed_chain_complete") or 0),
+            "source_typed_chain_completeness": str(meta.get("typed_chain_completeness") or ""),
+            "source_typed_chain_evidence_grade": str(meta.get("evidence_grade") or ""),
+            "source_typed_chain_claim_scope": str(meta.get("claim_scope") or ""),
+        }
+        priority = _section_atom_chain_priority(chain_meta)
+        for col in stage_cols:
+            atom_id = str(meta.get(col) or "")
+            if not atom_id:
+                continue
+            if atom_id not in out or priority > priorities.get(atom_id, (0, 0)):
+                out[atom_id] = chain_meta
+                priorities[atom_id] = priority
+    return out
+
+
+def _section_atom_chain_priority(chain_meta: dict[str, Any]) -> tuple[int, int]:
+    grade = str(chain_meta.get("source_typed_chain_evidence_grade") or "")
+    completeness = str(chain_meta.get("source_typed_chain_completeness") or "")
+    grade_rank = {
+        "typed_section_lineage": 5,
+        "typed_section_lineage_traced": 4,
+        "partial_typed_section_lineage": 3,
+        "weak_typed_section_lineage": 2,
+        "weak_partial_typed_section_lineage": 1,
+    }.get(grade, 0)
+    completeness_rank = {
+        "full": 5,
+        "validated_resolution_partial": 4,
+        "resolution_candidate_partial": 3,
+        "local_fix_partial": 3,
+        "attempted_path_partial": 2,
+        "constraint_failure_only": 1,
+        "sparse_stage_partial": 0,
+    }.get(completeness, 0)
+    return grade_rank, completeness_rank
 
 
 # ---------------------------------------------------------------------------
@@ -513,7 +618,7 @@ def section_atom_limitation_atoms(paper: dict) -> list[dict]:
             continue
         seen.add(key)
         evidence_grade = str(raw.get("evidence_grade") or "section_atom_weak")
-        weight = SECTION_ATOM_GRADE_WEIGHT.get(evidence_grade, 0.52)
+        weight = _section_atom_limitation_weight(raw)
         out.append(
             {
                 "paper_id": paper["id"],
@@ -528,6 +633,11 @@ def section_atom_limitation_atoms(paper: dict) -> list[dict]:
                 "source_section_atom_id": source_atom_id,
                 "source_section_atom_type": atom_type,
                 "source_section_atom_evidence_grade": evidence_grade,
+                "source_section_atom_chain_id": raw.get("source_section_atom_chain_id"),
+                "source_typed_chain_complete": raw.get("source_typed_chain_complete"),
+                "source_typed_chain_completeness": raw.get("source_typed_chain_completeness"),
+                "source_typed_chain_evidence_grade": raw.get("source_typed_chain_evidence_grade"),
+                "source_typed_chain_claim_scope": raw.get("source_typed_chain_claim_scope"),
                 "source_storage_uri": raw.get("source_storage_uri") or "",
                 "source_page_start": raw.get("page_start"),
                 "source_page_end": raw.get("page_end"),
@@ -537,6 +647,24 @@ def section_atom_limitation_atoms(paper: dict) -> list[dict]:
         if len(out) >= LIMITATION_MAX_ATOMS_PER_PAPER:
             break
     return out
+
+
+def _section_atom_limitation_weight(atom: dict[str, Any]) -> float:
+    evidence_grade = str(atom.get("evidence_grade") or "section_atom_weak")
+    base = SECTION_ATOM_GRADE_WEIGHT.get(evidence_grade, 0.52)
+    parser_contract = str(atom.get("parser_contract_version") or "legacy_unknown_contract")
+    if parser_contract != SECTION_PARSER_CONTRACT_VERSION:
+        return min(base, 0.60)
+
+    chain_grade = str(atom.get("source_typed_chain_evidence_grade") or "")
+    chain_completeness = str(atom.get("source_typed_chain_completeness") or "")
+    if chain_grade == "typed_section_lineage":
+        return max(base, 0.94)
+    if chain_grade == "typed_section_lineage_traced":
+        return max(base, 0.88)
+    if chain_grade == "partial_typed_section_lineage" and chain_completeness in MODERATE_PARTIAL_CHAIN_COMPLETENESS:
+        return max(base, 0.82)
+    return base
 
 
 def _is_section_atom_bridge_candidate(text: str) -> bool:
@@ -673,6 +801,11 @@ def write_atoms(conn_v14: sqlite3.Connection, atoms: List[dict]) -> List[int]:
             "source_section_atom_id": atom.get("source_section_atom_id"),
             "source_section_atom_type": atom.get("source_section_atom_type"),
             "source_section_atom_evidence_grade": atom.get("source_section_atom_evidence_grade"),
+            "source_section_atom_chain_id": atom.get("source_section_atom_chain_id"),
+            "source_typed_chain_complete": atom.get("source_typed_chain_complete"),
+            "source_typed_chain_completeness": atom.get("source_typed_chain_completeness"),
+            "source_typed_chain_evidence_grade": atom.get("source_typed_chain_evidence_grade"),
+            "source_typed_chain_claim_scope": atom.get("source_typed_chain_claim_scope"),
             "source_storage_uri": atom.get("source_storage_uri"),
             "source_page_start": atom.get("source_page_start"),
             "source_page_end": atom.get("source_page_end"),

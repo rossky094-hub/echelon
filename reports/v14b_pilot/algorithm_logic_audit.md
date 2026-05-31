@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T08:04:00Z`
+- generated_at: `2026-05-31T08:16:35Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`
@@ -12,11 +12,16 @@
 - section_atom_chains: `4,494`
 - section_atom_chain_full: `6`
 - section_atom_chain_decision_grade: `3`
-- limitation_exact_section_atoms: `1,462`
+- limitation_exact_section_atoms: `772`
 - limitation_aggregate_section_atoms: `0`
+- limitation_section_atom_bridge_atoms: `389`
+- limitation_current_contract_atoms: `317`
+- limitation_typed_chain_atoms: `245`
+- limitation_current_contract_typed_chain_atoms: `196`
+- limitation_abstract_atoms: `0`
 - complete_typed_lineage_triples: `24`
-- partial_typed_lineage_triples: `23,800`
-- lineage_completeness_counts: `{"attempted_path_partial": 1372, "constraint_failure_only": 6924, "full": 24, "local_fix_partial": 284, "resolution_candidate_partial": 1988, "sparse_stage_partial": 13232}`
+- partial_typed_lineage_triples: `21,040`
+- lineage_completeness_counts: `{"attempted_path_partial": 1372, "constraint_failure_only": 6152, "full": 24, "local_fix_partial": 284, "sparse_stage_partial": 13232}`
 - claim_cards_with_section_atom_chain_support: `5`
 - complete_claim_cards_with_section_atom_chain_support: `5`
 - claim_cards_with_full_decision_grade_chain: `5`
@@ -47,9 +52,9 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,029; topic_gap_decision_grade=30.4%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
 | Step5s-a section atom search | `aligned` | `pass` | Split trusted sections into span-bound retrieval atoms with exact hard-evidence search and fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only. | section_atoms=61,708; decision_grade_atoms=11,505; exact_atom_fts=yes; fuzzy_atom_embeddings=61,708; retrieval_only_embeddings=61,708; GNN/VGAE must not atomize sections. | Feed exact hits and fuzzy candidate recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text. |
 | Step5s-b section atom typed chains | `aligned` | `pass` | Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning. | section_atom_chains=4,494; full_chains=6; decision_grade_chains=3; these chains are evidence substrate, not conclusions. | Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages. |
-| Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,462; exact_section_atoms=1,462; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
+| Step5c limitation / resolution extraction | `aligned` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=772; exact_section_atoms=772; aggregate_section_atoms=0; section_atom_bridge_atoms=389; current_contract_atoms=317; typed_chain_atoms=245; current_contract_typed_chain_atoms=196; abstract_atoms=0; section coverage is still the limiting input. | Use Step5c limitation atoms as section-atom/typed-chain evidence; keep abstract fallback disabled for claims. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
-| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=5; high_confidence=0; chain_supported_cards=5; complete_chain_supported_cards=5; full_decision_grade_chain_cards=5; complete_typed_lineage_triples=24; partial_typed_lineage_triples=23,800; lineage_completeness={'sparse_stage_partial': 13232, 'constraint_failure_only': 6924, 'attempted_path_partial': 1372, 'local_fix_partial': 284, 'full': 24, 'resolution_candidate_partial': 1988}. | Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards can progress beyond exploratory status without weakening gates. |
+| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=5; high_confidence=0; chain_supported_cards=5; complete_chain_supported_cards=5; full_decision_grade_chain_cards=5; complete_typed_lineage_triples=24; partial_typed_lineage_triples=21,040; lineage_completeness={'sparse_stage_partial': 13232, 'constraint_failure_only': 6152, 'attempted_path_partial': 1372, 'local_fix_partial': 284, 'full': 24}. | Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards can progress beyond exploratory status without weakening gates. |
 | Step7 mutation | `aligned` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | mutation_hypotheses=5; with_falsification=5; with_evidence_contract=5. Legacy red/orange/purple node flags remain graph-inspection signals only. | Use mutation_hypotheses as falsifiable follow-up actions; do not promote visual flags into claims. |
 | Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,401; branch_lineages=5,276. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |
@@ -74,7 +79,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5s section evidence | OA PDFs and prioritized topic/claim/branch queues. | Current-contract decision-grade primary section rows plus failure taxonomy. | No section coverage for key papers means no high-confidence bottleneck/Claim Card. |
 | Step5s-a section atom search | paper_sections with parser contract, extraction provenance, pages, and raw-PDF storage URI when available. | section_atoms plus FTS/BM25 hard-evidence hits and atom embeddings labeled retrieval_context_only. | Exact atom hits can seed evidence work; fuzzy hits are candidate recall only and cannot become scientific conclusions without typed chains and promotion gates. |
 | Step5s-b section atom typed chains | section_atoms with atom_type, section order, parser contract, pages, and source URI. | section_atom_chains carrying typed_chain_completeness, evidence objects, claim_scope, and uncertainty reasons. | Partial chains are exploratory context only; full chains still require Step13 Claim Card promotion. |
-| Step5c limitation / resolution extraction | Decision-grade sections first, weak abstract metadata only as scoped fallback. | Typed limitations/resolutions with evidence source, section, and weight. | Abstract-only bottlenecks cannot support high-confidence Claim Cards. |
+| Step5c limitation / resolution extraction | Current-contract section atoms and typed chains first, weak abstract metadata only as scoped fallback. | Typed limitations/resolutions with section atom, typed-chain, parser-contract, and weight provenance. | Abstract-only bottlenecks cannot support high-confidence Claim Cards. |
 | Step6 fusion | Main path terminals, calibrated future candidates, limitations, field/topic context. | Future directions with evidence tier, claim scope, and adequacy label. | Sparse fusion should output few/zero directions instead of placeholders. |
 | Step13 first-principles + Claim Card engine | Fused directions, bottleneck lineage, section evidence, calibration, and history. | Five-question Claim Cards with evidence objects and uncertainty reasons. | Incomplete cards stay candidate pool; Radar main view requires complete cards. |
 | Step7 mutation | Claim-card candidates and graph/section constraints. | Mutation hypotheses scoped to candidate pool with inherited evidence contracts. | Mutation outputs must inherit evidence grade and falsification conditions. |

@@ -25,6 +25,7 @@ from echelon.v14b.direction_readiness_audit import (
     select_section_frontfill_state,
     table_exists,
 )
+from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 from echelon.v14b.topic_gap_no_target_inspection import load_topic_gap_no_target_inspection_state
 from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 
@@ -212,6 +213,40 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
             {"source_section_name"},
             "COALESCE(source_section_name, '') LIKE '%,%'",
         )
+        metrics["limitation_section_atom_bridge_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"source_section_atom_id"},
+            "COALESCE(source_section_atom_id, '') != ''",
+        )
+        metrics["limitation_current_contract_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"source_parser_contract_version"},
+            f"source_parser_contract_version = '{SECTION_PARSER_CONTRACT_VERSION}'",
+        )
+        metrics["limitation_typed_chain_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"source_section_atom_chain_id"},
+            "COALESCE(source_section_atom_chain_id, '') != ''",
+        )
+        metrics["limitation_current_contract_typed_chain_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {
+                "source_section_atom_chain_id",
+                "source_parser_contract_version",
+            },
+            "COALESCE(source_section_atom_chain_id, '') != '' "
+            f"AND source_parser_contract_version = '{SECTION_PARSER_CONTRACT_VERSION}'",
+        )
+        metrics["limitation_abstract_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"evidence_quality"},
+            "COALESCE(evidence_quality, '') = 'weak_abstract'",
+        )
         metrics["bottleneck_triples"] = _count(v14, "bottleneck_lineage_triples")
         metrics.update(_lineage_completeness_counts(v14))
         metrics.update(_claim_card_chain_support_counts(v14))
@@ -261,6 +296,19 @@ def build_algorithm_logic_audit(
     limitation_atoms = int(m.get("limitation_atoms") or 0)
     limitation_exact_section_atoms = int(m.get("limitation_exact_section_atoms") or 0)
     limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
+    limitation_section_atom_bridge_atoms = int(m.get("limitation_section_atom_bridge_atoms") or 0)
+    limitation_current_contract_atoms = int(m.get("limitation_current_contract_atoms") or 0)
+    limitation_typed_chain_atoms = int(m.get("limitation_typed_chain_atoms") or 0)
+    limitation_current_contract_typed_chain_atoms = int(
+        m.get("limitation_current_contract_typed_chain_atoms") or 0
+    )
+    limitation_abstract_atoms = int(m.get("limitation_abstract_atoms") or 0)
+    limitation_chain_contract_ready = (
+        limitation_atoms > 0
+        and limitation_aggregate_section_atoms == 0
+        and limitation_current_contract_typed_chain_atoms > 0
+        and limitation_abstract_atoms == 0
+    )
     complete_typed_lineage_triples = int(m.get("complete_typed_lineage_triples") or 0)
     partial_typed_lineage_triples = int(m.get("partial_typed_lineage_triples") or 0)
     lineage_completeness_counts = dict(m.get("lineage_completeness_counts") or {})
@@ -452,20 +500,27 @@ def build_algorithm_logic_audit(
         StepAudit(
             "Step5c limitation / resolution extraction",
             "Extract unresolved constraints and resolution attempts from trusted sections.",
-            "Decision-grade sections first, weak abstract metadata only as scoped fallback.",
-            "Typed limitations/resolutions with evidence source, section, and weight.",
+            "Current-contract section atoms and typed chains first, weak abstract metadata only as scoped fallback.",
+            "Typed limitations/resolutions with section atom, typed-chain, parser-contract, and weight provenance.",
             "Abstract-only bottlenecks cannot support high-confidence Claim Cards.",
-            "needs_tuning",
+            "aligned" if limitation_chain_contract_ready else "needs_tuning",
             "fail" if not limitation_atoms else ("fail" if limitation_aggregate_section_atoms else "warn"),
             (
                 f"limitation_atoms={limitation_atoms:,}; exact_section_atoms={limitation_exact_section_atoms:,}; "
-                f"aggregate_section_atoms={limitation_aggregate_section_atoms:,}; section coverage is still the limiting input."
+                f"aggregate_section_atoms={limitation_aggregate_section_atoms:,}; "
+                f"section_atom_bridge_atoms={limitation_section_atom_bridge_atoms:,}; "
+                f"current_contract_atoms={limitation_current_contract_atoms:,}; "
+                f"typed_chain_atoms={limitation_typed_chain_atoms:,}; "
+                f"current_contract_typed_chain_atoms={limitation_current_contract_typed_chain_atoms:,}; "
+                f"abstract_atoms={limitation_abstract_atoms:,}; section coverage is still the limiting input."
             ),
             (
                 "Re-run Step5c after section-source traceability repair; then retune toward typed chains from "
                 "current-contract sections and keep abstract fallback low scope."
                 if limitation_aggregate_section_atoms else
-                "Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope."
+                "Run Step5c after section atom chains so limitation atoms inherit current-contract typed-chain provenance."
+                if not limitation_chain_contract_ready else
+                "Use Step5c limitation atoms as section-atom/typed-chain evidence; keep abstract fallback disabled for claims."
             ),
         ),
         StepAudit(
@@ -601,6 +656,11 @@ def build_algorithm_logic_audit(
             "limitation_atoms": limitation_atoms,
             "limitation_exact_section_atoms": limitation_exact_section_atoms,
             "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
+            "limitation_section_atom_bridge_atoms": limitation_section_atom_bridge_atoms,
+            "limitation_current_contract_atoms": limitation_current_contract_atoms,
+            "limitation_typed_chain_atoms": limitation_typed_chain_atoms,
+            "limitation_current_contract_typed_chain_atoms": limitation_current_contract_typed_chain_atoms,
+            "limitation_abstract_atoms": limitation_abstract_atoms,
             "complete_typed_lineage_triples": complete_typed_lineage_triples,
             "partial_typed_lineage_triples": partial_typed_lineage_triples,
             "lineage_completeness_counts": lineage_completeness_counts,
@@ -649,6 +709,11 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- section_atom_chain_decision_grade: `{int(result['metrics']['section_atom_chain_decision_grade']):,}`",
         f"- limitation_exact_section_atoms: `{int(result['metrics']['limitation_exact_section_atoms']):,}`",
         f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
+        f"- limitation_section_atom_bridge_atoms: `{int(result['metrics']['limitation_section_atom_bridge_atoms']):,}`",
+        f"- limitation_current_contract_atoms: `{int(result['metrics']['limitation_current_contract_atoms']):,}`",
+        f"- limitation_typed_chain_atoms: `{int(result['metrics']['limitation_typed_chain_atoms']):,}`",
+        f"- limitation_current_contract_typed_chain_atoms: `{int(result['metrics']['limitation_current_contract_typed_chain_atoms']):,}`",
+        f"- limitation_abstract_atoms: `{int(result['metrics']['limitation_abstract_atoms']):,}`",
         f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
         f"- partial_typed_lineage_triples: `{int(result['metrics']['partial_typed_lineage_triples']):,}`",
         f"- lineage_completeness_counts: `{json.dumps(result['metrics'].get('lineage_completeness_counts') or {}, ensure_ascii=False, sort_keys=True)}`",

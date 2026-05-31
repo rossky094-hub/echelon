@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-31T08:03:56Z`
+- Audit: `2026-05-31T08:16:31Z`
 - Topic: `metalens`
 - Overall status: **warn**
 
@@ -66,4 +66,4 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
-| future_candidates_missing_claim_card |  | 85 | 5 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 122,123,124,125,126 |
+| future_candidates_missing_claim_card |  | 85 | 5 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 127,128,129,130,131 |

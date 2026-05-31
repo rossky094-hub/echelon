@@ -267,6 +267,11 @@ CREATE TABLE IF NOT EXISTS limitation_atoms (
     source_section_atom_id TEXT,
     source_section_atom_type TEXT,
     source_section_atom_evidence_grade TEXT,
+    source_section_atom_chain_id TEXT,
+    source_typed_chain_complete INTEGER,
+    source_typed_chain_completeness TEXT,
+    source_typed_chain_evidence_grade TEXT,
+    source_typed_chain_claim_scope TEXT,
     source_storage_uri TEXT,
     source_page_start INTEGER,
     source_page_end INTEGER,
@@ -555,6 +560,11 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
                 source_section_atom_id TEXT,
                 source_section_atom_type TEXT,
                 source_section_atom_evidence_grade TEXT,
+                source_section_atom_chain_id TEXT,
+                source_typed_chain_complete INTEGER,
+                source_typed_chain_completeness TEXT,
+                source_typed_chain_evidence_grade TEXT,
+                source_typed_chain_claim_scope TEXT,
                 source_storage_uri TEXT,
                 source_page_start INTEGER,
                 source_page_end INTEGER,
@@ -566,7 +576,9 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS idx_limitation_atoms_severity
                 ON limitation_atoms (severity);
             CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
-                ON limitation_atoms (source_section_atom_id)
+                ON limitation_atoms (source_section_atom_id);
+            CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom_chain
+                ON limitation_atoms (source_section_atom_chain_id)
         """),
         ("limitation_resolutions", "resolver_paper_id", """
             DROP TABLE IF EXISTS limitation_resolutions;
@@ -672,6 +684,11 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
         ("source_section_atom_id", "TEXT", None),
         ("source_section_atom_type", "TEXT", None),
         ("source_section_atom_evidence_grade", "TEXT", None),
+        ("source_section_atom_chain_id", "TEXT", None),
+        ("source_typed_chain_complete", "INTEGER", None),
+        ("source_typed_chain_completeness", "TEXT", None),
+        ("source_typed_chain_evidence_grade", "TEXT", None),
+        ("source_typed_chain_claim_scope", "TEXT", None),
         ("source_storage_uri", "TEXT", None),
         ("source_page_start", "INTEGER", None),
         ("source_page_end", "INTEGER", None),
@@ -682,6 +699,10 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
     _run_ddl_fragment(conn, """
         CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
             ON limitation_atoms (source_section_atom_id)
+    """)
+    _run_ddl_fragment(conn, """
+        CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom_chain
+            ON limitation_atoms (source_section_atom_chain_id)
     """)
 
     for col, ddl_type in (
