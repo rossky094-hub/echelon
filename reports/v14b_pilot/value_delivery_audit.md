@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T10:34:12Z`
+- generated_at: `2026-05-31T10:52:44Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 465,
+    "section_frontfill_done": 485,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 465,
+    "section_frontfill_progress_done": 485,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 665,
-      "current_contract_rate": 0.21947194719471946,
-      "decision_grade_papers": 661,
-      "decision_grade_rate": 0.21815181518151816,
+      "current_contract_papers": 685,
+      "current_contract_rate": 0.22607260726072606,
+      "decision_grade_papers": 681,
+      "decision_grade_rate": 0.22475247524752476,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1385,
-        "weak": 1645
+        "strong": 1402,
+        "weak": 1628
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4146,
-        "v14b_section_parser_contract_v3_toc_guard": 1498
+        "legacy_unknown_contract": 4115,
+        "v14b_section_parser_contract_v3_toc_guard": 1546
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4146,
-        "v14b_section_ingest_v3": 1498
+        "v14b_section_ingest_v2": 4115,
+        "v14b_section_ingest_v3": 1546
       },
       "primary_section_papers": 3030,
-      "primary_section_rows": 5644,
+      "primary_section_rows": 5661,
       "strategy_counts": {
         "embedded_heading": 57,
-        "explicit_heading": 2129,
-        "heading_continuation": 2722,
-        "inline_heading": 791,
-        "legacy_unknown_strategy": 2833,
+        "explicit_heading": 2162,
+        "heading_continuation": 2763,
+        "inline_heading": 805,
+        "legacy_unknown_strategy": 2808,
         "loose_inline_heading": 44,
-        "parser_hint": 65,
+        "parser_hint": 67,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1385,
-      "weak_only_papers": 1645,
-      "weak_only_rate": 0.5429042904290429
+      "strong_or_moderate_papers": 1402,
+      "weak_only_papers": 1628,
+      "weak_only_rate": 0.5372937293729373
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -575,6 +575,7 @@
     "section-queue-audit",
     "topic-gap-section-audit",
     "topic-gap-repair-plan",
+    "topic-gap-stage-candidate-recall",
     "topic-gap-no-target-inspect",
     "cited-work-backfill-queue",
     "raw-pdf-store-audit",
@@ -608,11 +609,13 @@
     "section-queue-audit",
     "topic-gap-section-audit",
     "topic-gap-repair-plan",
+    "topic-gap-stage-candidate-recall",
     "section-evidence-topic-gaps",
     "topic-regression",
     "section-queue-audit",
     "topic-gap-section-audit",
     "topic-gap-repair-plan",
+    "topic-gap-stage-candidate-recall",
     "direction-readiness-audit",
     "value-delivery-audit"
   ],
@@ -647,6 +650,7 @@
     "topic_gap_no_target_inspection_available_when_needed": true,
     "topic_gap_repair_plan_uses_closure_states": true,
     "topic_gap_section_triage_available_when_blocking": true,
+    "topic_gap_stage_candidate_recall_available": true,
     "topic_regression_avoids_gold_topic_aliases": true,
     "topic_regression_cli_defaults_to_suite": true,
     "topic_regression_exports_topic_dossier_repair_plan": true
@@ -662,8 +666,8 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_decision_grade_section_papers": 43,
-  "topic_gap_decision_grade_section_rate": 0.5512820512820513,
+  "topic_gap_decision_grade_section_papers": 45,
+  "topic_gap_decision_grade_section_rate": 0.5769230769230769,
   "topic_gap_no_target_inspection_available": true,
   "topic_gap_no_target_inspection_classifications": {
     "heading_like_but_not_target_section": 6,
@@ -679,21 +683,21 @@
   "topic_gap_repair_contract_closure_states": {
     "closed_decision_grade_section": 16,
     "closed_typed_chain_available": 1,
-    "open_section_evidence_not_decision_grade": 120,
+    "open_section_evidence_not_decision_grade": 118,
     "partial_atoms_available_no_chain": 12,
-    "partial_chain_incomplete": 66
+    "partial_chain_incomplete": 68
   },
   "topic_gap_repair_contracts": 215,
   "topic_gap_repair_contracts_closed": 17,
   "topic_gap_section_triage_available": true,
   "topic_gap_section_triage_failure_modes": {
     "current_contract_weak": 1,
-    "decision_grade_current_contract": 41,
+    "decision_grade_current_contract": 43,
     "lineage_chains_missing_after_atoms": 1,
     "lineage_full_chain_missing": 1,
     "no_target_sections_after_current_parser": 17,
     "no_target_sections_unknown_contract": 5,
-    "stale_parser_contract": 4,
+    "stale_parser_contract": 2,
     "unattempted_pdf_available": 8
   },
   "topic_gap_section_triage_status": "fail"

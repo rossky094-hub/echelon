@@ -1,11 +1,11 @@
 # Topic-Gap Repair Execution Plan
 
-- plan_ts: `2026-05-31T10:34:04Z`
+- plan_ts: `2026-05-31T10:51:22Z`
 - source_triage: `reports/v14b_pilot/topic_gap_section_evidence_audit.json`
 - status: `ready`
 - contracts: `215`; papers: `78`
 - quick-close contracts: `12`
-- local raw-PDF ingest contracts: `54`
+- local raw-PDF ingest contracts: `52`
 
 ## Execution Contract
 
@@ -19,8 +19,8 @@
 | group | contracts | papers | missing stages | command sequence |
 |---|---:|---:|---|---|
 | rebuild_section_atom_chains_quick_close | 12 | 8 | - | `make section-atom-chains`<br>`make topic-gap-section-audit`<br>`make topic-gap-repair-plan` |
-| targeted_local_raw_pdf_ingest_when_safe | 54 | 18 | - | `python scripts/guard_topic_gap_repair.py`<br>`make section-evidence-topic-gaps-local`<br>`make section-atoms`<br>`make section-atom-embeddings`<br>`make section-atom-chains`<br>`make topic-gap-section-audit`<br>`make topic-gap-repair-plan` |
-| inspect_typed_chain_stage_gaps | 66 | 31 | new_constraint:218, local_fix:179, failure_mechanism:124, attempted_path:94, constraint:54 | `inspect missing chain stages in reports/v14b_pilot/topic_gap_section_evidence_audit.csv`<br>`make section-atoms`<br>`make section-atom-chains`<br>`make topic-gap-section-audit`<br>`make topic-gap-repair-plan` |
+| targeted_local_raw_pdf_ingest_when_safe | 52 | 16 | - | `python scripts/guard_topic_gap_repair.py`<br>`make section-evidence-topic-gaps-local`<br>`make section-atoms`<br>`make section-atom-embeddings`<br>`make section-atom-chains`<br>`make topic-gap-section-audit`<br>`make topic-gap-repair-plan` |
+| inspect_typed_chain_stage_gaps | 68 | 33 | new_constraint:220, local_fix:180, failure_mechanism:124, attempted_path:94, constraint:56 | `make topic-gap-stage-candidate-recall`<br>`inspect missing chain stages in reports/v14b_pilot/topic_gap_section_evidence_audit.csv`<br>`make section-atoms`<br>`make section-atom-chains`<br>`make topic-gap-section-audit`<br>`make topic-gap-repair-plan` |
 | inspect_current_parser_no_target | 66 | 17 | - | `make topic-gap-no-target-inspect`<br>`make topic-gap-repair-plan` |
 | closed_waiting_step13_gate | 17 | 13 | - | `make post-frontfill-chain`<br>`make direction-readiness-audit`<br>`make value-delivery-audit` |
 

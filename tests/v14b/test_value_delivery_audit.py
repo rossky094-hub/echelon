@@ -227,7 +227,12 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "topic_gap_repair_plan.py").write_text(
         "closure_state partial_atoms_available_no_chain section-evidence-topic-gaps-local "
         "section-atom-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall "
-        "missing_stage_counts\n",
+        "typed_stage_candidate_recall missing_stage_counts\n",
+        encoding="utf-8",
+    )
+    (v14 / "topic_gap_stage_candidate_recall.py").write_text(
+        "missing_stage search_section_atoms search_section_atoms_fuzzy same_paper_candidate_hits "
+        "cross_paper_stage_examples retrieval_context_only candidate_recall_only_no_direct_promotion\n",
         encoding="utf-8",
     )
     (v14 / "topic_gap_section_evidence_audit.py").write_text(
@@ -451,6 +456,7 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
         "\t$(MAKE) topic-gap-repair-plan\n"
+        "\t$(MAKE) topic-gap-stage-candidate-recall\n"
         "\t$(MAKE) topic-gap-no-target-inspect\n"
         "\t$(MAKE) cited-work-backfill-queue\n"
         "\t$(MAKE) raw-pdf-store-audit\n"
@@ -464,15 +470,19 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
         "\t$(MAKE) topic-gap-repair-plan\n"
+        "\t$(MAKE) topic-gap-stage-candidate-recall\n"
         "\t$(MAKE) section-evidence-topic-gaps\n"
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
         "\t$(MAKE) topic-gap-repair-plan\n"
+        "\t$(MAKE) topic-gap-stage-candidate-recall\n"
         "\t$(MAKE) direction-readiness-audit\n"
         "\t$(MAKE) value-delivery-audit\n"
         "topic-gap-repair-plan:\n"
         "\tpython -m echelon.v14b.topic_gap_repair_plan --triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json\n"
+        "topic-gap-stage-candidate-recall:\n"
+        "\tpython -m echelon.v14b.topic_gap_stage_candidate_recall --triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json\n"
         "post-frontfill-chain:\n"
         "\tpython scripts/run_after_frontfill_product_chain.py\n"
         "## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow\n"

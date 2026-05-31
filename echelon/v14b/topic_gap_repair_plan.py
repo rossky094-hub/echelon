@@ -80,6 +80,7 @@ ACTION_GROUPS: dict[str, dict[str, Any]] = {
         "label": "Typed chains are partial; inspect missing stages",
         "rationale": "Evidence exists, but the bottleneck lineage is incomplete or topic-mismatched.",
         "command_sequence": [
+            "make topic-gap-stage-candidate-recall",
             "inspect missing chain stages in reports/v14b_pilot/topic_gap_section_evidence_audit.csv",
             "make section-atoms",
             "make section-atom-chains",
@@ -177,6 +178,7 @@ def execution_contract() -> dict[str, Any]:
             "section_atoms",
             "exact_fts_bm25",
             "atom_embeddings_fuzzy_recall",
+            "typed_stage_candidate_recall",
             "section_atom_chains",
             "Step5c_Step13_evidence_gates",
         ],
@@ -201,6 +203,10 @@ def execution_contract() -> dict[str, Any]:
         "dual_retrieval_layer": {
             "exact": "IDs, DOI, arXiv, title, section name, phrase query, and FTS/BM25 are hard retrieval evidence.",
             "fuzzy": "atom embeddings and section embeddings are fuzzy candidate recall only.",
+            "typed_stage_candidate_recall": (
+                "missing stage recall may suggest same-paper atoms and cross-paper templates, "
+                "but it cannot close repair contracts or promote conclusions."
+            ),
         },
         "graph_algorithm_layer": {
             "allowed_outputs": ["candidate expansion", "candidate ranking", "neighborhood discovery"],

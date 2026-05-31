@@ -2697,13 +2697,14 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     )
     pilot_full_context = legacy_contexts.get("pilot-full", "")
     product_chain_context = _make_target_context(makefile, "product-chain", before=0, after=14)
-    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=12)
-    topic_gap_repair_context = _make_target_context(makefile, "topic-gap-repair", before=0, after=14)
+    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=14)
+    topic_gap_repair_context = _make_target_context(makefile, "topic-gap-repair", before=0, after=16)
     decision_audit_targets = (
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
         "topic-gap-repair-plan",
+        "topic-gap-stage-candidate-recall",
         "topic-gap-no-target-inspect",
         "cited-work-backfill-queue",
         "raw-pdf-store-audit",
@@ -2717,11 +2718,13 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "section-queue-audit",
         "topic-gap-section-audit",
         "topic-gap-repair-plan",
+        "topic-gap-stage-candidate-recall",
         "section-evidence-topic-gaps",
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
         "topic-gap-repair-plan",
+        "topic-gap-stage-candidate-recall",
         "direction-readiness-audit",
         "value-delivery-audit",
     )
@@ -2879,6 +2882,7 @@ def audit_multi_topic_regression(
     section_atom_layer_prioritizes_typed_chain_stage_cues = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
+    topic_gap_stage_candidate_recall_available = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
@@ -2889,6 +2893,7 @@ def audit_multi_topic_regression(
         section_atom_chains_source = repo_root / "echelon/v14b/section_atom_chains.py"
         topic_gap_section_audit_source = repo_root / "echelon/v14b/topic_gap_section_evidence_audit.py"
         topic_gap_repair_plan_source = repo_root / "echelon/v14b/topic_gap_repair_plan.py"
+        topic_gap_stage_candidate_recall_source = repo_root / "echelon/v14b/topic_gap_stage_candidate_recall.py"
         step13_source = repo_root / "echelon/v14b/step13_first_principles_history.py"
         makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
@@ -3023,6 +3028,7 @@ def audit_multi_topic_regression(
                     "no_direct_promotion",
                     "GNN/VGAE atom generation",
                     "fuzzy vector recall",
+                    "typed_stage_candidate_recall",
                     "missing_stage_counts",
                 ),
             )
@@ -3040,6 +3046,28 @@ def audit_multi_topic_regression(
                     "topic-gap-repair-plan:",
                     "echelon.v14b.topic_gap_repair_plan",
                     "topic_gap_section_evidence_audit.json",
+                ),
+            )
+        )
+        topic_gap_stage_candidate_recall_available = (
+            _source_contains(
+                topic_gap_stage_candidate_recall_source,
+                (
+                    "missing_stage",
+                    "search_section_atoms",
+                    "search_section_atoms_fuzzy",
+                    "same_paper_candidate_hits",
+                    "cross_paper_stage_examples",
+                    "retrieval_context_only",
+                    "candidate_recall_only_no_direct_promotion",
+                ),
+            )
+            and _source_contains(
+                makefile_source,
+                (
+                    "topic-gap-stage-candidate-recall:",
+                    "echelon.v14b.topic_gap_stage_candidate_recall",
+                    "topic_gap_stage_candidate_recall",
                 ),
             )
         )
@@ -3073,6 +3101,7 @@ def audit_multi_topic_regression(
         and section_atom_layer_prioritizes_typed_chain_stage_cues
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
+        and topic_gap_stage_candidate_recall_available
         and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
@@ -3109,6 +3138,7 @@ def audit_multi_topic_regression(
             "section_atom_layer_prioritizes_typed_chain_stage_cues": section_atom_layer_prioritizes_typed_chain_stage_cues,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
+            "topic_gap_stage_candidate_recall_available": topic_gap_stage_candidate_recall_available,
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available
             ),

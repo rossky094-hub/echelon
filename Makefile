@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-stage-candidate-recall topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -233,6 +233,7 @@ decision-audit:
 	$(MAKE) section-queue-audit
 	$(MAKE) topic-gap-section-audit
 	$(MAKE) topic-gap-repair-plan
+	$(MAKE) topic-gap-stage-candidate-recall
 	$(MAKE) topic-gap-no-target-inspect
 	$(MAKE) cited-work-backfill-queue
 	$(MAKE) raw-pdf-store-audit
@@ -402,11 +403,13 @@ topic-gap-repair:
 	$(MAKE) section-queue-audit
 	$(MAKE) topic-gap-section-audit
 	$(MAKE) topic-gap-repair-plan
+	$(MAKE) topic-gap-stage-candidate-recall
 	$(MAKE) section-evidence-topic-gaps
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
 	$(MAKE) topic-gap-section-audit
 	$(MAKE) topic-gap-repair-plan
+	$(MAKE) topic-gap-stage-candidate-recall
 	$(MAKE) direction-readiness-audit
 	$(MAKE) value-delivery-audit
 
@@ -434,6 +437,15 @@ topic-gap-repair-plan:
 		--db $(DB_MAIN) \
 		--triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json \
 		--out-dir reports/v14b_pilot
+
+## Topic-gap stage candidate recall: 只读召回 partial typed chain 的缺失 stage 候选 atom
+topic-gap-stage-candidate-recall:
+	@echo ">>> Topic-gap stage candidate recall: exact/fuzzy atom candidates for missing typed stages..."
+	$(PYTHON) -m echelon.v14b.topic_gap_stage_candidate_recall \
+		--db $(DB_MAIN) \
+		--triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json \
+		--out-dir reports/v14b_pilot \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
 ## Topic-gap no-target inspect: 只读检查当前 parser no-target PDF 是否真有目标 heading
 topic-gap-no-target-inspect:
@@ -731,6 +743,7 @@ help:
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
 	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
 	@echo "  make topic-gap-repair-plan     # closure_state -> 下一轮修复执行组"
+	@echo "  make topic-gap-stage-candidate-recall # 缺失 typed stage 的 atom 候选召回"
 	@echo "  make topic-gap-no-target-inspect # 只读检查 no-target PDF heading 信号"
 	@echo "  make raw-pdf-store-audit # 检查外接盘 raw PDF 库及 section 复用状态"
 	@echo "  make topic-gap-raw-pdf-inspect # 只读解析本地 topic-gap PDF"

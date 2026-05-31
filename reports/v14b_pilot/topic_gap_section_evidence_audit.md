@@ -1,21 +1,21 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T10:34:03Z`
+- audit_ts: `2026-05-31T10:51:21Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
-- decision-grade current-contract coverage: `43/78` (55.1%)
-- promotion-ready coverage: `41/78` (52.6%)
+- decision-grade current-contract coverage: `45/78` (57.7%)
+- promotion-ready coverage: `43/78` (55.1%)
 
 ## Failure Modes
 
 | failure_mode | papers |
 |---|---:|
-| decision_grade_current_contract | 41 |
+| decision_grade_current_contract | 43 |
 | no_target_sections_after_current_parser | 17 |
 | unattempted_pdf_available | 8 |
 | no_target_sections_unknown_contract | 5 |
-| stale_parser_contract | 4 |
+| stale_parser_contract | 2 |
 | lineage_full_chain_missing | 1 |
 | current_contract_weak | 1 |
 | lineage_chains_missing_after_atoms | 1 |
@@ -39,8 +39,8 @@
 
 | closure_state | contracts |
 |---|---:|
-| open_section_evidence_not_decision_grade | 120 |
-| partial_chain_incomplete | 66 |
+| open_section_evidence_not_decision_grade | 118 |
+| partial_chain_incomplete | 68 |
 | closed_decision_grade_section | 16 |
 | partial_atoms_available_no_chain | 12 |
 | closed_typed_chain_available | 1 |
@@ -52,7 +52,7 @@
 | no_target_sections_after_current_parser | 17 | inspect parser misses or alternate full text; keep abstract-only claims weak. |
 | unattempted_pdf_available | 8 | run targeted topic-gap section ingest after active broad ingest is safe. |
 | no_target_sections_unknown_contract | 5 | re-run with current parser contract before treating the miss as structural. |
-| stale_parser_contract | 4 | reparse with the current section parser contract before evidence promotion. |
+| stale_parser_contract | 2 | reparse with the current section parser contract before evidence promotion. |
 | lineage_full_chain_missing | 1 | inspect missing typed stages (constraint:1, attempted_path:1, local_fix:1) and improve atom classification/chain assembly for this bottleneck. |
 | current_contract_weak | 1 | manual or alternate-parser review before high-confidence promotion. |
 | lineage_chains_missing_after_atoms | 1 | run section-atom-chains or tune atom ordering before Step13 promotion. |
@@ -62,7 +62,7 @@
 | topic | papers | decision-grade | rate | top failure modes |
 |---|---:|---:|---:|---|
 | metalens | 20 | 14 | 70.0% | decision_grade_current_contract:14, no_target_sections_after_current_parser:5, stale_parser_contract:1 |
-| metasurface holography | 25 | 14 | 56.0% | decision_grade_current_contract:14, no_target_sections_after_current_parser:3, unattempted_pdf_available:3 |
+| metasurface holography | 25 | 16 | 64.0% | decision_grade_current_contract:16, no_target_sections_after_current_parser:3, unattempted_pdf_available:3 |
 | photonic crystal cavity | 24 | 16 | 66.7% | decision_grade_current_contract:14, no_target_sections_after_current_parser:3, unattempted_pdf_available:3 |
 | quantum light source | 33 | 22 | 66.7% | decision_grade_current_contract:22, no_target_sections_after_current_parser:7, unattempted_pdf_available:2 |
 
@@ -117,7 +117,7 @@
 | 45 | `01KS6VBZMHP7DCAGSHHDXAHRQ1` | photonic crystal cavity, quantum light source | `decision_grade_current_contract` | `success_primary` | Parametrically driven pure-Kerr temporal solitons in a chip-integrated microcavity |
 | 46 | `01KS6VC0TXWGM4M7Y1ZM55TE5R` | quantum light source | `decision_grade_current_contract` | `success_primary` | Spectral-temporal-spatial customization via modulating multimodal nonlinear pulse propagation |
 | 47 | `01KS6VCY969FNTVD1590J5JCF6` | photonic crystal cavity | `decision_grade_current_contract` | `already_has_primary` | Programmable Integrated Photonics for Topological Hamiltonians |
-| 48 | `01KS6VD2S4WZB2WN3FF8SJ7VT4` | metasurface holography | `stale_parser_contract` | `already_has_primary` | Electrochemically-controlled metasurfaces with high-contrast switching at visible frequencies |
+| 48 | `01KS6VD2S4WZB2WN3FF8SJ7VT4` | metasurface holography | `decision_grade_current_contract` | `success_primary` | Electrochemically-controlled metasurfaces with high-contrast switching at visible frequencies |
 | 49 | `01KS6VD3391WKPAQ70D3078XB8` | photonic crystal cavity, quantum light source | `decision_grade_current_contract` | `already_has_primary` | GaAs nano-ridge laser diodes fully fabricated in a 300 mm CMOS pilot line |
 | 50 | `01KS6VD3NAZ5E6GXMPNANGG8EK` | metalens, metasurface holography, photonic crystal cavity, quantum light source | `decision_grade_current_contract` | `success_primary` | Broadband Thermal Imaging using Meta-Optics |
 
