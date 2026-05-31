@@ -240,10 +240,13 @@ SECTION_INGEST_REQUIRE_ARXIV: bool = (
     os.environ.get("V14B_SECTION_INGEST_REQUIRE_ARXIV", "true").lower()
     in ("1", "true", "yes")
 )
+DEFAULT_RAW_PDF_STORE_ROOT: Path = Path(
+    os.environ.get("V14B_DEFAULT_RAW_PDF_STORE_ROOT", "/Volumes/LaCie/Echelon_Paper_Raw_Data")
+).expanduser()
 RAW_PDF_STORE_ROOT: Path | None = (
     Path(os.environ["V14B_RAW_PDF_STORE_ROOT"]).expanduser()
     if os.environ.get("V14B_RAW_PDF_STORE_ROOT")
-    else None
+    else DEFAULT_RAW_PDF_STORE_ROOT
 )
 RAW_PDF_MANIFEST: Path | None = (
     Path(os.environ["V14B_RAW_PDF_MANIFEST"]).expanduser()

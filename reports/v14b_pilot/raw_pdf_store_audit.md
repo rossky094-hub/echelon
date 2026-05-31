@@ -1,6 +1,6 @@
 # Raw PDF Store Audit
 
-- generated_at: `2026-05-31T05:46:50Z`
+- generated_at: `2026-05-31T11:18:55Z`
 - status: **pass**
 - store_root: `/Volumes/LaCie/Echelon_Paper_Raw_Data`
 - manifest: `/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3`
@@ -9,13 +9,13 @@
 
 | status | papers | GB |
 |---|---:|---:|
-| failed | 1 | 0.00 |
-| http_error | 38 | 0.00 |
-| queued | 52673 | 0.00 |
-| success | 2679 | 0.93 |
+| failed | 5 | 0.00 |
+| http_error | 53 | 0.00 |
+| queued | 50320 | 0.00 |
+| success | 5013 | 2.58 |
 
-- success probable PDFs: 2679/2679 (100.0%)
-- success existing paths: 2679
+- success probable PDFs: 5013/5013 (100.0%)
+- success existing paths: 5013
 
 ## Section Reuse
 
@@ -26,9 +26,9 @@
 ## Candidate Queue Coverage
 
 - candidate_file: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
-- queue papers: 38
-- raw PDF available papers: 7 (18.4%)
-- sample missing paper_ids: 01KS5KVWY6VAA6HXWFJV2SXZ48, 01KS6FG0VYNT6MYBBYMX8TBYDR, 01KS6FFJF6XNCHFY2X589F6QD5, 01KS6FGD433ZJXYBXPYVZ727SG, 01KS6FK557AWZRGP7QFMMBVT17, 01KS6GND5KCR5HPW1YFZYW5ANY, 01KS6H25PCS743PEWJ8HF8YGEH, 01KS6GKT1AN2MQ1NXP1ZJY5EKA, 01KS6HGSMCY03E789TEE3B0FCT, 01KS6HMZS9ACM80N6QJ22RAHGV
+- queue papers: 78
+- raw PDF available papers: 15 (19.2%)
+- sample missing paper_ids: 01KS6HJEXQGTKP950NRDA3CVT2, 01KS6HK2C4GYG2KSM1BA314XPY, 01KS6GND5KCR5HPW1YFZYW5ANY, 01KS6H23DPA3GB6AYCZYA8X08T, 01KS6GG3QQ4KDB4CAS1PMND5FV, 01KS6GQGRRD3AR4MY361CME1HG, 01KS6HGSMCY03E789TEE3B0FCT, 01KS6HMZS9ACM80N6QJ22RAHGV, 01KS6HPP3KS1MWWYWQ6GW64AV7, 01KS6HVY4CKH0GP6VQK7MXRXEK
 
 ## Next Actions
 

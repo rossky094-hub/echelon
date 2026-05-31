@@ -2882,6 +2882,7 @@ def audit_multi_topic_regression(
     section_atom_layer_prioritizes_typed_chain_stage_cues = True
     section_atom_chain_assembler_marks_inferred_order = True
     inferred_order_chain_consumers_keep_moderate_boundary = True
+    section_ingest_defaults_to_local_raw_pdf_store = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
     topic_gap_stage_candidate_recall_available = True
@@ -2897,6 +2898,7 @@ def audit_multi_topic_regression(
         topic_gap_repair_plan_source = repo_root / "echelon/v14b/topic_gap_repair_plan.py"
         topic_gap_stage_candidate_recall_source = repo_root / "echelon/v14b/topic_gap_stage_candidate_recall.py"
         step13_source = repo_root / "echelon/v14b/step13_first_principles_history.py"
+        config_source = repo_root / "echelon/v14b/config.py"
         makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
             topic_regression_source,
@@ -3047,6 +3049,15 @@ def audit_multi_topic_regression(
                 ),
             )
         )
+        section_ingest_defaults_to_local_raw_pdf_store = _source_contains(
+            config_source,
+            (
+                "DEFAULT_RAW_PDF_STORE_ROOT",
+                "/Volumes/LaCie/Echelon_Paper_Raw_Data",
+                "RAW_PDF_STORE_ROOT",
+                "RAW_PDF_MANIFEST",
+            ),
+        )
         topic_gap_repair_plan_uses_closure_states = (
             _source_contains(
                 topic_gap_repair_plan_source,
@@ -3131,6 +3142,7 @@ def audit_multi_topic_regression(
         and section_atom_layer_prioritizes_typed_chain_stage_cues
         and section_atom_chain_assembler_marks_inferred_order
         and inferred_order_chain_consumers_keep_moderate_boundary
+        and section_ingest_defaults_to_local_raw_pdf_store
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
         and topic_gap_stage_candidate_recall_available
@@ -3170,6 +3182,7 @@ def audit_multi_topic_regression(
             "section_atom_layer_prioritizes_typed_chain_stage_cues": section_atom_layer_prioritizes_typed_chain_stage_cues,
             "section_atom_chain_assembler_marks_inferred_order": section_atom_chain_assembler_marks_inferred_order,
             "inferred_order_chain_consumers_keep_moderate_boundary": inferred_order_chain_consumers_keep_moderate_boundary,
+            "section_ingest_defaults_to_local_raw_pdf_store": section_ingest_defaults_to_local_raw_pdf_store,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_stage_candidate_recall_available": topic_gap_stage_candidate_recall_available,

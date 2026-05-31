@@ -316,6 +316,9 @@ def _write_product_sources(root: Path) -> None:
         encoding="utf-8",
     )
     (v14 / "config.py").write_text(
+        "DEFAULT_RAW_PDF_STORE_ROOT = '/Volumes/LaCie/Echelon_Paper_Raw_Data'\n"
+        "RAW_PDF_STORE_ROOT = DEFAULT_RAW_PDF_STORE_ROOT\n"
+        "RAW_PDF_MANIFEST = RAW_PDF_STORE_ROOT + '/manifests/raw_pdf_downloads.sqlite3'\n"
         'V14B_LIMITATION_USE_LLM", "false"\n'
         'V14B_SCIBERT_LLM_FALLBACK", "false"\n'
         'V14B_FUSION_USE_LLM_NAMING", "false"\n'
@@ -681,6 +684,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["section_ingest_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["section_atom_layer_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["topic_gap_repair_plan_uses_closure_states"] is True
+    assert multi_gate["checks"]["section_ingest_defaults_to_local_raw_pdf_store"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"
