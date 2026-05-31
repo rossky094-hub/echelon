@@ -224,6 +224,11 @@ def _write_product_sources(root: Path) -> None:
         "def run_topic_readiness_preflight():\n    return build_topic_readiness_preflight\n",
         encoding="utf-8",
     )
+    (v14 / "topic_gap_repair_plan.py").write_text(
+        "closure_state partial_atoms_available_no_chain section-evidence-topic-gaps-local "
+        "section-atom-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall\n",
+        encoding="utf-8",
+    )
     (v14 / "product_baseline.py").write_text(
         'PRODUCT_BASELINE_TOPICS = ("metalens", "metasurface holography", "photonic crystal cavity", "quantum light source")\n'
         'parser.add_argument("--topic", default="all")\n'
@@ -439,6 +444,7 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
+        "\t$(MAKE) topic-gap-repair-plan\n"
         "\t$(MAKE) topic-gap-no-target-inspect\n"
         "\t$(MAKE) cited-work-backfill-queue\n"
         "\t$(MAKE) raw-pdf-store-audit\n"
@@ -451,12 +457,16 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
+        "\t$(MAKE) topic-gap-repair-plan\n"
         "\t$(MAKE) section-evidence-topic-gaps\n"
         "\t$(MAKE) topic-regression\n"
         "\t$(MAKE) section-queue-audit\n"
         "\t$(MAKE) topic-gap-section-audit\n"
+        "\t$(MAKE) topic-gap-repair-plan\n"
         "\t$(MAKE) direction-readiness-audit\n"
         "\t$(MAKE) value-delivery-audit\n"
+        "topic-gap-repair-plan:\n"
+        "\tpython -m echelon.v14b.topic_gap_repair_plan --triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json\n"
         "post-frontfill-chain:\n"
         "\tpython scripts/run_after_frontfill_product_chain.py\n"
         "## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow\n"
@@ -651,6 +661,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["section_queue_preserves_repair_contracts"] is True
     assert multi_gate["checks"]["section_ingest_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["section_atom_layer_preserves_repair_contract_provenance"] is True
+    assert multi_gate["checks"]["topic_gap_repair_plan_uses_closure_states"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"

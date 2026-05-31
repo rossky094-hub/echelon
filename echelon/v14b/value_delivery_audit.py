@@ -2703,6 +2703,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
+        "topic-gap-repair-plan",
         "topic-gap-no-target-inspect",
         "cited-work-backfill-queue",
         "raw-pdf-store-audit",
@@ -2715,10 +2716,12 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
+        "topic-gap-repair-plan",
         "section-evidence-topic-gaps",
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
+        "topic-gap-repair-plan",
         "direction-readiness-audit",
         "value-delivery-audit",
     )
@@ -2874,6 +2877,7 @@ def audit_multi_topic_regression(
     section_ingest_preserves_repair_contract_provenance = True
     section_atom_layer_preserves_repair_contract_provenance = True
     topic_regression_exports_topic_dossier_repair_plan = True
+    topic_gap_repair_plan_uses_closure_states = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
@@ -2882,6 +2886,7 @@ def audit_multi_topic_regression(
         section_ingest_source = repo_root / "echelon/v14b/step5s_section_ingest.py"
         section_atoms_source = repo_root / "echelon/v14b/section_atoms.py"
         section_atom_chains_source = repo_root / "echelon/v14b/section_atom_chains.py"
+        topic_gap_repair_plan_source = repo_root / "echelon/v14b/topic_gap_repair_plan.py"
         step13_source = repo_root / "echelon/v14b/step13_first_principles_history.py"
         makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
@@ -2995,6 +3000,28 @@ def audit_multi_topic_regression(
                 ),
             )
         )
+        topic_gap_repair_plan_uses_closure_states = (
+            _source_contains(
+                topic_gap_repair_plan_source,
+                (
+                    "closure_state",
+                    "partial_atoms_available_no_chain",
+                    "section-evidence-topic-gaps-local",
+                    "section-atom-embeddings",
+                    "no_direct_promotion",
+                    "GNN/VGAE atom generation",
+                    "fuzzy vector recall",
+                ),
+            )
+            and _source_contains(
+                makefile_source,
+                (
+                    "topic-gap-repair-plan:",
+                    "echelon.v14b.topic_gap_repair_plan",
+                    "topic_gap_section_evidence_audit.json",
+                ),
+            )
+        )
         stale_gold_topic_doc_phrases = (
             "topic gold fixtures",
             "Create gold expectations",
@@ -3023,6 +3050,7 @@ def audit_multi_topic_regression(
         and section_ingest_preserves_repair_contract_provenance
         and section_atom_layer_preserves_repair_contract_provenance
         and topic_regression_exports_topic_dossier_repair_plan
+        and topic_gap_repair_plan_uses_closure_states
         and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
@@ -3057,6 +3085,7 @@ def audit_multi_topic_regression(
             "section_ingest_preserves_repair_contract_provenance": section_ingest_preserves_repair_contract_provenance,
             "section_atom_layer_preserves_repair_contract_provenance": section_atom_layer_preserves_repair_contract_provenance,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
+            "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available
             ),

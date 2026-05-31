@@ -1,6 +1,6 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T09:57:33Z`
+- audit_ts: `2026-05-31T10:15:04Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
