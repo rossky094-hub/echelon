@@ -2463,7 +2463,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     )
     pilot_full_context = legacy_contexts.get("pilot-full", "")
     product_chain_context = _make_target_context(makefile, "product-chain", before=0, after=14)
-    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=10)
+    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=12)
     topic_gap_repair_context = _make_target_context(makefile, "topic-gap-repair", before=0, after=14)
     decision_audit_targets = (
         "topic-regression",
@@ -2472,6 +2472,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "topic-gap-no-target-inspect",
         "cited-work-backfill-queue",
         "raw-pdf-store-audit",
+        "topic-gap-raw-pdf-inspect",
         "direction-readiness-audit",
         "algorithm-logic-audit",
         "value-delivery-audit",
@@ -2571,7 +2572,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
             "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap "
-            "section triage, no-target PDF inspection, raw PDF store reuse audit, direction readiness, "
+            "section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, "
             "algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
             "gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "

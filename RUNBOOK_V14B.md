@@ -818,9 +818,10 @@ export V14B_SECTION_INGEST_PREFER_LOCAL_RAW_PDF=true
 
 ```bash
 make raw-pdf-store-audit
+make topic-gap-raw-pdf-inspect
 ```
 
-该审计会同时报告 manifest 下载进度、multi-topic gap 队列中可直接复用本地 PDF 的比例，以及 `paper_sections` 中已经由 `local_raw_pdf_cache` 产生的证据行数。若 manifest 已有成功下载但 section ingest 复用数仍为 0，说明下一轮 ingest 需要带上上述环境变量或更新本地 `.env`。
+`raw-pdf-store-audit` 会同时报告 manifest 下载进度、multi-topic gap 队列中可直接复用本地 PDF 的比例，以及 `paper_sections` 中已经由 `local_raw_pdf_cache` 产生的证据行数。`topic-gap-raw-pdf-inspect` 不写主库，只解析外接盘里已经命中的 topic-gap PDF，判断当前 parser 是否能抽出 primary sections；若 manifest 已有成功下载但 section ingest 复用数仍为 0，说明下一轮 ingest 需要带上上述环境变量或更新本地 `.env`。
 
 ---
 

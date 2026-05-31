@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -235,6 +235,7 @@ decision-audit:
 	$(MAKE) topic-gap-no-target-inspect
 	$(MAKE) cited-work-backfill-queue
 	$(MAKE) raw-pdf-store-audit
+	$(MAKE) topic-gap-raw-pdf-inspect
 	$(MAKE) direction-readiness-audit
 	$(MAKE) algorithm-logic-audit
 	$(MAKE) value-delivery-audit
@@ -397,6 +398,17 @@ topic-gap-no-target-inspect:
 	$(PYTHON) -m echelon.v14b.topic_gap_no_target_inspection \
 		--db $(DB_MAIN) \
 		--triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json \
+		--out-dir reports/v14b_pilot \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Topic-gap raw PDF inspect: 只读解析外接盘已命中的 topic-gap PDF
+topic-gap-raw-pdf-inspect:
+	@echo ">>> Topic-gap raw PDF parser inspection: local cache dry run..."
+	$(PYTHON) -m echelon.v14b.topic_gap_raw_pdf_inspection \
+		--db $(DB_MAIN) \
+		--triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json \
+		--store-root $${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data} \
+		--manifest $${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3} \
 		--out-dir reports/v14b_pilot \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
@@ -677,6 +689,7 @@ help:
 	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
 	@echo "  make topic-gap-no-target-inspect # 只读检查 no-target PDF heading 信号"
 	@echo "  make raw-pdf-store-audit # 检查外接盘 raw PDF 库及 section 复用状态"
+	@echo "  make topic-gap-raw-pdf-inspect # 只读解析本地 topic-gap PDF"
 	@echo "  make section-atoms             # 从 paper_sections 生成可检索证据 atoms"
 	@echo "  make section-atom-chains       # 从 section atoms 生成 typed bottleneck chains"
 	@echo "  make algorithm-logic-audit     # 逐步审计算法角色、输入输出和 promotion guard"

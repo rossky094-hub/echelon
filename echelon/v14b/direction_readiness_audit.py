@@ -25,6 +25,7 @@ from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_stat
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
 from echelon.v14b.raw_pdf_store_audit import load_raw_pdf_store_audit_state
 from echelon.v14b.topic_gap_no_target_inspection import load_topic_gap_no_target_inspection_state
+from echelon.v14b.topic_gap_raw_pdf_inspection import load_topic_gap_raw_pdf_inspection_state
 from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 
 WEAK_SECTION_STRATEGIES = {
@@ -973,6 +974,16 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
         and int(raw_pdf.get("success_papers") or 0) > 0
         and int(raw_pdf.get("local_raw_pdf_section_papers") or 0) == 0
     ):
+        raw_pdf_inspection = m.get("topic_gap_raw_pdf_inspection_state") or {}
+        dry_run_detail = ""
+        if raw_pdf_inspection.get("available"):
+            dry_run_detail = (
+                " Local topic-gap parser dry run: "
+                f"primary-ready={int(raw_pdf_inspection.get('parser_primary_ready_papers') or 0):,}, "
+                f"repair-ready={int(raw_pdf_inspection.get('parser_primary_ready_repair_candidates') or 0):,}, "
+                f"no-target={int(raw_pdf_inspection.get('parser_no_target_papers') or 0):,}, "
+                f"parser-exception={int(raw_pdf_inspection.get('parser_exception_papers') or 0):,}."
+            )
         blockers.append(
             {
                 "gate": "raw_pdf_cache_reuse",
@@ -984,6 +995,7 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                     f"Topic-gap queue local PDF availability is "
                     f"{int(raw_pdf.get('queue_raw_pdf_available_papers') or 0):,}/"
                     f"{int(raw_pdf.get('queue_papers') or 0):,}."
+                    f"{dry_run_detail}"
                 ),
                 "next_action": (
                     "At the next safe section-ingest boundary, start Step5s with V14B_RAW_PDF_STORE_ROOT, "
@@ -1137,6 +1149,17 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"topic_gap_local_pdf={int(raw_pdf.get('queue_raw_pdf_available_papers') or 0):,}/"
             f"{int(raw_pdf.get('queue_papers') or 0):,}"
         ]
+    raw_pdf_inspection = metrics.get("topic_gap_raw_pdf_inspection_state") or {}
+    raw_pdf_inspection_line = []
+    if raw_pdf_inspection.get("available"):
+        raw_pdf_inspection_line = [
+            f"- topic-gap raw PDF parser dry run: `{raw_pdf_inspection.get('status')}`; "
+            f"local={int(raw_pdf_inspection.get('local_pdf_available_papers') or 0):,}; "
+            f"primary-ready={int(raw_pdf_inspection.get('parser_primary_ready_papers') or 0):,}; "
+            f"repair-ready={int(raw_pdf_inspection.get('parser_primary_ready_repair_candidates') or 0):,}; "
+            f"no-target={int(raw_pdf_inspection.get('parser_no_target_papers') or 0):,}; "
+            f"parser-exception={int(raw_pdf_inspection.get('parser_exception_papers') or 0):,}"
+        ]
     lines = [
         "# Direction Readiness Audit",
         "",
@@ -1196,6 +1219,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         *no_target_inspection_line,
         *frontfill_line,
         *raw_pdf_line,
+        *raw_pdf_inspection_line,
         f"- future candidate edges: {metrics['future_candidate_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
         f"- future directions: {metrics['future_directions']:,}",
@@ -1273,6 +1297,9 @@ def run_audit(
     )
     metrics["raw_pdf_store_audit_state"] = load_raw_pdf_store_audit_state(
         out_dir / "raw_pdf_store_audit.json"
+    )
+    metrics["topic_gap_raw_pdf_inspection_state"] = load_topic_gap_raw_pdf_inspection_state(
+        out_dir / "topic_gap_raw_pdf_inspection.json"
     )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)

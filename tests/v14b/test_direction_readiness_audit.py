@@ -392,6 +392,15 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
             "queue_raw_pdf_available_papers": 5,
             "queue_papers": 47,
         },
+        "topic_gap_raw_pdf_inspection_state": {
+            "available": True,
+            "status": "pass",
+            "local_pdf_available_papers": 5,
+            "parser_primary_ready_papers": 2,
+            "parser_primary_ready_repair_candidates": 1,
+            "parser_no_target_papers": 3,
+            "parser_exception_papers": 0,
+        },
     }
 
     blockers = classify_blockers(metrics)
@@ -399,6 +408,8 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
     blocker = next(b for b in blockers if b["gate"] == "raw_pdf_cache_reuse")
     assert "1,929 successful PDFs" in blocker["why"]
     assert "5/47" in blocker["why"]
+    assert "primary-ready=2" in blocker["why"]
+    assert "repair-ready=1" in blocker["why"]
     assert "next safe section-ingest boundary" in blocker["next_action"]
 
 
