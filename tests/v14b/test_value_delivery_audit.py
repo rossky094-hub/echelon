@@ -165,6 +165,8 @@ def _write_product_sources(root: Path) -> None:
         'def _build_bottleneck_lineage(): return {"can_explain": ["x"], "cannot_explain": ["a proven causal root-cause chain when section-level typed triples are missing", "that a bottleneck is solved without linked resolution atoms"]}\n'
         'def _claim_card_evidence_objects(): minimal_validation_experiment Step13 Claim Card "evidence_objects": item.get("evidence_objects")\n'
         'def _build_validation_directions(): return {"can_explain": ["x"], "cannot_explain": ["that the direction is ready for Radar", "Radar promotion without a complete Claim Card"], "required_evidence": ["x"]}\n'
+        'def _build_topic_evidence_repair_plan(): return {"claim_scope": "evidence_repair_queue_only", "gap_type": "future_candidates_missing_claim_card", "target_pipeline_steps": ["section-atom-chains"]}\n'
+        '"evidence_repair_plan": evidence_repair_plan\n'
         "def _apply_future_edge_contracts(): future_candidates candidate_pool_only required_evidence evidence_objects\n"
         "def _visual_edge_contract(): return visual_edge + claim_scope + evidence_grade + uncertainty_reasons\n"
         "def get_visual_edges(): return _visual_edge_contract\n"
@@ -195,7 +197,7 @@ def _write_product_sources(root: Path) -> None:
         "function renderHover() { els.hover.innerHTML = node.claim_scope + node.evidence_grade + node.uncertainty_reasons; }\n"
         "function renderBottleneckLineage() { return c.can_explain + c.cannot_explain + '不能说明'; }\n"
         "function buildSearchFallbackTopicLens() { return 'ui_search_fallback_readiness insufficient_evidence retrieval_context_only No branch lineage, bottleneck lineage, main-path, Step6 fusion, or Step13 Claim Card'; }\n"
-        "function renderTopicDossier() { return readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + renderEvidenceObjects(d.evidence_objects); }\n"
+        "function renderTopicDossier() { const repairPlan = dossier.evidence_repair_plan; return 'Evidence repair plan' + readingPath + item.can_explain + item.cannot_explain + '不能说明' + split.lineage_status + split.parent_branch_id + split.claim_scope + split.evidence_grade + split.uncertainty_reasons + b.resolution_status + b.unresolved_evidence_count + b.resolved_evidence_count + d.minimal_validation_experiment + d.can_explain + d.cannot_explain + d.required_evidence + '进入 Radar 还需要' + task.target_pipeline_steps + task.cannot_explain + renderEvidenceObjects(task.evidence_objects) + renderEvidenceObjects(d.evidence_objects); }\n"
         "function renderEvidenceMapSummary() { const mainPath = evidence.main_path; return 'Main-path evidence boundary' + renderComboContract(mainPath) + renderEvidenceObjects(mainPath.evidence_objects) + renderUncertaintyOverlays(evidence.uncertainty_overlays) + renderComboContract('Fusion value'); }\n"
         "function renderUncertaintyOverlays() { return 'Uncertainty overlays' + overlay.claim_scope + overlay.evidence_grade + overlay.uncertainty_reasons + renderEvidenceObjects(overlay.evidence_objects); }\n"
         "function collectTopicIds() { return lens.future_growth?.candidate_edges; }\n"
@@ -645,6 +647,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_validation_directions_carry_limits"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_topic_dossier_exposes_evidence_repair_plan"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_reading_path_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_paper_list_renders_hit_contract"] is True
@@ -653,6 +656,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_validation_direction_evidence_objects"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_validation_direction_limits"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["ui_renders_topic_dossier_evidence_repair_plan"] is True
     evidence_map_gate = next(g for g in result["gates"] if g["issue"] == "Evolution Evidence Map Contract")
     assert evidence_map_gate["status"] == "pass"
     assert evidence_map_gate["checks"]["fusion_value_is_auditable_layer"] is True
@@ -719,11 +723,13 @@ def test_online_topic_readiness_contract_is_arbitrary_topic_and_no_llm(tmp_path)
     assert result["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert result["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
     assert result["checks"]["api_validation_directions_carry_limits"] is True
+    assert result["checks"]["api_topic_dossier_exposes_evidence_repair_plan"] is True
     assert result["checks"]["ui_search_fallback_is_insufficient_evidence"] is True
     assert result["checks"]["ui_renders_reading_path_limits"] is True
     assert result["checks"]["ui_renders_topic_bottleneck_resolution_counts"] is True
     assert result["checks"]["ui_renders_validation_direction_evidence_objects"] is True
     assert result["checks"]["ui_renders_validation_direction_limits"] is True
+    assert result["checks"]["ui_renders_topic_dossier_evidence_repair_plan"] is True
     assert "turning papers with strong/moderate section provenance" in result["observed_gates"]
 
 

@@ -4771,6 +4771,302 @@ def _build_reading_path(
     return path
 
 
+def _repair_plan_candidate_papers(papers: list[dict[str, Any]], *, why: str, limit: int = 8) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for paper in papers:
+        if not isinstance(paper, dict):
+            continue
+        pid = paper.get("paper_id")
+        if not pid:
+            continue
+        pid_s = str(pid)
+        if pid_s in seen:
+            continue
+        seen.add(pid_s)
+        out.append(_paper_ref(paper, why))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _repair_plan_id(gap_type: str, label: str, index: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:48]
+    return f"{gap_type}:{slug or index}"
+
+
+def _build_topic_evidence_repair_plan(
+    *,
+    topic: str,
+    hits: list[dict[str, Any]],
+    turning_hits: list[dict[str, Any]],
+    branch_splits: list[dict[str, Any]],
+    bottleneck_dossiers: list[dict[str, Any]],
+    future_growth: list[dict[str, Any]],
+    rd_radar: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Translate evidence gaps into auditable frontfill work.
+
+    The repair plan is deliberately not a claim layer. It tells the local PDF,
+    section atom, chain, Step5c, Step6, and Step13 jobs what evidence is missing.
+    """
+
+    actions: list[dict[str, Any]] = []
+    default_sections = ["limitations", "discussion", "conclusion", "results", "methods", "future_work"]
+
+    def add_action(
+        *,
+        gap_type: str,
+        title: str,
+        priority: str,
+        why: str,
+        candidate_papers: list[dict[str, Any]],
+        frontfill_query: str,
+        required_sections: list[str],
+        target_pipeline_steps: list[str],
+        evidence_objects: list[dict[str, Any] | None],
+        required_evidence: list[str],
+        uncertainty_reasons: list[str],
+    ) -> None:
+        action_index = len(actions) + 1
+        repair_id = _repair_plan_id(gap_type, title, action_index)
+        paper_refs = _repair_plan_candidate_papers(candidate_papers, why=why)
+        repair_object = {
+            "type": "evidence_repair_task",
+            "role": "frontfill_queue_item",
+            "source": "topic_dossier_evidence_repair_plan",
+            "id": repair_id,
+            "label": title,
+            "gap_type": gap_type,
+            "claim_scope": "evidence_repair_queue_only",
+            "evidence_grade": "frontfill_target",
+            "frontfill_query": frontfill_query,
+            "required_sections": required_sections,
+            "target_pipeline_steps": target_pipeline_steps,
+            "source_storage_uri_policy": "prefer raw_pdf_local_library before network fetch",
+        }
+        actions.append(
+            {
+                "repair_id": repair_id,
+                "gap_type": gap_type,
+                "title": title,
+                "priority": priority,
+                "claim_scope": "evidence_repair_queue_only",
+                "evidence_grade": "frontfill_target",
+                "why": why,
+                "can_explain": [
+                    "which topic evidence gap should be frontfilled next",
+                    "which papers or graph objects should seed deterministic parsing",
+                    "which downstream pipeline steps need to be rerun after repair",
+                ],
+                "cannot_explain": [
+                    "that the underlying scientific claim is true",
+                    "that a candidate should be promoted to Radar",
+                    "a substitute for page-traceable section atoms and Step13 Claim Cards",
+                ],
+                "uncertainty_reasons": sorted(set(uncertainty_reasons)),
+                "required_evidence": sorted(set(required_evidence)),
+                "candidate_papers": paper_refs,
+                "candidate_paper_ids": [str(p.get("paper_id")) for p in paper_refs if p.get("paper_id")],
+                "frontfill_query": frontfill_query,
+                "required_sections": required_sections,
+                "target_pipeline_steps": target_pipeline_steps,
+                "retrieval_modes": [
+                    "exact_id_doi_arxiv_title_section_phrase_bm25",
+                    "atom_or_section_embedding_fuzzy_recall",
+                ],
+                "parser_contract": "deterministic_section_atom_parser_with_page_span_provenance",
+                "source_storage_uri_policy": "prefer raw_pdf_local_library before network fetch",
+                "evidence_objects": _compact_evidence_objects([repair_object, *evidence_objects], limit=12),
+            }
+        )
+
+    missing_turning = [
+        p for p in turning_hits
+        if isinstance(p, dict) and not _paper_has_primary_evidence(p)
+    ][:8]
+    if missing_turning:
+        add_action(
+            gap_type="key_turning_paper_missing_primary_section",
+            title="Frontfill primary sections for key turning papers",
+            priority="high",
+            why="Topic turning papers cannot support lineage or Claim Card interpretation until their local primary sections are parsed.",
+            candidate_papers=missing_turning,
+            frontfill_query=f"{topic} key turning papers primary sections",
+            required_sections=["introduction", "methods", "results", "discussion", "conclusion", "limitations"],
+            target_pipeline_steps=["raw-pdf-local-library", "section-evidence", "section-atoms", "section-atom-chains", "Step5c", "Step13"],
+            evidence_objects=[
+                _paper_evidence_object(p, role="turning_paper_needs_primary_section", source="topic_dossier_evidence_repair_plan")
+                for p in missing_turning[:6]
+            ],
+            required_evidence=[
+                "raw PDF in local storage or a resolvable access link",
+                "page-traceable primary sections",
+                "section atoms with parser_contract and page/span provenance",
+            ],
+            uncertainty_reasons=[
+                "key turning paper lacks local primary section evidence",
+                "main-path or fallback turning status remains context-only until section evidence is available",
+            ],
+        )
+
+    weak_turning = [
+        p for p in turning_hits
+        if isinstance(p, dict)
+        and _paper_has_primary_evidence(p)
+        and not _paper_has_decision_grade_primary_evidence(p)
+    ][:8]
+    if weak_turning:
+        add_action(
+            gap_type="key_turning_paper_weak_section_provenance",
+            title="Reparse weak-provenance sections for key turning papers",
+            priority="high",
+            why="These turning papers have primary sections, but parser provenance is too weak for decision-grade lineage claims.",
+            candidate_papers=weak_turning,
+            frontfill_query=f"{topic} key turning papers explicit headings parser provenance",
+            required_sections=["methods", "results", "discussion", "conclusion", "limitations"],
+            target_pipeline_steps=["section-evidence", "section-atoms", "section-atom-chains", "Step5c", "Step13"],
+            evidence_objects=[
+                _paper_evidence_object(p, role="turning_paper_needs_parser_provenance", source="topic_dossier_evidence_repair_plan")
+                for p in weak_turning[:6]
+            ],
+            required_evidence=[
+                "explicit or embedded heading detection",
+                "strong/moderate parser provenance",
+                "page/span provenance for every promoted atom",
+            ],
+            uncertainty_reasons=[
+                "primary section evidence exists but parser provenance is weak",
+                "weak section provenance blocks promotion beyond exploratory context",
+            ],
+        )
+
+    bottleneck_gaps = [
+        b for b in bottleneck_dossiers
+        if int(b.get("section_level_evidence_count") or 0) == 0
+        or int(b.get("resolved_evidence_count") or 0) == 0
+        or b.get("resolution_status") == "open_no_resolution_evidence"
+    ][:3]
+    for bottleneck in bottleneck_gaps:
+        name = str(bottleneck.get("name") or "topic bottleneck")
+        add_action(
+            gap_type="bottleneck_lineage_or_resolution_evidence_gap",
+            title=f"Build section atom chains for bottleneck: {name}",
+            priority="high",
+            why="Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions.",
+            candidate_papers=[
+                p for p in (bottleneck.get("evidence_papers") or [])
+                if isinstance(p, dict)
+            ],
+            frontfill_query=f"{topic} {name} limitation resolution section evidence",
+            required_sections=default_sections,
+            target_pipeline_steps=["raw-pdf-local-library", "section-evidence", "section-atoms", "section-atom-chains", "Step5c", "Step13"],
+            evidence_objects=list(bottleneck.get("evidence_objects") or [])[:8],
+            required_evidence=[
+                "limitation atoms separated from resolution atoms",
+                "typed constraint->failure->attempt->fix/new-constraint chain",
+                "resolver paper evidence with page/span provenance",
+            ],
+            uncertainty_reasons=[
+                "bottleneck has missing section-level, lineage, or resolution evidence",
+                "a bottleneck cannot be treated as solved without linked resolution atoms",
+            ],
+        )
+
+    if not bottleneck_dossiers and hits:
+        add_action(
+            gap_type="missing_bottleneck_section_evidence",
+            title="Frontfill limitation sections for topic anchors",
+            priority="high",
+            why="The topic has related papers but no section-linked bottleneck dossier, so Step5c cannot yet produce constraint evidence.",
+            candidate_papers=hits[:8],
+            frontfill_query=f"{topic} limitations discussion conclusion bottleneck evidence",
+            required_sections=default_sections,
+            target_pipeline_steps=["raw-pdf-local-library", "section-evidence", "section-atoms", "section-atom-chains", "Step5c", "Step13"],
+            evidence_objects=[
+                _paper_evidence_object(p, role="topic_anchor_needs_bottleneck_sections", source="topic_dossier_evidence_repair_plan")
+                for p in hits[:6]
+            ],
+            required_evidence=[
+                "primary section extraction for topic anchors",
+                "limitation/discussion/conclusion atoms",
+                "Step5c unresolved limitation classification",
+            ],
+            uncertainty_reasons=[
+                "no section-linked bottleneck dossier is available for this topic",
+                "topic interpretation would become generic trend prose without bottleneck evidence",
+            ],
+        )
+
+    weak_branches = [
+        b for b in branch_splits
+        if b.get("lineage_status") != "evidence_backed_split"
+        or str(b.get("evidence_grade") or "").startswith(("layout", "graph_weak"))
+    ][:3]
+    for branch in weak_branches:
+        name = str(branch.get("name") or branch.get("branch_id") or "topic branch")
+        add_action(
+            gap_type="branch_lineage_needs_evidence",
+            title=f"Audit branch lineage evidence: {name}",
+            priority="medium",
+            why="Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed.",
+            candidate_papers=[
+                p for p in (branch.get("driver_papers") or [])
+                if isinstance(p, dict)
+            ],
+            frontfill_query=f"{topic} {name} branch split driver papers constraint shift",
+            required_sections=["introduction", "methods", "results", "discussion", "conclusion", "limitations"],
+            target_pipeline_steps=["section-evidence", "section-atoms", "section-atom-chains", "Step5c"],
+            evidence_objects=list(branch.get("evidence_objects") or [])[:8],
+            required_evidence=[
+                "parent_branch_id and split-year support",
+                "driver papers with primary section evidence",
+                "constraint shift tied to section atoms",
+            ],
+            uncertainty_reasons=[
+                "branch split is weak or layout-derived",
+                "GNN/cluster neighborhood cannot be narrated as causal branch evolution without lineage evidence",
+            ],
+        )
+
+    if future_growth and not rd_radar.get("claim_cards_ready"):
+        future_papers: list[dict[str, Any]] = []
+        future_objects: list[dict[str, Any] | None] = []
+        for edge in future_growth[:6]:
+            if not isinstance(edge, dict):
+                continue
+            for key, pid_key in (("source_paper", "source_paper_id"), ("target_paper", "target_paper_id")):
+                paper = edge.get(key)
+                if isinstance(paper, dict) and paper.get("paper_id"):
+                    future_papers.append(paper)
+                elif edge.get(pid_key):
+                    future_papers.append({"paper_id": edge.get(pid_key)})
+            future_objects.append(_edge_evidence_object(edge, edge_type="future_candidate", source="topic_dossier_evidence_repair_plan"))
+        add_action(
+            gap_type="future_candidates_missing_claim_card",
+            title="Convert future candidates into Step6/Step13 evidence tasks",
+            priority="medium",
+            why="GNN/VGAE future edges are useful for recall, but they need fusion evidence and complete five-question Claim Cards before decision use.",
+            candidate_papers=future_papers,
+            frontfill_query=f"{topic} future candidate bottleneck claim card evidence",
+            required_sections=default_sections,
+            target_pipeline_steps=["section-evidence", "section-atoms", "section-atom-chains", "Step5c", "Step6", "Step13"],
+            evidence_objects=future_objects,
+            required_evidence=[
+                "Step6 fusion evidence for candidate direction",
+                "complete Step13 five-question Claim Card",
+                "minimal validation experiment with falsification conditions",
+                "calibrated future-candidate backtest",
+            ],
+            uncertainty_reasons=[
+                "future candidates exist but no complete five-question Claim Card is available",
+                "GNN/VGAE is a candidate generator, not a conclusion generator",
+            ],
+        )
+
+    return actions[:10]
+
+
 def _build_topic_dossier(
     *,
     topic: str,
@@ -4820,6 +5116,15 @@ def _build_topic_dossier(
         branch_splits=branch_splits,
         bottleneck_dossiers=bottleneck_dossiers,
         validation_directions=validation_directions,
+        future_growth=future_growth,
+        rd_radar=rd_radar,
+    )
+    evidence_repair_plan = _build_topic_evidence_repair_plan(
+        topic=topic,
+        hits=hits,
+        turning_hits=turning_hits,
+        branch_splits=branch_splits,
+        bottleneck_dossiers=bottleneck_dossiers,
         future_growth=future_growth,
         rd_radar=rd_radar,
     )
@@ -4997,6 +5302,7 @@ def _build_topic_dossier(
         "hard_bottlenecks": bottleneck_dossiers,
         "validation_directions": validation_directions,
         "reading_path": reading_path,
+        "evidence_repair_plan": evidence_repair_plan,
         "evidence_objects": evidence_objects,
         "insufficient_evidence": insufficient_evidence,
         "solved_vs_open": {
@@ -5037,6 +5343,13 @@ def _build_topic_dossier(
             "fusion_status": value_model.get("fusion_status"),
         },
         "next_actions": [
+            *(
+                [
+                    "Run the Topic Dossier evidence_repair_plan before rerunning Step5c/Step6/Step13."
+                ]
+                if evidence_repair_plan
+                else []
+            ),
             "Inspect top Branch Dossiers to verify whether branch labels match the topic intent.",
             "Read Key Turning Papers with access links and evidence sections before trusting a lineage claim.",
             "Treat GNN/VGAE future edges as discovery candidates until a Step13 Claim Card passes all five questions.",

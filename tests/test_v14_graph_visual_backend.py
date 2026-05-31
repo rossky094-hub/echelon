@@ -759,6 +759,22 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert evidence_main["can_explain"]
     assert evidence_main["cannot_explain"]
     assert evidence_main["evidence_objects"][0]["type"] == "main_path_edge"
+    repair_plan = data["topic_dossier"]["evidence_repair_plan"]
+    assert repair_plan
+    assert all(task["claim_scope"] == "evidence_repair_queue_only" for task in repair_plan)
+    assert all(task["evidence_grade"] == "frontfill_target" for task in repair_plan)
+    assert all(task["uncertainty_reasons"] for task in repair_plan)
+    assert all(task["cannot_explain"] for task in repair_plan)
+    assert all(task["required_evidence"] for task in repair_plan)
+    assert all(task["evidence_objects"] for task in repair_plan)
+    assert all(task["parser_contract"] for task in repair_plan)
+    assert all("exact_id_doi_arxiv_title_section_phrase_bm25" in task["retrieval_modes"] for task in repair_plan)
+    assert {
+        "key_turning_paper_missing_primary_section",
+        "future_candidates_missing_claim_card",
+        "bottleneck_lineage_or_resolution_evidence_gap",
+        "missing_bottleneck_section_evidence",
+    } & {task["gap_type"] for task in repair_plan}
     reading_step = data["topic_dossier"]["reading_path"][0]
     assert reading_step["claim_scope"]
     assert reading_step["evidence_grade"]

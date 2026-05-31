@@ -1138,6 +1138,7 @@ function renderTopicDossier(dossier = {}) {
   const readingPath = dossier.reading_path || [];
   const solved = dossier.solved_vs_open || {};
   const insufficient = dossier.insufficient_evidence || [];
+  const repairPlan = dossier.evidence_repair_plan || [];
   return `
     <div class="dossier-hero">
       <strong>${esc(dossier.headline || "Topic dossier is being assembled.")}</strong>
@@ -1171,6 +1172,37 @@ function renderTopicDossier(dossier = {}) {
           ${insufficient.map((item) => `
             <p><strong>${esc(item.claim || "claim")}</strong><br>
             <small>${esc(item.reason || "")} / 需要：${esc(item.needed || "")}</small></p>
+          `).join("")}
+        </details>
+      ` : ""}
+      ${repairPlan.length ? `
+        <details class="insufficient-evidence" open>
+          <summary>证据修复队列 / Evidence repair plan (${fmt(repairPlan.length)})</summary>
+          ${repairPlan.slice(0, 8).map((task) => `
+            <div class="branch-card">
+              <strong>${esc(task.title || task.gap_type || "repair task")}</strong>
+              <div class="pill-row">
+                <span class="pill warn">${esc(task.priority || "priority unknown")}</span>
+                <span class="pill">${esc(task.claim_scope || "evidence_repair_queue_only")}</span>
+                <span class="pill">${esc(task.evidence_grade || "frontfill_target")}</span>
+              </div>
+              <p>${esc(task.why || "")}</p>
+              <p class="mini"><strong>frontfill query：</strong>${esc(task.frontfill_query || "")}</p>
+              ${(task.required_sections || []).length ? `<p class="mini"><strong>section：</strong>${(task.required_sections || []).slice(0, 8).map(esc).join(" / ")}</p>` : ""}
+              ${(task.target_pipeline_steps || []).length ? `<p class="mini"><strong>rerun：</strong>${(task.target_pipeline_steps || []).slice(0, 8).map(esc).join(" -> ")}</p>` : ""}
+              ${(task.retrieval_modes || []).length ? `<p class="mini"><strong>retrieval：</strong>${(task.retrieval_modes || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+              ${(task.can_explain || []).length ? `<p class="mini"><strong>能说明：</strong>${(task.can_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+              ${(task.cannot_explain || []).length ? `<p class="mini"><strong>不能说明：</strong>${(task.cannot_explain || []).slice(0, 3).map(esc).join(" / ")}</p>` : ""}
+              ${(task.required_evidence || []).length ? `<p class="mini"><strong>需要证据：</strong>${(task.required_evidence || []).slice(0, 4).map(esc).join(" / ")}</p>` : ""}
+              ${(task.uncertainty_reasons || []).length ? `
+                <details>
+                  <summary>修复任务不确定性 (${fmt((task.uncertainty_reasons || []).length)})</summary>
+                  ${(task.uncertainty_reasons || []).slice(0, 5).map((reason) => `<p class="mini">${esc(reason)}</p>`).join("")}
+                </details>
+              ` : ""}
+              ${evidencePaperButtons(task.candidate_papers || [], 5)}
+              ${renderEvidenceObjects(task.evidence_objects || [], 6)}
+            </div>
           `).join("")}
         </details>
       ` : ""}
