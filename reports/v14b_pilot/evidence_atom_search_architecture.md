@@ -77,7 +77,7 @@ Current implementation:
 - `make section-atoms` materializes the atom table and exact FTS/BM25 index.
 - `make section-atom-embeddings` materializes deterministic atom vectors for fuzzy candidate recall.
 - `search_section_atoms_hybrid()` returns exact hits and fuzzy candidates under one retrieval contract.
-- `POST /graph/visual/evidence-atoms/search` exposes exact, fuzzy, and hybrid atom retrieval to API clients.
+- `POST /graph/visual/evidence-atoms/search` exposes exact, fuzzy, and hybrid atom retrieval to API clients through a read-only DB path.
 - `echelon.v14b.section_atom_chains` assembles co-located atoms into typed bottleneck-chain evidence candidates.
 - `make section-atom-chains` materializes `section_atom_chains` with explicit missing stages.
 - Search hits carry `claim_scope=retrieval_context_only`; they are retrieval context, not product claims.
@@ -95,7 +95,7 @@ Execution snapshot:
 - `section_atom_chains`: 4,494
 - Full typed chains: 6
 - Exact FTS smoke check for `fabrication/loss`: 2,225 atom hits
-- API hybrid smoke check for `fabrication loss thermal instability`: exact hits and fuzzy candidates both return `retrieval_context_only`; no embedding payload is exposed.
+- API hybrid smoke check for `fabrication loss thermal instability`: exact hits and fuzzy candidates both return `retrieval_context_only`; no embedding payload is exposed, and missing FTS/embedding substrates return `ready=false` instead of being created by a read request.
 
 Pipeline entry:
 

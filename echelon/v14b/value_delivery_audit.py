@@ -1636,6 +1636,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
         "api_topic_branch_splits_inherit_lineage": False,
         "api_reading_path_items_carry_limits": False,
         "api_search_hits_carry_contract": False,
+        "api_evidence_atom_search_is_read_only_contract": False,
         "api_topic_bottlenecks_use_resolution_evidence": False,
         "api_limitation_atoms_carry_contract": False,
         "api_topic_validation_directions_inherit_claim_card_evidence": False,
@@ -1690,6 +1691,18 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "claim_scope",
                     "evidence_grade",
                     "uncertainty_reasons",
+                ),
+            ),
+            "api_evidence_atom_search_is_read_only_contract": _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "def search_evidence_atoms",
+                    "_connect_main(readonly=True)",
+                    "section_atoms_fts",
+                    "section_atom_embeddings",
+                    "search_section_atoms_hybrid",
+                    "ensure_schema=False",
+                    "retrieval_context_only",
                 ),
             ),
             "api_topic_bottlenecks_use_resolution_evidence": _source_contains(

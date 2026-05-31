@@ -80,11 +80,14 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
-def _connect_main() -> sqlite3.Connection | None:
+def _connect_main(*, readonly: bool = False) -> sqlite3.Connection | None:
     path = _db_main_path()
     if not path.exists():
         return None
-    conn = sqlite3.connect(str(path), timeout=10)
+    if readonly:
+        conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True, timeout=10)
+    else:
+        conn = sqlite3.connect(str(path), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=10000")
     return conn
@@ -1126,7 +1129,7 @@ def _evidence_atom_search_contract(search_mode: str) -> dict[str, Any]:
 def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
     """Search traceable section atoms in DB_MAIN with exact/fuzzy semantics."""
     start = time.perf_counter()
-    conn = _connect_main()
+    conn = _connect_main(readonly=True)
     if conn is None:
         return {
             "query_id": query.query_id,
@@ -1144,9 +1147,12 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
         }
 
     try:
-        missing = [table for table in ("section_atoms",) if not _table_exists(conn, table)]
-        if query.search_mode in {"fuzzy", "hybrid"} and not _table_exists(conn, "section_atom_embeddings"):
-            missing.append("section_atom_embeddings")
+        required_tables = ["section_atoms"]
+        if query.search_mode in {"exact", "hybrid"}:
+            required_tables.append("section_atoms_fts")
+        if query.search_mode in {"fuzzy", "hybrid"}:
+            required_tables.append("section_atom_embeddings")
+        missing = [table for table in required_tables if not _table_exists(conn, table)]
         if missing:
             return {
                 "query_id": query.query_id,
@@ -1169,6 +1175,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 query.query_text,
                 top_k=query.top_k,
                 filters=query.filters,
+                ensure_schema=False,
             )
             exact_hits = hits
             fuzzy_hits: list[dict[str, Any]] = []
@@ -1182,6 +1189,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 embedding_model=query.embedding_model,
                 embedding_dim=query.embedding_dim,
                 min_score=query.min_fuzzy_score,
+                ensure_schema=False,
             )
             exact_hits = []
             fuzzy_hits = hits
@@ -1197,6 +1205,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 embedding_model=query.embedding_model,
                 embedding_dim=query.embedding_dim,
                 min_fuzzy_score=query.min_fuzzy_score,
+                ensure_schema=False,
             )
             hits = result["merged_hits"]
             exact_hits = result["exact_hits"]

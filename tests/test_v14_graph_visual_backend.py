@@ -456,6 +456,38 @@ def test_evidence_atom_search_endpoint_returns_exact_and_fuzzy_contracts(tmp_pat
     assert data["hits"][0]["source_storage_uri"].endswith("/p1.pdf")
 
 
+def test_evidence_atom_search_endpoint_is_read_only_and_requires_fts(tmp_path, monkeypatch):
+    db_path = tmp_path / "echelon_library.sqlite3"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("CREATE TABLE section_atoms (atom_id TEXT PRIMARY KEY, atom_text TEXT)")
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_MAIN", str(db_path))
+
+    resp = client.post(
+        "/graph/visual/evidence-atoms/search",
+        headers=VIEWER_HEADERS,
+        json={
+            "query_text": "fabrication loss",
+            "search_mode": "exact",
+            "top_k": 5,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is False
+    assert data["search_contract"]["claim_scope"] == "retrieval_context_only"
+    assert "section_atoms_fts" in data["missing_tables"]
+
+    conn = sqlite3.connect(str(db_path))
+    created = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE name = 'section_atoms_fts'"
+    ).fetchone()
+    conn.close()
+    assert created is None
+
+
 def test_visual_citation_and_bottleneck_search(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

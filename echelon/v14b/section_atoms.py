@@ -675,9 +675,13 @@ def search_section_atoms(
     *,
     top_k: int = 20,
     filters: dict[str, Any] | None = None,
+    ensure_schema: bool = True,
 ) -> list[dict[str, Any]]:
     filters = filters or {}
-    ensure_section_atoms_schema(conn)
+    if ensure_schema:
+        ensure_section_atoms_schema(conn)
+    elif not _table_exists(conn, "section_atoms"):
+        return []
     where = []
     params: list[Any] = []
     if filters.get("paper_id"):
@@ -759,9 +763,13 @@ def search_section_atoms_fuzzy(
     embedding_model: str = ATOM_EMBEDDING_MODEL,
     embedding_dim: int = ATOM_EMBEDDING_DIM,
     min_score: float = 0.0,
+    ensure_schema: bool = True,
 ) -> list[dict[str, Any]]:
     filters = filters or {}
-    ensure_section_atom_embeddings_schema(conn)
+    if ensure_schema:
+        ensure_section_atom_embeddings_schema(conn)
+    elif not (_table_exists(conn, "section_atoms") and _table_exists(conn, "section_atom_embeddings")):
+        return []
     if not query_text or not _table_exists(conn, "section_atom_embeddings"):
         return []
     where = ["e.embedding_model = ?", "e.embedding_dim = ?"]
@@ -833,6 +841,7 @@ def search_section_atoms_hybrid(
     embedding_model: str = ATOM_EMBEDDING_MODEL,
     embedding_dim: int = ATOM_EMBEDDING_DIM,
     min_fuzzy_score: float = 0.0,
+    ensure_schema: bool = True,
 ) -> dict[str, Any]:
     """Return exact atom hits plus fuzzy recall candidates under one contract."""
     filters = filters or {}
@@ -841,6 +850,7 @@ def search_section_atoms_hybrid(
         query_text,
         top_k=exact_top_k or top_k,
         filters=filters,
+        ensure_schema=ensure_schema,
     )
     fuzzy_hits = search_section_atoms_fuzzy(
         conn,
@@ -850,6 +860,7 @@ def search_section_atoms_hybrid(
         embedding_model=embedding_model,
         embedding_dim=int(embedding_dim),
         min_score=min_fuzzy_score,
+        ensure_schema=ensure_schema,
     )
     merged = _merge_hybrid_hits(exact_hits, fuzzy_hits, top_k=top_k)
     return {

@@ -152,6 +152,7 @@ def _write_product_sources(root: Path) -> None:
         'def _reading_path_item(): return {"can_explain": can_explain, "cannot_explain": cannot_explain, "note": "Radar promotion without complete Step13 Claim Cards GNN/VGAE is a candidate generator, not a conclusion generator"}\n'
         'def _paper_hit_contract(): return visual_search_hit + retrieval_context_only + claim_scope + evidence_grade + uncertainty_reasons + reason.get("claim_scope") + reason.get("evidence_objects")\n'
         "def _hydrate_hits(): return _paper_hit_contract\n"
+        "def search_evidence_atoms(): return _connect_main(readonly=True) + section_atoms_fts + section_atom_embeddings + search_section_atoms_hybrid + ensure_schema=False + retrieval_context_only\n"
         "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
@@ -634,6 +635,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_branch_splits_inherit_lineage"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_reading_path_items_carry_limits"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_search_hits_carry_contract"] is True
+    assert topic_gate["online_readiness_contract"]["checks"]["api_evidence_atom_search_is_read_only_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_bottlenecks_use_resolution_evidence"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_limitation_atoms_carry_contract"] is True
     assert topic_gate["online_readiness_contract"]["checks"]["api_topic_validation_directions_inherit_claim_card_evidence"] is True
