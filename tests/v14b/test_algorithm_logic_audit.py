@@ -48,7 +48,11 @@ def _make_v14(path: Path) -> None:
         CREATE TABLE visual_nodes (paper_id TEXT);
         CREATE TABLE visual_edges (layer TEXT);
         CREATE TABLE branch_lineages (branch_id TEXT);
-        CREATE TABLE bottleneck_lineage_triples (source_stage TEXT, target_stage TEXT);
+        CREATE TABLE bottleneck_lineage_triples (
+            source_stage TEXT,
+            target_stage TEXT,
+            metadata_json TEXT
+        );
         """
     )
     conn.execute("INSERT INTO main_path_edges VALUES (1)")
@@ -62,6 +66,21 @@ def _make_v14(path: Path) -> None:
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute("INSERT INTO visual_edges VALUES ('future')")
     conn.execute("INSERT INTO branch_lineages VALUES ('b1')")
+    conn.executemany(
+        "INSERT INTO bottleneck_lineage_triples VALUES (?, ?, ?)",
+        [
+            (
+                "constraint_failure",
+                "candidate_resolver",
+                json.dumps({"typed_chain_completeness": "resolution_candidate_partial"}),
+            ),
+            (
+                "constraint_failure",
+                "validated_resolver",
+                json.dumps({"typed_chain_completeness": "full", "typed_chain_complete": True}),
+            ),
+        ],
+    )
     conn.commit()
     conn.close()
 
@@ -100,4 +119,8 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert "never produce conclusions directly" in md
     assert "Step5s section evidence" in md
     assert "Do not loosen parser" in md
+    assert "resolution_candidate_partial" in md
+    payload = json.loads((reports / "algorithm_logic_audit.json").read_text(encoding="utf-8"))
+    assert payload["metrics"]["lineage_completeness_counts"]["resolution_candidate_partial"] == 1
+    assert payload["metrics"]["complete_typed_lineage_triples"] == 1
     assert result["status_counts"]["readiness"]["fail"] >= 1

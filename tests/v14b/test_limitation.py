@@ -17,6 +17,7 @@ from echelon.v14b.step5c_limitation import (
     get_top_papers_for_limitation,
     check_resolution,
     rank_unresolved_limitations,
+    HEURISTIC_RESOLUTION_EVIDENCE_TEXT,
     LIMITATION_EXTRACT_PROMPT,
     RESOLUTION_CHECK_PROMPT,
 )
@@ -295,6 +296,25 @@ class TestRankUnresolvedLimitations:
 
         atom_ids = {r["atom_id"] for r in unresolved}
         assert 4 not in atom_ids, "Resolved atom should not appear"
+
+    def test_heuristic_resolution_does_not_remove_unresolved_atom(self, tmp_path):
+        conn = self._create_test_db(tmp_path)
+        conn.execute(
+            "DELETE FROM limitation_resolutions WHERE atom_id = 4"
+        )
+        conn.execute(
+            """
+            INSERT INTO limitation_resolutions (atom_id, resolver_paper_id, confidence, evidence_text)
+            VALUES (?, ?, ?, ?)
+            """,
+            (4, 21, 0.65, HEURISTIC_RESOLUTION_EVIDENCE_TEXT),
+        )
+        conn.commit()
+        unresolved = rank_unresolved_limitations(conn, top_n=10)
+        conn.close()
+
+        atom_ids = {r["atom_id"] for r in unresolved}
+        assert 4 in atom_ids, "Lexical resolver candidates should not close unresolved atoms"
 
     def test_high_severity_first(self, tmp_path):
         conn = self._create_test_db(tmp_path)

@@ -183,6 +183,10 @@ COST_TERMS = re.compile(
     re.I,
 )
 
+HEURISTIC_RESOLUTION_EVIDENCE_TEXT = (
+    "Algorithmic lexical match between limitation keyword and resolver claim."
+)
+
 def jdumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -470,9 +474,14 @@ def load_atoms(
             """
             SELECT atom_id, MIN(COALESCE(resolution_year, 9999)) AS first_year, COUNT(*) AS n
             FROM limitation_resolutions
-            WHERE COALESCE(confidence, 0) >= 0.6
+            WHERE COALESCE(confidence, 0) >= 0.75
+              AND (
+                    evidence_text IS NULL
+                    OR evidence_text != ?
+              )
             GROUP BY atom_id
-            """
+            """,
+            (HEURISTIC_RESOLUTION_EVIDENCE_TEXT,),
         ).fetchall()
         resolved_map = {
             int(r[0]): (0 if r[1] == 9999 else int(r[1]), int(r[2]))
@@ -1260,6 +1269,12 @@ def _normalize_section_name(raw: str) -> str:
     return name
 
 
+def _resolution_row_is_validated(row: dict) -> bool:
+    evidence = str(row.get("evidence_text") or "").strip()
+    confidence = float(row.get("confidence") or 0.0)
+    return confidence >= 0.75 and evidence != HEURISTIC_RESOLUTION_EVIDENCE_TEXT
+
+
 def build_bottleneck_lineage_triples(
     *,
     atoms: list[dict],
@@ -1329,9 +1344,13 @@ def build_bottleneck_lineage_triples(
         local_fix_text = "missing evidence: no validated local fix"
         next_constraint_text = "missing evidence: no follow-on constraint"
         rel_rows = resolution_by_atom.get(atom_id, [])
+        validated_rel_rows = [row for row in rel_rows if _resolution_row_is_validated(row)]
         if rel_rows:
             best = max(rel_rows, key=lambda r: float(r.get("confidence") or 0.0))
-            attempt_text = f"resolver:{best.get('resolver_paper_id')}"
+            attempt_text = f"candidate_resolver:{best.get('resolver_paper_id')}"
+        if validated_rel_rows:
+            best = max(validated_rel_rows, key=lambda r: float(r.get("confidence") or 0.0))
+            attempt_text = f"validated_resolver:{best.get('resolver_paper_id')}"
             local_fix_text = str(best.get("evidence_text") or "reported mitigation")[:280]
         siblings = keyword_future_atoms.get(kw, [])
         newer = [a for a in siblings if int(a.get("publication_year") or 0) > year]
@@ -1342,19 +1361,27 @@ def build_bottleneck_lineage_triples(
         stage_evidence = {
             "constraint": "principle_keyword_classification",
             "failure_mechanism": "limitation_atom_description",
-            "attempt_path": "resolution_record" if rel_rows else "missing_resolution_evidence",
-            "local_fix": "resolution_evidence_text" if rel_rows else "missing_local_fix_evidence",
+            "attempt_path": "candidate_resolution_record" if rel_rows else "missing_resolution_evidence",
+            "local_fix": (
+                "validated_resolution_evidence_text"
+                if validated_rel_rows else
+                "missing_validated_local_fix_evidence"
+            ),
             "new_constraint": "later_same_keyword_atom" if newer else "missing_follow_on_constraint",
         }
         if not rel_rows:
-            placeholder_stages.extend(["attempt_path", "local_fix"])
+            placeholder_stages.append("attempt_path")
+        if not validated_rel_rows:
+            placeholder_stages.append("local_fix")
         if not newer:
             placeholder_stages.append("new_constraint")
         typed_chain_complete = not placeholder_stages
         if typed_chain_complete:
             typed_chain_completeness = "full"
+        elif validated_rel_rows:
+            typed_chain_completeness = "validated_resolution_partial"
         elif rel_rows:
-            typed_chain_completeness = "resolution_backed_partial"
+            typed_chain_completeness = "resolution_candidate_partial"
         else:
             typed_chain_completeness = "constraint_failure_only"
         lineage_missing_reasons = [
@@ -1400,6 +1427,7 @@ def build_bottleneck_lineage_triples(
                             "root_constraint_type": root_type,
                             "severity": atom.get("severity"),
                             "n_resolutions": len(rel_rows),
+                            "n_validated_resolutions": len(validated_rel_rows),
                             "page_candidates": pages,
                             "lineage_schema": [
                                 "constraint",

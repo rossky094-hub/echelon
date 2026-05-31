@@ -90,6 +90,10 @@ RESOLUTION_TERMS = re.compile(
     re.I,
 )
 
+HEURISTIC_RESOLUTION_EVIDENCE_TEXT = (
+    "Algorithmic lexical match between limitation keyword and resolver claim."
+)
+
 # ---------------------------------------------------------------------------
 # Prompt 模板
 # ---------------------------------------------------------------------------
@@ -482,7 +486,7 @@ def check_resolution(
                 "resolver_paper_id": resolver_paper["id"],
                 "resolution_year": resolver_paper.get("publication_year"),
                 "confidence": confidence,
-                "evidence_text": "Algorithmic lexical match between limitation keyword and resolver claim.",
+                "evidence_text": HEURISTIC_RESOLUTION_EVIDENCE_TEXT,
             }
         return None
 
@@ -533,14 +537,19 @@ def rank_unresolved_limitations(
             MAX(COALESCE(r.confidence, 0)) AS max_confidence
         FROM limitation_atoms a
         LEFT JOIN limitation_resolutions r
-            ON a.atom_id = r.atom_id AND r.confidence > 0.6
+            ON a.atom_id = r.atom_id
+           AND r.confidence >= 0.75
+           AND (
+                r.evidence_text IS NULL
+                OR r.evidence_text != ?
+           )
         GROUP BY a.atom_id
         HAVING max_confidence < 0.7 OR max_confidence IS NULL
         ORDER BY
             CASE a.severity WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC,
             n_resolved ASC
         LIMIT ?
-    """, (top_n,)).fetchall()
+    """, (HEURISTIC_RESOLUTION_EVIDENCE_TEXT, top_n)).fetchall()
 
     return [dict(r) for r in rows]
 

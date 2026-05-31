@@ -86,7 +86,10 @@ def test_step13_load_atoms_rejects_aggregate_section_provenance(tmp_path):
 
 
 def test_bottleneck_lineage_triples_mark_missing_stages():
-    from echelon.v14b.step13_first_principles_history import build_bottleneck_lineage_triples
+    from echelon.v14b.step13_first_principles_history import (
+        HEURISTIC_RESOLUTION_EVIDENCE_TEXT,
+        build_bottleneck_lineage_triples,
+    )
 
     triples = build_bottleneck_lineage_triples(
         atoms=[
@@ -103,7 +106,15 @@ def test_bottleneck_lineage_triples_mark_missing_stages():
                 "source_section_name": "discussion",
             }
         ],
-        resolution_rows=[],
+        resolution_rows=[
+            {
+                "atom_id": 1,
+                "resolver_paper_id": "p2",
+                "resolution_year": 2025,
+                "confidence": 0.65,
+                "evidence_text": HEURISTIC_RESOLUTION_EVIDENCE_TEXT,
+            }
+        ],
         section_pages={},
         future_directions=[],
     )
@@ -111,9 +122,65 @@ def test_bottleneck_lineage_triples_mark_missing_stages():
     assert len(triples) == 4
     metadata = json.loads(triples[1]["metadata_json"])
     assert metadata["typed_chain_complete"] is False
-    assert metadata["typed_chain_completeness"] == "constraint_failure_only"
-    assert "attempt_path" in metadata["placeholder_stages"]
-    assert triples[1]["target_text"].startswith("missing evidence:")
+    assert metadata["typed_chain_completeness"] == "resolution_candidate_partial"
+    assert metadata["n_resolutions"] == 1
+    assert metadata["n_validated_resolutions"] == 0
+    assert "attempt_path" not in metadata["placeholder_stages"]
+    assert "local_fix" in metadata["placeholder_stages"]
+    assert triples[1]["target_text"].startswith("candidate_resolver:")
+    assert triples[2]["target_text"].startswith("missing evidence:")
+
+
+def test_bottleneck_lineage_triples_can_be_full_with_validated_fix_and_follow_on_constraint():
+    from echelon.v14b.step13_first_principles_history import build_bottleneck_lineage_triples
+
+    triples = build_bottleneck_lineage_triples(
+        atoms=[
+            {
+                "atom_id": 1,
+                "paper_id": "p1",
+                "paper_title": "Paper",
+                "publication_year": 2021,
+                "description": "Fabrication tolerance still limits broadband imaging quality.",
+                "keyword": "fabrication",
+                "severity": "high",
+                "evidence_quality": "section_level",
+                "evidence_weight": 0.9,
+                "source_section_name": "discussion",
+            },
+            {
+                "atom_id": 2,
+                "paper_id": "p3",
+                "paper_title": "Follow-on paper",
+                "publication_year": 2024,
+                "description": "Packaging drift becomes the new fabrication constraint.",
+                "keyword": "fabrication",
+                "severity": "medium",
+                "evidence_quality": "section_level",
+                "evidence_weight": 0.8,
+                "source_section_name": "discussion",
+            },
+        ],
+        resolution_rows=[
+            {
+                "atom_id": 1,
+                "resolver_paper_id": "p2",
+                "resolution_year": 2023,
+                "confidence": 0.9,
+                "evidence_text": "Measured mitigation improves fabrication tolerance and reduces imaging loss.",
+            }
+        ],
+        section_pages={},
+        future_directions=[],
+    )
+
+    first_atom_triples = [t for t in triples if t["atom_id"] == 1]
+    assert len(first_atom_triples) == 4
+    metadata = json.loads(first_atom_triples[0]["metadata_json"])
+    assert metadata["typed_chain_complete"] is True
+    assert metadata["typed_chain_completeness"] == "full"
+    assert metadata["placeholder_stages"] == []
+    assert first_atom_triples[2]["target_text"].startswith("Measured mitigation")
 
 
 def test_step13_builds_first_principles_outputs(tmp_path):

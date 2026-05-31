@@ -71,19 +71,24 @@ def _lineage_completeness_counts(conn: sqlite3.Connection) -> dict[str, int]:
             "complete_typed_lineage_triples": 0,
             "partial_typed_lineage_triples": 0,
             "unknown_typed_lineage_triples": _count(conn, "bottleneck_lineage_triples"),
+            "lineage_completeness_counts": {},
         }
     complete = 0
     partial = 0
     unknown = 0
+    by_completeness: dict[str, int] = {}
     for row in conn.execute("SELECT metadata_json FROM bottleneck_lineage_triples").fetchall():
         raw = row[0] if not isinstance(row, sqlite3.Row) else row["metadata_json"]
         try:
             meta = json.loads(raw or "{}")
         except Exception:
             meta = {}
-        if meta.get("typed_chain_complete") or meta.get("typed_chain_completeness") == "full":
+        completeness = str(meta.get("typed_chain_completeness") or "").strip()
+        if completeness:
+            by_completeness[completeness] = by_completeness.get(completeness, 0) + 1
+        if meta.get("typed_chain_complete") or completeness == "full":
             complete += 1
-        elif meta.get("typed_chain_completeness"):
+        elif completeness:
             partial += 1
         else:
             unknown += 1
@@ -91,6 +96,7 @@ def _lineage_completeness_counts(conn: sqlite3.Connection) -> dict[str, int]:
         "complete_typed_lineage_triples": complete,
         "partial_typed_lineage_triples": partial,
         "unknown_typed_lineage_triples": unknown,
+        "lineage_completeness_counts": by_completeness,
     }
 
 
@@ -163,6 +169,7 @@ def build_algorithm_logic_audit(
     limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
     complete_typed_lineage_triples = int(m.get("complete_typed_lineage_triples") or 0)
     partial_typed_lineage_triples = int(m.get("partial_typed_lineage_triples") or 0)
+    lineage_completeness_counts = dict(m.get("lineage_completeness_counts") or {})
     topic_gap_dg_rate = float(m.get("topic_gap_decision_grade_section_rate") or 0.0)
     no_target = m.get("topic_gap_no_target_inspection_state") or {}
     frontfill = m.get("section_frontfill_state") or {}
@@ -342,7 +349,8 @@ def build_algorithm_logic_audit(
                 f"complete={int(m.get('complete_claim_cards') or 0):,}; "
                 f"high_confidence={int(m.get('high_confidence_claim_cards') or 0):,}; "
                 f"complete_typed_lineage_triples={complete_typed_lineage_triples:,}; "
-                f"partial_typed_lineage_triples={partial_typed_lineage_triples:,}."
+                f"partial_typed_lineage_triples={partial_typed_lineage_triples:,}; "
+                f"lineage_completeness={lineage_completeness_counts}."
             ),
             "Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria.",
         ),
@@ -429,6 +437,7 @@ def build_algorithm_logic_audit(
             "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
             "complete_typed_lineage_triples": complete_typed_lineage_triples,
             "partial_typed_lineage_triples": partial_typed_lineage_triples,
+            "lineage_completeness_counts": lineage_completeness_counts,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
         },
@@ -461,6 +470,7 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
         f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
         f"- partial_typed_lineage_triples: `{int(result['metrics']['partial_typed_lineage_triples']):,}`",
+        f"- lineage_completeness_counts: `{json.dumps(result['metrics'].get('lineage_completeness_counts') or {}, ensure_ascii=False, sort_keys=True)}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
         "",

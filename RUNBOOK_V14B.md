@@ -778,4 +778,34 @@ echelon-v14b/
 
 ---
 
+## Raw PDF 外接盘下载
+
+全量论文 PDF 不进入 git，也不直接写主库 `pdfs` 表。下载器把文件和 manifest 都放在外接盘，避免与在线 section ingest 抢 SQLite 写锁：
+
+```bash
+mkdir -p /Volumes/LaCie/Echelon_Paper_Raw_Data/{pdfs,metadata,sections,manifests,logs,tmp}
+python3 scripts/download_raw_papers.py \
+  --store-root /Volumes/LaCie/Echelon_Paper_Raw_Data \
+  --concurrency 2 \
+  --request-delay 0.75
+```
+
+后台运行建议使用 `screen`，日志写入外接盘：
+
+```bash
+screen -dmS v14b_raw_pdf_full zsh -lc 'cd /Users/r/Documents/New\ project/echelon/echelon-v14b && export PYTHONPATH=. COPYFILE_DISABLE=1 && python3 scripts/download_raw_papers.py --store-root /Volumes/LaCie/Echelon_Paper_Raw_Data --concurrency 2 --request-delay 0.75 --progress-every 100 >> /Volumes/LaCie/Echelon_Paper_Raw_Data/logs/raw_pdf_full.log 2>&1'
+```
+
+进度检查：
+
+```bash
+sqlite3 /Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3 \
+  "SELECT status, COUNT(*), ROUND(SUM(COALESCE(size_bytes,0))/1024.0/1024.0/1024.0,2) AS gb FROM raw_pdf_downloads GROUP BY status;"
+tail -f /Volumes/LaCie/Echelon_Paper_Raw_Data/logs/raw_pdf_full.log
+```
+
+当前策略：raw PDF 全量低速常驻下载；section 抽取仍按高价值队列优先推进。等 raw PDF 覆盖稳定后，再让 section ingest 优先读本地 PDF 来缩短调优周期。
+
+---
+
 *Echelon V14-B | 演化树 Pilot 运行手册 v1.0*
