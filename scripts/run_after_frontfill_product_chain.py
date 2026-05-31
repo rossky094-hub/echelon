@@ -31,6 +31,9 @@ from echelon.v14b.evidence_contracts import (
 
 
 DEFAULT_STEPS = (
+    "section-atoms",
+    "section-atom-embeddings",
+    "section-atom-chains",
     "limitation",
     "fusion",
     "first-principles",
@@ -42,6 +45,18 @@ DEFAULT_STEPS = (
 )
 
 STEP_MODULES = {
+    "section-atoms": ("echelon.v14b.section_atoms", ()),
+    "section-atom-embeddings": (
+        "echelon.v14b.section_atoms",
+        (
+            "--skip-atom-build",
+            "--build-embeddings",
+            "--embedding-rebuild",
+            "--embedding-dim",
+            os.getenv("V14B_SECTION_ATOM_EMBEDDING_DIM", "256"),
+        ),
+    ),
+    "section-atom-chains": ("echelon.v14b.section_atom_chains", ()),
     "limitation": ("echelon.v14b.step5c_limitation", ()),
     "fusion": ("echelon.v14b.step6_fusion", ()),
     "first-principles": ("echelon.v14b.step13_first_principles_history", ("--out-dir", "reports/v14b_pilot")),
@@ -53,6 +68,9 @@ STEP_MODULES = {
 }
 
 EVIDENCE_SENSITIVE_STEPS = {
+    "section-atoms",
+    "section-atom-embeddings",
+    "section-atom-chains",
     "limitation",
     "fusion",
     "mutation",
@@ -596,6 +614,11 @@ def main(argv=None) -> int:
         default=os.getenv("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),
     )
     parser.add_argument("--active-section-pattern", default="step5s_section_ingest")
+    parser.add_argument(
+        "--skip-active-section-gate",
+        action="store_true",
+        help="Allow downstream writers even when a broad section ingest process is active; use only for isolated smoke tests.",
+    )
     parser.add_argument("--step", action="append", default=None)
     parser.add_argument("--force", action="store_true", help="Run even if evidence gates are not ready; use only for smoke tests.")
     parser.add_argument("--corpus-id", default=os.getenv("V14B_CORPUS_ID") or None)
@@ -641,9 +664,19 @@ def main(argv=None) -> int:
     failures = list(base_failures)
     if topic_gap_failures:
         failures.extend(topic_gap_failures)
-    ready = base_ready and topic_gap_ready
+    active_section_writer = (
+        not args.skip_active_section_gate
+        and active_section_ingest(args.active_section_pattern)
+    )
+    if active_section_writer:
+        failures.append(
+            "active_section_ingest still running; wait before rebuilding section atoms/chains and downstream claims"
+        )
+    ready = base_ready and topic_gap_ready and not active_section_writer
     if failures:
         log(log_file, "FRONTFILL_WAIT " + "; ".join(failures))
+    if active_section_writer:
+        return 0
     if not ready and not args.force:
         return 0
 

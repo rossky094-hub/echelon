@@ -33,6 +33,35 @@ def test_post_frontfill_rebuilds_evidence_sensitive_steps_with_no_resume(tmp_pat
     assert cmd[cmd.index("--corpus-id") + 1] == "optics"
 
 
+def test_post_frontfill_default_chain_rebuilds_section_atom_substrate_before_step5c():
+    mod = _load_module()
+
+    assert list(mod.DEFAULT_STEPS[:4]) == [
+        "section-atoms",
+        "section-atom-embeddings",
+        "section-atom-chains",
+        "limitation",
+    ]
+
+
+def test_post_frontfill_section_atom_embedding_step_rebuilds_vectors(tmp_path):
+    mod = _load_module()
+
+    cmd = mod.build_step_command(
+        python_exe="python3",
+        step="section-atom-embeddings",
+        db_main=tmp_path / "main.sqlite3",
+        db_v14=tmp_path / "v14.sqlite3",
+        force_rerun=True,
+    )
+
+    assert cmd[:3] == ["python3", "-m", "echelon.v14b.section_atoms"]
+    assert "--skip-atom-build" in cmd
+    assert "--build-embeddings" in cmd
+    assert "--embedding-rebuild" in cmd
+    assert "--no-resume" in cmd
+
+
 def test_post_frontfill_rebuilds_visual_outputs_without_checkpoint_flag(tmp_path):
     mod = _load_module()
 
@@ -270,4 +299,33 @@ def test_post_frontfill_detects_active_section_ingest_without_screen_wrappers():
     assert not mod._is_active_section_ingest_line(
         "123 python3 scripts/watch_step5s_section_ingest.py",
         "step5s_section_ingest",
+    )
+
+
+def test_post_frontfill_active_section_ingest_blocks_downstream_writers(tmp_path, monkeypatch):
+    mod = _load_module()
+    monkeypatch.setattr(mod, "active_section_ingest", lambda _pattern: True)
+    monkeypatch.setattr(
+        mod,
+        "run_step",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("run_step should not be called")),
+    )
+
+    rc = mod.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--db-main",
+            "main.sqlite3",
+            "--db-v14",
+            "v14.sqlite3",
+            "--log-file",
+            "after_frontfill.log",
+            "--force",
+        ]
+    )
+
+    assert rc == 0
+    assert "active_section_ingest still running" in (tmp_path / "after_frontfill.log").read_text(
+        encoding="utf-8"
     )

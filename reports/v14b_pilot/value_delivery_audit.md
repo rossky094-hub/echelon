@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T07:38:03Z`
+- generated_at: `2026-05-31T07:44:36Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -496,6 +496,7 @@
     "package_docstring_avoids_legacy_pilot_flow": true,
     "pilot_full_is_legacy_compatibility_only": true,
     "post_frontfill_entry_present": true,
+    "post_frontfill_rebuilds_section_atom_substrate": true,
     "post_frontfill_requires_decision_grade_section_gates": true,
     "post_frontfill_uses_topic_gap_repair": true,
     "product_chain_runs_decision_audit": true,

@@ -2677,6 +2677,15 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
             ("V14B_TOPIC_GAP_FRONTFILL_CMD", "make topic-gap-repair"),
         ),
+        "post_frontfill_rebuilds_section_atom_substrate": _source_contains(
+            (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
+            (
+                "section-atoms",
+                "section-atom-embeddings",
+                "section-atom-chains",
+                "active_section_ingest still running",
+            ),
+        ),
         "post_frontfill_requires_decision_grade_section_gates": _source_contains(
             (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
             (
