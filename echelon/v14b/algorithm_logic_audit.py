@@ -101,6 +101,47 @@ def _lineage_completeness_counts(conn: sqlite3.Connection) -> dict[str, int]:
     }
 
 
+def _claim_card_chain_support_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    if "quality_gate_json" not in _columns(conn, "direction_claim_cards"):
+        return {
+            "claim_cards_with_section_atom_chain_support": 0,
+            "complete_claim_cards_with_section_atom_chain_support": 0,
+            "high_confidence_claim_cards_with_section_atom_chain_support": 0,
+            "claim_cards_with_full_decision_grade_chain": 0,
+        }
+    out = {
+        "claim_cards_with_section_atom_chain_support": 0,
+        "complete_claim_cards_with_section_atom_chain_support": 0,
+        "high_confidence_claim_cards_with_section_atom_chain_support": 0,
+        "claim_cards_with_full_decision_grade_chain": 0,
+    }
+    rows = conn.execute(
+        """
+        SELECT five_question_complete, high_confidence_eligible, quality_gate_json
+        FROM direction_claim_cards
+        """
+    ).fetchall()
+    for row in rows:
+        raw = row["quality_gate_json"] if isinstance(row, sqlite3.Row) else row[2]
+        try:
+            gate = json.loads(raw or "{}")
+        except Exception:
+            gate = {}
+        support = gate.get("section_atom_chain_support") if isinstance(gate, dict) else {}
+        if not isinstance(support, dict) or int(support.get("total") or 0) <= 0:
+            continue
+        out["claim_cards_with_section_atom_chain_support"] += 1
+        complete = int(row["five_question_complete"] if isinstance(row, sqlite3.Row) else row[0] or 0)
+        high_confidence = int(row["high_confidence_eligible"] if isinstance(row, sqlite3.Row) else row[1] or 0)
+        if complete:
+            out["complete_claim_cards_with_section_atom_chain_support"] += 1
+        if high_confidence:
+            out["high_confidence_claim_cards_with_section_atom_chain_support"] += 1
+        if int(support.get("full_decision_grade") or 0) > 0:
+            out["claim_cards_with_full_decision_grade_chain"] += 1
+    return out
+
+
 def _load_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
@@ -173,6 +214,7 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
         )
         metrics["bottleneck_triples"] = _count(v14, "bottleneck_lineage_triples")
         metrics.update(_lineage_completeness_counts(v14))
+        metrics.update(_claim_card_chain_support_counts(v14))
         metrics["vgae_calibration_audit"] = _count(v14, "vgae_calibration_audit")
         metrics["branch_lineages"] = _count(v14, "branch_lineages")
         metrics["visual_nodes"] = _count(v14, "visual_nodes")
@@ -207,6 +249,14 @@ def build_algorithm_logic_audit(
     complete_typed_lineage_triples = int(m.get("complete_typed_lineage_triples") or 0)
     partial_typed_lineage_triples = int(m.get("partial_typed_lineage_triples") or 0)
     lineage_completeness_counts = dict(m.get("lineage_completeness_counts") or {})
+    claim_cards_with_chain_support = int(m.get("claim_cards_with_section_atom_chain_support") or 0)
+    complete_claim_cards_with_chain_support = int(
+        m.get("complete_claim_cards_with_section_atom_chain_support") or 0
+    )
+    high_confidence_claim_cards_with_chain_support = int(
+        m.get("high_confidence_claim_cards_with_section_atom_chain_support") or 0
+    )
+    claim_cards_with_full_decision_grade_chain = int(m.get("claim_cards_with_full_decision_grade_chain") or 0)
     topic_gap_dg_rate = float(m.get("topic_gap_decision_grade_section_rate") or 0.0)
     no_target = m.get("topic_gap_no_target_inspection_state") or {}
     frontfill = m.get("section_frontfill_state") or {}
@@ -418,11 +468,17 @@ def build_algorithm_logic_audit(
                 f"Claim Cards={int(m.get('direction_claim_cards') or 0):,}; "
                 f"complete={int(m.get('complete_claim_cards') or 0):,}; "
                 f"high_confidence={int(m.get('high_confidence_claim_cards') or 0):,}; "
+                f"chain_supported_cards={claim_cards_with_chain_support:,}; "
+                f"complete_chain_supported_cards={complete_claim_cards_with_chain_support:,}; "
+                f"full_decision_grade_chain_cards={claim_cards_with_full_decision_grade_chain:,}; "
                 f"complete_typed_lineage_triples={complete_typed_lineage_triples:,}; "
                 f"partial_typed_lineage_triples={partial_typed_lineage_triples:,}; "
                 f"lineage_completeness={lineage_completeness_counts}."
             ),
-            "Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria.",
+            (
+                "Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards "
+                "can progress beyond exploratory status without weakening gates."
+            ),
         ),
         StepAudit(
             "Step7 mutation",
@@ -516,6 +572,10 @@ def build_algorithm_logic_audit(
             "complete_typed_lineage_triples": complete_typed_lineage_triples,
             "partial_typed_lineage_triples": partial_typed_lineage_triples,
             "lineage_completeness_counts": lineage_completeness_counts,
+            "claim_cards_with_section_atom_chain_support": claim_cards_with_chain_support,
+            "complete_claim_cards_with_section_atom_chain_support": complete_claim_cards_with_chain_support,
+            "high_confidence_claim_cards_with_section_atom_chain_support": high_confidence_claim_cards_with_chain_support,
+            "claim_cards_with_full_decision_grade_chain": claim_cards_with_full_decision_grade_chain,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
         },
@@ -557,6 +617,9 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
         f"- partial_typed_lineage_triples: `{int(result['metrics']['partial_typed_lineage_triples']):,}`",
         f"- lineage_completeness_counts: `{json.dumps(result['metrics'].get('lineage_completeness_counts') or {}, ensure_ascii=False, sort_keys=True)}`",
+        f"- claim_cards_with_section_atom_chain_support: `{int(result['metrics']['claim_cards_with_section_atom_chain_support']):,}`",
+        f"- complete_claim_cards_with_section_atom_chain_support: `{int(result['metrics']['complete_claim_cards_with_section_atom_chain_support']):,}`",
+        f"- claim_cards_with_full_decision_grade_chain: `{int(result['metrics']['claim_cards_with_full_decision_grade_chain']):,}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
         "",

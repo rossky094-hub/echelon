@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T04:50:11Z`
+- generated_at: `2026-05-31T05:02:43Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,025`
@@ -14,9 +14,12 @@
 - section_atom_chain_decision_grade: `3`
 - limitation_exact_section_atoms: `1,073`
 - limitation_aggregate_section_atoms: `0`
-- complete_typed_lineage_triples: `20`
-- partial_typed_lineage_triples: `22,064`
-- lineage_completeness_counts: `{"attempted_path_partial": 1368, "constraint_failure_only": 5308, "full": 20, "local_fix_partial": 272, "resolution_candidate_partial": 1988, "sparse_stage_partial": 13128}`
+- complete_typed_lineage_triples: `24`
+- partial_typed_lineage_triples: `22,172`
+- lineage_completeness_counts: `{"attempted_path_partial": 1372, "constraint_failure_only": 5348, "full": 24, "local_fix_partial": 284, "resolution_candidate_partial": 1988, "sparse_stage_partial": 13180}`
+- claim_cards_with_section_atom_chain_support: `5`
+- complete_claim_cards_with_section_atom_chain_support: `4`
+- claim_cards_with_full_decision_grade_chain: `1`
 - topic_gap_decision_grade_section_rate: `48.9%`
 - failed regression topics: `metalens, metasurface holography, photonic crystal cavity, quantum light source`
 
@@ -43,7 +46,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5s-b section atom typed chains | `aligned` | `pass` | Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning. | section_atom_chains=4,476; full_chains=6; decision_grade_chains=3; these chains are evidence substrate, not conclusions. | Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages. |
 | Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,073; exact_section_atoms=1,073; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
-| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=1; high_confidence=0; complete_typed_lineage_triples=20; partial_typed_lineage_triples=22,064; lineage_completeness={'sparse_stage_partial': 13128, 'constraint_failure_only': 5308, 'attempted_path_partial': 1368, 'local_fix_partial': 272, 'full': 20, 'resolution_candidate_partial': 1988}. | Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria. |
+| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=4; high_confidence=0; chain_supported_cards=5; complete_chain_supported_cards=4; full_decision_grade_chain_cards=1; complete_typed_lineage_triples=24; partial_typed_lineage_triples=22,172; lineage_completeness={'sparse_stage_partial': 13180, 'constraint_failure_only': 5348, 'attempted_path_partial': 1372, 'local_fix_partial': 284, 'full': 24, 'resolution_candidate_partial': 1988}. | Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards can progress beyond exploratory status without weakening gates. |
 | Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |
 | Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,391; branch_lineages=5,278. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |

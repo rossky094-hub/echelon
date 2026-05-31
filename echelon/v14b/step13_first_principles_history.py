@@ -993,42 +993,52 @@ def _claim_card_evidence_objects(
             }
         )
     for attempt in attempts[:4]:
-        objects.append(
-            {
-                "type": "claim_card_attempt",
-                "role": "past_attempt_failure",
-                "source": "Step13 Claim Card",
-                "id": attempt.get("paper_id") or card_id,
-                "direction_id": direction_id,
-                "paper_id": attempt.get("paper_id"),
-                "label": attempt.get("attempt_path") or attempt.get("keyword") or "past attempt",
-                "description": attempt.get("why_failed"),
-                "event_year": attempt.get("year"),
-                "claim_scope": claim_scope,
-                "evidence_grade": evidence_grade,
-                "evidence_quality": attempt.get("evidence_quality"),
-                "section_provenance_strength": attempt.get("section_provenance_strength"),
-                "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
-            }
-        )
+        obj = {
+            "type": (
+                "claim_card_typed_chain_attempt"
+                if attempt.get("source") == "section_atom_chain"
+                else "claim_card_attempt"
+            ),
+            "role": "past_attempt_failure",
+            "source": attempt.get("source") or "Step13 Claim Card",
+            "id": attempt.get("section_atom_chain_id") or attempt.get("paper_id") or card_id,
+            "direction_id": direction_id,
+            "paper_id": attempt.get("paper_id"),
+            "label": attempt.get("attempt_path") or attempt.get("keyword") or "past attempt",
+            "description": attempt.get("why_failed"),
+            "event_year": attempt.get("year"),
+            "claim_scope": claim_scope,
+            "evidence_grade": attempt.get("evidence_grade") or evidence_grade,
+            "evidence_quality": attempt.get("evidence_quality"),
+            "section_provenance_strength": attempt.get("section_provenance_strength"),
+            "typed_chain_complete": attempt.get("typed_chain_complete"),
+            "typed_chain_completeness": attempt.get("typed_chain_completeness"),
+            "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
+        }
+        objects.append(obj)
     for bottleneck in unresolved[:4]:
-        objects.append(
-            {
-                "type": "claim_card_unresolved_bottleneck",
-                "role": "open_bottleneck",
-                "source": "Step13 Claim Card",
-                "id": bottleneck.get("paper_id") or card_id,
-                "direction_id": direction_id,
-                "paper_id": bottleneck.get("paper_id"),
-                "label": bottleneck.get("keyword") or "unresolved bottleneck",
-                "description": bottleneck.get("description"),
-                "claim_scope": claim_scope,
-                "evidence_grade": evidence_grade,
-                "evidence_quality": bottleneck.get("evidence_quality"),
-                "section_provenance_strength": bottleneck.get("section_provenance_strength"),
-                "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
-            }
-        )
+        obj = {
+            "type": (
+                "claim_card_typed_chain_bottleneck"
+                if bottleneck.get("source") == "section_atom_chain"
+                else "claim_card_unresolved_bottleneck"
+            ),
+            "role": "open_bottleneck",
+            "source": bottleneck.get("source") or "Step13 Claim Card",
+            "id": bottleneck.get("section_atom_chain_id") or bottleneck.get("paper_id") or card_id,
+            "direction_id": direction_id,
+            "paper_id": bottleneck.get("paper_id"),
+            "label": bottleneck.get("keyword") or "unresolved bottleneck",
+            "description": bottleneck.get("description"),
+            "claim_scope": claim_scope,
+            "evidence_grade": bottleneck.get("evidence_grade") or evidence_grade,
+            "evidence_quality": bottleneck.get("evidence_quality"),
+            "section_provenance_strength": bottleneck.get("section_provenance_strength"),
+            "typed_chain_complete": bottleneck.get("typed_chain_complete"),
+            "typed_chain_completeness": bottleneck.get("typed_chain_completeness"),
+            "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
+        }
+        objects.append(obj)
     return [obj for obj in objects if obj]
 
 
@@ -1713,6 +1723,82 @@ def _chain_evidence_weight(evidence_grade: str, *, typed_chain_complete: bool) -
     return 0.45
 
 
+def _principle_by_id(principle_id: str) -> PrincipleDef:
+    for principle in PRINCIPLES:
+        if principle.principle_id == principle_id:
+            return principle
+    return FALLBACK_PRINCIPLE
+
+
+def _chain_text(chain: dict[str, Any]) -> str:
+    return " ".join(
+        str(chain.get(key) or "")
+        for key in (
+            "paper_title",
+            "section_name",
+            "constraint_text",
+            "failure_mechanism_text",
+            "attempted_path_text",
+            "local_fix_text",
+            "new_constraint_text",
+        )
+        if str(chain.get(key) or "").strip()
+    )
+
+
+def _chain_support_level(chain: dict[str, Any]) -> str:
+    grade = str(chain.get("evidence_grade") or "")
+    if grade == "typed_section_lineage":
+        return "strong"
+    if grade in {"typed_section_lineage_traced", "partial_typed_section_lineage"}:
+        return "moderate"
+    return "weak"
+
+
+def section_atom_chain_support_summary(chains: list[dict[str, Any]]) -> dict[str, Any]:
+    grades = Counter(str(chain.get("evidence_grade") or "unknown") for chain in chains)
+    completeness = Counter(str(chain.get("typed_chain_completeness") or "unknown") for chain in chains)
+    full_decision_grade = sum(
+        1
+        for chain in chains
+        if int(chain.get("typed_chain_complete") or 0) == 1
+        and str(chain.get("evidence_grade") or "") == "typed_section_lineage"
+    )
+    full_traced = sum(
+        1
+        for chain in chains
+        if int(chain.get("typed_chain_complete") or 0) == 1
+        and str(chain.get("evidence_grade") or "") in {"typed_section_lineage", "typed_section_lineage_traced"}
+    )
+    partial = sum(1 for chain in chains if int(chain.get("typed_chain_complete") or 0) == 0)
+    weak = sum(1 for chain in chains if _chain_support_level(chain) == "weak")
+    return {
+        "total": len(chains),
+        "full": int(completeness.get("full", 0)),
+        "full_decision_grade": full_decision_grade,
+        "full_traced_or_decision_grade": full_traced,
+        "partial": partial,
+        "weak": weak,
+        "by_evidence_grade": dict(sorted(grades.items())),
+        "by_completeness": dict(sorted(completeness.items())),
+    }
+
+
+def evidence_strength_level_from_chain_support(chain_support: dict[str, Any]) -> str:
+    if int(chain_support.get("full_decision_grade") or 0) > 0:
+        return "strong"
+    if int(chain_support.get("full_traced_or_decision_grade") or 0) > 0:
+        return "moderate"
+    if int(chain_support.get("total") or 0) > int(chain_support.get("weak") or 0):
+        return "moderate"
+    return "weak"
+
+
+def _stronger_evidence_level(left: str, right: str) -> str:
+    order = {"weak": 0, "moderate": 1, "strong": 2}
+    return left if order.get(left, 0) >= order.get(right, 0) else right
+
+
 def _direction_id_for_lineage(
     *,
     paper_id: str,
@@ -1735,13 +1821,119 @@ def _direction_id_for_lineage(
     return best_direction if best_overlap >= 2 else None
 
 
+def _chains_for_direction(
+    *,
+    direction: dict[str, Any],
+    chains: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    pids = _safe_json_loads(direction.get("paper_ids_json") or "[]", [])
+    if not isinstance(pids, list):
+        pids = []
+    pid_set = {str(pid) for pid in pids if pid}
+    direction_tokens = {
+        token
+        for token in re.findall(
+            r"[a-zA-Z][a-zA-Z0-9\-]{2,}",
+            str(direction.get("direction_name") or "").lower(),
+        )
+    }
+    matches: list[tuple[int, float, dict[str, Any]]] = []
+    for chain in chains:
+        text_tokens = {
+            token
+            for token in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", _chain_text(chain).lower())
+        }
+        paper_match = str(chain.get("paper_id") or "") in pid_set
+        token_overlap = len(direction_tokens & text_tokens)
+        if not paper_match and token_overlap < 2:
+            continue
+        completeness_bonus = 2 if int(chain.get("typed_chain_complete") or 0) else 0
+        grade_bonus = {
+            "typed_section_lineage": 3,
+            "typed_section_lineage_traced": 2,
+            "partial_typed_section_lineage": 1,
+        }.get(str(chain.get("evidence_grade") or ""), 0)
+        matches.append((int(paper_match), float(completeness_bonus + grade_bonus + token_overlap), chain))
+    matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [item[2] for item in matches[:12]]
+
+
+def _attempts_from_section_atom_chains(chains: list[dict[str, Any]], *, now_year: int) -> list[dict[str, Any]]:
+    attempts: list[dict[str, Any]] = []
+    for chain in chains:
+        attempt_text = str(chain.get("attempted_path_text") or "").strip()
+        if not attempt_text:
+            continue
+        year = int(chain.get("publication_year") or 0)
+        if year and year < now_year - 10:
+            continue
+        attempts.append(
+            {
+                "source": "section_atom_chain",
+                "section_atom_chain_id": chain.get("chain_id"),
+                "paper_id": chain.get("paper_id"),
+                "year": year,
+                "attempt_path": attempt_text[:220],
+                "why_failed": str(chain.get("failure_mechanism_text") or chain.get("constraint_text") or "")[:240],
+                "local_fix": str(chain.get("local_fix_text") or "")[:220],
+                "new_constraint": str(chain.get("new_constraint_text") or "")[:220],
+                "keyword": str(chain.get("section_key") or chain.get("section_name") or "typed section chain"),
+                "severity": "high" if int(chain.get("typed_chain_complete") or 0) else "medium",
+                "evidence_quality": "section_level",
+                "section_provenance_strength": _chain_support_level(chain),
+                "section_name": chain.get("section_name"),
+                "typed_chain_complete": bool(int(chain.get("typed_chain_complete") or 0)),
+                "typed_chain_completeness": chain.get("typed_chain_completeness"),
+                "evidence_grade": chain.get("evidence_grade"),
+                "claim_scope": chain.get("claim_scope"),
+            }
+        )
+    return attempts
+
+
+def _unresolved_from_section_atom_chains(chains: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unresolved: list[dict[str, Any]] = []
+    for chain in chains:
+        text = (
+            str(chain.get("new_constraint_text") or "").strip()
+            or str(chain.get("constraint_text") or "").strip()
+            or str(chain.get("failure_mechanism_text") or "").strip()
+        )
+        if not text:
+            continue
+        unresolved.append(
+            {
+                "source": "section_atom_chain",
+                "section_atom_chain_id": chain.get("chain_id"),
+                "paper_id": chain.get("paper_id"),
+                "description": text[:240],
+                "keyword": str(chain.get("section_key") or chain.get("section_name") or "typed section chain"),
+                "severity": "high" if int(chain.get("typed_chain_complete") or 0) else "medium",
+                "evidence_quality": "section_level",
+                "section_provenance_strength": _chain_support_level(chain),
+                "section_name": chain.get("section_name"),
+                "typed_chain_complete": bool(int(chain.get("typed_chain_complete") or 0)),
+                "typed_chain_completeness": chain.get("typed_chain_completeness"),
+                "evidence_grade": chain.get("evidence_grade"),
+                "claim_scope": chain.get("claim_scope"),
+                "evidence_weight": _chain_evidence_weight(
+                    str(chain.get("evidence_grade") or ""),
+                    typed_chain_complete=bool(int(chain.get("typed_chain_complete") or 0)),
+                ),
+            }
+        )
+    return unresolved
+
+
 def build_direction_claim_cards(
     *,
     atoms: list[dict],
     future_directions: list[dict],
     principle_rows: list[dict],
     calibration_audit: dict,
+    section_atom_chains: list[dict] | None = None,
 ) -> tuple[list[dict], list[dict]]:
+    section_atom_chains = section_atom_chains or []
     principles_by_id = {p["principle_id"]: p for p in principle_rows}
     now_year = datetime.utcnow().year
     atom_by_paper: dict[str, list[dict]] = defaultdict(list)
@@ -1768,6 +1960,10 @@ def build_direction_claim_cards(
                 atom for atom in atoms
                 if (atom.get("keyword") or "").lower() in direction_name.lower()
             ][:8]
+        direction_chains = _chains_for_direction(
+            direction=d,
+            chains=section_atom_chains,
+        )
 
         weighted_principles: Counter[str] = Counter()
         for atom in direction_atoms:
@@ -1781,17 +1977,27 @@ def build_direction_claim_cards(
                 )
             ).principle_id
             weighted_principles[pid] += float(score_atom(atom))
+        for chain in direction_chains:
+            pid = classify_principle(_chain_text(chain)).principle_id
+            weighted_principles[pid] += _chain_evidence_weight(
+                str(chain.get("evidence_grade") or ""),
+                typed_chain_complete=bool(int(chain.get("typed_chain_complete") or 0)),
+            )
         top_principle_id = weighted_principles.most_common(1)[0][0] if weighted_principles else "FP_OTHER"
         top_principle = principles_by_id.get(top_principle_id, {})
+        top_principle_def = _principle_by_id(top_principle_id)
 
         top_atom = sorted(
             direction_atoms,
             key=lambda a: float(score_atom(a)),
             reverse=True,
         )[0] if direction_atoms else {}
+        top_chain = direction_chains[0] if direction_chains else {}
         root_text = (
             str(top_principle.get("root_cause") or "")
+            or str(top_chain.get("constraint_text") or "")
             or str(top_atom.get("description") or "")
+            or top_principle_def.root_cause
             or "insufficient evidence"
         )
         root_type = infer_root_constraint_type(
@@ -1804,10 +2010,10 @@ def build_direction_claim_cards(
             "type": root_type,
             "constraint": root_text[:320],
             "principle_id": top_principle_id,
-            "principle_name": top_principle.get("principle_name"),
+            "principle_name": top_principle.get("principle_name") or top_principle_def.name,
         }
 
-        attempts = []
+        attempts = _attempts_from_section_atom_chains(direction_chains, now_year=now_year)
         for atom in sorted(
             direction_atoms,
             key=lambda a: int(a.get("publication_year") or 0),
@@ -1836,7 +2042,10 @@ def build_direction_claim_cards(
 
         calibration_ready = bool(calibration_audit.get("method"))
         rolling_avg_auc = float(calibration_audit.get("avg_calibrated_auc") or 0.0)
-        section_strength = evidence_strength_level_from_atoms(direction_atoms)
+        atom_section_strength = evidence_strength_level_from_atoms(direction_atoms)
+        chain_support = section_atom_chain_support_summary(direction_chains)
+        chain_section_strength = evidence_strength_level_from_chain_support(chain_support)
+        section_strength = _stronger_evidence_level(atom_section_strength, chain_section_strength)
         section_provenance = section_provenance_summary_from_atoms(direction_atoms)
         strong_or_moderate_provenance = int(section_provenance.get("strong", 0)) + int(
             section_provenance.get("moderate", 0)
@@ -1844,12 +2053,12 @@ def build_direction_claim_cards(
         section_provenance_ready = strong_or_moderate_provenance >= max(
             1,
             int(0.35 * max(1, len(direction_atoms))),
-        )
+        ) or int(chain_support.get("full_traced_or_decision_grade") or 0) > 0
         decision_grade_sections = int(section_provenance.get("decision_grade") or 0)
         section_decision_grade_ready = decision_grade_sections >= max(
             1,
             int(0.35 * max(1, len(direction_atoms))),
-        )
+        ) or int(chain_support.get("full_decision_grade") or 0) > 0
         new_enablers = []
         missing_enablers = []
         if calibration_ready and rolling_avg_auc >= 0.65:
@@ -1868,6 +2077,10 @@ def build_direction_claim_cards(
             missing_enablers.append(
                 "current parser-contract decision-grade section evidence is missing or below threshold"
             )
+        if int(chain_support.get("full_decision_grade") or 0) > 0:
+            new_enablers.append("full typed section atom chain evidence is available")
+        elif int(chain_support.get("partial") or 0) > 0:
+            missing_enablers.append("typed section atom chain evidence is partial and remains exploratory")
         candidate_score = float(d.get("candidate_score") or d.get("confidence") or 0.0)
         if candidate_score >= 0.70:
             new_enablers.append("future candidate score is above the candidate threshold")
@@ -1885,9 +2098,11 @@ def build_direction_claim_cards(
             "rolling_avg_calibrated_auc": rolling_avg_auc,
             "evidence_tier": d.get("evidence_tier"),
             "section_provenance": section_provenance,
+            "section_atom_chain_support": chain_support,
         }
 
-        unresolved = [
+        unresolved = _unresolved_from_section_atom_chains(direction_chains)
+        unresolved.extend(
             {
                 "paper_id": atom.get("paper_id"),
                 "description": str(atom.get("description") or "")[:220],
@@ -1905,8 +2120,11 @@ def build_direction_claim_cards(
                 key=lambda a: float(score_atom(a)),
                 reverse=True,
             )[:6]
-        ]
+        )
+        unresolved = unresolved[:8]
         top_kw = str((top_atom.get("keyword") or "technical bottleneck")).strip()
+        if top_kw == "technical bottleneck" and top_chain:
+            top_kw = str(top_chain.get("section_key") or top_chain.get("section_name") or top_kw)
         minimal_experiment = minimal_experiment_template(
             root_type=root_type,
             keyword=top_kw,
@@ -1959,6 +2177,7 @@ def build_direction_claim_cards(
             "missing_gates": missing_gates,
             "section_evidence_strength": section_strength,
             "section_provenance": section_provenance,
+            "section_atom_chain_support": chain_support,
             "calibration_ready": calibration_ready,
             "rolling_avg_calibrated_auc": rolling_avg_auc,
             "candidate_score": candidate_score,
@@ -2012,6 +2231,7 @@ def build_direction_claim_cards(
                         "items": unresolved,
                         "evidence_strength_level": section_strength,
                         "section_provenance": section_provenance,
+                        "section_atom_chain_support": chain_support,
                     }
                 ),
                 "minimal_validation_experiment_json": jdumps(minimal_experiment),
@@ -2299,6 +2519,7 @@ def run_first_principles_history(
         future_directions=future_directions,
         principle_rows=principle_rows,
         calibration_audit=calibration_audit,
+        section_atom_chains=section_atom_chains,
     )
     write_db(conn_v14, principle_rows, history_rows)
     write_lineage_and_claim_cards(

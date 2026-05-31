@@ -81,7 +81,8 @@ def _make_v14(path: Path) -> None:
         CREATE TABLE future_directions (direction_id INTEGER);
         CREATE TABLE direction_claim_cards (
             five_question_complete INTEGER,
-            high_confidence_eligible INTEGER
+            high_confidence_eligible INTEGER,
+            quality_gate_json TEXT
         );
         CREATE TABLE visual_nodes (paper_id TEXT);
         CREATE TABLE visual_edges (layer TEXT);
@@ -100,7 +101,21 @@ def _make_v14(path: Path) -> None:
     conn.execute("INSERT INTO vgae_calibration_audit VALUES ('rolling')")
     conn.execute("INSERT INTO limitation_atoms VALUES ('p1')")
     conn.execute("INSERT INTO future_directions VALUES (1)")
-    conn.execute("INSERT INTO direction_claim_cards VALUES (1, 0)")
+    conn.execute(
+        "INSERT INTO direction_claim_cards VALUES (?, ?, ?)",
+        (
+            1,
+            0,
+            json.dumps(
+                {
+                    "section_atom_chain_support": {
+                        "total": 1,
+                        "full_decision_grade": 1,
+                    }
+                }
+            ),
+        ),
+    )
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute("INSERT INTO visual_edges VALUES ('future')")
     conn.execute("INSERT INTO branch_lineages VALUES ('b1')")
@@ -173,4 +188,7 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert payload["metrics"]["section_atom_chains"] == 1
     assert payload["metrics"]["section_atom_chain_full"] == 1
     assert payload["metrics"]["section_atom_chain_decision_grade"] == 1
+    assert payload["metrics"]["claim_cards_with_section_atom_chain_support"] == 1
+    assert payload["metrics"]["complete_claim_cards_with_section_atom_chain_support"] == 1
+    assert payload["metrics"]["claim_cards_with_full_decision_grade_chain"] == 1
     assert result["status_counts"]["readiness"]["fail"] >= 1

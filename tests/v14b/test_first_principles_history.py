@@ -712,3 +712,122 @@ def test_step13_current_contract_decision_grade_sections_can_be_high_confidence(
     assert gate["section_provenance"]["decision_grade"] == 3
     assert unresolved["section_provenance"]["current_contract"] == 3
     assert updates[0]["high_confidence_eligible"] == 1
+
+
+def test_step13_claim_cards_consume_full_section_atom_chains_as_five_question_evidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    chain = {
+        "chain_id": "sac_full",
+        "paper_id": "p1",
+        "paper_title": "Wafer-scale metalens manufacturing",
+        "publication_year": 2025,
+        "section_name": "discussion",
+        "section_key": "discussion",
+        "constraint_text": "Fabrication tolerance is the root physical constraint.",
+        "failure_mechanism_text": "Overlay mismatch creates phase loss.",
+        "attempted_path_text": "The authors attempted calibration and inverse design.",
+        "local_fix_text": "Calibration mitigates mismatch in the prototype.",
+        "new_constraint_text": "Packaging drift remains as a new constraint.",
+        "typed_chain_complete": 1,
+        "typed_chain_completeness": "full",
+        "evidence_grade": "typed_section_lineage",
+        "claim_scope": "bottleneck_lineage_evidence",
+    }
+
+    cards, updates = build_direction_claim_cards(
+        atoms=[],
+        section_atom_chains=[chain],
+        future_directions=[
+            {
+                "direction_id": 42,
+                "direction_name": "Wafer-scale fabrication packaging drift",
+                "paper_ids_json": '["p1"]',
+                "confidence": 0.84,
+                "evidence_tier": "triangulated_strong",
+                "calibration_label": "calibrated_temporal_holdout",
+            }
+        ],
+        principle_rows=[
+            {
+                "principle_id": "FP_PHYSICAL_CONSTRAINT",
+                "principle_name": "物理实现与制造约束",
+                "root_cause": "fabrication tolerance and material loss",
+            }
+        ],
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    attempts = json.loads(cards[0]["attempts_last_10y_json"])
+    unresolved = json.loads(cards[0]["unresolved_bottleneck_json"])
+    gate = json.loads(cards[0]["quality_gate_json"])
+    objects = json.loads(cards[0]["evidence_objects_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["high_confidence_eligible"] == 1
+    assert cards[0]["claim_scope"] == "validated_candidate"
+    assert cards[0]["evidence_grade"] == "decision_grade_claim_card"
+    assert attempts[0]["source"] == "section_atom_chain"
+    assert attempts[0]["attempt_path"].startswith("The authors attempted")
+    assert unresolved["items"][0]["source"] == "section_atom_chain"
+    assert unresolved["items"][0]["description"].startswith("Packaging drift")
+    assert gate["section_atom_chain_support"]["full_decision_grade"] == 1
+    assert gate["high_confidence_gates"]["section_decision_grade_ready"] is True
+    assert any(obj["type"] == "claim_card_typed_chain_attempt" for obj in objects)
+    assert any(obj["type"] == "claim_card_typed_chain_bottleneck" for obj in objects)
+    assert updates[0]["high_confidence_eligible"] == 1
+
+
+def test_step13_partial_section_atom_chains_complete_card_but_block_high_confidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    chain = {
+        "chain_id": "sac_partial",
+        "paper_id": "p1",
+        "paper_title": "Metalens coupling loss",
+        "publication_year": 2025,
+        "section_name": "results",
+        "section_key": "results",
+        "constraint_text": "Efficiency remains limited by coupling loss.",
+        "failure_mechanism_text": "Coupling loss dominates the measured failure mode.",
+        "attempted_path_text": "A grating coupler was attempted.",
+        "typed_chain_complete": 0,
+        "typed_chain_completeness": "attempted_path_partial",
+        "evidence_grade": "partial_typed_section_lineage",
+        "claim_scope": "exploratory_bottleneck_lineage",
+    }
+
+    cards, updates = build_direction_claim_cards(
+        atoms=[],
+        section_atom_chains=[chain],
+        future_directions=[
+            {
+                "direction_id": 43,
+                "direction_name": "Metalens coupling loss mitigation",
+                "paper_ids_json": '["p1"]',
+                "confidence": 0.85,
+                "evidence_tier": "triangulated_strong",
+                "calibration_label": "calibrated_temporal_holdout",
+            }
+        ],
+        principle_rows=[
+            {
+                "principle_id": "FP_PHYSICAL_CONSTRAINT",
+                "principle_name": "物理实现与制造约束",
+                "root_cause": "coupling loss and fabrication tolerance",
+            }
+        ],
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    gate = json.loads(cards[0]["quality_gate_json"])
+    reasons = json.loads(cards[0]["uncertainty_reasons_json"])
+    assert cards[0]["five_question_complete"] == 1
+    assert cards[0]["high_confidence_eligible"] == 0
+    assert cards[0]["claim_scope"] == "exploratory_with_claim_card"
+    assert cards[0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
+    assert gate["section_atom_chain_support"]["partial"] == 1
+    assert gate["high_confidence_gates"]["section_evidence_strong"] is False
+    assert gate["high_confidence_gates"]["section_decision_grade_ready"] is False
+    assert "strong section-level evidence" in gate["missing_high_confidence_gates"]
+    assert any("current parser-contract decision-grade" in reason for reason in reasons)
+    assert updates[0]["high_confidence_eligible"] == 0

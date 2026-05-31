@@ -1,6 +1,6 @@
 # Future Candidate Lifecycle Audit
 
-- generated_at: `2026-05-31T04:50:01Z`
+- generated_at: `2026-05-31T05:04:26Z`
 - total candidates: 1,000
 - radar eligible Claim Cards: 0
 - raw edge rows eligible for Radar main view: 0
@@ -11,8 +11,8 @@
 
 | state | count | product meaning |
 | --- | ---: | --- |
-| candidate_pool_incomplete_claim_card | 21 | Claim Card exists, but at least one of the five hard questions is missing. |
-| exploratory_claim_card | 421 | Five-question card is complete, but high-confidence gates are not all satisfied. |
+| candidate_pool_incomplete_claim_card | 17 | Claim Card exists, but at least one of the five hard questions is missing. |
+| exploratory_claim_card | 425 | Five-question card is complete, but high-confidence gates are not all satisfied. |
 | future_candidate_unfused | 558 | GNN/VGAE candidate only; Step6 has not promoted it to a direction. |
 
 ## Calibration Status
@@ -27,8 +27,7 @@
 | --- | ---: |
 | Step13 Claim Card | 558 |
 | Step6 fusion direction | 558 |
-| historical attempts and failure evidence | 21 |
-| unresolved bottleneck evidence | 4 |
+| historical attempts and failure evidence | 17 |
 
 ## Top Candidate Pool Samples
 
