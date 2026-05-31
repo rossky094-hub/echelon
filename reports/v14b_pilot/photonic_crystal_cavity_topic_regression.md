@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-31T09:00:45Z`
+- Audit: `2026-05-31T09:10:05Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -68,3 +68,10 @@
 | bottleneck_lineage_missing_topic_specific_typed_chain | coupling loss | 97 | 3 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=2, but none matched both this topic context and this bottleneck. |
 | bottleneck_lineage_missing_topic_specific_typed_chain | fabrication disorder | 97 | 3 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=2, but none matched both this topic context and this bottleneck. |
 | bottleneck_lineage_missing_topic_specific_typed_chain | thermal stability | 97 | 3 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=2, but none matched both this topic context and this bottleneck. |
+| key_turning_paper_missing_primary_section |  | 95 | 8 | Topic turning papers cannot support lineage or Claim Card interpretation until their local primary sections are parsed. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| branch_lineage_needs_evidence |  | 85 | 3 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |
+| branch_lineage_needs_evidence |  | 85 | 2 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |
+| branch_lineage_needs_evidence |  | 85 | 3 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |

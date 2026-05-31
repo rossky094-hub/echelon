@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T09:00:26Z`
+- generated_at: `2026-05-31T09:13:38Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 373,
+    "section_frontfill_done": 376,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 373,
+    "section_frontfill_progress_done": 376,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 575,
-      "current_contract_rate": 0.18983162759986794,
-      "decision_grade_papers": 571,
-      "decision_grade_rate": 0.18851105975569496,
+      "current_contract_papers": 578,
+      "current_contract_rate": 0.1908220534829977,
+      "decision_grade_papers": 574,
+      "decision_grade_rate": 0.18950148563882468,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1299,
-        "weak": 1730
+        "strong": 1302,
+        "weak": 1727
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4295,
-        "v14b_section_parser_contract_v3_toc_guard": 1302
+        "legacy_unknown_contract": 4291,
+        "v14b_section_parser_contract_v3_toc_guard": 1306
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4295,
-        "v14b_section_ingest_v3": 1302
+        "v14b_section_ingest_v2": 4291,
+        "v14b_section_ingest_v3": 1306
       },
       "primary_section_papers": 3029,
       "primary_section_rows": 5597,
       "strategy_counts": {
         "embedded_heading": 54,
-        "explicit_heading": 1972,
-        "heading_continuation": 2541,
+        "explicit_heading": 1976,
+        "heading_continuation": 2545,
         "inline_heading": 751,
-        "legacy_unknown_strategy": 2973,
-        "loose_inline_heading": 42,
+        "legacy_unknown_strategy": 2969,
+        "loose_inline_heading": 43,
         "parser_hint": 58,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1299,
-      "weak_only_papers": 1730,
-      "weak_only_rate": 0.5711455926048201
+      "strong_or_moderate_papers": 1302,
+      "weak_only_papers": 1727,
+      "weak_only_rate": 0.5701551667216903
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -640,7 +640,8 @@
     "topic_gap_no_target_inspection_available_when_needed": true,
     "topic_gap_section_triage_available_when_blocking": true,
     "topic_regression_avoids_gold_topic_aliases": true,
-    "topic_regression_cli_defaults_to_suite": true
+    "topic_regression_cli_defaults_to_suite": true,
+    "topic_regression_exports_topic_dossier_repair_plan": true
   },
   "failed_topics": [
     "metasurface holography",
@@ -653,26 +654,29 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_decision_grade_section_papers": 14,
-  "topic_gap_decision_grade_section_rate": 0.30434782608695654,
+  "topic_gap_decision_grade_section_papers": 43,
+  "topic_gap_decision_grade_section_rate": 0.5512820512820513,
   "topic_gap_no_target_inspection_available": true,
   "topic_gap_no_target_inspection_classifications": {
-    "heading_like_but_not_target_section": 9,
-    "sectionless_or_non_target_heading_format": 11,
-    "target_heading_signal_subthreshold": 2
+    "heading_like_but_not_target_section": 6,
+    "sectionless_or_non_target_heading_format": 10,
+    "target_heading_signal_subthreshold": 1
   },
   "topic_gap_no_target_inspection_status": "pass",
   "topic_gap_no_target_parser_signal_papers": 0,
-  "topic_gap_primary_section_papers": 16,
-  "topic_gap_primary_section_rate": 0.34782608695652173,
-  "topic_gap_queue_papers": 46,
+  "topic_gap_primary_section_papers": 48,
+  "topic_gap_primary_section_rate": 0.6153846153846154,
+  "topic_gap_queue_papers": 78,
   "topic_gap_section_triage_available": true,
   "topic_gap_section_triage_failure_modes": {
-    "current_contract_weak": 4,
-    "decision_grade_current_contract": 14,
+    "current_contract_weak": 1,
+    "decision_grade_current_contract": 41,
     "lineage_chains_missing_after_atoms": 1,
     "lineage_full_chain_missing": 1,
-    "no_target_sections_after_current_parser": 18
+    "no_target_sections_after_current_parser": 17,
+    "no_target_sections_unknown_contract": 5,
+    "stale_parser_contract": 4,
+    "unattempted_pdf_available": 8
   },
   "topic_gap_section_triage_status": "fail"
 }

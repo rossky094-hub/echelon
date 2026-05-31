@@ -2870,6 +2870,7 @@ def audit_multi_topic_regression(
     makefile_product_baseline_defaults_to_suite = True
     section_queue_defaults_to_multi_topic = True
     section_queue_tracks_decision_grade_gap_coverage = True
+    topic_regression_exports_topic_dossier_repair_plan = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
@@ -2890,6 +2891,15 @@ def audit_multi_topic_regression(
         topic_regression_cli_defaults_to_suite = _source_contains(
             topic_regression_source,
             ('default="all"', "BENCHMARK_TOPICS"),
+        )
+        topic_regression_exports_topic_dossier_repair_plan = _source_contains(
+            topic_regression_source,
+            (
+                "topic_dossier_repair_plan",
+                "topic_dossier_evidence_repair_plan",
+                "target_pipeline_steps",
+                "evidence_repair_queue_only",
+            ),
         )
         product_baseline_defaults_to_suite = (
             _source_contains(
@@ -2952,6 +2962,7 @@ def audit_multi_topic_regression(
         and makefile_product_baseline_defaults_to_suite
         and section_queue_defaults_to_multi_topic
         and section_queue_tracks_decision_grade_gap_coverage
+        and topic_regression_exports_topic_dossier_repair_plan
         and current_plan_docs_avoid_gold_topic_language
     )
     topic_gap_queue_papers = int(metrics.get("topic_gap_queue_papers") or 0)
@@ -2981,6 +2992,7 @@ def audit_multi_topic_regression(
             "makefile_product_baseline_defaults_to_suite": makefile_product_baseline_defaults_to_suite,
             "section_queue_defaults_to_multi_topic": section_queue_defaults_to_multi_topic,
             "section_queue_tracks_decision_grade_gap_coverage": section_queue_tracks_decision_grade_gap_coverage,
+            "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available
             ),

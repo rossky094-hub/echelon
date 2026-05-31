@@ -219,6 +219,8 @@ def _write_product_sources(root: Path) -> None:
         'BENCHMARK_TOPICS = {}\n'
         'def configure_parser(parser): parser.add_argument("--topic", default="all")\n'
         'def _future_edges(lens): return lens.get("future_growth", {}).get("candidate_edges") or []\n'
+        'def _topic_dossier_repair_plan_rows(result): return "topic_dossier_evidence_repair_plan target_pipeline_steps evidence_repair_queue_only"\n'
+        '"topic_dossier_repair_plan"\n'
         "def run_topic_readiness_preflight():\n    return build_topic_readiness_preflight\n",
         encoding="utf-8",
     )
@@ -622,6 +624,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     multi_gate = next(g for g in result["gates"] if g["issue"] == "Multi-topic Regression")
     assert multi_gate["checks"]["topic_regression_avoids_gold_topic_aliases"] is True
     assert multi_gate["checks"]["topic_regression_cli_defaults_to_suite"] is True
+    assert multi_gate["checks"]["topic_regression_exports_topic_dossier_repair_plan"] is True
     assert multi_gate["checks"]["product_baseline_defaults_to_suite"] is True
     assert multi_gate["checks"]["makefile_product_baseline_defaults_to_suite"] is True
     assert multi_gate["checks"]["section_queue_defaults_to_multi_topic"] is True

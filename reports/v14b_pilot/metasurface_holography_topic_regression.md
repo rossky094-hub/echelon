@@ -1,6 +1,6 @@
 # Metasurface Holography Topic Regression
 
-- Audit: `2026-05-31T09:00:44Z`
+- Audit: `2026-05-31T09:10:04Z`
 - Topic: `metasurface holography`
 - Overall status: **fail**
 
@@ -66,3 +66,11 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | future_candidates_missing_claim_card |  | 85 | 4 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. complete Claim Cards found only as weak topic context: 127,128,129,130,131 |
+| key_turning_paper_missing_primary_section |  | 95 | 6 | Topic turning papers cannot support lineage or Claim Card interpretation until their local primary sections are parsed. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| bottleneck_lineage_or_resolution_evidence_gap |  | 95 | 5 | Bottleneck claims need unresolved and resolved section atoms linked into typed chains before they can constrain Step13 decisions. |
+| branch_lineage_needs_evidence |  | 85 | 3 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |
+| branch_lineage_needs_evidence |  | 85 | 3 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |
+| branch_lineage_needs_evidence |  | 85 | 2 | Branch splits remain weak/layout candidates until driver papers and section-level constraint shifts are parsed. |
+| future_candidates_missing_claim_card |  | 85 | 4 | GNN/VGAE future edges are useful for recall, but they need fusion evidence and complete five-question Claim Cards before decision use. |

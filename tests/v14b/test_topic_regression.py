@@ -214,6 +214,46 @@ def test_future_candidate_gap_rows_include_claim_card_missing_gates():
     assert "weak topic context: 82" in future_gap["why"]
 
 
+def test_topic_dossier_repair_plan_exports_to_frontfill_gap_rows():
+    result = {
+        "topic": "metalens",
+        "topic_dossier_repair_plan": [
+            {
+                "repair_id": "future_candidates_missing_claim_card:metalens",
+                "gap_type": "future_candidates_missing_claim_card",
+                "priority": "medium",
+                "candidate_paper_ids": ["p1"],
+                "candidate_papers": [{"paper_id": "p2", "title": "Candidate endpoint"}],
+                "frontfill_query": "metalens future candidate bottleneck evidence",
+                "required_sections": ["limitations", "discussion", "results"],
+                "target_pipeline_steps": ["section-atoms", "section-atom-chains", "Step5c", "Step13"],
+                "retrieval_modes": [
+                    "exact_id_doi_arxiv_title_section_phrase_bm25",
+                    "atom_or_section_embedding_fuzzy_recall",
+                ],
+                "parser_contract": "deterministic_section_atom_parser_with_page_span_provenance",
+                "claim_scope": "evidence_repair_queue_only",
+                "evidence_grade": "frontfill_target",
+                "why": "GNN/VGAE candidate needs Claim Card evidence before Radar use.",
+            }
+        ],
+    }
+
+    rows = build_evidence_gap_rows(result)
+
+    repair_row = [
+        row for row in rows
+        if row.get("source_contract") == "topic_dossier_evidence_repair_plan"
+    ][0]
+    assert repair_row["candidate_paper_ids"] == "p1;p2"
+    assert repair_row["priority"] == 85
+    assert repair_row["claim_scope"] == "evidence_repair_queue_only"
+    assert repair_row["evidence_grade"] == "frontfill_target"
+    assert "section-atom-chains" in repair_row["target_pipeline_steps"]
+    assert "exact_id_doi_arxiv_title_section_phrase_bm25" in repair_row["retrieval_modes"]
+    assert repair_row["parser_contract"] == "deterministic_section_atom_parser_with_page_span_provenance"
+
+
 def test_topic_regression_does_not_count_weak_full_lineage_as_promotable():
     fragments = _evidence_contract_fragments()
     fragments["bottleneck_lineage"]["constraints"][0].update(

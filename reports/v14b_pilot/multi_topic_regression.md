@@ -1,6 +1,6 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-31T09:00:45Z`
+- Audit: `2026-05-31T09:10:05Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Full Lineage | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -16,9 +16,11 @@ This suite prevents the Topic Dossier from being tuned only for Metalens. A topi
 ## Evidence Gap Summary
 
 - bottleneck_lineage_missing_topic_specific_typed_chain: 5
-- future_candidates_missing_claim_card: 3
-- key_turning_paper_missing_primary_section: 26
-- key_turning_paper_weak_section_provenance: 1
+- bottleneck_lineage_or_resolution_evidence_gap: 12
+- branch_lineage_needs_evidence: 12
+- future_candidates_missing_claim_card: 6
+- key_turning_paper_missing_primary_section: 30
+- key_turning_paper_weak_section_provenance: 2
 - missing_bottleneck_section_evidence: 3
 
 See `multi_topic_evidence_gap_queue.csv` for section/OpenAlex/frontfill targets.
