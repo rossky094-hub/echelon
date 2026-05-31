@@ -819,7 +819,36 @@ def build_evidence_gap_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     lineage = result.get("bottleneck_lineage_contracts") or {}
-    if int(lineage.get("with_clickable_evidence") or 0) < 1:
+    if int(lineage.get("with_typed_chain") or 0) < 1:
+        matched_lineage_bottlenecks = {
+            str(x) for x in (lineage.get("matched_expected_bottlenecks") or [])
+        }
+        fallback_candidate_ids = _result_gap_candidate_ids(result)
+        for bottleneck in result.get("bottleneck_results") or []:
+            label = str(bottleneck.get("name") or "").strip()
+            if label in matched_lineage_bottlenecks:
+                continue
+            candidate_ids = bottleneck.get("candidate_paper_ids") or fallback_candidate_ids
+            rows.append(
+                {
+                    "topic": topic,
+                    "gap_type": "bottleneck_lineage_missing_topic_specific_typed_chain",
+                    "bottleneck": label,
+                    "priority": 97 if bottleneck.get("present_in_evidence") else 94,
+                    "candidate_paper_ids": ";".join(str(x) for x in candidate_ids),
+                    "frontfill_query": (
+                        f"{topic} {label} constraint failure attempted path local fix remaining limitation"
+                    ),
+                    "required_sections": "limitation;discussion;conclusion;future work;results;error_analysis;ablation;method;experiments",
+                    "why": (
+                        "Expected bottleneck lacks a topic-specific full typed section chain "
+                        "(constraint -> failure mechanism -> attempted path -> local fix -> new constraint). "
+                        f"Promotable full chains available globally={int(lineage.get('with_promotable_typed_chain_any') or 0)}, "
+                        "but none matched both this topic context and this bottleneck."
+                    ),
+                }
+            )
+    elif int(lineage.get("with_clickable_evidence") or 0) < 1:
         rows.append(
             {
                 "topic": topic,
@@ -987,7 +1016,7 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
         },
         {
             "name": "bottleneck lineage typed contracts",
-            "actual": lineage_contracts["with_clickable_evidence"],
+            "actual": lineage_contracts["with_typed_chain"],
             "required": 1,
             "status": _status(
                 lineage_contracts["with_contract"] >= 1

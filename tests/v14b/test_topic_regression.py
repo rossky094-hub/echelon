@@ -253,6 +253,7 @@ def test_topic_regression_does_not_count_weak_full_lineage_as_promotable():
     assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
     assert result["bottleneck_lineage_contracts"]["with_promotable_typed_chain_any"] == 0
     lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["actual"] == 0
     assert lineage_gate["status"] == "fail"
 
 
@@ -296,6 +297,7 @@ def test_topic_regression_requires_full_lineage_to_match_expected_bottleneck():
     assert result["bottleneck_lineage_contracts"]["with_promotable_typed_chain_any"] == 1
     assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
     lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["actual"] == 0
     assert lineage_gate["status"] == "fail"
 
 
@@ -351,7 +353,46 @@ def test_topic_regression_requires_full_lineage_paper_to_match_topic_context():
     assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
     assert result["bottleneck_lineage_contracts"]["matched_expected_bottlenecks"] == []
     lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["actual"] == 0
     assert lineage_gate["status"] == "fail"
+
+
+def test_topic_specific_lineage_gap_routes_even_with_clickable_global_chains():
+    result = {
+        "topic": "metalens",
+        "bottleneck_results": [
+            {
+                "name": "manufacturing consistency",
+                "present_in_evidence": True,
+                "candidate_paper_ids": ["driver-1"],
+            },
+            {
+                "name": "field of view",
+                "present_in_evidence": False,
+                "candidate_paper_ids": ["driver-2"],
+            },
+        ],
+        "bottleneck_lineage_contracts": {
+            "with_typed_chain": 0,
+            "with_clickable_evidence": 5,
+            "with_promotable_typed_chain_any": 1,
+            "matched_expected_bottlenecks": [],
+        },
+    }
+
+    rows = build_evidence_gap_rows(result)
+
+    lineage_rows = [
+        row for row in rows
+        if row["gap_type"] == "bottleneck_lineage_missing_topic_specific_typed_chain"
+    ]
+    assert [row["bottleneck"] for row in lineage_rows] == [
+        "manufacturing consistency",
+        "field of view",
+    ]
+    assert lineage_rows[0]["priority"] == 97
+    assert lineage_rows[0]["candidate_paper_ids"] == "driver-1"
+    assert "globally=1" in lineage_rows[0]["why"]
 
 
 def test_bottleneck_synonyms_do_not_hide_evidence():

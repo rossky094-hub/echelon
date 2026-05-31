@@ -1,6 +1,6 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-31T03:28:18Z`
+- Audit: `2026-05-31T03:34:56Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Full Lineage | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -15,6 +15,7 @@ This suite prevents the Topic Dossier from being tuned only for Metalens. A topi
 
 ## Evidence Gap Summary
 
+- bottleneck_lineage_missing_topic_specific_typed_chain: 21
 - future_candidates_missing_claim_card: 4
 - key_turning_paper_missing_primary_section: 18
 - missing_bottleneck_section_evidence: 3

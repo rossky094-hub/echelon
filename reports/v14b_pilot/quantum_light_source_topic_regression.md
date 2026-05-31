@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-31T03:28:18Z`
+- Audit: `2026-05-31T03:34:56Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -17,7 +17,7 @@
 | turning papers with strong/moderate section provenance | 7 | 2 | pass |
 | turning papers with decision-grade section evidence | 7 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
-| bottleneck lineage typed contracts | 5 | 1 | fail |
+| bottleneck lineage typed contracts | 0 | 1 | fail |
 | auditable reading path | 5 | 4 | pass |
 | Claim Cards for Radar | 0 | 1 | warn |
 
@@ -63,3 +63,8 @@
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | future_candidates_missing_claim_card |  | 85 | 12 | Future candidates exist but Step6/Step13 has not produced a complete Claim Card; frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence. missing five-question gates: historical attempts and failure evidence=4, unresolved bottleneck evidence=3; missing high-confidence gates: complete five-question Claim Card=4, current parser-contract decision-grade section evidence=3, strong or moderate section parser provenance=3, strong section-level evidence=3, triangulated Step6 fusion evidence=4; incomplete direction ids: 83,84,85,86; complete Claim Cards found only as weak topic context: 82 |
+| bottleneck_lineage_missing_topic_specific_typed_chain | brightness | 97 | 5 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=1, but none matched both this topic context and this bottleneck. |
+| bottleneck_lineage_missing_topic_specific_typed_chain | indistinguishability | 94 | 5 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=1, but none matched both this topic context and this bottleneck. |
+| bottleneck_lineage_missing_topic_specific_typed_chain | collection efficiency | 97 | 5 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=1, but none matched both this topic context and this bottleneck. |
+| bottleneck_lineage_missing_topic_specific_typed_chain | scalability | 97 | 3 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=1, but none matched both this topic context and this bottleneck. |
+| bottleneck_lineage_missing_topic_specific_typed_chain | integration | 97 | 5 | Expected bottleneck lacks a topic-specific full typed section chain (constraint -> failure mechanism -> attempted path -> local fix -> new constraint). Promotable full chains available globally=1, but none matched both this topic context and this bottleneck. |
