@@ -2483,12 +2483,14 @@ def _lineage_grade_rank(meta: dict[str, Any]) -> int:
         return 5
     if grade == "typed_section_lineage":
         return 4
-    if grade == "partial_typed_section_lineage":
+    if grade == "typed_section_lineage_inferred_order":
         return 3
-    if grade == "weak_typed_section_lineage":
+    if grade == "partial_typed_section_lineage":
         return 2
-    if grade == "weak_partial_typed_section_lineage":
+    if grade == "weak_typed_section_lineage":
         return 1
+    if grade == "weak_partial_typed_section_lineage":
+        return 0
     return 0
 
 

@@ -889,6 +889,72 @@ def test_visual_topic_lens_prioritizes_promotable_typed_lineage(tmp_path, monkey
     assert constraint["evidence_objects"][0]["section_atom_chain_id"] == "sac_promotable"
 
 
+def test_visual_topic_lens_ranks_inferred_order_lineage_above_partial(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    partial_meta = json.dumps(
+        {
+            "typed_chain_complete": False,
+            "typed_chain_completeness": "attempted_path_partial",
+            "claim_scope": "exploratory_bottleneck_lineage",
+            "evidence_grade": "partial_typed_section_lineage",
+            "source": "section_atom_chain",
+            "placeholder_stages": ["local_fix", "new_constraint"],
+        }
+    )
+    inferred_meta = json.dumps(
+        {
+            "typed_chain_complete": True,
+            "typed_chain_completeness": "full",
+            "claim_scope": "bottleneck_lineage_evidence",
+            "evidence_grade": "typed_section_lineage_inferred_order",
+            "source": "section_atom_chain",
+            "section_atom_chain_id": "sac_inferred",
+            "placeholder_stages": [],
+            "chain_uncertainty_reasons": [
+                "chain stage order is inferred from atom types because text span order is non-linear"
+            ],
+        }
+    )
+    for triple_id, meta, weight, year in (
+        ("partial:new", partial_meta, 0.68, 2026),
+        ("inferred:old", inferred_meta, 0.74, 2020),
+    ):
+        conn.execute(
+            """
+            INSERT INTO bottleneck_lineage_triples
+                (triple_id, principle_id, direction_id, atom_id, edge_order,
+                 source_stage, target_stage, source_text, target_text, relation_type,
+                 paper_id, resolver_paper_id, event_year, evidence_section,
+                 evidence_page, evidence_quality, evidence_weight, metadata_json)
+            VALUES (?, 'bp1', NULL, NULL, 1,
+                    'constraint', 'failure_mechanism',
+                    'typed constraint evidence',
+                    'typed failure evidence',
+                    'constraint_causes_failure', 'p1', NULL, ?,
+                    'discussion', 4, 'section_level', ?, ?)
+            """,
+            (triple_id, year, weight, meta),
+        )
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get(
+        "/graph/visual/topic-lens",
+        headers=VIEWER_HEADERS,
+        params={"topic": "laser optics", "top_k": 20},
+    )
+
+    assert resp.status_code == 200
+    constraint = resp.json()["bottleneck_lineage"]["constraints"][0]
+    assert constraint["typed_chain_completeness"] == "full"
+    assert constraint["evidence_grade"] == "typed_section_lineage_inferred_order"
+    assert constraint["typed_chain"][0]["triple_id"] == "inferred:old"
+    assert constraint["typed_chain"][0]["typed_chain_promotable"] is True
+
+
 def test_visual_topic_lens_links_claim_cards_by_future_edge_overlap(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

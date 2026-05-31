@@ -2881,6 +2881,7 @@ def audit_multi_topic_regression(
     section_atom_layer_preserves_repair_contract_provenance = True
     section_atom_layer_prioritizes_typed_chain_stage_cues = True
     section_atom_chain_assembler_marks_inferred_order = True
+    inferred_order_chain_consumers_keep_moderate_boundary = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
     topic_gap_stage_candidate_recall_available = True
@@ -3027,6 +3028,25 @@ def audit_multi_topic_regression(
                 "chain stage order is inferred from atom types",
             ),
         )
+        inferred_order_chain_consumers_keep_moderate_boundary = (
+            _source_contains(
+                step13_source,
+                (
+                    "typed_section_lineage_inferred_order",
+                    "full_inferred_order",
+                    "return 0.74",
+                    "return \"moderate\"",
+                ),
+            )
+            and _source_contains(
+                repo_root / "echelon/api/graph_visual_backend.py",
+                (
+                    "typed_section_lineage_inferred_order",
+                    "_lineage_grade_rank",
+                    "return 3",
+                ),
+            )
+        )
         topic_gap_repair_plan_uses_closure_states = (
             _source_contains(
                 topic_gap_repair_plan_source,
@@ -3110,6 +3130,7 @@ def audit_multi_topic_regression(
         and section_atom_layer_preserves_repair_contract_provenance
         and section_atom_layer_prioritizes_typed_chain_stage_cues
         and section_atom_chain_assembler_marks_inferred_order
+        and inferred_order_chain_consumers_keep_moderate_boundary
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
         and topic_gap_stage_candidate_recall_available
@@ -3148,6 +3169,7 @@ def audit_multi_topic_regression(
             "section_atom_layer_preserves_repair_contract_provenance": section_atom_layer_preserves_repair_contract_provenance,
             "section_atom_layer_prioritizes_typed_chain_stage_cues": section_atom_layer_prioritizes_typed_chain_stage_cues,
             "section_atom_chain_assembler_marks_inferred_order": section_atom_chain_assembler_marks_inferred_order,
+            "inferred_order_chain_consumers_keep_moderate_boundary": inferred_order_chain_consumers_keep_moderate_boundary,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_stage_candidate_recall_available": topic_gap_stage_candidate_recall_available,

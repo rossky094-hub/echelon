@@ -353,6 +353,32 @@ def test_bottleneck_lineage_triples_keep_partial_section_atom_chains_exploratory
     assert metadata["claim_scope"] == "exploratory_bottleneck_lineage"
 
 
+def test_step13_treats_inferred_order_typed_chain_as_moderate_not_strong():
+    from echelon.v14b.step13_first_principles_history import (
+        _chain_evidence_weight,
+        _chain_support_level,
+        evidence_strength_level_from_chain_support,
+        section_atom_chain_support_summary,
+    )
+
+    chain = {
+        "typed_chain_complete": 1,
+        "typed_chain_completeness": "full",
+        "evidence_grade": "typed_section_lineage_inferred_order",
+    }
+
+    assert _chain_evidence_weight(
+        "typed_section_lineage_inferred_order",
+        typed_chain_complete=True,
+        typed_chain_completeness="full",
+    ) == 0.74
+    assert _chain_support_level(chain) == "moderate"
+    summary = section_atom_chain_support_summary([chain])
+    assert summary["full_inferred_order"] == 1
+    assert summary["full_decision_grade"] == 0
+    assert evidence_strength_level_from_chain_support(summary) == "moderate"
+
+
 def test_step13_builds_first_principles_outputs(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step13_first_principles_history import run_first_principles_history

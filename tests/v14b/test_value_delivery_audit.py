@@ -177,6 +177,7 @@ def _write_product_sources(root: Path) -> None:
         '"evidence_map": evidence_map\n'
         '_build_history_main_path_contract history_main_path_contract "history_main_path": {\n'
         '"candidate_score": candidate_score "score_semantics": "candidate ranking score; not validation confidence or a conclusion probability" "candidate_score": conf claim_cards incomplete_claim_cards candidate_pool GNN/VGAE candidate edges future candidate generator candidate_score calibrated_candidate_score raw_candidate_score calibrated_prob raw_predicted_prob\n'
+        "def _lineage_grade_rank(meta):\n    return 3  # typed_section_lineage_inferred_order\n"
         '"future_growth": {"candidate_edges": future_growth, "future_directions": future_directions}\n'
         "def _future_candidate_evidence_text(): return 'GNN/VGAE candidate edge candidate_score= calibrated_candidate_score= raw_candidate_score='\n"
         'if edge_type == "future_candidate": obj.pop("confidence", None) "candidate_score": candidate_score "calibrated_candidate_score": evidence.get("calibrated_candidate_score")\n'
@@ -377,7 +378,7 @@ def _write_product_sources(root: Path) -> None:
         "candidate_score_ready \"candidate_score\": candidate_score future candidate score "
         "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria "
         "evidence_grade uncertainty_reasons_json evidence_objects_json repair_contracts_json "
-        '"repair_contracts" section_atom_chain\n',
+        '"repair_contracts" section_atom_chain typed_section_lineage_inferred_order full_inferred_order return 0.74 return "moderate"\n',
         encoding="utf-8",
     )
     (v14 / "step9_report.py").write_text(

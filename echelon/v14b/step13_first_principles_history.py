@@ -1804,6 +1804,8 @@ def _chain_evidence_weight(
         return 0.92
     if evidence_grade == "typed_section_lineage_traced":
         return 0.85
+    if evidence_grade == "typed_section_lineage_inferred_order":
+        return 0.74
     if typed_chain_complete:
         return 0.70
     if evidence_grade == "partial_typed_section_lineage":
@@ -1841,7 +1843,7 @@ def _chain_support_level(chain: dict[str, Any]) -> str:
     completeness = str(chain.get("typed_chain_completeness") or "")
     if grade == "typed_section_lineage":
         return "strong"
-    if grade == "typed_section_lineage_traced":
+    if grade in {"typed_section_lineage_traced", "typed_section_lineage_inferred_order"}:
         return "moderate"
     if grade == "partial_typed_section_lineage" and completeness in MODERATE_PARTIAL_CHAIN_COMPLETENESS:
         return "moderate"
@@ -1863,6 +1865,12 @@ def section_atom_chain_support_summary(chains: list[dict[str, Any]]) -> dict[str
         if int(chain.get("typed_chain_complete") or 0) == 1
         and str(chain.get("evidence_grade") or "") in {"typed_section_lineage", "typed_section_lineage_traced"}
     )
+    full_inferred_order = sum(
+        1
+        for chain in chains
+        if int(chain.get("typed_chain_complete") or 0) == 1
+        and str(chain.get("evidence_grade") or "") == "typed_section_lineage_inferred_order"
+    )
     partial = sum(1 for chain in chains if int(chain.get("typed_chain_complete") or 0) == 0)
     weak = sum(1 for chain in chains if _chain_support_level(chain) == "weak")
     return {
@@ -1870,6 +1878,7 @@ def section_atom_chain_support_summary(chains: list[dict[str, Any]]) -> dict[str
         "full": int(completeness.get("full", 0)),
         "full_decision_grade": full_decision_grade,
         "full_traced_or_decision_grade": full_traced,
+        "full_inferred_order": full_inferred_order,
         "partial": partial,
         "weak": weak,
         "by_evidence_grade": dict(sorted(grades.items())),
@@ -1881,6 +1890,8 @@ def evidence_strength_level_from_chain_support(chain_support: dict[str, Any]) ->
     if int(chain_support.get("full_decision_grade") or 0) > 0:
         return "strong"
     if int(chain_support.get("full_traced_or_decision_grade") or 0) > 0:
+        return "moderate"
+    if int(chain_support.get("full_inferred_order") or 0) > 0:
         return "moderate"
     if int(chain_support.get("total") or 0) > int(chain_support.get("weak") or 0):
         return "moderate"
@@ -1953,6 +1964,7 @@ def _chains_for_direction(
         grade_bonus = {
             "typed_section_lineage": 3,
             "typed_section_lineage_traced": 2,
+            "typed_section_lineage_inferred_order": 2,
             "partial_typed_section_lineage": 1,
         }.get(str(chain.get("evidence_grade") or ""), 0)
         matches.append(
