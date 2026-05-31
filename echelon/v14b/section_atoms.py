@@ -420,6 +420,7 @@ def build_section_atoms(
         pending.extend(atoms)
         if len(pending) >= 1000:
             total += _insert_atoms(conn, pending, replace_fts_rows=not rebuild)
+            conn.commit()
             pending = []
     if pending:
         total += _insert_atoms(conn, pending, replace_fts_rows=not rebuild)
