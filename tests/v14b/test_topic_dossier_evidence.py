@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import echelon.api.graph_visual_backend as graph_backend
@@ -1110,6 +1111,13 @@ def test_bottleneck_lineage_constraints_are_auditable_typed_chains():
                 "evidence_section": "discussion",
                 "evidence_quality": "section_level",
                 "evidence_weight": 0.75,
+                "metadata_json": json.dumps(
+                    {
+                        "typed_chain_complete": True,
+                        "typed_chain_completeness": "full",
+                        "placeholder_stages": [],
+                    }
+                ),
             }
         ],
     )
@@ -1117,10 +1125,72 @@ def test_bottleneck_lineage_constraints_are_auditable_typed_chains():
     constraint = lineage["constraints"][0]
     assert constraint["claim_scope"] == "bottleneck_lineage_evidence"
     assert constraint["evidence_grade"] == "typed_section_lineage"
+    assert constraint["typed_chain_completeness"] == "full"
     assert constraint["typed_chain"][0]["source_stage"] == "constraint"
     assert constraint["required_evidence"]
     assert constraint["evidence_objects"][0]["type"] == "bottleneck_lineage_triple"
     assert constraint["evidence_objects"][0]["click_target"] == {"kind": "paper", "id": "p1"}
+
+
+def test_bottleneck_lineage_partial_typed_chains_do_not_overclaim():
+    lineage = _build_bottleneck_lineage(
+        principles=[
+            {
+                "principle_id": "FP_MANUFACTURING",
+                "principle_name": "Manufacturing scalability",
+                "root_cause": "Large-area metalens fabrication loses uniformity.",
+                "risk_label": "high",
+                "bottleneck_score": 0.9,
+                "unresolved_atoms": 3,
+                "resolved_atoms": 0,
+                "current_backlog": 2.0,
+                "peak_backlog_year": 2024,
+                "top_keywords_json": '[{"key":"scalability"}]',
+            }
+        ],
+        history_events=[],
+        unresolved_limitations=[
+            {
+                "paper_id": "p1",
+                "keyword": "scalability",
+                "description": "scalability remains limited",
+                "evidence_quality": "section_level",
+                "source_section_name": "discussion",
+            }
+        ],
+        lineage_triples=[
+            {
+                "triple_id": "t1",
+                "principle_id": "FP_MANUFACTURING",
+                "edge_order": 1,
+                "source_stage": "failure_mechanism",
+                "target_stage": "attempt_path",
+                "source_text": "uniformity drops",
+                "target_text": "missing evidence: no linked attempted path",
+                "relation_type": "failure_triggers_attempt",
+                "paper_id": "p1",
+                "event_year": 2024,
+                "evidence_section": "discussion",
+                "evidence_quality": "section_level",
+                "evidence_weight": 0.75,
+                "metadata_json": json.dumps(
+                    {
+                        "typed_chain_complete": False,
+                        "typed_chain_completeness": "constraint_failure_only",
+                        "placeholder_stages": ["attempt_path", "local_fix", "new_constraint"],
+                    }
+                ),
+            }
+        ],
+    )
+
+    constraint = lineage["constraints"][0]
+    assert constraint["claim_scope"] == "exploratory_bottleneck_lineage"
+    assert constraint["evidence_grade"] == "partial_typed_section_lineage"
+    assert constraint["typed_chain_complete"] is False
+    assert constraint["typed_chain_completeness"] == "partial"
+    assert "attempt_path" in constraint["typed_chain_missing_stages"]
+    assert any("typed lineage is partial" in r for r in constraint["uncertainty_reasons"])
 
 
 def test_topic_lens_readiness_preflight_is_arbitrary_topic_contract():
@@ -1176,6 +1246,7 @@ def test_topic_lens_readiness_preflight_is_arbitrary_topic_contract():
                 {
                     "claim_scope": "bottleneck_lineage_evidence",
                     "evidence_grade": "typed_section_lineage",
+                    "typed_chain_completeness": "full",
                     "typed_chain": [{"source_stage": "constraint", "target_stage": "failure"}],
                     "evidence_objects": [{"type": "bottleneck_lineage_triple"}],
                 }

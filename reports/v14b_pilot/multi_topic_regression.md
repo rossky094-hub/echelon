@@ -1,13 +1,13 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-31T01:13:42Z`
+- Audit: `2026-05-31T01:29:03Z`
 
-| Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |
+| Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Full Lineage | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| metalens | warn | 1.00 | 13 | 5 | 5 | 5 | 0 |
-| metasurface holography | warn | 1.00 | 8 | 5 | 5 | 5 | 0 |
-| photonic crystal cavity | fail | 1.00 | 9 | 5 | 5 | 5 | 0 |
-| quantum light source | fail | 1.00 | 10 | 5 | 5 | 5 | 0 |
+| metalens | fail | 1.00 | 13 | 5 | 0 | 5 | 0 |
+| metasurface holography | fail | 1.00 | 8 | 5 | 0 | 5 | 0 |
+| photonic crystal cavity | fail | 1.00 | 9 | 5 | 0 | 5 | 0 |
+| quantum light source | fail | 1.00 | 10 | 5 | 0 | 5 | 0 |
 
 ## Product Gate
 

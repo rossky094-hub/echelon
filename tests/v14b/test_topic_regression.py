@@ -97,6 +97,7 @@ def _evidence_contract_fragments():
                     "claim_scope": "bottleneck_lineage_evidence",
                     "evidence_grade": "typed_section_lineage",
                     "uncertainty_reasons": ["audit fixture"],
+                    "typed_chain_completeness": "full",
                     "typed_chain": [{"source_stage": "constraint", "target_stage": "failure"}],
                     "evidence_objects": [
                         {

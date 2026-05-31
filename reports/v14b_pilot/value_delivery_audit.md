@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T01:13:52Z`
+- generated_at: `2026-05-31T01:29:19Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,43 +58,43 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 363,
+    "section_frontfill_done": 369,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 363,
+    "section_frontfill_progress_done": 369,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 337,
-      "current_contract_rate": 0.11155246607083748,
-      "decision_grade_papers": 337,
-      "decision_grade_rate": 0.11155246607083748,
+      "current_contract_papers": 343,
+      "current_contract_rate": 0.11353856338960609,
+      "decision_grade_papers": 343,
+      "decision_grade_rate": 0.11353856338960609,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1093,
-        "weak": 1928
+        "strong": 1099,
+        "weak": 1922
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4683,
-        "v14b_section_parser_contract_v3_toc_guard": 778
+        "legacy_unknown_contract": 4676,
+        "v14b_section_parser_contract_v3_toc_guard": 788
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4683,
-        "v14b_section_ingest_v3": 778
+        "v14b_section_ingest_v2": 4676,
+        "v14b_section_ingest_v3": 788
       },
       "primary_section_papers": 3021,
-      "primary_section_rows": 5461,
+      "primary_section_rows": 5464,
       "strategy_counts": {
-        "embedded_heading": 46,
-        "explicit_heading": 1576,
-        "heading_continuation": 2082,
-        "inline_heading": 651,
-        "legacy_unknown_strategy": 3320,
+        "embedded_heading": 47,
+        "explicit_heading": 1585,
+        "heading_continuation": 2091,
+        "inline_heading": 653,
+        "legacy_unknown_strategy": 3313,
         "loose_inline_heading": 34,
         "parser_hint": 38
       },
-      "strong_or_moderate_papers": 1093,
-      "weak_only_papers": 1928,
-      "weak_only_rate": 0.6381992717643165
+      "strong_or_moderate_papers": 1099,
+      "weak_only_papers": 1922,
+      "weak_only_rate": 0.6362131744455478
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -148,8 +148,8 @@
     "local_fix->new_constraint"
   ],
   "status": "pass",
-  "triples": 2920,
-  "triples_with_page": 1600
+  "triples": 4292,
+  "triples_with_page": 3404
 }
 ```
 
@@ -611,6 +611,8 @@
     "topic_regression_cli_defaults_to_suite": true
   },
   "failed_topics": [
+    "metalens",
+    "metasurface holography",
     "photonic crystal cavity",
     "quantum light source"
   ],

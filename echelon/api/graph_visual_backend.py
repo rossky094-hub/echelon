@@ -2240,6 +2240,7 @@ def _lineage_triple_evidence_object(triple: dict[str, Any] | None, *, source: st
     source_stage = triple.get("source_stage") or "constraint"
     target_stage = triple.get("target_stage") or "failure_mechanism"
     label = f"{source_stage} -> {target_stage}"
+    lineage_meta = _loads(triple.get("metadata_json"), {}) if triple.get("metadata_json") else {}
     return {
         "type": "bottleneck_lineage_triple",
         "role": "typed_bottleneck_lineage",
@@ -2255,11 +2256,17 @@ def _lineage_triple_evidence_object(triple: dict[str, Any] | None, *, source: st
         "evidence_page": triple.get("evidence_page"),
         "evidence_quality": triple.get("evidence_quality"),
         "evidence_weight": triple.get("evidence_weight"),
+        "typed_chain_complete": bool(lineage_meta.get("typed_chain_complete")),
+        "typed_chain_completeness": lineage_meta.get("typed_chain_completeness") or "unknown",
+        "placeholder_stages": lineage_meta.get("placeholder_stages") or [],
         "lineage_chain": {
             "source_stage": source_stage,
             "target_stage": target_stage,
             "source_text": triple.get("source_text"),
             "target_text": triple.get("target_text"),
+            "source_stage_evidence": lineage_meta.get("source_stage_evidence"),
+            "target_stage_evidence": lineage_meta.get("target_stage_evidence"),
+            "target_stage_is_placeholder": bool(lineage_meta.get("target_stage_is_placeholder")),
         },
         "click_target": {"kind": "paper", "id": paper_id} if paper_id else None,
     }
@@ -3909,17 +3916,37 @@ def _build_bottleneck_lineage(
                 int(x.get("edge_order") or 0),
             ),
         )[:10]
+        triple_metadata = [
+            _loads(t.get("metadata_json"), {}) if t.get("metadata_json") else {}
+            for t in triples
+        ]
         has_section_triple = any(
             "section" in str(x.get("evidence_quality") or "").lower()
             for x in triples
+        )
+        has_complete_typed_chain = any(
+            bool(m.get("typed_chain_complete")) or m.get("typed_chain_completeness") == "full"
+            for m in triple_metadata
+        )
+        has_partial_typed_chain = bool(triples)
+        placeholder_stages = sorted(
+            {
+                str(stage)
+                for meta in triple_metadata
+                for stage in (meta.get("placeholder_stages") or [])
+                if stage
+            }
         )
         has_section_limitation = any(
             "section" in str(x.get("evidence_quality") or "").lower()
             for x in matched_limitations
         )
-        if has_section_triple:
+        if has_section_triple and has_complete_typed_chain:
             evidence_grade = "typed_section_lineage"
             claim_scope = "bottleneck_lineage_evidence"
+        elif has_section_triple and has_partial_typed_chain:
+            evidence_grade = "partial_typed_section_lineage"
+            claim_scope = "exploratory_bottleneck_lineage"
         elif has_section_limitation:
             evidence_grade = "section_bottleneck_context"
             claim_scope = "exploratory_bottleneck_lineage"
@@ -3936,6 +3963,11 @@ def _build_bottleneck_lineage(
             uncertainty.append("no typed constraint->failure->attempt lineage triples matched this principle")
         if not has_section_triple:
             uncertainty.append("lineage lacks section-level typed triples for this topic")
+        if triples and not has_complete_typed_chain:
+            uncertainty.append(
+                "typed lineage is partial; missing evidence stages: "
+                + (", ".join(placeholder_stages) if placeholder_stages else "unknown")
+            )
         if not matched_limitations:
             uncertainty.append("no topic-matched limitation atoms attached to this root constraint")
         required_evidence = [
@@ -3958,6 +3990,17 @@ def _build_bottleneck_lineage(
                 "evidence_page": t.get("evidence_page"),
                 "evidence_quality": t.get("evidence_quality"),
                 "evidence_weight": t.get("evidence_weight"),
+                "typed_chain_complete": bool(
+                    (_loads(t.get("metadata_json"), {}) if t.get("metadata_json") else {}).get("typed_chain_complete")
+                ),
+                "typed_chain_completeness": (
+                    (_loads(t.get("metadata_json"), {}) if t.get("metadata_json") else {}).get("typed_chain_completeness")
+                    or "unknown"
+                ),
+                "placeholder_stages": (
+                    (_loads(t.get("metadata_json"), {}) if t.get("metadata_json") else {}).get("placeholder_stages")
+                    or []
+                ),
             }
             for t in triples[:5]
         ]
@@ -3988,6 +4031,13 @@ def _build_bottleneck_lineage(
                 "top_keywords": keyword_list,
                 "recent_events": event_by_principle.get(pid, [])[:8],
                 "typed_chain": typed_chain,
+                "typed_chain_complete": has_complete_typed_chain,
+                "typed_chain_completeness": (
+                    "full"
+                    if has_complete_typed_chain
+                    else ("partial" if has_partial_typed_chain else "missing")
+                ),
+                "typed_chain_missing_stages": placeholder_stages,
                 "claim_scope": claim_scope,
                 "evidence_grade": evidence_grade,
                 "can_explain": [

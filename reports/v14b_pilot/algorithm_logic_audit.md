@@ -1,13 +1,15 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T01:15:02Z`
+- generated_at: `2026-05-31T01:29:19Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,021`
 - limitation_exact_section_atoms: `1,073`
 - limitation_aggregate_section_atoms: `0`
+- complete_typed_lineage_triples: `0`
+- partial_typed_lineage_triples: `4,292`
 - topic_gap_decision_grade_section_rate: `0.0%`
-- failed regression topics: `photonic crystal cavity, quantum light source`
+- failed regression topics: `metalens, metasurface holography, photonic crystal cavity, quantum light source`
 
 ## Policy
 
@@ -30,11 +32,11 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,021; topic_gap_decision_grade=0.0%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
 | Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,073; exact_section_atoms=1,073; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
-| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=1; high_confidence=0. | Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria. |
+| Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=1; high_confidence=0; complete_typed_lineage_triples=0; partial_typed_lineage_triples=4,292. | Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria. |
 | Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |
 | Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,391; branch_lineages=5,278. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |
-| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
+| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=metalens, metasurface holography, photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
 | Step12 / value delivery audit | `aligned` | `fail` | Enforce acceptance gates and keep weak evidence from becoming product claims. | evidence_policy depends on linked refs, topic-gap sections, calibration, Claim Cards, and multi-corpus gates. | Use this audit as the release stop/go gate; do not redefine success around passing subsets. |
 | quarterly / multi-corpus | `aligned` | `pass` | Preserve corpus-specific builds before cross-corpus bridge graph. | corpus_registry=1; corpus_snapshots=0. | Add per-corpus algorithm-logic audit before building cross-corpus bridge claims. |
 

@@ -12,6 +12,110 @@ def test_classify_principle_detects_physical_constraint():
     assert p.principle_id == "FP_PHYSICAL_CONSTRAINT"
 
 
+def test_step13_load_atoms_rejects_aggregate_section_provenance(tmp_path):
+    from echelon.v14b.db_schema import init_v14b_db
+    from echelon.v14b.step13_first_principles_history import load_atoms
+
+    db_main = tmp_path / "main.sqlite3"
+    conn_main = sqlite3.connect(str(db_main))
+    conn_main.row_factory = sqlite3.Row
+    conn_main.executescript(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            abstract TEXT,
+            publication_year INTEGER,
+            primary_field_id TEXT
+        );
+        CREATE TABLE paper_sections (
+            paper_id TEXT NOT NULL,
+            section_name TEXT NOT NULL,
+            section_text TEXT NOT NULL,
+            section_meta_json TEXT
+        );
+        INSERT INTO papers VALUES ('p1', 'Paper', 'Abstract', 2024, 'F1');
+        """
+    )
+    conn_main.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
+        (
+            "p1",
+            "discussion",
+            "current contract limitation evidence " * 12,
+            json.dumps(
+                {
+                    "extraction_strategies": ["explicit_heading"],
+                    "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                }
+            ),
+        ),
+    )
+    conn_main.commit()
+
+    db_v14 = tmp_path / "v14.sqlite3"
+    conn_v14 = init_v14b_db(db_v14)
+    conn_v14.execute(
+        """
+        INSERT INTO limitation_atoms
+            (paper_id, description, keyword, severity, evidence_source,
+             evidence_quality, evidence_weight, source_section_name, extractor_method)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p1",
+            "Fabrication remains limited.",
+            "fabrication",
+            "high",
+            "structured_sections",
+            "section_level",
+            0.9,
+            "discussion,method",
+            "heuristic",
+        ),
+    )
+    conn_v14.commit()
+
+    atoms = load_atoms(conn_main, conn_v14)
+    conn_main.close()
+    conn_v14.close()
+
+    assert atoms
+    assert atoms[0]["section_parser_contract_version"] == "legacy_unknown_contract"
+    assert atoms[0]["section_decision_grade"] is False
+
+
+def test_bottleneck_lineage_triples_mark_missing_stages():
+    from echelon.v14b.step13_first_principles_history import build_bottleneck_lineage_triples
+
+    triples = build_bottleneck_lineage_triples(
+        atoms=[
+            {
+                "atom_id": 1,
+                "paper_id": "p1",
+                "paper_title": "Paper",
+                "publication_year": 2024,
+                "description": "Fabrication tolerance still limits broadband imaging quality.",
+                "keyword": "fabrication",
+                "severity": "high",
+                "evidence_quality": "section_level",
+                "evidence_weight": 0.9,
+                "source_section_name": "discussion",
+            }
+        ],
+        resolution_rows=[],
+        section_pages={},
+        future_directions=[],
+    )
+
+    assert len(triples) == 4
+    metadata = json.loads(triples[1]["metadata_json"])
+    assert metadata["typed_chain_complete"] is False
+    assert metadata["typed_chain_completeness"] == "constraint_failure_only"
+    assert "attempt_path" in metadata["placeholder_stages"]
+    assert triples[1]["target_text"].startswith("missing evidence:")
+
+
 def test_step13_builds_first_principles_outputs(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step13_first_principles_history import run_first_principles_history

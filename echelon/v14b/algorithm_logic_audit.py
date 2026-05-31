@@ -65,6 +65,35 @@ def _count_when_columns(
     return _count(conn, table, where)
 
 
+def _lineage_completeness_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    if "metadata_json" not in _columns(conn, "bottleneck_lineage_triples"):
+        return {
+            "complete_typed_lineage_triples": 0,
+            "partial_typed_lineage_triples": 0,
+            "unknown_typed_lineage_triples": _count(conn, "bottleneck_lineage_triples"),
+        }
+    complete = 0
+    partial = 0
+    unknown = 0
+    for row in conn.execute("SELECT metadata_json FROM bottleneck_lineage_triples").fetchall():
+        raw = row[0] if not isinstance(row, sqlite3.Row) else row["metadata_json"]
+        try:
+            meta = json.loads(raw or "{}")
+        except Exception:
+            meta = {}
+        if meta.get("typed_chain_complete") or meta.get("typed_chain_completeness") == "full":
+            complete += 1
+        elif meta.get("typed_chain_completeness"):
+            partial += 1
+        else:
+            unknown += 1
+    return {
+        "complete_typed_lineage_triples": complete,
+        "partial_typed_lineage_triples": partial,
+        "unknown_typed_lineage_triples": unknown,
+    }
+
+
 def _load_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
@@ -108,6 +137,7 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
             "COALESCE(source_section_name, '') LIKE '%,%'",
         )
         metrics["bottleneck_triples"] = _count(v14, "bottleneck_lineage_triples")
+        metrics.update(_lineage_completeness_counts(v14))
         metrics["vgae_calibration_audit"] = _count(v14, "vgae_calibration_audit")
         metrics["branch_lineages"] = _count(v14, "branch_lineages")
         metrics["visual_nodes"] = _count(v14, "visual_nodes")
@@ -131,6 +161,8 @@ def build_algorithm_logic_audit(
     limitation_atoms = int(m.get("limitation_atoms") or 0)
     limitation_exact_section_atoms = int(m.get("limitation_exact_section_atoms") or 0)
     limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
+    complete_typed_lineage_triples = int(m.get("complete_typed_lineage_triples") or 0)
+    partial_typed_lineage_triples = int(m.get("partial_typed_lineage_triples") or 0)
     topic_gap_dg_rate = float(m.get("topic_gap_decision_grade_section_rate") or 0.0)
     no_target = m.get("topic_gap_no_target_inspection_state") or {}
     frontfill = m.get("section_frontfill_state") or {}
@@ -305,7 +337,13 @@ def build_algorithm_logic_audit(
             "Incomplete cards stay candidate pool; Radar main view requires complete cards.",
             "aligned",
             "warn" if int(m.get("complete_claim_cards") or 0) else "fail",
-            f"Claim Cards={int(m.get('direction_claim_cards') or 0):,}; complete={int(m.get('complete_claim_cards') or 0):,}; high_confidence={int(m.get('high_confidence_claim_cards') or 0):,}.",
+            (
+                f"Claim Cards={int(m.get('direction_claim_cards') or 0):,}; "
+                f"complete={int(m.get('complete_claim_cards') or 0):,}; "
+                f"high_confidence={int(m.get('high_confidence_claim_cards') or 0):,}; "
+                f"complete_typed_lineage_triples={complete_typed_lineage_triples:,}; "
+                f"partial_typed_lineage_triples={partial_typed_lineage_triples:,}."
+            ),
             "Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria.",
         ),
         StepAudit(
@@ -389,6 +427,8 @@ def build_algorithm_logic_audit(
             "limitation_atoms": limitation_atoms,
             "limitation_exact_section_atoms": limitation_exact_section_atoms,
             "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
+            "complete_typed_lineage_triples": complete_typed_lineage_triples,
+            "partial_typed_lineage_triples": partial_typed_lineage_triples,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
         },
@@ -419,6 +459,8 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- primary_section_papers: `{int(result['metrics']['primary_section_papers']):,}`",
         f"- limitation_exact_section_atoms: `{int(result['metrics']['limitation_exact_section_atoms']):,}`",
         f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
+        f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
+        f"- partial_typed_lineage_triples: `{int(result['metrics']['partial_typed_lineage_triples']):,}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
         "",

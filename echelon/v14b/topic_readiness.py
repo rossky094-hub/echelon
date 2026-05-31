@@ -92,7 +92,11 @@ def build_topic_readiness_preflight(
 
     first_principles_contracts, five_q_clickable = _contracts(first_principles_questions)
     lineage_contracts, lineage_clickable_base = _contracts(constraints)
-    lineage_clickable = [c for c in lineage_clickable_base if c.get("typed_chain")]
+    lineage_clickable = [
+        c
+        for c in lineage_clickable_base
+        if c.get("typed_chain") and c.get("typed_chain_completeness") == "full"
+    ]
     reading_contracts, reading_clickable = _contracts(reading_path)
 
     turning_with_access = sum(1 for p in turning_hits if paper_has_access(p))

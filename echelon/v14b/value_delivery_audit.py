@@ -1471,6 +1471,7 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "claim_scope": "bottleneck_lineage_evidence",
                     "evidence_grade": "typed_section_lineage",
                     "uncertainty_reasons": ["audit fixture"],
+                    "typed_chain_completeness": "full",
                     "typed_chain": [{"source_stage": "constraint", "target_stage": "failure_mechanism"}],
                     "evidence_objects": [{"type": "bottleneck_lineage_triple", "paper_id": "p1"}],
                 }

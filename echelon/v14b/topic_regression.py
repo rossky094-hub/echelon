@@ -396,12 +396,18 @@ def _bottleneck_lineage_contract_summary(lens: dict[str, Any]) -> dict[str, int]
         if isinstance(c, dict)
     ]
     contracted = [c for c in constraints if _has_evidence_contract(c)]
-    typed = [c for c in contracted if c.get("typed_chain")]
+    partial_typed = [c for c in contracted if c.get("typed_chain")]
+    typed = [
+        c
+        for c in partial_typed
+        if c.get("typed_chain_completeness") == "full"
+    ]
     clickable = [c for c in contracted if _has_clickable_evidence(c)]
     return {
         "total": len(constraints),
         "with_contract": len(contracted),
         "with_typed_chain": len(typed),
+        "with_partial_typed_chain": len(partial_typed),
         "with_clickable_evidence": len(clickable),
     }
 
@@ -914,7 +920,12 @@ def render_regression_md(result: dict[str, Any]) -> str:
             f"{k.get('with_decision_grade_primary_section', 0)} with decision-grade current-contract evidence.",
             f"- Future candidates: {f['total']} graph candidates, {f['claim_cards']} Radar cards, {f['complete_claim_cards']} complete cards.",
             f"- Five-question evidence contracts: {q.get('with_clickable_evidence', 0)}/{q.get('total', 0)} have claim scope, evidence grade, uncertainty, and clickable evidence.",
-            f"- Bottleneck lineage contracts: {lineage.get('with_clickable_evidence', 0)}/{lineage.get('total', 0)} constraints have typed/clickable evidence contracts.",
+            (
+                f"- Bottleneck lineage contracts: full={lineage.get('with_typed_chain', 0)}, "
+                f"partial={lineage.get('with_partial_typed_chain', 0)}, "
+                f"clickable={lineage.get('with_clickable_evidence', 0)}/{lineage.get('total', 0)}. "
+                "Only full typed chains satisfy the lineage gate."
+            ),
             f"- Reading path contracts: {reading.get('with_clickable_evidence', 0)}/{reading.get('total', 0)} steps are auditable; modes={', '.join(reading.get('modes') or []) or 'N/A'}.",
             "- Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.",
             "- This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.",
@@ -989,7 +1000,7 @@ def render_multi_regression_md(results: list[dict[str, Any]]) -> str:
         "",
         f"- Audit: `{utc_now()}`",
         "",
-        "| Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |",
+        "| Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Full Lineage | Reading Path | Complete Claim Cards |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for result in results:
@@ -1010,7 +1021,7 @@ def render_multi_regression_md(results: list[dict[str, Any]]) -> str:
                 ),
                 turning=int(turning.get("total") or 0),
                 fiveq=int(q.get("with_clickable_evidence") or 0),
-                lineage=int(lineage.get("with_clickable_evidence") or 0),
+                lineage=int(lineage.get("with_typed_chain") or 0),
                 reading=int(reading.get("with_clickable_evidence") or 0),
                 cards=int(future.get("complete_claim_cards") or 0),
             )

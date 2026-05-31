@@ -1257,8 +1257,7 @@ def _normalize_section_name(raw: str) -> str:
     name = (raw or "").strip().lower()
     if not name:
         return ""
-    # source_section_name may contain comma-separated names.
-    return name.split(",")[0].strip()
+    return name
 
 
 def build_bottleneck_lineage_triples(
@@ -1326,9 +1325,9 @@ def build_bottleneck_lineage_triples(
 
         constraint_text = f"{root_type}:{kw}"
         failure_text = desc[:280]
-        attempt_text = "historical attempt unresolved"
-        local_fix_text = "no validated local fix yet"
-        next_constraint_text = "unresolved follow-on constraint"
+        attempt_text = "missing evidence: no linked attempted path"
+        local_fix_text = "missing evidence: no validated local fix"
+        next_constraint_text = "missing evidence: no follow-on constraint"
         rel_rows = resolution_by_atom.get(atom_id, [])
         if rel_rows:
             best = max(rel_rows, key=lambda r: float(r.get("confidence") or 0.0))
@@ -1338,6 +1337,33 @@ def build_bottleneck_lineage_triples(
         newer = [a for a in siblings if int(a.get("publication_year") or 0) > year]
         if newer:
             next_constraint_text = str(newer[0].get("description") or "")[:280]
+
+        placeholder_stages = []
+        stage_evidence = {
+            "constraint": "principle_keyword_classification",
+            "failure_mechanism": "limitation_atom_description",
+            "attempt_path": "resolution_record" if rel_rows else "missing_resolution_evidence",
+            "local_fix": "resolution_evidence_text" if rel_rows else "missing_local_fix_evidence",
+            "new_constraint": "later_same_keyword_atom" if newer else "missing_follow_on_constraint",
+        }
+        if not rel_rows:
+            placeholder_stages.extend(["attempt_path", "local_fix"])
+        if not newer:
+            placeholder_stages.append("new_constraint")
+        typed_chain_complete = not placeholder_stages
+        if typed_chain_complete:
+            typed_chain_completeness = "full"
+        elif rel_rows:
+            typed_chain_completeness = "resolution_backed_partial"
+        else:
+            typed_chain_completeness = "constraint_failure_only"
+        lineage_missing_reasons = [
+            {
+                "stage": stage,
+                "reason": stage_evidence.get(stage),
+            }
+            for stage in placeholder_stages
+        ]
 
         def add_edge(
             edge_order: int,
@@ -1385,6 +1411,19 @@ def build_bottleneck_lineage_triples(
                             "evidence_grade": grade_from_qualities([atom.get("evidence_quality")]),
                             "section_provenance_strength": atom.get("section_provenance_strength"),
                             "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
+                            "stage_evidence": stage_evidence,
+                            "typed_chain_complete": typed_chain_complete,
+                            "typed_chain_completeness": typed_chain_completeness,
+                            "placeholder_stages": placeholder_stages,
+                            "lineage_missing_reasons": lineage_missing_reasons,
+                            "source_stage_evidence": stage_evidence.get(src_stage),
+                            "target_stage_evidence": stage_evidence.get(dst_stage),
+                            "target_stage_is_placeholder": dst_stage in placeholder_stages,
+                            "lineage_contract": (
+                                "complete_typed_chain"
+                                if typed_chain_complete
+                                else "partial_typed_chain_with_explicit_missing_stages"
+                            ),
                             "claim_policy": "lineage evidence only; not a standalone prediction",
                         }
                     ),
