@@ -66,6 +66,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
             paper_id TEXT PRIMARY KEY,
             priority_score REAL NOT NULL DEFAULT 0,
             reasons_json TEXT NOT NULL,
+            repair_contracts_json TEXT NOT NULL DEFAULT '[]',
             in_top_n INTEGER NOT NULL DEFAULT 0,
             has_any_section INTEGER NOT NULL DEFAULT 0,
             has_primary_section INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +110,7 @@ def _ensure_audit_tables(conn_v14: sqlite3.Connection) -> None:
         "retry_class": "ALTER TABLE section_priority_papers ADD COLUMN retry_class TEXT",
         "retry_priority": "ALTER TABLE section_priority_papers ADD COLUMN retry_priority REAL NOT NULL DEFAULT 0",
         "access_strategy": "ALTER TABLE section_priority_papers ADD COLUMN access_strategy TEXT",
+        "repair_contracts_json": "ALTER TABLE section_priority_papers ADD COLUMN repair_contracts_json TEXT NOT NULL DEFAULT '[]'",
         "has_current_primary_section": "ALTER TABLE section_priority_papers ADD COLUMN has_current_primary_section INTEGER NOT NULL DEFAULT 0",
         "has_decision_grade_primary_section": "ALTER TABLE section_priority_papers ADD COLUMN has_decision_grade_primary_section INTEGER NOT NULL DEFAULT 0",
         "section_contract_status": "ALTER TABLE section_priority_papers ADD COLUMN section_contract_status TEXT",
@@ -212,22 +214,58 @@ def _gap_category(gap_type: str) -> str:
     return "topic_evidence_gap"
 
 
+def _gap_repair_contract(row: dict[str, Any], *, category: str, priority: float) -> dict[str, Any] | None:
+    contract_keys = (
+        "source_contract",
+        "repair_id",
+        "target_pipeline_steps",
+        "retrieval_modes",
+        "parser_contract",
+        "claim_scope",
+        "evidence_grade",
+    )
+    if not any(str(row.get(key) or "").strip() for key in contract_keys):
+        return None
+    return {
+        "source_contract": row.get("source_contract") or "multi_topic_regression_gate",
+        "repair_id": row.get("repair_id") or "",
+        "gap_type": row.get("gap_type") or "topic_evidence_gap",
+        "topic": row.get("topic") or "",
+        "bottleneck": row.get("bottleneck") or "",
+        "category": category,
+        "priority": priority,
+        "frontfill_query": row.get("frontfill_query") or "",
+        "required_sections": row.get("required_sections") or "",
+        "target_pipeline_steps": row.get("target_pipeline_steps") or "",
+        "retrieval_modes": row.get("retrieval_modes") or "",
+        "parser_contract": row.get("parser_contract") or "",
+        "claim_scope": row.get("claim_scope") or "",
+        "evidence_grade": row.get("evidence_grade") or "",
+        "why": row.get("why") or "",
+    }
+
+
 def apply_topic_evidence_gap_queue(
     reasons: dict[str, set[str]],
     scores: Counter[str],
     categories: dict[str, set[str]],
     *,
     gap_rows: list[dict[str, Any]],
+    repair_contracts: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Merge multi-topic regression gaps into the section evidence budget.
 
     The regression gate should not merely fail; it should feed the next section
     ingest batch with the exact papers whose missing sections block useful
-    Topic Dossiers and Claim Cards.
+    Topic Dossiers and Claim Cards. Rows from Topic Dossier evidence_repair_plan
+    use source_contract=topic_dossier_evidence_repair_plan and must keep their
+    target pipeline/parser contracts attached to each queued paper.
     """
     paper_ids: set[str] = set()
     rows_without_ids = 0
     category_counts: Counter[str] = Counter()
+    repair_contract_rows = 0
+    repair_contract_papers: set[str] = set()
     for row in gap_rows:
         gap_type = str(row.get("gap_type") or "topic_evidence_gap")
         category = _gap_category(gap_type)
@@ -241,9 +279,16 @@ def apply_topic_evidence_gap_queue(
             priority = 80.0
         topic = str(row.get("topic") or "topic").strip()
         bottleneck = str(row.get("bottleneck") or "").strip()
+        contract = _gap_repair_contract(row, category=category, priority=priority)
+        if contract:
+            repair_contract_rows += 1
         for pid in pids:
             paper_ids.add(pid)
             category_counts[category] += 1
+            if contract:
+                repair_contract_papers.add(pid)
+                if repair_contracts is not None:
+                    repair_contracts[pid].append(dict(contract))
             reason = f"topic_gap:{topic}:{gap_type}"
             if bottleneck:
                 reason += f":{bottleneck}"
@@ -254,6 +299,8 @@ def apply_topic_evidence_gap_queue(
         "gap_rows_without_candidate_papers": rows_without_ids,
         "gap_paper_ids": len(paper_ids),
         "gap_category_counts": dict(category_counts),
+        "repair_contract_rows": repair_contract_rows,
+        "repair_contract_papers": len(repair_contract_papers),
     }
 
 
@@ -595,11 +642,13 @@ def run_section_queue_audit(
         top_n=top_n,
     )
     gap_rows = _load_topic_evidence_gap_rows(topic_evidence_gap_queue)
+    repair_contracts: dict[str, list[dict[str, Any]]] = defaultdict(list)
     gap_summary = apply_topic_evidence_gap_queue(
         reasons,
         scores,
         categories,
         gap_rows=gap_rows,
+        repair_contracts=repair_contracts,
     )
     candidate_set = set(candidate_ids)
     any_section, primary_section, current_primary_section, decision_grade_primary_section = _section_status(conn_main)
@@ -630,6 +679,7 @@ def run_section_queue_audit(
                 "paper_id": pid,
                 "priority_score": round(float(scores[pid]) + retry_boost, 4),
                 "reasons": sorted(reasons[pid]),
+                "repair_contracts": repair_contracts.get(pid, []),
                 "in_top_n": pid in candidate_set,
                 "has_any_section": pid in any_section,
                 "has_primary_section": pid in primary_section,
@@ -656,18 +706,19 @@ def run_section_queue_audit(
     conn_v14.executemany(
         """
         INSERT OR REPLACE INTO section_priority_papers
-            (paper_id, priority_score, reasons_json, in_top_n, has_any_section,
+            (paper_id, priority_score, reasons_json, repair_contracts_json, in_top_n, has_any_section,
              has_primary_section, has_current_primary_section, has_decision_grade_primary_section, eligible_pdf,
              last_attempt_outcome, last_attempt_ts, retry_class, retry_priority,
              access_strategy, section_contract_status, title, publication_year,
              source_url, audit_ts)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
                 r["paper_id"],
                 r["priority_score"],
                 json.dumps(r["reasons"], ensure_ascii=False),
+                json.dumps(r["repair_contracts"], ensure_ascii=False, sort_keys=True),
                 int(r["in_top_n"]),
                 int(r["has_any_section"]),
                 int(r["has_primary_section"]),
@@ -807,9 +858,25 @@ def run_section_queue_audit(
         "eligible_pdf", "last_attempt_outcome", "last_attempt_ts", "retry_class",
         "retry_priority", "access_strategy", "publication_year", "title", "source_url",
         "doi", "arxiv_id", "openalex_id", "s2_paper_id",
+        "source_contracts", "repair_ids", "target_pipeline_steps", "retrieval_modes",
+        "parser_contracts", "claim_scopes", "evidence_grades", "repair_contracts_json",
     ]
 
     def write_delta_csv(path: Path, selected_rows: list[dict[str, Any]]) -> None:
+        def join_contract_field(contracts: list[dict[str, Any]], key: str) -> str:
+            values: list[str] = []
+            seen: set[str] = set()
+            for contract in contracts:
+                raw = str((contract or {}).get(key) or "").strip()
+                if not raw:
+                    continue
+                for value in raw.replace(",", ";").split(";"):
+                    item = value.strip()
+                    if item and item not in seen:
+                        seen.add(item)
+                        values.append(item)
+            return ";".join(values)
+
         def clean_cell(value: Any) -> Any:
             if isinstance(value, str):
                 return " ".join(value.split())
@@ -821,6 +888,15 @@ def run_section_queue_audit(
             for r in selected_rows:
                 row = dict(r)
                 row["reasons"] = "|".join(row["reasons"])
+                contracts = row.get("repair_contracts") or []
+                row["source_contracts"] = join_contract_field(contracts, "source_contract")
+                row["repair_ids"] = join_contract_field(contracts, "repair_id")
+                row["target_pipeline_steps"] = join_contract_field(contracts, "target_pipeline_steps")
+                row["retrieval_modes"] = join_contract_field(contracts, "retrieval_modes")
+                row["parser_contracts"] = join_contract_field(contracts, "parser_contract")
+                row["claim_scopes"] = join_contract_field(contracts, "claim_scope")
+                row["evidence_grades"] = join_contract_field(contracts, "evidence_grade")
+                row["repair_contracts_json"] = json.dumps(contracts, ensure_ascii=False, sort_keys=True)
                 row = {key: clean_cell(row.get(key, "")) for key in fieldnames}
                 writer.writerow(row)
 
@@ -843,6 +919,8 @@ def run_section_queue_audit(
         f"- next delta queue needing primary section/action: `{len(delta_rows):,}`",
         f"- multi-topic evidence-gap rows merged: `{gap_summary['gap_rows']:,}` "
         f"({gap_summary['gap_paper_ids']:,} papers)",
+        f"- topic repair contracts preserved: `{gap_summary['repair_contract_rows']:,}` "
+        f"rows / `{gap_summary['repair_contract_papers']:,}` papers",
         f"- topic evidence-gap delta queue: `{len(topic_gap_rows):,}` papers",
         "",
         "## Failure / Retry Classes",

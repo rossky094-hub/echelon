@@ -565,8 +565,8 @@ def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):
     gap_csv.write_text(
         "\n".join(
             [
-                "topic,gap_type,bottleneck,priority,candidate_paper_ids,frontfill_query,required_sections,why",
-                "metalens,missing_bottleneck_section_evidence,field of view,100,p_gap,metalens field of view,limitation;discussion,missing field-of-view section evidence",
+                "topic,gap_type,bottleneck,priority,candidate_paper_ids,frontfill_query,required_sections,why,source_contract,repair_id,target_pipeline_steps,retrieval_modes,parser_contract,claim_scope,evidence_grade",
+                "metalens,missing_bottleneck_section_evidence,field of view,100,p_gap,metalens field of view,limitation;discussion,missing field-of-view section evidence,topic_dossier_evidence_repair_plan,repair-1,section-atoms;section-atom-chains;Step5c,exact_id_doi_arxiv_title_section_phrase_bm25,deterministic_section_atom_parser_with_page_span_provenance,evidence_repair_queue_only,frontfill_target",
                 "metalens,key_turning_paper_missing_primary_section,,90,p_branch,metalens branch driver,limitation;discussion,key turning paper parsed but no target sections",
                 "quantum light source,future_candidates_missing_claim_card,,85,,quantum light source,limitation;discussion,claim card input gap",
             ]
@@ -588,10 +588,15 @@ def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):
     assert result["topic_evidence_gap_summary"]["gap_rows"] == 3
     assert result["topic_evidence_gap_summary"]["gap_paper_ids"] == 2
     assert result["topic_evidence_gap_summary"]["gap_rows_without_candidate_papers"] == 1
+    assert result["topic_evidence_gap_summary"]["repair_contract_rows"] == 1
+    assert result["topic_evidence_gap_summary"]["repair_contract_papers"] == 1
     assert result["topic_gap_delta_queue"] == 2
     topic_gap_queue = tmp_path / "data" / "topic_evidence_gap_delta_queue.csv"
     assert topic_gap_queue.exists()
-    assert "p_branch" in topic_gap_queue.read_text(encoding="utf-8")
+    topic_gap_text = topic_gap_queue.read_text(encoding="utf-8")
+    assert "p_branch" in topic_gap_text
+    assert "topic_dossier_evidence_repair_plan" in topic_gap_text
+    assert "section-atom-chains" in topic_gap_text
     topic_gap_bytes = topic_gap_queue.read_bytes()
     assert b"\r\n" not in topic_gap_bytes
     assert len(topic_gap_queue.read_text(encoding="utf-8").splitlines()) == result["topic_gap_delta_queue"] + 1
@@ -599,13 +604,16 @@ def test_section_queue_audit_merges_multi_topic_evidence_gaps(tmp_path):
     conn = sqlite3.connect(str(db_v14))
     try:
         row = conn.execute(
-            "SELECT priority_score, reasons_json FROM section_priority_papers WHERE paper_id='p_gap'"
+            "SELECT priority_score, reasons_json, repair_contracts_json FROM section_priority_papers WHERE paper_id='p_gap'"
         ).fetchone()
     finally:
         conn.close()
 
     assert row is not None
     reasons = json.loads(row[1])
+    contracts = json.loads(row[2])
     assert "topic_gap_bottleneck_evidence" in reasons
     assert "topic:metalens" in reasons
+    assert contracts[0]["source_contract"] == "topic_dossier_evidence_repair_plan"
+    assert "section-atom-chains" in contracts[0]["target_pipeline_steps"]
     assert row[0] >= 200

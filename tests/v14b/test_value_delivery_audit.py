@@ -237,7 +237,8 @@ def _write_product_sources(root: Path) -> None:
         "topic_terms = topic_terms or list(DEFAULT_SECTION_AUDIT_TOPICS)\n"
         '"has_decision_grade_primary_section"\n'
         '"decision_grade_primary_section_rate"\n'
-        'not r["has_decision_grade_primary_section"]\n',
+        'not r["has_decision_grade_primary_section"]\n'
+        '"repair_contracts_json" "source_contracts" "target_pipeline_steps" "parser_contracts" "topic_dossier_evidence_repair_plan"\n',
         encoding="utf-8",
     )
     (v14 / "direction_readiness_audit.py").write_text(
@@ -628,6 +629,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["product_baseline_defaults_to_suite"] is True
     assert multi_gate["checks"]["makefile_product_baseline_defaults_to_suite"] is True
     assert multi_gate["checks"]["section_queue_defaults_to_multi_topic"] is True
+    assert multi_gate["checks"]["section_queue_preserves_repair_contracts"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"
