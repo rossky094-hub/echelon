@@ -162,6 +162,7 @@ def build_release_readiness(
     value_audit = _load_json(report_dir / "value_delivery_audit.json", {})
     direction_readiness = _load_json(report_dir / "direction_readiness_audit.json", {})
     algorithm_logic = _load_json(report_dir / "algorithm_logic_audit.json", {})
+    path_challenge = _load_json(report_dir / "path_challenge_audit.json", {})
     raw_pdf = _load_json(report_dir / "raw_pdf_store_audit.json", {})
     multi_topic = _load_json(report_dir / "multi_topic_regression.json", [])
 
@@ -195,6 +196,7 @@ def build_release_readiness(
         "value_delivery_has_no_failures": not bool(value_summary.get("fail", 0)),
         "radar_has_high_confidence_claim_card": high_confidence_claim_cards > 0,
         "raw_pdf_store_available": raw_pdf.get("status") == "pass",
+        "path_challenge_audit_available": bool(path_challenge.get("overall_status")),
     }
     acceptance_ready = all(checks.values())
     return {
@@ -207,6 +209,8 @@ def build_release_readiness(
         "value_delivery_summary": value_summary,
         "direction_readiness_level": direction_readiness.get("readiness_level") or "unknown",
         "algorithm_logic_status_counts": algorithm_logic.get("status_counts") or {},
+        "path_challenge_status": path_challenge.get("overall_status") or "missing",
+        "path_challenge_verdict_counts": path_challenge.get("verdict_counts") or {},
         "multi_topic_status_counts": multi_topic_counts,
         "frontfill_snapshot": {
             "section_frontfill_status": section_frontfill.get("status") or value_metrics.get("section_frontfill_status"),

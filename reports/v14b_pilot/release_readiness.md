@@ -1,6 +1,6 @@
 # V14B Release Readiness
 
-- generated_at: `2026-05-31T12:01:05Z`
+- generated_at: `2026-05-31T12:09:37Z`
 - release_status: `evidence_gated_not_release_ready`
 - acceptance_ready: `false`
 - evidence_policy: `insufficient_evidence`
@@ -17,14 +17,15 @@
 | value_delivery_has_no_failures | hold |
 | radar_has_high_confidence_claim_card | hold |
 | raw_pdf_store_available | pass |
+| path_challenge_audit_available | pass |
 
 ## Frontfill Snapshot
 
 - section_frontfill_status: `running_or_unknown`
-- section_frontfill_done: `510`
+- section_frontfill_done: `516`
 - section_frontfill_total: `8373`
 - section_current_contract_primary: `705`
-- paper_sections: `5681`
+- paper_sections: `5683`
 - section_atoms: `61708`
 - section_atom_embeddings: `61708`
 - section_embeddings: `None`
@@ -41,8 +42,8 @@
 
 - **citation_graph_bone** `high`: linked refs are 14.1%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,763,687 no-local-match. Next: Continue processing the remaining cited-work queue in small exact-ID batches; rerun exact relink and graph features after each applied batch.
 - **section_evidence** `high`: primary section evidence covers only 3,030 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **section_evidence_provenance** `medium`: primary section evidence quality is still fragile: 1,426 papers have strong/moderate parser provenance; weak-only rate is 52.9%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
-- **section_parser_contract_coverage** `medium`: primary section evidence has current parser-contract coverage for only 710/3,030 papers (23.4%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
+- **section_evidence_provenance** `medium`: primary section evidence quality is still fragile: 1,432 papers have strong/moderate parser provenance; weak-only rate is 52.7%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
+- **section_parser_contract_coverage** `medium`: primary section evidence has current parser-contract coverage for only 716/3,030 papers (23.6%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
 - **multi_topic_evidence_gap** `high`: multi-topic regression still has decision-grade section evidence for only 45/78 queued benchmark-topic papers (57.7%); raw primary-section coverage is 48/78 (61.5%). Triage: current-parser no-target=17, stale-contract=2, unattempted-PDF=8. Typed-chain triage: atoms-missing=0, chains-missing=1, full-chain-missing=1, topic-mismatch=0. Missing stages: constraint:1, attempted_path:1, local_fix:1. Repair-contract closure: closed=17/215 (7.9%). No-target inspection: parser-target-signal=0, subthreshold-target-signal=1, sectionless/non-target-heading=10. Next: Do not loosen the current parser for the no-target bucket; keep those papers as weak full-text or metadata evidence and focus repair effort on stale-contract reparse and unattempted PDFs.
 - **openalex_topic_coverage** `medium`: OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 

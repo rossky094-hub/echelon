@@ -2700,7 +2700,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     )
     pilot_full_context = legacy_contexts.get("pilot-full", "")
     product_chain_context = _make_target_context(makefile, "product-chain", before=0, after=14)
-    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=14)
+    decision_audit_context = _make_target_context(makefile, "decision-audit", before=0, after=18)
     topic_gap_repair_context = _make_target_context(makefile, "topic-gap-repair", before=0, after=16)
     decision_audit_targets = (
         "topic-regression",
@@ -2715,6 +2715,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "direction-readiness-audit",
         "algorithm-logic-audit",
         "value-delivery-audit",
+        "path-challenge-audit",
         "release-readiness",
     )
     topic_gap_repair_targets = (
@@ -2837,8 +2838,9 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             "algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
             "gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
-            "not raw primary-section presence, and must finish by refreshing the decision-audit loop. Release readiness must "
-            "summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. "
+            "not raw primary-section presence, and must finish by refreshing the decision-audit loop. The loop must include "
+            "a first-principles path-challenge audit before release readiness so the current route is challenged, not merely executed. "
+            "Release readiness must summarize the go/no-go state from current evidence instead of relying on green tests or graph renderability. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
         ),
     }
