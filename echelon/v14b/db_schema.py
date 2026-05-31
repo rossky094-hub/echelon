@@ -353,6 +353,30 @@ CREATE TABLE IF NOT EXISTS fusion_evidence_audit (
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Step 7 evidence-scoped mutation hypotheses.
+CREATE TABLE IF NOT EXISTS mutation_hypotheses (
+    hypothesis_id                       TEXT PRIMARY KEY,
+    claim_card_id                       TEXT NOT NULL,
+    direction_id                        INTEGER,
+    direction_name                      TEXT,
+    mutation_type                       TEXT NOT NULL,
+    hypothesis_text                     TEXT NOT NULL,
+    minimal_validation_experiment_json  TEXT NOT NULL,
+    falsification_conditions_json       TEXT NOT NULL,
+    evidence_grade                      TEXT NOT NULL,
+    claim_scope                         TEXT NOT NULL,
+    source_claim_scope                  TEXT,
+    uncertainty_reasons_json            TEXT NOT NULL DEFAULT '[]',
+    source_evidence_objects_json        TEXT NOT NULL DEFAULT '[]',
+    quality_gate_json                   TEXT,
+    created_at                          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_mutation_hypotheses_claim_card
+    ON mutation_hypotheses (claim_card_id);
+CREATE INDEX IF NOT EXISTS idx_mutation_hypotheses_scope
+    ON mutation_hypotheses (claim_scope, evidence_grade);
+
 -- 运行元数据 (各 step 完成标记)
 CREATE TABLE IF NOT EXISTS v14b_run_meta (
     step_name    TEXT    PRIMARY KEY,

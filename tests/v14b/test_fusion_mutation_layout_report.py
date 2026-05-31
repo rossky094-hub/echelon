@@ -850,6 +850,92 @@ class TestMutationMarking:
 
         assert n == len(red_ids | orange_ids | purple_ids)
 
+    def test_mutation_write_clears_stale_flags_when_no_current_mutations(self, tmp_path):
+        from echelon.v14b.step7_mutation import write_mutations
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        conn_v14.execute(
+            "UPDATE subgraph_nodes SET mutation_red = 1, mutation_orange = 1, mutation_purple = 1"
+        )
+        n = write_mutations(conn_v14, set(), set(), set())
+        stale = conn_v14.execute(
+            """
+            SELECT SUM(mutation_red), SUM(mutation_orange), SUM(mutation_purple)
+            FROM subgraph_nodes
+            """
+        ).fetchone()
+        conn_v14.close()
+
+        assert n == 0
+        assert tuple(stale) == (0, 0, 0)
+
+    def test_mutation_hypotheses_inherit_claim_card_contract(self, tmp_path):
+        from echelon.v14b.step13_first_principles_history import ensure_schema as ensure_step13_schema
+        from echelon.v14b.step7_mutation import build_mutation_hypotheses, write_mutation_hypotheses
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        ensure_step13_schema(conn_v14)
+        minimal_experiment = {
+            "experiment": "Build A/B prototype isolating coupling loss.",
+            "cost_level": "medium",
+            "cycle_weeks": 6,
+            "success_criteria": ["Measured margin improves >=20%"],
+            "falsification_conditions": ["Improvement is below 10% vs baseline"],
+        }
+        conn_v14.execute(
+            """
+            INSERT INTO direction_claim_cards (
+                claim_card_id, direction_id, direction_name,
+                root_constraint_json, attempts_last_10y_json,
+                enabling_conditions_json, unresolved_bottleneck_json,
+                minimal_validation_experiment_json, evidence_strength_level,
+                evidence_grade, claim_scope, uncertainty_reasons_json,
+                evidence_objects_json, five_question_complete,
+                high_confidence_eligible, quality_gate_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "claim:7",
+                7,
+                "Metalens coupling loss mitigation",
+                json.dumps({"type": "physical", "constraint": "coupling loss"}),
+                "[]",
+                json.dumps({"new_enablers": ["calibrated candidate"]}),
+                json.dumps({"items": [{"description": "coupling loss remains"}]}),
+                json.dumps(minimal_experiment),
+                "moderate",
+                "complete_claim_card_pending_high_confidence_evidence",
+                "exploratory_with_claim_card",
+                json.dumps(["missing high-confidence gate: strong section-level evidence"]),
+                json.dumps([{"type": "claim_card", "id": "claim:7"}]),
+                1,
+                0,
+                json.dumps({"five_question_complete": True, "high_confidence_eligible": False}),
+            ),
+        )
+        hypotheses = build_mutation_hypotheses(conn_v14)
+        n = write_mutation_hypotheses(conn_v14, hypotheses)
+        row = conn_v14.execute(
+            """
+            SELECT evidence_grade, claim_scope, source_claim_scope,
+                   falsification_conditions_json, uncertainty_reasons_json
+            FROM mutation_hypotheses
+            WHERE hypothesis_id = 'mutation:claim:7'
+            """
+        ).fetchone()
+        conn_v14.close()
+
+        assert n == 1
+        assert hypotheses[0]["evidence_grade"] == "complete_claim_card_pending_high_confidence_evidence"
+        assert hypotheses[0]["claim_scope"] == "candidate_pool_only"
+        assert row["source_claim_scope"] == "exploratory_with_claim_card"
+        assert json.loads(row["falsification_conditions_json"]) == [
+            "Improvement is below 10% vs baseline"
+        ]
+        reasons = json.loads(row["uncertainty_reasons_json"])
+        assert "missing high-confidence gate: strong section-level evidence" in reasons
+        assert any("cannot promote itself" in reason for reason in reasons)
+
     def test_mutation_percentile_boundary(self):
         """边界测试: p95 阈值正确"""
         vals = list(range(100))  # 0-99

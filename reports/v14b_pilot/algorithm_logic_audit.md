@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T07:54:04Z`
+- generated_at: `2026-05-31T08:04:00Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`
@@ -20,6 +20,9 @@
 - claim_cards_with_section_atom_chain_support: `5`
 - complete_claim_cards_with_section_atom_chain_support: `5`
 - claim_cards_with_full_decision_grade_chain: `5`
+- mutation_hypotheses: `5`
+- mutation_hypotheses_with_falsification: `5`
+- mutation_hypotheses_with_evidence_contract: `5`
 - topic_gap_decision_grade_section_rate: `30.4%`
 - failed regression topics: `metasurface holography, photonic crystal cavity, quantum light source`
 
@@ -47,7 +50,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,462; exact_section_atoms=1,462; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
 | Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=5; high_confidence=0; chain_supported_cards=5; complete_chain_supported_cards=5; full_decision_grade_chain_cards=5; complete_typed_lineage_triples=24; partial_typed_lineage_triples=23,800; lineage_completeness={'sparse_stage_partial': 13232, 'constraint_failure_only': 6924, 'attempted_path_partial': 1372, 'local_fix_partial': 284, 'full': 24, 'resolution_candidate_partial': 1988}. | Increase full decision-grade typed chains and Step6 fusion tier so chain-supported complete cards can progress beyond exploratory status without weakening gates. |
-| Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |
+| Step7 mutation | `aligned` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | mutation_hypotheses=5; with_falsification=5; with_evidence_contract=5. Legacy red/orange/purple node flags remain graph-inspection signals only. | Use mutation_hypotheses as falsifiable follow-up actions; do not promote visual flags into claims. |
 | Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,401; branch_lineages=5,276. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |
 | Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=metasurface holography, photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
@@ -74,7 +77,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5c limitation / resolution extraction | Decision-grade sections first, weak abstract metadata only as scoped fallback. | Typed limitations/resolutions with evidence source, section, and weight. | Abstract-only bottlenecks cannot support high-confidence Claim Cards. |
 | Step6 fusion | Main path terminals, calibrated future candidates, limitations, field/topic context. | Future directions with evidence tier, claim scope, and adequacy label. | Sparse fusion should output few/zero directions instead of placeholders. |
 | Step13 first-principles + Claim Card engine | Fused directions, bottleneck lineage, section evidence, calibration, and history. | Five-question Claim Cards with evidence objects and uncertainty reasons. | Incomplete cards stay candidate pool; Radar main view requires complete cards. |
-| Step7 mutation | Claim-card candidates and graph/section constraints. | Mutation hypotheses scoped to candidate pool. | Mutation outputs must inherit evidence grade and falsification conditions. |
+| Step7 mutation | Claim-card candidates and graph/section constraints. | Mutation hypotheses scoped to candidate pool with inherited evidence contracts. | Mutation outputs must inherit evidence grade and falsification conditions. |
 | Step8 layout | Visual nodes/edges with layer contracts. | Coordinates and clusters with lineage_status separation. | Layout cluster alone cannot imply branch lineage. |
 | Step9 report | Audits, graph outputs, Claim Cards, and regression results. | Evidence-decision report with uncertainty and next actions. | Reports must not describe low-coverage paths as complete. |
 | Step10 visual graph / Topic Dossier / Radar | Evidence layers, lineage, candidates, and Claim Cards. | Dossier, Evidence Map, and Radar views with layer limits. | No naked GNN edges in Radar main view. |

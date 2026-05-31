@@ -216,6 +216,21 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
         metrics.update(_lineage_completeness_counts(v14))
         metrics.update(_claim_card_chain_support_counts(v14))
         metrics["vgae_calibration_audit"] = _count(v14, "vgae_calibration_audit")
+        metrics["mutation_hypotheses"] = _count(v14, "mutation_hypotheses")
+        metrics["mutation_hypotheses_with_falsification"] = _count_when_columns(
+            v14,
+            "mutation_hypotheses",
+            {"falsification_conditions_json"},
+            "COALESCE(falsification_conditions_json, '[]') NOT IN ('[]', '', 'null')",
+        )
+        metrics["mutation_hypotheses_with_evidence_contract"] = _count_when_columns(
+            v14,
+            "mutation_hypotheses",
+            {"evidence_grade", "claim_scope", "uncertainty_reasons_json"},
+            "COALESCE(evidence_grade, '') != '' "
+            "AND COALESCE(claim_scope, '') != '' "
+            "AND COALESCE(uncertainty_reasons_json, '[]') NOT IN ('', 'null')",
+        )
         metrics["branch_lineages"] = _count(v14, "branch_lineages")
         metrics["visual_nodes"] = _count(v14, "visual_nodes")
         metrics["visual_edges"] = _count(v14, "visual_edges")
@@ -257,6 +272,14 @@ def build_algorithm_logic_audit(
         m.get("high_confidence_claim_cards_with_section_atom_chain_support") or 0
     )
     claim_cards_with_full_decision_grade_chain = int(m.get("claim_cards_with_full_decision_grade_chain") or 0)
+    mutation_hypotheses = int(m.get("mutation_hypotheses") or 0)
+    mutation_hypotheses_with_falsification = int(m.get("mutation_hypotheses_with_falsification") or 0)
+    mutation_hypotheses_with_evidence_contract = int(m.get("mutation_hypotheses_with_evidence_contract") or 0)
+    mutation_contract_ready = (
+        mutation_hypotheses > 0
+        and mutation_hypotheses_with_falsification == mutation_hypotheses
+        and mutation_hypotheses_with_evidence_contract == mutation_hypotheses
+    )
     topic_gap_dg_rate = float(m.get("topic_gap_decision_grade_section_rate") or 0.0)
     no_target = m.get("topic_gap_no_target_inspection_state") or {}
     frontfill = m.get("section_frontfill_state") or {}
@@ -484,12 +507,21 @@ def build_algorithm_logic_audit(
             "Step7 mutation",
             "Explore evidence-backed variation paths without inventing scientific conclusions.",
             "Claim-card candidates and graph/section constraints.",
-            "Mutation hypotheses scoped to candidate pool.",
+            "Mutation hypotheses scoped to candidate pool with inherited evidence contracts.",
             "Mutation outputs must inherit evidence grade and falsification conditions.",
-            "needs_tuning",
-            "warn",
-            "Mutation is useful only after Claim Card evidence objects are complete.",
-            "Retune mutation generation around minimal validation experiments rather than visual novelty.",
+            "aligned" if mutation_contract_ready else "needs_tuning",
+            "warn" if mutation_contract_ready else "warn",
+            (
+                f"mutation_hypotheses={mutation_hypotheses:,}; "
+                f"with_falsification={mutation_hypotheses_with_falsification:,}; "
+                f"with_evidence_contract={mutation_hypotheses_with_evidence_contract:,}. "
+                "Legacy red/orange/purple node flags remain graph-inspection signals only."
+            ),
+            (
+                "Use mutation_hypotheses as falsifiable follow-up actions; do not promote visual flags into claims."
+                if mutation_contract_ready else
+                "Run Step7 after Step13 so mutation_hypotheses inherit Claim Card evidence grade, scope, and falsification."
+            ),
         ),
         StepAudit(
             "Step8 layout",
@@ -576,6 +608,9 @@ def build_algorithm_logic_audit(
             "complete_claim_cards_with_section_atom_chain_support": complete_claim_cards_with_chain_support,
             "high_confidence_claim_cards_with_section_atom_chain_support": high_confidence_claim_cards_with_chain_support,
             "claim_cards_with_full_decision_grade_chain": claim_cards_with_full_decision_grade_chain,
+            "mutation_hypotheses": mutation_hypotheses,
+            "mutation_hypotheses_with_falsification": mutation_hypotheses_with_falsification,
+            "mutation_hypotheses_with_evidence_contract": mutation_hypotheses_with_evidence_contract,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
         },
@@ -620,6 +655,9 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- claim_cards_with_section_atom_chain_support: `{int(result['metrics']['claim_cards_with_section_atom_chain_support']):,}`",
         f"- complete_claim_cards_with_section_atom_chain_support: `{int(result['metrics']['complete_claim_cards_with_section_atom_chain_support']):,}`",
         f"- claim_cards_with_full_decision_grade_chain: `{int(result['metrics']['claim_cards_with_full_decision_grade_chain']):,}`",
+        f"- mutation_hypotheses: `{int(result['metrics']['mutation_hypotheses']):,}`",
+        f"- mutation_hypotheses_with_falsification: `{int(result['metrics']['mutation_hypotheses_with_falsification']):,}`",
+        f"- mutation_hypotheses_with_evidence_contract: `{int(result['metrics']['mutation_hypotheses_with_evidence_contract']):,}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
         "",

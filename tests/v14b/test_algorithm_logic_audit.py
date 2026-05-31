@@ -87,6 +87,13 @@ def _make_v14(path: Path) -> None:
         CREATE TABLE visual_nodes (paper_id TEXT);
         CREATE TABLE visual_edges (layer TEXT);
         CREATE TABLE branch_lineages (branch_id TEXT);
+        CREATE TABLE mutation_hypotheses (
+            hypothesis_id TEXT,
+            evidence_grade TEXT,
+            claim_scope TEXT,
+            uncertainty_reasons_json TEXT,
+            falsification_conditions_json TEXT
+        );
         CREATE TABLE bottleneck_lineage_triples (
             source_stage TEXT,
             target_stage TEXT,
@@ -119,6 +126,16 @@ def _make_v14(path: Path) -> None:
     conn.execute("INSERT INTO visual_nodes VALUES ('p1')")
     conn.execute("INSERT INTO visual_edges VALUES ('future')")
     conn.execute("INSERT INTO branch_lineages VALUES ('b1')")
+    conn.execute(
+        "INSERT INTO mutation_hypotheses VALUES (?, ?, ?, ?, ?)",
+        (
+            "mutation:claim:1",
+            "complete_claim_card_pending_high_confidence_evidence",
+            "candidate_pool_only",
+            json.dumps(["inherits claim card uncertainty"]),
+            json.dumps(["falsify if margin fails"]),
+        ),
+    )
     conn.executemany(
         "INSERT INTO bottleneck_lineage_triples VALUES (?, ?, ?)",
         [
@@ -178,6 +195,9 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert "Do not loosen parser" in md
     assert "resolution_candidate_partial" in md
     payload = json.loads((reports / "algorithm_logic_audit.json").read_text(encoding="utf-8"))
+    step7 = next(step for step in payload["steps"] if step["step"] == "Step7 mutation")
+    assert step7["algorithm_fit"] == "aligned"
+    assert "mutation_hypotheses=1" in step7["challenge"]
     assert payload["metrics"]["lineage_completeness_counts"]["resolution_candidate_partial"] == 1
     assert payload["metrics"]["complete_typed_lineage_triples"] == 1
     assert payload["metrics"]["section_atoms"] == 1
@@ -191,4 +211,7 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert payload["metrics"]["claim_cards_with_section_atom_chain_support"] == 1
     assert payload["metrics"]["complete_claim_cards_with_section_atom_chain_support"] == 1
     assert payload["metrics"]["claim_cards_with_full_decision_grade_chain"] == 1
+    assert payload["metrics"]["mutation_hypotheses"] == 1
+    assert payload["metrics"]["mutation_hypotheses_with_falsification"] == 1
+    assert payload["metrics"]["mutation_hypotheses_with_evidence_contract"] == 1
     assert result["status_counts"]["readiness"]["fail"] >= 1
