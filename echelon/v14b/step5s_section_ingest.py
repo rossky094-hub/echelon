@@ -239,7 +239,8 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
             primary_sections INTEGER NOT NULL DEFAULT 0,
             candidate_file TEXT,
             parser_name TEXT,
-            parser_contract_version TEXT
+            parser_contract_version TEXT,
+            repair_contracts_json TEXT
         )
         """
     )
@@ -250,6 +251,8 @@ def ensure_sections_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN parser_name TEXT")
     if "parser_contract_version" not in attempt_cols:
         conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN parser_contract_version TEXT")
+    if "repair_contracts_json" not in attempt_cols:
+        conn.execute("ALTER TABLE section_ingest_attempts ADD COLUMN repair_contracts_json TEXT")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_section_ingest_attempts_paper_ts
@@ -276,17 +279,19 @@ def record_ingest_attempt(
     inserted_sections: int = 0,
     primary_sections: int = 0,
     candidate_file: Path | None = None,
+    repair_contracts: list[dict[str, Any]] | None = None,
 ) -> None:
     """Record why a high-value paper did or did not yield local section evidence."""
     if outcome not in SECTION_INGEST_OUTCOMES:
         outcome = "parse_no_blocks"
+    repair_contracts_payload = _normalise_repair_contracts(repair_contracts)
     conn.execute(
         """
         INSERT INTO section_ingest_attempts
             (paper_id, attempt_ts, run_id, outcome, source_url, detail,
              inserted_sections, primary_sections, candidate_file, parser_name,
-             parser_contract_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             parser_contract_version, repair_contracts_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             paper_id,
@@ -300,6 +305,10 @@ def record_ingest_attempt(
             str(candidate_file) if candidate_file else None,
             SECTION_PARSER_NAME,
             SECTION_PARSER_CONTRACT_VERSION,
+            (
+                json.dumps(repair_contracts_payload, ensure_ascii=False, sort_keys=True)
+                if repair_contracts_payload else None
+            ),
         ),
     )
 
@@ -555,6 +564,23 @@ def _candidate_priority(row: dict[str, Any]) -> float:
     return 0.0
 
 
+def _read_candidate_csv_rows(path: Path) -> tuple[set[str], list[dict[str, Any]]] | None:
+    with Path(path).open("r", encoding="utf-8", newline="") as f:
+        sample = f.read(4096)
+        f.seek(0)
+        first_line = sample.splitlines()[0] if sample.splitlines() else ""
+        if "," not in first_line:
+            return None
+        reader = csv.DictReader(f)
+        fieldnames = set(reader.fieldnames or [])
+        if not fieldnames:
+            return None
+        rows = list(enumerate(reader))
+        if "candidate_paper_ids" in fieldnames:
+            rows.sort(key=lambda item: (-_candidate_priority(item[1]), item[0]))
+        return fieldnames, [row for _, row in rows]
+
+
 def _split_candidate_paper_ids(raw: Any) -> list[str]:
     return [
         value.strip()
@@ -563,34 +589,140 @@ def _split_candidate_paper_ids(raw: Any) -> list[str]:
     ]
 
 
+def _candidate_row_paper_ids(row: dict[str, Any], fieldnames: set[str]) -> list[str]:
+    if "candidate_paper_ids" in fieldnames:
+        return (
+            _split_candidate_paper_ids(row.get("candidate_paper_ids"))
+            or _split_candidate_paper_ids(row.get("paper_id"))
+        )
+    if "paper_id" in fieldnames:
+        return _split_candidate_paper_ids(row.get("paper_id"))
+    return []
+
+
+REPAIR_CONTRACT_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "repair_id": ("repair_id", "repair_ids"),
+    "source_contract": ("source_contract", "source_contracts"),
+    "target_pipeline_steps": ("target_pipeline_steps",),
+    "retrieval_modes": ("retrieval_modes",),
+    "parser_contract": ("parser_contract", "parser_contracts"),
+    "claim_scope": ("claim_scope", "claim_scopes"),
+    "evidence_grade": ("evidence_grade", "evidence_grades"),
+    "topic": ("topic",),
+    "gap_type": ("gap_type",),
+    "bottleneck": ("bottleneck",),
+    "frontfill_query": ("frontfill_query",),
+    "required_sections": ("required_sections",),
+}
+
+
+def _normalise_repair_contract(contract: dict[str, Any]) -> dict[str, Any]:
+    clean: dict[str, Any] = {}
+    for key, value in contract.items():
+        if key in {"paper_id", "candidate_paper_ids"}:
+            continue
+        if value is None:
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                continue
+            clean[key] = value[:2000]
+        elif isinstance(value, (int, float, bool)):
+            clean[key] = value
+        elif isinstance(value, (list, tuple)):
+            values = [v for v in value if v not in (None, "")]
+            if values:
+                clean[key] = values
+        elif isinstance(value, dict):
+            nested = _normalise_repair_contract(value)
+            if nested:
+                clean[key] = nested
+        else:
+            text = str(value).strip()
+            if text:
+                clean[key] = text[:2000]
+    if clean:
+        clean.setdefault("contract_source", "candidate_file")
+    return clean
+
+
+def _normalise_repair_contracts(
+    contracts: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None,
+) -> list[dict[str, Any]]:
+    if not contracts:
+        return []
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        clean = _normalise_repair_contract(contract)
+        if not clean:
+            continue
+        key = json.dumps(clean, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(clean)
+    return result
+
+
+def _merge_repair_contracts(
+    existing: list[dict[str, Any]] | None,
+    incoming: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    return _normalise_repair_contracts([*(existing or []), *(incoming or [])])
+
+
+def _row_repair_contracts(row: dict[str, Any]) -> list[dict[str, Any]]:
+    contracts: list[dict[str, Any]] = []
+    raw_contracts = str(row.get("repair_contracts_json") or "").strip()
+    if raw_contracts:
+        try:
+            parsed = json.loads(raw_contracts)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict):
+            contracts.append(parsed)
+        elif isinstance(parsed, list):
+            contracts.extend([item for item in parsed if isinstance(item, dict)])
+
+    fallback: dict[str, Any] = {}
+    for out_key, aliases in REPAIR_CONTRACT_FIELD_ALIASES.items():
+        for alias in aliases:
+            value = row.get(alias)
+            if value not in (None, ""):
+                fallback[out_key] = value
+                break
+    if fallback:
+        contracts.append(fallback)
+    return _normalise_repair_contracts(contracts)
+
+
 def read_candidate_file(path: Path | None, limit: int | None = None) -> list[str] | None:
     if not path:
         return None
     ids: list[str] = []
     seen: set[str] = set()
+    csv_rows = _read_candidate_csv_rows(Path(path))
     with Path(path).open("r", encoding="utf-8", newline="") as f:
         sample = f.read(4096)
         f.seek(0)
         first_line = sample.splitlines()[0] if sample.splitlines() else ""
-        if "," in first_line:
-            reader = csv.DictReader(f)
-            fieldnames = set(reader.fieldnames or [])
-            if "candidate_paper_ids" in fieldnames:
-                rows = list(enumerate(reader))
-                rows.sort(key=lambda item: (-_candidate_priority(item[1]), item[0]))
+        if csv_rows:
+            fieldnames, rows = csv_rows
+            if "candidate_paper_ids" in fieldnames or "paper_id" in fieldnames:
                 raw_values = (
                     pid
-                    for _, row in rows
-                    for pid in (
-                        _split_candidate_paper_ids(row.get("candidate_paper_ids"))
-                        or _split_candidate_paper_ids(row.get("paper_id"))
-                    )
+                    for row in rows
+                    for pid in _candidate_row_paper_ids(row, fieldnames)
                 )
-            elif "paper_id" in fieldnames:
-                raw_values = (row.get("paper_id") for row in reader)
             else:
                 f.seek(0)
                 raw_values = (line.split(",")[0] for line in f)
+        elif "," in first_line:
+            raw_values = (line.split(",")[0] for line in f)
         else:
             raw_values = (line.split(",")[0] for line in f)
         for raw in raw_values:
@@ -602,6 +734,27 @@ def read_candidate_file(path: Path | None, limit: int | None = None) -> list[str
             if limit and len(ids) >= int(limit):
                 break
     return ids
+
+
+def read_candidate_repair_contracts(path: Path | None) -> dict[str, list[dict[str, Any]]]:
+    """Map candidate paper ids to repair contracts carried by the queue CSV."""
+    if not path:
+        return {}
+    csv_rows = _read_candidate_csv_rows(Path(path))
+    if not csv_rows:
+        return {}
+    fieldnames, rows = csv_rows
+    repair_by_paper: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        contracts = _row_repair_contracts(row)
+        if not contracts:
+            continue
+        for pid in _candidate_row_paper_ids(row, fieldnames):
+            repair_by_paper[pid] = _merge_repair_contracts(
+                repair_by_paper.get(pid),
+                contracts,
+            )
+    return repair_by_paper
 
 
 def _heading_to_section(line: str) -> Optional[str]:
@@ -972,8 +1125,10 @@ def upsert_sections(
     source_url: str,
     *,
     source_storage_uri: str = "",
+    repair_contracts: list[dict[str, Any]] | None = None,
 ) -> int:
     inserted = 0
+    repair_contracts_payload = _normalise_repair_contracts(repair_contracts)
     for sec_name, payload in sections.items():
         sec_text = str((payload or {}).get("text") or "").strip()
         if not sec_text:
@@ -999,6 +1154,9 @@ def upsert_sections(
             section_meta["source_storage_uri"] = source_storage_uri
         else:
             section_meta["source_delivery"] = "network_pdf_fetch"
+        if repair_contracts_payload:
+            section_meta["repair_contracts"] = repair_contracts_payload
+            section_meta["repair_contract_source"] = "candidate_file"
         section_meta_json = json.dumps(section_meta, ensure_ascii=False)
         existing = conn.execute(
             """
@@ -1032,6 +1190,28 @@ def upsert_sections(
                         sec_name,
                     ),
                 )
+            elif repair_contracts_payload:
+                merged_contracts = _merge_repair_contracts(
+                    old_meta.get("repair_contracts")
+                    if isinstance(old_meta.get("repair_contracts"), list)
+                    else [],
+                    repair_contracts_payload,
+                )
+                if merged_contracts != old_meta.get("repair_contracts"):
+                    old_meta["repair_contracts"] = merged_contracts
+                    old_meta["repair_contract_source"] = "candidate_file"
+                    conn.execute(
+                        """
+                        UPDATE paper_sections
+                        SET section_meta_json = ?
+                        WHERE paper_id = ? AND section_name = ?
+                        """,
+                        (
+                            json.dumps(old_meta, ensure_ascii=False),
+                            paper_id,
+                            sec_name,
+                        ),
+                    )
         else:
             conn.execute(
                 """
@@ -1315,6 +1495,7 @@ def run_section_ingest(
 
     n_target = int(limit or top_n or LIMITATION_TOP_N)
     candidate_ids = read_candidate_file(candidate_file, limit=n_target if limit else None)
+    repair_contracts_by_paper = read_candidate_repair_contracts(candidate_file)
     papers = load_candidates(
         conn_main,
         conn_v14,
@@ -1337,6 +1518,7 @@ def run_section_ingest(
             "records_n": 0,
             "papers_n": 0,
             "with_primary_sections": 0,
+            "candidate_repair_contract_papers": len(repair_contracts_by_paper),
             "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
             "parser_contract_digest": _parser_contract_digest(),
         }
@@ -1364,6 +1546,7 @@ def run_section_ingest(
         with make_progress(papers, desc="Step5s sections") as pbar:
             for paper in pbar:
                 pid = paper["id"]
+                paper_repair_contracts = repair_contracts_by_paper.get(pid, [])
                 has_any_primary = _has_primary_sections(conn_main, pid)
                 has_current_primary = _has_current_primary_sections(conn_main, pid)
                 blob, local_pdf_path = read_local_raw_pdf(
@@ -1387,6 +1570,7 @@ def run_section_ingest(
                         ),
                         primary_sections=1,
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1404,6 +1588,7 @@ def run_section_ingest(
                         run_id=run_id,
                         detail="Local raw PDF only mode is enabled and no reusable cache hit was found.",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1418,6 +1603,7 @@ def run_section_ingest(
                         run_id=run_id,
                         detail="No arXiv PDF and Semantic Scholar openAccessPdf unavailable or disabled.",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1439,6 +1625,7 @@ def run_section_ingest(
                         source_url=pdf_url,
                         detail="PDF request returned no bytes.",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1459,6 +1646,7 @@ def run_section_ingest(
                         source_url=pdf_url,
                         detail=str(exc),
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1473,6 +1661,7 @@ def run_section_ingest(
                         source_url=pdf_url,
                         detail=f"{type(exc).__name__}: {exc}",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1491,6 +1680,7 @@ def run_section_ingest(
                         source_url=pdf_url,
                         detail="Parser returned zero text blocks.",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1506,6 +1696,7 @@ def run_section_ingest(
                         source_url=pdf_url,
                         detail="PDF parsed, but no target evidence sections were detected.",
                         candidate_file=candidate_file,
+                        repair_contracts=paper_repair_contracts,
                     )
                     conn_main.commit()
                     continue
@@ -1517,6 +1708,7 @@ def run_section_ingest(
                     sections,
                     pdf_url,
                     source_storage_uri=str(local_pdf_path or ""),
+                    repair_contracts=paper_repair_contracts,
                 )
                 inserted_sections += inserted_now
                 for sec_name in sections:
@@ -1536,6 +1728,7 @@ def run_section_ingest(
                     inserted_sections=inserted_now,
                     primary_sections=primary_now,
                     candidate_file=candidate_file,
+                    repair_contracts=paper_repair_contracts,
                 )
                 conn_main.commit()
                 if primary_now:
@@ -1570,6 +1763,7 @@ def run_section_ingest(
         "claim_supporting_sections_enabled": list(PRIMARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,
         "candidate_digest": candidate_digest,
+        "candidate_repair_contract_papers": len(repair_contracts_by_paper),
         "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
         "parser_contract_digest": _parser_contract_digest(),
         "run_kind": "delta_queue" if candidate_file else "topn_scan",

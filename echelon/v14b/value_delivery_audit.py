@@ -2871,12 +2871,14 @@ def audit_multi_topic_regression(
     section_queue_defaults_to_multi_topic = True
     section_queue_tracks_decision_grade_gap_coverage = True
     section_queue_preserves_repair_contracts = True
+    section_ingest_preserves_repair_contract_provenance = True
     topic_regression_exports_topic_dossier_repair_plan = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
         topic_regression_source = repo_root / "echelon/v14b/topic_regression.py"
         product_baseline_source = repo_root / "echelon/v14b/product_baseline.py"
         section_queue_source = repo_root / "echelon/v14b/step5s_section_queue_audit.py"
+        section_ingest_source = repo_root / "echelon/v14b/step5s_section_ingest.py"
         makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
             topic_regression_source,
@@ -2949,6 +2951,17 @@ def audit_multi_topic_regression(
                 "topic_dossier_evidence_repair_plan",
             ),
         )
+        section_ingest_preserves_repair_contract_provenance = _source_contains(
+            section_ingest_source,
+            (
+                "read_candidate_repair_contracts",
+                "repair_contracts_by_paper",
+                "repair_contracts_json",
+                '"repair_contracts"',
+                "repair_contract_source",
+                "candidate_repair_contract_papers",
+            ),
+        )
         stale_gold_topic_doc_phrases = (
             "topic gold fixtures",
             "Create gold expectations",
@@ -2974,6 +2987,7 @@ def audit_multi_topic_regression(
         and section_queue_defaults_to_multi_topic
         and section_queue_tracks_decision_grade_gap_coverage
         and section_queue_preserves_repair_contracts
+        and section_ingest_preserves_repair_contract_provenance
         and topic_regression_exports_topic_dossier_repair_plan
         and current_plan_docs_avoid_gold_topic_language
     )
@@ -3005,6 +3019,7 @@ def audit_multi_topic_regression(
             "section_queue_defaults_to_multi_topic": section_queue_defaults_to_multi_topic,
             "section_queue_tracks_decision_grade_gap_coverage": section_queue_tracks_decision_grade_gap_coverage,
             "section_queue_preserves_repair_contracts": section_queue_preserves_repair_contracts,
+            "section_ingest_preserves_repair_contract_provenance": section_ingest_preserves_repair_contract_provenance,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available

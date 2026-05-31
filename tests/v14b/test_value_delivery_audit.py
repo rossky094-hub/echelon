@@ -241,6 +241,13 @@ def _write_product_sources(root: Path) -> None:
         '"repair_contracts_json" "source_contracts" "target_pipeline_steps" "parser_contracts" "topic_dossier_evidence_repair_plan"\n',
         encoding="utf-8",
     )
+    (v14 / "step5s_section_ingest.py").write_text(
+        'def read_candidate_repair_contracts(): return "repair_contracts_json"\n'
+        'repair_contracts_by_paper = read_candidate_repair_contracts(None)\n'
+        'section_meta = {"repair_contracts": repair_contracts_by_paper, "repair_contract_source": "candidate_file"}\n'
+        'stats = {"candidate_repair_contract_papers": len(repair_contracts_by_paper)}\n',
+        encoding="utf-8",
+    )
     (v14 / "direction_readiness_audit.py").write_text(
         "def _public_latest_fusion_audit(row):\n"
         "    return {'candidate_ranking_score_avg': 0.8, 'min_candidate_score_threshold': 0.55}\n",
@@ -630,6 +637,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["makefile_product_baseline_defaults_to_suite"] is True
     assert multi_gate["checks"]["section_queue_defaults_to_multi_topic"] is True
     assert multi_gate["checks"]["section_queue_preserves_repair_contracts"] is True
+    assert multi_gate["checks"]["section_ingest_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"

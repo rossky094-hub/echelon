@@ -21,6 +21,7 @@ from echelon.v14b.step5s_section_ingest import (
     record_ingest_attempt,
     read_local_raw_pdf,
     read_candidate_file,
+    read_candidate_repair_contracts,
     run_section_ingest,
     upsert_sections,
 )
@@ -552,6 +553,30 @@ def test_read_candidate_file_expands_multi_topic_gap_queue_by_priority(tmp_path)
     assert read_candidate_file(queue, limit=2) == ["p_top", "p_high"]
 
 
+def test_read_candidate_repair_contracts_maps_gap_queue_contracts(tmp_path):
+    queue = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    queue.write_text(
+        "\n".join(
+            [
+                "topic,gap_type,priority,candidate_paper_ids,source_contract,repair_id,target_pipeline_steps,retrieval_modes,parser_contract,claim_scope,evidence_grade,repair_contracts_json",
+                'metalens,missing_bottleneck_section_evidence,100,p_top;p_shared,topic_dossier_evidence_repair_plan,repair-top,section-atom-chains,exact+semantic,current_section_parser_contract,evidence_repair_queue_only,frontfill_target,"[{""repair_id"": ""json-top"", ""source_contract"": ""topic_dossier_evidence_repair_plan"", ""target_pipeline_steps"": [""section-atom-chains""], ""claim_scope"": ""evidence_repair_queue_only""}]"',
+                "metalens,future_candidates_missing_claim_card,85,p_low;p_shared,topic_dossier_evidence_repair_plan,repair-low,section-atom-chains,semantic,current_section_parser_contract,evidence_repair_queue_only,frontfill_target,",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    contracts = read_candidate_repair_contracts(queue)
+
+    assert set(contracts) == {"p_top", "p_shared", "p_low"}
+    assert contracts["p_top"][0]["repair_id"] == "json-top"
+    assert contracts["p_top"][0]["source_contract"] == "topic_dossier_evidence_repair_plan"
+    assert contracts["p_top"][0]["target_pipeline_steps"] == ["section-atom-chains"]
+    assert contracts["p_shared"][-1]["repair_id"] == "repair-low"
+    assert contracts["p_shared"][-1]["retrieval_modes"] == "semantic"
+
+
 def test_load_candidates_preserves_evidence_budget_order():
     conn_main = sqlite3.connect(":memory:")
     conn_main.row_factory = sqlite3.Row
@@ -667,6 +692,42 @@ def test_upsert_sections_records_local_raw_pdf_delivery():
     meta = json.loads(row["section_meta_json"])
     assert meta["source_delivery"] == "local_raw_pdf_cache"
     assert meta["source_storage_uri"].endswith("2401.00001.pdf")
+
+
+def test_upsert_sections_records_repair_contract_provenance():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "This discussion section carries decision evidence. " * 5,
+                "pages": [2],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+        repair_contracts=[
+            {
+                "repair_id": "repair-p1",
+                "source_contract": "topic_dossier_evidence_repair_plan",
+                "target_pipeline_steps": ["section-atom-chains"],
+                "claim_scope": "evidence_repair_queue_only",
+            }
+        ],
+    )
+
+    row = conn.execute(
+        "SELECT section_meta_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    meta = json.loads(row["section_meta_json"])
+    assert meta["repair_contract_source"] == "candidate_file"
+    assert meta["repair_contracts"][0]["repair_id"] == "repair-p1"
+    assert meta["repair_contracts"][0]["target_pipeline_steps"] == ["section-atom-chains"]
 
 
 def test_legacy_primary_sections_do_not_block_current_parser_contract():
@@ -833,23 +894,34 @@ def test_section_ingest_records_attempt_outcomes(tmp_path):
         detail="parsed but no target section",
         inserted_sections=0,
         primary_sections=0,
+        repair_contracts=[
+            {
+                "repair_id": "repair-p1",
+                "source_contract": "topic_dossier_evidence_repair_plan",
+                "claim_scope": "evidence_repair_queue_only",
+            }
+        ],
     )
     conn.commit()
 
     row = conn.execute(
         """
-        SELECT paper_id, outcome, source_url, detail, parser_contract_version
+        SELECT paper_id, outcome, source_url, detail, parser_contract_version,
+               repair_contracts_json
         FROM section_ingest_attempts
         """
     ).fetchone()
     conn.close()
-    assert row == (
+    assert tuple(row)[:5] == (
         "p1",
         "no_target_sections",
         "https://arxiv.org/pdf/2401.00001.pdf",
         "parsed but no target section",
         SECTION_PARSER_CONTRACT_VERSION,
     )
+    contracts = json.loads(row[5])
+    assert contracts[0]["repair_id"] == "repair-p1"
+    assert contracts[0]["claim_scope"] == "evidence_repair_queue_only"
 
 
 def test_run_section_ingest_refreshes_current_sections_from_local_raw_pdf(tmp_path, monkeypatch):
@@ -943,7 +1015,11 @@ def test_run_section_ingest_refreshes_current_sections_from_local_raw_pdf(tmp_pa
     conn.close()
 
     queue = tmp_path / "queue.csv"
-    queue.write_text("paper_id\np1\n", encoding="utf-8")
+    queue.write_text(
+        "paper_id,source_contracts,repair_ids,target_pipeline_steps,retrieval_modes,parser_contracts,claim_scopes,evidence_grades\n"
+        "p1,topic_dossier_evidence_repair_plan,repair-p1,section-atom-chains,exact+semantic,current_section_parser_contract,evidence_repair_queue_only,frontfill_target\n",
+        encoding="utf-8",
+    )
 
     stats = run_section_ingest(
         db_main=db_main,
@@ -965,7 +1041,7 @@ def test_run_section_ingest_refreshes_current_sections_from_local_raw_pdf(tmp_pa
     ).fetchone()
     attempt = conn.execute(
         """
-        SELECT outcome, detail
+        SELECT outcome, detail, repair_contracts_json
         FROM section_ingest_attempts
         WHERE paper_id='p1'
         ORDER BY attempt_id DESC
@@ -982,5 +1058,10 @@ def test_run_section_ingest_refreshes_current_sections_from_local_raw_pdf(tmp_pa
     assert row["section_pages_json"] == "[3]"
     assert meta["source_delivery"] == "local_raw_pdf_cache"
     assert meta["source_storage_uri"] == str(pdf_path)
+    assert meta["repair_contracts"][0]["source_contract"] == "topic_dossier_evidence_repair_plan"
+    assert meta["repair_contracts"][0]["target_pipeline_steps"] == "section-atom-chains"
     assert attempt["outcome"] == "success_primary"
     assert "PDF bytes loaded from raw cache" in attempt["detail"]
+    attempt_contracts = json.loads(attempt["repair_contracts_json"])
+    assert attempt_contracts[0]["repair_id"] == "repair-p1"
+    assert attempt_contracts[0]["claim_scope"] == "evidence_repair_queue_only"
