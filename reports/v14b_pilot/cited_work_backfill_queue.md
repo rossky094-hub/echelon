@@ -1,6 +1,6 @@
 # V14B Cited Work Backfill Queue
 
-- generated_at: `2026-05-31T12:23:55Z`
+- generated_at: `2026-05-31T12:33:18Z`
 - seed papers: 12,465
 - high-value reference rows scanned: 508,691
 - no-local-match refs from seeds: 508,691

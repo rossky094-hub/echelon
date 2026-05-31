@@ -82,6 +82,8 @@ def _release_status(
     multi_topic_counts: dict[str, int],
     section_embeddings: int | None,
     high_confidence_claim_cards: int,
+    evidence_repair_available: bool,
+    evidence_repair_blocking_p0: int,
 ) -> str:
     if value_summary.get("fail", 0) or multi_topic_counts.get("fail", 0):
         return "evidence_gated_not_release_ready"
@@ -89,6 +91,10 @@ def _release_status(
         return "post_frontfill_rebuild_required"
     if high_confidence_claim_cards <= 0:
         return "actionable_but_not_high_confidence"
+    if not evidence_repair_available:
+        return "evidence_repair_priority_missing"
+    if evidence_repair_blocking_p0 > 0:
+        return "evidence_repair_required"
     if value_summary.get("warn", 0):
         return "release_candidate_with_evidence_warnings"
     return "decision_grade_release_candidate"
@@ -179,11 +185,16 @@ def build_release_readiness(
     multi_topic_counts = _multi_topic_status_counts(multi_topic)
     high_confidence_claim_cards = int(direction_metrics.get("high_confidence_claim_cards") or 0)
     section_frontfill = value_metrics.get("section_frontfill_state") or {}
+    evidence_repair_summary = evidence_repair_priority.get("summary") or {}
+    evidence_repair_available = bool(evidence_repair_priority.get("overall_status"))
+    evidence_repair_blocking_p0 = int(evidence_repair_summary.get("blocking_p0") or 0)
     release_status = _release_status(
         value_summary=value_summary,
         multi_topic_counts=multi_topic_counts,
         section_embeddings=section_embeddings,
         high_confidence_claim_cards=high_confidence_claim_cards,
+        evidence_repair_available=evidence_repair_available,
+        evidence_repair_blocking_p0=evidence_repair_blocking_p0,
     )
 
     legacy_gate = _gate_by_issue(value_audit, "Legacy Flow Isolation Contract")
@@ -198,6 +209,8 @@ def build_release_readiness(
         "radar_has_high_confidence_claim_card": high_confidence_claim_cards > 0,
         "raw_pdf_store_available": raw_pdf.get("status") == "pass",
         "path_challenge_audit_available": bool(path_challenge.get("overall_status")),
+        "evidence_repair_priority_available": evidence_repair_available,
+        "evidence_repair_has_no_blocking_p0": evidence_repair_available and evidence_repair_blocking_p0 == 0,
     }
     acceptance_ready = all(checks.values())
     return {

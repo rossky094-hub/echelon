@@ -1,6 +1,6 @@
 # V14B Evidence Repair Priority
 
-- generated_at: `2026-05-31T12:25:35Z`
+- generated_at: `2026-05-31T12:34:58Z`
 - overall_status: `evidence_first_repair_required`
 - claim_scope: `evidence_repair_queue_only`
 - promotion_policy: `no_direct_promotion`
@@ -76,4 +76,4 @@
 - pipeline_stage: `raw_pdf_local_store`
 - why: The crawler improves local-first section ingest, but broad crawling is supportive; benchmark-topic evidence repair remains the promotion bottleneck.
 - immediate_safe_action: Refresh the read-only raw PDF store audit; do not treat crawler progress as release readiness.
-- evidence: `{"candidate_queue_papers": 78, "candidate_queue_raw_pdf_available_papers": 18, "candidate_queue_raw_pdf_available_rate": 0.23076923076923078, "manifest_status": "ok", "queued_papers": 50088, "status": "pass", "success_papers": 5243, "success_probable_pdf_rate": 1.0, "total_manifest_rows": 55391}`
+- evidence: `{"candidate_queue_papers": 78, "candidate_queue_raw_pdf_available_papers": 18, "candidate_queue_raw_pdf_available_rate": 0.23076923076923078, "manifest_status": "ok", "queued_papers": 50041, "status": "pass", "success_papers": 5290, "success_probable_pdf_rate": 1.0, "total_manifest_rows": 55391}`

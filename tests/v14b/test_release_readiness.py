@@ -125,6 +125,8 @@ def test_release_readiness_holds_when_section_embeddings_and_multi_topic_gate_ar
     assert result["checks"]["section_embeddings_materialized"] is False
     assert result["checks"]["multi_topic_regression_passed"] is False
     assert result["checks"]["path_challenge_audit_available"] is True
+    assert result["checks"]["evidence_repair_priority_available"] is True
+    assert result["checks"]["evidence_repair_has_no_blocking_p0"] is False
     assert result["path_challenge_status"] == "redirect_evidence_first"
     assert result["evidence_repair_priority_status"] == "evidence_first_repair_required"
     assert result["evidence_repair_top_actions"][0]["action_id"] == "topic_gap_evidence_repair"
@@ -143,6 +145,8 @@ def test_release_readiness_can_be_decision_grade_when_all_current_gates_are_clos
 
     assert result["release_status"] == "decision_grade_release_candidate"
     assert result["acceptance_ready"] is True
+    assert result["checks"]["evidence_repair_priority_available"] is True
+    assert result["checks"]["evidence_repair_has_no_blocking_p0"] is True
     assert result["path_challenge_status"] == "path_aligned"
     assert result["evidence_repair_priority_status"] == "no_blocking_repair"
     assert (report_dir / "release_readiness.json").exists()
@@ -150,3 +154,50 @@ def test_release_readiness_can_be_decision_grade_when_all_current_gates_are_clos
     assert "Evidence Repair Priority" in md
     assert "Product Boundary" in md
     assert "graph renderability" in md
+
+
+def test_release_readiness_requires_evidence_repair_priority_report(tmp_path):
+    report_dir = tmp_path / "reports"
+    _write_audit_reports(report_dir, all_pass=True)
+    (report_dir / "evidence_repair_priority.json").unlink()
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = _make_db(db_main, with_section_embeddings=True, high_confidence_cards=1)
+
+    result = build_release_readiness(db_main=db_main, db_v14=db_v14, report_dir=report_dir, repo_root=tmp_path)
+
+    assert result["release_status"] == "evidence_repair_priority_missing"
+    assert result["acceptance_ready"] is False
+    assert result["checks"]["evidence_repair_priority_available"] is False
+    assert result["checks"]["evidence_repair_has_no_blocking_p0"] is False
+
+
+def test_release_readiness_holds_when_evidence_repair_has_blocking_p0(tmp_path):
+    report_dir = tmp_path / "reports"
+    _write_audit_reports(report_dir, all_pass=True)
+    _write_json(
+        report_dir / "evidence_repair_priority.json",
+        {
+            "overall_status": "evidence_first_repair_required",
+            "summary": {"items": 1, "blocking_p0": 1},
+            "priority_items": [
+                {
+                    "rank": 1,
+                    "priority": "P0",
+                    "action_id": "post_frontfill_retrieval_rebuild",
+                    "command": "make post-frontfill-chain",
+                    "requires_db_writer_boundary": True,
+                    "can_run_while_broad_ingest_active": False,
+                }
+            ],
+        },
+    )
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = _make_db(db_main, with_section_embeddings=True, high_confidence_cards=1)
+
+    result = build_release_readiness(db_main=db_main, db_v14=db_v14, report_dir=report_dir, repo_root=tmp_path)
+
+    assert result["release_status"] == "evidence_repair_required"
+    assert result["acceptance_ready"] is False
+    assert result["checks"]["evidence_repair_priority_available"] is True
+    assert result["checks"]["evidence_repair_has_no_blocking_p0"] is False
+    assert result["evidence_repair_top_actions"][0]["action_id"] == "post_frontfill_retrieval_rebuild"

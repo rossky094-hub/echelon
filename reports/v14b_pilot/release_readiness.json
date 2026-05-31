@@ -12,6 +12,8 @@
   },
   "audit_type": "v14b_release_readiness",
   "checks": {
+    "evidence_repair_has_no_blocking_p0": false,
+    "evidence_repair_priority_available": true,
     "multi_topic_regression_passed": false,
     "path_challenge_audit_available": true,
     "post_frontfill_finishes_with_decision_audit": true,
@@ -88,7 +90,7 @@
     "section_atoms": 61708,
     "section_current_contract_primary": 722,
     "section_embeddings": null,
-    "section_frontfill_done": 522,
+    "section_frontfill_done": 526,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373
   },
@@ -104,7 +106,7 @@
       "status": "fail"
     }
   ],
-  "generated_at": "2026-05-31T12:25:35Z",
+  "generated_at": "2026-05-31T12:34:59Z",
   "live_blockers": [
     {
       "gate": "citation_graph_bone",
@@ -122,13 +124,13 @@
       "gate": "section_evidence_provenance",
       "next_action": "Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.",
       "severity": "medium",
-      "why": "primary section evidence quality is still fragile: 1,438 papers have strong/moderate parser provenance; weak-only rate is 52.5%."
+      "why": "primary section evidence quality is still fragile: 1,439 papers have strong/moderate parser provenance; weak-only rate is 52.5%."
     },
     {
       "gate": "section_parser_contract_coverage",
       "next_action": "Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.",
       "severity": "medium",
-      "why": "primary section evidence has current parser-contract coverage for only 722/3,030 papers (23.8%); legacy parser-contract sections may predate TOC/fragment guards."
+      "why": "primary section evidence has current parser-contract coverage for only 723/3,030 papers (23.9%); legacy parser-contract sections may predate TOC/fragment guards."
     },
     {
       "gate": "multi_topic_evidence_gap",
