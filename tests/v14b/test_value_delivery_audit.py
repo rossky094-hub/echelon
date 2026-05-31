@@ -418,6 +418,7 @@ def _write_product_sources(root: Path) -> None:
     scripts = root / "scripts"
     scripts.mkdir(parents=True, exist_ok=True)
     (scripts / "run_after_frontfill_product_chain.py").write_text(
+        "DEFAULT_STEPS decision-audit\n"
         "V14B_TOPIC_GAP_FRONTFILL_CMD make topic-gap-repair\n"
         "section-atoms section-atom-embeddings section-embeddings section-atom-chains\n"
         "--build-section-embeddings V14B_SECTION_EMBEDDING_DIM\n"
@@ -917,6 +918,7 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True
     assert result["checks"]["post_frontfill_rebuilds_section_atom_substrate"] is True
+    assert result["checks"]["post_frontfill_runs_decision_audit"] is True
     assert result["checks"]["post_frontfill_requires_decision_grade_section_gates"] is True
     assert result["checks"]["pilot_full_is_legacy_compatibility_only"] is True
     assert result["checks"]["legacy_arxiv_scripts_require_explicit_opt_in"] is True

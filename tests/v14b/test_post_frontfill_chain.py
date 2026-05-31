@@ -43,6 +43,7 @@ def test_post_frontfill_default_chain_rebuilds_section_retrieval_substrate_befor
         "section-atom-chains",
         "limitation",
     ]
+    assert mod.DEFAULT_STEPS[-1] == "decision-audit"
 
 
 def test_post_frontfill_section_atom_embedding_step_rebuilds_vectors(tmp_path):

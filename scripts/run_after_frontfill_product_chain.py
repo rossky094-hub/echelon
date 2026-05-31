@@ -43,6 +43,7 @@ DEFAULT_STEPS = (
     "report",
     "visual-graph",
     "goal-audit",
+    "decision-audit",
 )
 
 STEP_MODULES = {

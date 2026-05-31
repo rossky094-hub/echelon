@@ -2771,6 +2771,13 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
                 "active_section_ingest still running",
             ),
         ),
+        "post_frontfill_runs_decision_audit": _source_contains(
+            (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
+            (
+                "DEFAULT_STEPS",
+                "decision-audit",
+            ),
+        ),
         "post_frontfill_requires_decision_grade_section_gates": _source_contains(
             (repo_root or Path(".")) / "scripts/run_after_frontfill_product_chain.py",
             (
@@ -2829,7 +2836,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             "algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
             "gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
-            "not raw primary-section presence. "
+            "not raw primary-section presence, and must finish by refreshing the decision-audit loop. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
         ),
     }

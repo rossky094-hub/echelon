@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T11:41:55Z`
+- generated_at: `2026-05-31T11:51:43Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -20,7 +20,7 @@
 | 10 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
 | 11 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 12 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
 | 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened. |
 | 15 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 499,
+    "section_frontfill_done": 508,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 499,
+    "section_frontfill_progress_done": 508,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 699,
-      "current_contract_rate": 0.2306930693069307,
-      "decision_grade_papers": 695,
-      "decision_grade_rate": 0.22937293729372937,
+      "current_contract_papers": 708,
+      "current_contract_rate": 0.23366336633663368,
+      "decision_grade_papers": 704,
+      "decision_grade_rate": 0.23234323432343235,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1416,
-        "weak": 1614
+        "strong": 1424,
+        "weak": 1606
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4090,
-        "v14b_section_parser_contract_v3_toc_guard": 1584
+        "legacy_unknown_contract": 4078,
+        "v14b_section_parser_contract_v3_toc_guard": 1600
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4090,
-        "v14b_section_ingest_v3": 1584
+        "v14b_section_ingest_v2": 4078,
+        "v14b_section_ingest_v3": 1600
       },
       "primary_section_papers": 3030,
-      "primary_section_rows": 5674,
+      "primary_section_rows": 5678,
       "strategy_counts": {
         "embedded_heading": 57,
-        "explicit_heading": 2197,
-        "heading_continuation": 2801,
-        "inline_heading": 814,
-        "legacy_unknown_strategy": 2783,
+        "explicit_heading": 2208,
+        "heading_continuation": 2816,
+        "inline_heading": 820,
+        "legacy_unknown_strategy": 2772,
         "loose_inline_heading": 44,
         "parser_hint": 68,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1416,
-      "weak_only_papers": 1614,
-      "weak_only_rate": 0.5326732673267327
+      "strong_or_moderate_papers": 1424,
+      "weak_only_papers": 1606,
+      "weak_only_rate": 0.53003300330033
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -511,6 +511,7 @@
     "post_frontfill_entry_present": true,
     "post_frontfill_rebuilds_section_atom_substrate": true,
     "post_frontfill_requires_decision_grade_section_gates": true,
+    "post_frontfill_runs_decision_audit": true,
     "post_frontfill_uses_topic_gap_repair": true,
     "product_chain_runs_decision_audit": true,
     "product_chains_avoid_legacy_targets": true,
@@ -603,7 +604,7 @@
     "pilot-graph",
     "pilot-visual"
   ],
-  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
+  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, no-target PDF inspection, raw PDF store reuse audit, local raw-PDF parser dry run, direction readiness, algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence, and must finish by refreshing the decision-audit loop. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
   "status": "pass",
   "topic_gap_repair_required_targets": [
     "topic-regression",

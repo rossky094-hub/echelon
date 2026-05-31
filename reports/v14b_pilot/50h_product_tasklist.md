@@ -32,7 +32,7 @@ This checklist is the execution queue while section/OpenAlex frontfill runs.  Ea
 | P9-26 | 44-47h | 图层组合解释 | Main/Co-cite/Cite/Semantic/Future/Bottleneck/Uncertainty/Fusion value explanations | selected layer combinations explain what the user is seeing and why it matters | completed |
 | P9-27 | 44-47h | 交互打磨 | clickable branch, bottleneck, key paper, claim card | no important card is a dead end | completed |
 | P10-28 | 47-50h | 整理审计报告 | completed items, remaining risk, next required frontfill | remaining risk is explicit and tied to product-goal impact | next |
-| P10-29 | 47-50h | 准备爬虫完成后的自动运行顺序 | post-frontfill-chain ready/restartable | section/OpenAlex threshold triggers downstream chain from a safe breakpoint | next |
+| P10-29 | 47-50h | 准备爬虫完成后的自动运行顺序 | post-frontfill-chain ready/restartable | section/OpenAlex threshold triggers downstream chain from a safe breakpoint and finishes with decision-audit | completed |
 | P10-30 | 47-50h | GitHub 同步与最终状态确认 | pushed branch, passing tests, live monitors | repo is reproducible while crawlers continue | next |
 
 ## Execution Rule
