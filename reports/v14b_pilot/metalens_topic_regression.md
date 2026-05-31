@@ -1,8 +1,8 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-31T03:15:09Z`
+- Audit: `2026-05-31T03:28:14Z`
 - Topic: `metalens`
-- Overall status: **warn**
+- Overall status: **fail**
 
 ## Gates
 
@@ -17,7 +17,7 @@
 | turning papers with strong/moderate section provenance | 8 | 3 | pass |
 | turning papers with decision-grade section evidence | 8 | 3 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
-| bottleneck lineage typed contracts | 5 | 1 | pass |
+| bottleneck lineage typed contracts | 5 | 1 | fail |
 | auditable reading path | 5 | 4 | pass |
 | Claim Cards for Radar | 0 | 1 | warn |
 
@@ -48,7 +48,7 @@
 - Key turning papers: 13 total, 13 with access links, 8 with primary local sections, 8 with strong/moderate parser provenance, 8 with decision-grade current-contract evidence.
 - Future candidates: 3 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
-- Bottleneck lineage contracts: full=1, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
+- Bottleneck lineage contracts: full=0, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
 - Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
 - Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.

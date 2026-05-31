@@ -1,6 +1,6 @@
 # Quantum Light Source Topic Regression
 
-- Audit: `2026-05-31T03:15:12Z`
+- Audit: `2026-05-31T03:28:18Z`
 - Topic: `quantum light source`
 - Overall status: **fail**
 
@@ -17,7 +17,7 @@
 | turning papers with strong/moderate section provenance | 7 | 2 | pass |
 | turning papers with decision-grade section evidence | 7 | 2 | pass |
 | five-question evidence contracts | 5 | 5 | pass |
-| bottleneck lineage typed contracts | 5 | 1 | pass |
+| bottleneck lineage typed contracts | 5 | 1 | fail |
 | auditable reading path | 5 | 4 | pass |
 | Claim Cards for Radar | 0 | 1 | warn |
 
@@ -45,7 +45,7 @@
 - Key turning papers: 10 total, 10 with access links, 7 with primary local sections, 7 with strong/moderate parser provenance, 7 with decision-grade current-contract evidence.
 - Future candidates: 320 graph candidates, 0 Radar cards, 0 complete cards.
 - Five-question evidence contracts: 5/5 have claim scope, evidence grade, uncertainty, and clickable evidence.
-- Bottleneck lineage contracts: full=1, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
+- Bottleneck lineage contracts: full=0, partial=5, clickable=5/5. Only full typed chains satisfy the lineage gate.
 - Reading path contracts: 5/5 steps are auditable; modes=bottleneck, branch_driver, future_candidate, starter, turning.
 - Benchmark topics are regression fixtures, not a product allowlist or an LLM cost-control boundary.
 - This regression fails loudly when the UI is only showing paper lists or raw GNN edges.  Passing it means the Topic Dossier is closer to a decision-grade research brief.

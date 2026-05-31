@@ -98,7 +98,15 @@ def _evidence_contract_fragments():
                     "evidence_grade": "typed_section_lineage",
                     "uncertainty_reasons": ["audit fixture"],
                     "typed_chain_completeness": "full",
-                    "typed_chain": [{"source_stage": "constraint", "target_stage": "failure"}],
+                    "typed_chain": [
+                        {
+                            "source_stage": "constraint",
+                            "target_stage": "failure",
+                            "paper_id": "p1",
+                            "source_text": "manufacturing consistency limits repeatable yield",
+                            "target_text": "wafer-scale repeatability and yield remain the bottleneck",
+                        }
+                    ],
                     "evidence_objects": [
                         {
                             "type": "bottleneck_lineage_triple",
@@ -243,6 +251,105 @@ def test_topic_regression_does_not_count_weak_full_lineage_as_promotable():
 
     assert result["bottleneck_lineage_contracts"]["with_partial_typed_chain"] == 1
     assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
+    assert result["bottleneck_lineage_contracts"]["with_promotable_typed_chain_any"] == 0
+    lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["status"] == "fail"
+
+
+def test_topic_regression_requires_full_lineage_to_match_expected_bottleneck():
+    fragments = _evidence_contract_fragments()
+    fragments["bottleneck_lineage"]["constraints"][0]["typed_chain"] = [
+        {
+            "source_stage": "constraint",
+            "target_stage": "failure",
+            "paper_id": "p1",
+            "source_text": "surface roughness increases reconstruction noise",
+            "target_text": "generic deflectometry reconstruction degrades",
+        }
+    ]
+    lens = {
+        "ready": True,
+        **fragments,
+        "topic_dossier": {
+            **fragments["topic_dossier"],
+            "branch_splits": [_branch(name) for name in METALENS_BENCHMARK.expected_branches],
+            "bottleneck_dossiers": [
+                {"name": name, "evidence_papers": [{"paper_id": "p1"}]}
+                for name in METALENS_BENCHMARK.expected_bottlenecks
+            ],
+        },
+        "history_main_path": {
+            "key_turning_papers": [
+                {
+                    "paper_id": f"p{i}",
+                    "access_links": [{"url": "https://example.test"}],
+                    "content_availability": _decision_grade_primary_availability(),
+                }
+                for i in range(8)
+            ]
+        },
+        "rd_radar": {"claim_cards": [{"eligible": True}]},
+    }
+
+    result = run_topic_regression(lens)
+
+    assert result["bottleneck_lineage_contracts"]["with_promotable_typed_chain_any"] == 1
+    assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
+    lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["status"] == "fail"
+
+
+def test_topic_regression_requires_full_lineage_paper_to_match_topic_context():
+    fragments = _evidence_contract_fragments()
+    fragments["bottleneck_lineage"]["constraints"][0]["typed_chain"] = [
+        {
+            "source_stage": "constraint",
+            "target_stage": "failure",
+            "paper_id": "outside-topic-paper",
+            "source_text": "manufacturing consistency limits repeatable yield",
+            "target_text": "wafer-scale repeatability and yield remain the bottleneck",
+        }
+    ]
+    fragments["bottleneck_lineage"]["constraints"][0]["evidence_objects"] = [
+        {
+            "type": "bottleneck_lineage_triple",
+            "paper_id": "outside-topic-paper",
+            "click_target": {"kind": "paper", "id": "outside-topic-paper"},
+        }
+    ]
+    lens = {
+        "ready": True,
+        **fragments,
+        "topic_dossier": {
+            **fragments["topic_dossier"],
+            "branch_splits": [_branch(name) for name in METALENS_BENCHMARK.expected_branches],
+            "bottleneck_dossiers": [
+                {"name": name, "evidence_papers": [{"paper_id": "p1"}]}
+                for name in METALENS_BENCHMARK.expected_bottlenecks
+            ],
+        },
+        "unresolved_limitations": [
+            {"keyword": name, "description": name, "paper_id": "p1"}
+            for name in METALENS_BENCHMARK.expected_bottlenecks
+        ],
+        "history_main_path": {
+            "key_turning_papers": [
+                {
+                    "paper_id": f"p{i}",
+                    "access_links": [{"url": "https://example.test"}],
+                    "content_availability": _decision_grade_primary_availability(),
+                }
+                for i in range(8)
+            ]
+        },
+        "rd_radar": {"claim_cards": [{"eligible": True}]},
+    }
+
+    result = run_topic_regression(lens)
+
+    assert result["bottleneck_lineage_contracts"]["with_promotable_typed_chain_any"] == 1
+    assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
+    assert result["bottleneck_lineage_contracts"]["matched_expected_bottlenecks"] == []
     lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
     assert lineage_gate["status"] == "fail"
 

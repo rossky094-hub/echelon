@@ -426,7 +426,10 @@ def _five_question_contract_summary(lens: dict[str, Any]) -> dict[str, int]:
     }
 
 
-def _bottleneck_lineage_contract_summary(lens: dict[str, Any]) -> dict[str, int]:
+def _bottleneck_lineage_contract_summary(
+    lens: dict[str, Any],
+    expected_bottlenecks: tuple[str, ...] = (),
+) -> dict[str, Any]:
     constraints = [
         c
         for c in ((lens.get("bottleneck_lineage") or {}).get("constraints") or [])
@@ -434,15 +437,122 @@ def _bottleneck_lineage_contract_summary(lens: dict[str, Any]) -> dict[str, int]
     ]
     contracted = [c for c in constraints if _has_evidence_contract(c)]
     partial_typed = [c for c in contracted if c.get("typed_chain")]
-    typed = [c for c in partial_typed if _promotable_full_lineage_constraint(c)]
+    typed_any = [c for c in partial_typed if _promotable_full_lineage_constraint(c)]
+    topic_context_paper_ids = _topic_context_paper_ids(lens)
+    typed = [
+        c
+        for c in typed_any
+        if _lineage_matches_expected_bottleneck(c, expected_bottlenecks, topic_context_paper_ids)
+    ]
+    matched_expected_bottlenecks = sorted(
+        {
+            label
+            for c in typed
+            for label in expected_bottlenecks
+            if _matched_terms(label, _lineage_constraint_text(c))
+        }
+    )
     clickable = [c for c in contracted if _has_clickable_evidence(c)]
     return {
         "total": len(constraints),
         "with_contract": len(contracted),
         "with_typed_chain": len(typed),
+        "with_promotable_typed_chain_any": len(typed_any),
         "with_partial_typed_chain": len(partial_typed),
         "with_clickable_evidence": len(clickable),
+        "matched_expected_bottlenecks": matched_expected_bottlenecks,
     }
+
+
+def _lineage_matches_expected_bottleneck(
+    constraint: dict[str, Any],
+    expected_bottlenecks: tuple[str, ...],
+    topic_context_paper_ids: set[str] | None = None,
+) -> bool:
+    if topic_context_paper_ids:
+        lineage_papers = _lineage_constraint_paper_ids(constraint)
+        if not lineage_papers or not (lineage_papers & topic_context_paper_ids):
+            return False
+    if not expected_bottlenecks:
+        return True
+    text = _lineage_constraint_text(constraint)
+    return any(_matched_terms(label, text) for label in expected_bottlenecks)
+
+
+def _topic_context_paper_ids(lens: dict[str, Any]) -> set[str]:
+    ids: set[str] = set()
+
+    def add_ref(value: Any) -> None:
+        paper_id = _paper_ref_id(value)
+        if paper_id:
+            ids.add(paper_id)
+
+    for paper in lens.get("related_papers") or []:
+        add_ref(paper)
+    for paper in (lens.get("history_main_path") or {}).get("key_turning_papers") or []:
+        add_ref(paper)
+    for limitation in lens.get("unresolved_limitations") or []:
+        add_ref(limitation)
+    dossier = lens.get("topic_dossier") or {}
+    for branch in dossier.get("branch_splits") or []:
+        if not isinstance(branch, dict):
+            continue
+        for paper in branch.get("driver_papers") or []:
+            add_ref(paper)
+    for bottleneck in (dossier.get("hard_bottlenecks") or dossier.get("bottleneck_dossiers") or []):
+        if not isinstance(bottleneck, dict):
+            continue
+        for paper in bottleneck.get("evidence_papers") or []:
+            add_ref(paper)
+    for step in dossier.get("reading_path") or []:
+        if not isinstance(step, dict):
+            continue
+        for paper in step.get("papers") or []:
+            add_ref(paper)
+    return ids
+
+
+def _lineage_constraint_paper_ids(constraint: dict[str, Any]) -> set[str]:
+    ids: set[str] = set()
+    for edge in constraint.get("typed_chain") or []:
+        paper_id = _paper_ref_id(edge)
+        if paper_id:
+            ids.add(paper_id)
+    for obj in constraint.get("evidence_objects") or []:
+        paper_id = _paper_ref_id(obj)
+        if paper_id:
+            ids.add(paper_id)
+    return ids
+
+
+def _paper_ref_id(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        return ""
+    for key in ("paper_id", "id", "source_paper_id", "target_paper_id"):
+        if value.get(key):
+            return str(value.get(key))
+    return ""
+
+
+def _lineage_constraint_text(constraint: dict[str, Any]) -> str:
+    typed_chain = constraint.get("typed_chain") or []
+    parts: list[str] = []
+    for edge in typed_chain:
+        if not isinstance(edge, dict):
+            continue
+        parts.extend(
+            [
+                str(edge.get("source_stage") or ""),
+                str(edge.get("target_stage") or ""),
+                str(edge.get("source_text") or ""),
+                str(edge.get("target_text") or ""),
+                str(edge.get("relation_type") or ""),
+                str(edge.get("evidence_section") or ""),
+            ]
+        )
+    return " ".join(parts).lower()
 
 
 def _promotable_full_lineage_constraint(constraint: dict[str, Any]) -> bool:
@@ -760,7 +870,7 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
     claim_cards = _claim_cards(lens)
     claim_card_gap_summary = _claim_card_gap_summary(lens)
     five_question_contracts = _five_question_contract_summary(lens)
-    lineage_contracts = _bottleneck_lineage_contract_summary(lens)
+    lineage_contracts = _bottleneck_lineage_contract_summary(lens, benchmark.expected_bottlenecks)
     reading_path_contracts = _reading_path_contract_summary(lens)
 
     branch_results = []
