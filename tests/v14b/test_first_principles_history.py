@@ -944,3 +944,82 @@ def test_step13_partial_section_atom_chains_complete_card_but_block_high_confide
     assert "strong section-level evidence" in gate["missing_high_confidence_gates"]
     assert any("current parser-contract decision-grade" in reason for reason in reasons)
     assert updates[0]["high_confidence_eligible"] == 0
+
+
+def test_step13_sparse_partial_section_atom_chains_remain_weak_context():
+    from echelon.v14b.step13_first_principles_history import (
+        evidence_strength_level_from_chain_support,
+        section_atom_chain_support_summary,
+    )
+
+    summary = section_atom_chain_support_summary(
+        [
+            {
+                "chain_id": "sac_sparse",
+                "paper_id": "p1",
+                "paper_title": "Sparse section lineage",
+                "publication_year": 2025,
+                "section_name": "results",
+                "section_key": "results",
+                "constraint_text": "Efficiency remains limited by coupling loss.",
+                "typed_chain_complete": 0,
+                "typed_chain_completeness": "sparse_stage_partial",
+                "evidence_grade": "partial_typed_section_lineage",
+                "claim_scope": "exploratory_bottleneck_lineage",
+            }
+        ]
+    )
+
+    assert summary["partial"] == 1
+    assert summary["weak"] == 1
+    assert evidence_strength_level_from_chain_support(summary) == "weak"
+
+
+def test_step13_sparse_partial_chain_does_not_enable_moderate_section_evidence():
+    from echelon.v14b.step13_first_principles_history import build_direction_claim_cards
+
+    chain = {
+        "chain_id": "sac_sparse",
+        "paper_id": "p1",
+        "paper_title": "Sparse section lineage",
+        "publication_year": 2025,
+        "section_name": "results",
+        "section_key": "results",
+        "constraint_text": "Efficiency remains limited by coupling loss.",
+        "typed_chain_complete": 0,
+        "typed_chain_completeness": "sparse_stage_partial",
+        "evidence_grade": "partial_typed_section_lineage",
+        "claim_scope": "exploratory_bottleneck_lineage",
+    }
+
+    cards, updates = build_direction_claim_cards(
+        atoms=[],
+        section_atom_chains=[chain],
+        future_directions=[
+            {
+                "direction_id": 44,
+                "direction_name": "Metalens coupling loss mitigation",
+                "paper_ids_json": '["p1"]',
+                "confidence": 0.85,
+                "evidence_tier": "triangulated_strong",
+                "calibration_label": "calibrated_temporal_holdout",
+            }
+        ],
+        principle_rows=[
+            {
+                "principle_id": "FP_PHYSICAL_CONSTRAINT",
+                "principle_name": "物理实现与制造约束",
+                "root_cause": "coupling loss and fabrication tolerance",
+            }
+        ],
+        calibration_audit={"method": "temporal_platt_logistic", "avg_calibrated_auc": 0.84},
+    )
+
+    gate = json.loads(cards[0]["quality_gate_json"])
+    enabling = json.loads(cards[0]["enabling_conditions_json"])
+    assert gate["section_evidence_strength"] == "weak"
+    assert gate["section_atom_chain_support"]["partial"] == 1
+    assert gate["section_atom_chain_support"]["weak"] == 1
+    assert not any("section-level bottleneck evidence" in item for item in enabling["new_enablers"])
+    assert any("section-level bottleneck evidence is weak" in item for item in enabling["missing_enablers"])
+    assert updates[0]["high_confidence_eligible"] == 0

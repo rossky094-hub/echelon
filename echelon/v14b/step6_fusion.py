@@ -53,6 +53,13 @@ logger = logging.getLogger("echelon.v14b.step6_fusion")
 FUSION_VGAE_TOP_N = int(os.environ.get("V14B_FUSION_VGAE_TOP_N", "500"))
 FUSION_MIN_VGAE_CONFIDENCE = float(os.environ.get("V14B_FUSION_MIN_VGAE_CONFIDENCE", "0.55"))
 STEP6_INPUT_SIGNATURE_VERSION = "step6_input_signature_v1"
+MODERATE_PARTIAL_CHAIN_COMPLETENESS = {
+    "constraint_failure_only",
+    "attempted_path_partial",
+    "local_fix_partial",
+    "resolution_candidate_partial",
+    "validated_resolution_partial",
+}
 
 # Prompt: 命名 future direction
 DIRECTION_NAMING_PROMPT = """\
@@ -454,7 +461,9 @@ def _chain_evidence_weight(chain: dict[str, Any]) -> float:
     if typed_chain_complete:
         return 0.70
     if evidence_grade == "partial_typed_section_lineage":
-        return 0.68
+        if str(chain.get("typed_chain_completeness") or "") in MODERATE_PARTIAL_CHAIN_COMPLETENESS:
+            return 0.68
+        return 0.50
     return 0.45
 
 

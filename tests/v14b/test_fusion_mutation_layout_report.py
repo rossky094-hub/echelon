@@ -596,6 +596,23 @@ class TestFusion:
         assert candidates[0]["section_atom_chain_support"]["partial"] == 1
         assert "typed section atom chains" in candidates[0]["limitation_evidence"]
 
+    def test_step6_sparse_partial_typed_chain_has_weak_weight(self):
+        from echelon.v14b.step6_fusion import _chain_evidence_weight
+
+        assert _chain_evidence_weight(
+            {
+                "typed_chain_complete": 0,
+                "typed_chain_completeness": "sparse_stage_partial",
+                "evidence_grade": "partial_typed_section_lineage",
+            }
+        ) < _chain_evidence_weight(
+            {
+                "typed_chain_complete": 0,
+                "typed_chain_completeness": "attempted_path_partial",
+                "evidence_grade": "partial_typed_section_lineage",
+            }
+        )
+
     def test_step6_rejects_aggregate_section_name_as_decision_grade(self, tmp_path):
         from echelon.v14b.step6_fusion import attach_limitation_section_contracts
 

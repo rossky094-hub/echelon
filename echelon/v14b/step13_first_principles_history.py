@@ -40,6 +40,14 @@ SEVERITY_WEIGHT = {
     "low": 0.35,
 }
 
+MODERATE_PARTIAL_CHAIN_COMPLETENESS = {
+    "constraint_failure_only",
+    "attempted_path_partial",
+    "local_fix_partial",
+    "resolution_candidate_partial",
+    "validated_resolution_partial",
+}
+
 
 @dataclass(frozen=True)
 class PrincipleDef:
@@ -1679,7 +1687,11 @@ def build_section_atom_chain_lineage_triples(
             direction_tokens=direction_tokens,
         )
         event_year = int(chain.get("publication_year") or 0)
-        evidence_weight = _chain_evidence_weight(evidence_grade, typed_chain_complete=typed_chain_complete)
+        evidence_weight = _chain_evidence_weight(
+            evidence_grade,
+            typed_chain_complete=typed_chain_complete,
+            typed_chain_completeness=typed_chain_completeness,
+        )
         stage_evidence = {
             stage: (
                 f"section_atom:{stage_atom_ids[stage]}"
@@ -1779,7 +1791,12 @@ def _chain_page_candidates(evidence_objects: Any) -> list[int]:
     return sorted(pages)
 
 
-def _chain_evidence_weight(evidence_grade: str, *, typed_chain_complete: bool) -> float:
+def _chain_evidence_weight(
+    evidence_grade: str,
+    *,
+    typed_chain_complete: bool,
+    typed_chain_completeness: str | None = None,
+) -> float:
     if evidence_grade == "typed_section_lineage":
         return 0.92
     if evidence_grade == "typed_section_lineage_traced":
@@ -1787,7 +1804,9 @@ def _chain_evidence_weight(evidence_grade: str, *, typed_chain_complete: bool) -
     if typed_chain_complete:
         return 0.70
     if evidence_grade == "partial_typed_section_lineage":
-        return 0.68
+        if str(typed_chain_completeness or "") in MODERATE_PARTIAL_CHAIN_COMPLETENESS:
+            return 0.68
+        return 0.50
     return 0.45
 
 
@@ -1816,9 +1835,12 @@ def _chain_text(chain: dict[str, Any]) -> str:
 
 def _chain_support_level(chain: dict[str, Any]) -> str:
     grade = str(chain.get("evidence_grade") or "")
+    completeness = str(chain.get("typed_chain_completeness") or "")
     if grade == "typed_section_lineage":
         return "strong"
-    if grade in {"typed_section_lineage_traced", "partial_typed_section_lineage"}:
+    if grade == "typed_section_lineage_traced":
+        return "moderate"
+    if grade == "partial_typed_section_lineage" and completeness in MODERATE_PARTIAL_CHAIN_COMPLETENESS:
         return "moderate"
     return "weak"
 
@@ -2002,6 +2024,7 @@ def _unresolved_from_section_atom_chains(chains: list[dict[str, Any]]) -> list[d
                 "evidence_weight": _chain_evidence_weight(
                     str(chain.get("evidence_grade") or ""),
                     typed_chain_complete=bool(int(chain.get("typed_chain_complete") or 0)),
+                    typed_chain_completeness=str(chain.get("typed_chain_completeness") or ""),
                 ),
             }
         )
@@ -2065,6 +2088,7 @@ def build_direction_claim_cards(
             weighted_principles[pid] += _chain_evidence_weight(
                 str(chain.get("evidence_grade") or ""),
                 typed_chain_complete=bool(int(chain.get("typed_chain_complete") or 0)),
+                typed_chain_completeness=str(chain.get("typed_chain_completeness") or ""),
             )
         top_principle_id = weighted_principles.most_common(1)[0][0] if weighted_principles else "FP_OTHER"
         top_principle = principles_by_id.get(top_principle_id, {})
