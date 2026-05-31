@@ -2876,6 +2876,7 @@ def audit_multi_topic_regression(
     section_queue_preserves_repair_contracts = True
     section_ingest_preserves_repair_contract_provenance = True
     section_atom_layer_preserves_repair_contract_provenance = True
+    section_atom_layer_prioritizes_typed_chain_stage_cues = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
     current_plan_docs_avoid_gold_topic_language = True
@@ -3001,6 +3002,16 @@ def audit_multi_topic_regression(
                 ),
             )
         )
+        section_atom_layer_prioritizes_typed_chain_stage_cues = _source_contains(
+            section_atoms_source,
+            (
+                "CHAIN_STAGE_PRECEDENCE",
+                "STAGEFUL_SENTENCE_MIN_CHARS",
+                "_is_stageful_sentence",
+                "new_constraint",
+                "local_fix",
+            ),
+        )
         topic_gap_repair_plan_uses_closure_states = (
             _source_contains(
                 topic_gap_repair_plan_source,
@@ -3059,6 +3070,7 @@ def audit_multi_topic_regression(
         and section_queue_preserves_repair_contracts
         and section_ingest_preserves_repair_contract_provenance
         and section_atom_layer_preserves_repair_contract_provenance
+        and section_atom_layer_prioritizes_typed_chain_stage_cues
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
         and current_plan_docs_avoid_gold_topic_language
@@ -3094,6 +3106,7 @@ def audit_multi_topic_regression(
             "section_queue_preserves_repair_contracts": section_queue_preserves_repair_contracts,
             "section_ingest_preserves_repair_contract_provenance": section_ingest_preserves_repair_contract_provenance,
             "section_atom_layer_preserves_repair_contract_provenance": section_atom_layer_preserves_repair_contract_provenance,
+            "section_atom_layer_prioritizes_typed_chain_stage_cues": section_atom_layer_prioritizes_typed_chain_stage_cues,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_section_triage_available_when_blocking": (

@@ -39,6 +39,31 @@ def test_classify_atom_type_keeps_section_atoms_deterministic():
     assert classify_atom_type("The measured efficiency reached 35% at 1550 nm.")[0] == "metric_result"
     assert classify_atom_type("We used a simulation benchmark and experimental setup.")[0] == "attempted_path"
     assert classify_atom_type("This improves manufacturability and mitigates integration risk.")[0] == "local_fix"
+    assert classify_atom_type("The calibration mitigates mismatch and reduces coupling loss.")[0] == "local_fix"
+    assert classify_atom_type("However, packaging drift remains a constraint for deployment.")[0] == "new_constraint"
+
+
+def test_extract_section_atoms_keeps_stageful_short_sentences_atomic():
+    row = {
+        "paper_id": "p_stageful",
+        "section_name": "Discussion",
+        "section_text": (
+            "A central constraint is wafer-scale phase drift during packaging. "
+            "The calibration mitigates mismatch and reduces coupling loss. "
+            "However, packaging drift remains a constraint for deployment."
+        ),
+        "source_url": "https://example.test/p_stageful.pdf",
+        "section_pages_json": json.dumps([9]),
+        "section_meta_json": _meta(),
+        "title": "Stageful atomization",
+    }
+
+    atoms = extract_section_atoms_from_row(row)
+    atom_types = [atom["atom_type"] for atom in atoms]
+
+    assert atom_types[:3] == ["constraint", "local_fix", "new_constraint"]
+    assert "mitigates mismatch" in atoms[1]["atom_text"]
+    assert atoms[1]["span_start"] < atoms[2]["span_start"]
 
 
 def test_extract_section_atoms_marks_current_traced_decision_sections_decision_grade():

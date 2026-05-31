@@ -261,7 +261,8 @@ def _write_product_sources(root: Path) -> None:
     (v14 / "section_atoms.py").write_text(
         'def _repair_contracts_from_meta(meta): return meta.get("repair_contracts_json")\n'
         'section_atom = {"repair_contracts": [], "claim_scope": "retrieval_context_only"}\n'
-        'repair_contracts_json = "[]"\n',
+        'repair_contracts_json = "[]"\n'
+        "CHAIN_STAGE_PRECEDENCE STAGEFUL_SENTENCE_MIN_CHARS _is_stageful_sentence new_constraint local_fix\n",
         encoding="utf-8",
     )
     (v14 / "section_atom_chains.py").write_text(

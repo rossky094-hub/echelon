@@ -46,6 +46,14 @@ ATOM_TYPES = (
     "validation_setup",
     "cost_or_scaling_signal",
 )
+CHAIN_STAGE_TYPES = (
+    "constraint",
+    "failure_mechanism",
+    "attempted_path",
+    "local_fix",
+    "new_constraint",
+)
+STAGEFUL_SENTENCE_MIN_CHARS = 35
 
 ATOM_EMBEDDING_MODEL = "deterministic_hashing_atom_embedding_v1"
 ATOM_EMBEDDING_DIM = 256
@@ -140,7 +148,8 @@ TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "local_fix": re.compile(
-        r"\b(overcome|resolve|mitigate|address|improv(?:e|ed|es|ement)|"
+        r"\b(overcome|resolve(?:d|s)?|mitigat(?:e|ed|es|ing|ion)|"
+        r"address(?:ed|es|ing)?|improv(?:e|ed|es|ement)|"
         r"enable(?:d|s)?|achiev(?:e|ed|es)|demonstrat(?:e|ed|es))\b",
         re.I,
     ),
@@ -179,6 +188,14 @@ SECTION_TYPE_BIAS: dict[str, str] = {
     "conclusion": "new_constraint",
 }
 
+CHAIN_STAGE_PRECEDENCE = (
+    "new_constraint",
+    "local_fix",
+    "constraint",
+    "attempted_path",
+    "failure_mechanism",
+)
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -193,6 +210,15 @@ def _loads(raw: Any, default: Any) -> Any:
         return json.loads(str(raw))
     except Exception:
         return default
+
+
+def _has_stage_signal(text: str) -> bool:
+    return any(TYPE_PATTERNS[atom_type].search(text or "") for atom_type in CHAIN_STAGE_TYPES)
+
+
+def _is_stageful_sentence(text: str, *, min_chars: int = STAGEFUL_SENTENCE_MIN_CHARS) -> bool:
+    clean = re.sub(r"\s+", " ", str(text or "")).strip()
+    return len(clean) >= int(min_chars) and _has_stage_signal(clean)
 
 
 def ensure_section_atoms_schema(conn: sqlite3.Connection) -> None:
@@ -321,6 +347,16 @@ def _sentence_chunks(text: str, *, min_chars: int = 80, max_chars: int = 700) ->
                 if len(part) >= min_chars:
                     chunks.append(part)
             continue
+        if _is_stageful_sentence(piece):
+            if buf:
+                if len(buf) >= min_chars or _is_stageful_sentence(buf):
+                    chunks.append(buf.strip())
+                    buf = ""
+                else:
+                    piece = f"{buf} {piece}".strip()
+                    buf = ""
+            chunks.append(piece.strip())
+            continue
         candidate = f"{buf} {piece}".strip() if buf else piece
         if len(candidate) > max_chars and buf:
             if len(buf) >= min_chars:
@@ -365,6 +401,9 @@ def _sentence_chunks_with_spans(
 def classify_atom_type(text: str, section_name: str = "") -> tuple[str, dict[str, bool]]:
     section_key = normalize_section_key(section_name)
     features = {name: bool(pattern.search(text or "")) for name, pattern in TYPE_PATTERNS.items()}
+    for atom_type in CHAIN_STAGE_PRECEDENCE:
+        if features.get(atom_type):
+            return atom_type, features
     for atom_type in ATOM_TYPES:
         if features.get(atom_type):
             return atom_type, features
