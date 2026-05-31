@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-stage-candidate-recall topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit release-readiness evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-stage-candidate-recall topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -241,6 +241,16 @@ decision-audit:
 	$(MAKE) direction-readiness-audit
 	$(MAKE) algorithm-logic-audit
 	$(MAKE) value-delivery-audit
+	$(MAKE) release-readiness
+
+## Release readiness: consolidated go/no-go summary from the current audit state
+release-readiness:
+	@echo ">>> Release readiness: consolidate audit gates into product go/no-go..."
+	$(PYTHON) -m echelon.v14b.release_readiness \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--repo-root .
 
 ## Evidence bone audit: unlinked refs + high-value section coverage + frontfill log taxonomy
 evidence-bone-audit:
@@ -765,6 +775,7 @@ help:
 	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"
 	@echo "  make cited-work-backfill       # 小批量处理 exact-ID missing cited works"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"
+	@echo "  make release-readiness         # 汇总当前交付 go/no-go 与剩余风险"
 	@echo ""
 	@echo "Legacy compatibility (not current acceptance path):"
 	@echo "  make pilot                     # old graph rerun compatibility target"

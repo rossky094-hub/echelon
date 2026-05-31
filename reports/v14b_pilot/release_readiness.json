@@ -1,0 +1,126 @@
+{
+  "acceptance_ready": false,
+  "algorithm_logic_status_counts": {
+    "algorithm_fit": {
+      "aligned": 22
+    },
+    "readiness": {
+      "fail": 3,
+      "pass": 8,
+      "warn": 11
+    }
+  },
+  "audit_type": "v14b_release_readiness",
+  "checks": {
+    "multi_topic_regression_passed": false,
+    "post_frontfill_finishes_with_decision_audit": true,
+    "radar_has_high_confidence_claim_card": false,
+    "raw_pdf_store_available": true,
+    "section_atom_retrieval_substrate_available": true,
+    "section_embeddings_materialized": false,
+    "value_delivery_has_no_failures": false
+  },
+  "direction_readiness_level": "actionable_but_not_high_confidence",
+  "evidence_policy": "insufficient_evidence",
+  "frontfill_snapshot": {
+    "direction_claim_cards": 5,
+    "high_confidence_claim_cards": 0,
+    "paper_sections": 5681,
+    "raw_pdf_store_status": "pass",
+    "section_atom_embeddings": 61708,
+    "section_atoms": 61708,
+    "section_current_contract_primary": 705,
+    "section_embeddings": null,
+    "section_frontfill_done": 510,
+    "section_frontfill_status": "running_or_unknown",
+    "section_frontfill_total": 8373
+  },
+  "gate_blockers": [
+    {
+      "issue": "Evidence Bone",
+      "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
+      "status": "warn"
+    },
+    {
+      "issue": "Multi-topic Regression",
+      "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened.",
+      "status": "fail"
+    }
+  ],
+  "generated_at": "2026-05-31T12:01:05Z",
+  "live_blockers": [
+    {
+      "gate": "citation_graph_bone",
+      "next_action": "Continue processing the remaining cited-work queue in small exact-ID batches; rerun exact relink and graph features after each applied batch.",
+      "severity": "high",
+      "why": "linked refs are 14.1%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,763,687 no-local-match."
+    },
+    {
+      "gate": "section_evidence",
+      "next_action": "Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.",
+      "severity": "high",
+      "why": "primary section evidence covers only 3,030 papers."
+    },
+    {
+      "gate": "section_evidence_provenance",
+      "next_action": "Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.",
+      "severity": "medium",
+      "why": "primary section evidence quality is still fragile: 1,426 papers have strong/moderate parser provenance; weak-only rate is 52.9%."
+    },
+    {
+      "gate": "section_parser_contract_coverage",
+      "next_action": "Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.",
+      "severity": "medium",
+      "why": "primary section evidence has current parser-contract coverage for only 710/3,030 papers (23.4%); legacy parser-contract sections may predate TOC/fragment guards."
+    },
+    {
+      "gate": "multi_topic_evidence_gap",
+      "next_action": "Do not loosen the current parser for the no-target bucket; keep those papers as weak full-text or metadata evidence and focus repair effort on stale-contract reparse and unattempted PDFs.",
+      "severity": "high",
+      "why": "multi-topic regression still has decision-grade section evidence for only 45/78 queued benchmark-topic papers (57.7%); raw primary-section coverage is 48/78 (61.5%). Triage: current-parser no-target=17, stale-contract=2, unattempted-PDF=8. Typed-chain triage: atoms-missing=0, chains-missing=1, full-chain-missing=1, topic-mismatch=0. Missing stages: constraint:1, attempted_path:1, local_fix:1. Repair-contract closure: closed=17/215 (7.9%). No-target inspection: parser-target-signal=0, subthreshold-target-signal=1, sectionless/non-target-heading=10."
+    },
+    {
+      "gate": "openalex_topic_coverage",
+      "next_action": "Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.",
+      "severity": "medium",
+      "why": "OpenAlex W coverage is 64.4%; cross-field claims need uncertainty."
+    }
+  ],
+  "multi_topic_status_counts": {
+    "fail": 3,
+    "warn": 1
+  },
+  "next_actions": [
+    {
+      "action": "Wait for the active broad section ingest to reach a safe boundary, then run post-frontfill-chain.",
+      "command": "make post-frontfill-chain",
+      "priority": "P0",
+      "why": "Section-level fuzzy context is code-complete but not materialized; downstream Claim Cards need the rebuilt section retrieval substrate and decision-audit refresh."
+    },
+    {
+      "action": "Continue targeted benchmark-topic evidence repair before promoting Topic Dossier or Radar conclusions.",
+      "command": "make topic-gap-repair",
+      "priority": "P0",
+      "why": "Multi-topic regression still has benchmark-topic decision-grade section gaps."
+    },
+    {
+      "action": "Process exact-ID cited-work batches, then rerun exact relinking and graph features.",
+      "command": "make cited-work-backfill && make reference-relink-apply && make graph-features",
+      "priority": "P1",
+      "why": "linked refs are 14.1%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,763,687 no-local-match."
+    },
+    {
+      "action": "Continue conservative OpenAlex/local field-topic repair without treating coverage as a success claim.",
+      "command": "make openalex-backfill",
+      "priority": "P2",
+      "why": "OpenAlex W coverage is 64.4%; cross-field claims need uncertainty."
+    }
+  ],
+  "release_status": "evidence_gated_not_release_ready",
+  "repo_root": ".",
+  "value_delivery_summary": {
+    "fail": 1,
+    "pass": 13,
+    "warn": 1
+  }
+}

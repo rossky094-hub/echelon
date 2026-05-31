@@ -474,6 +474,7 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) direction-readiness-audit\n"
         "\t$(MAKE) algorithm-logic-audit\n"
         "\t$(MAKE) value-delivery-audit\n"
+        "\t$(MAKE) release-readiness\n"
         "topic-gap-repair:\n"
         "\tpython scripts/guard_topic_gap_repair.py\n"
         "\t$(MAKE) topic-regression\n"
@@ -914,6 +915,7 @@ def test_legacy_flow_isolation_contract_marks_old_pilot_as_legacy(tmp_path):
     assert result["checks"]["help_prefers_current_chain"] is True
     assert result["checks"]["product_chain_runs_decision_audit"] is True
     assert result["checks"]["decision_audit_runs_regression_gap_readiness_value"] is True
+    assert "release-readiness" in result["decision_audit_required_targets"]
     assert result["checks"]["topic_gap_repair_refreshes_queue_ingests_and_reaudits"] is True
     assert result["checks"]["topic_gap_repair_refuses_concurrent_section_ingest"] is True
     assert result["checks"]["post_frontfill_uses_topic_gap_repair"] is True
