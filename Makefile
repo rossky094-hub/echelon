@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-chains section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -234,6 +234,7 @@ decision-audit:
 	$(MAKE) topic-gap-section-audit
 	$(MAKE) topic-gap-no-target-inspect
 	$(MAKE) cited-work-backfill-queue
+	$(MAKE) raw-pdf-store-audit
 	$(MAKE) direction-readiness-audit
 	$(MAKE) algorithm-logic-audit
 	$(MAKE) value-delivery-audit
@@ -346,6 +347,17 @@ section-atom-chains:
 	$(PYTHON) -m echelon.v14b.section_atom_chains \
 		--db $(DB_MAIN) \
 		--max-chains-per-section $${V14B_SECTION_ATOM_CHAIN_MAX_PER_SECTION:-3} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Raw PDF store audit: 外接盘下载库 -> section ingest 复用状态
+raw-pdf-store-audit:
+	@echo ">>> Raw PDF store audit: manifest progress and section reuse..."
+	$(PYTHON) -m echelon.v14b.raw_pdf_store_audit \
+		--db $(DB_MAIN) \
+		--store-root $${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data} \
+		--manifest $${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3} \
+		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-reports/v14b_pilot/multi_topic_evidence_gap_queue.csv} \
+		--out-dir reports/v14b_pilot \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
 ## Topic gap repair: regression gaps -> queue refresh -> targeted ingest -> re-audit
@@ -664,6 +676,7 @@ help:
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
 	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
 	@echo "  make topic-gap-no-target-inspect # 只读检查 no-target PDF heading 信号"
+	@echo "  make raw-pdf-store-audit # 检查外接盘 raw PDF 库及 section 复用状态"
 	@echo "  make section-atoms             # 从 paper_sections 生成可检索证据 atoms"
 	@echo "  make section-atom-chains       # 从 section atoms 生成 typed bottleneck chains"
 	@echo "  make algorithm-logic-audit     # 逐步审计算法角色、输入输出和 promotion guard"

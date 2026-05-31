@@ -411,6 +411,7 @@ def _write_makefile_contracts(root: Path) -> None:
         "\t$(MAKE) topic-gap-section-audit\n"
         "\t$(MAKE) topic-gap-no-target-inspect\n"
         "\t$(MAKE) cited-work-backfill-queue\n"
+        "\t$(MAKE) raw-pdf-store-audit\n"
         "\t$(MAKE) direction-readiness-audit\n"
         "\t$(MAKE) algorithm-logic-audit\n"
         "\t$(MAKE) value-delivery-audit\n"

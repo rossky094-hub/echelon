@@ -804,7 +804,7 @@ sqlite3 /Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite
 tail -f /Volumes/LaCie/Echelon_Paper_Raw_Data/logs/raw_pdf_full.log
 ```
 
-当前策略：raw PDF 全量低速常驻下载；section 抽取仍按高价值队列优先推进。等 raw PDF 覆盖稳定后，再让 section ingest 优先读本地 PDF 来缩短调优周期。
+当前策略：raw PDF 全量低速常驻下载；section 抽取仍按高价值队列优先推进。新启动的 section ingest 应优先读本地 PDF cache；正在运行的旧 ingest 不强行中断，等安全断点或下一轮队列再切换。
 
 要让 Step5s 优先复用外接盘 PDF cache，设置：
 
@@ -813,6 +813,14 @@ export V14B_RAW_PDF_STORE_ROOT=/Volumes/LaCie/Echelon_Paper_Raw_Data
 export V14B_RAW_PDF_MANIFEST=/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3
 export V14B_SECTION_INGEST_PREFER_LOCAL_RAW_PDF=true
 ```
+
+复用状态只读审计：
+
+```bash
+make raw-pdf-store-audit
+```
+
+该审计会同时报告 manifest 下载进度、multi-topic gap 队列中可直接复用本地 PDF 的比例，以及 `paper_sections` 中已经由 `local_raw_pdf_cache` 产生的证据行数。若 manifest 已有成功下载但 section ingest 复用数仍为 0，说明下一轮 ingest 需要带上上述环境变量或更新本地 `.env`。
 
 ---
 

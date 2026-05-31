@@ -48,7 +48,7 @@ from echelon.v14b.evidence_contracts import (
     SECTION_PARSER_CONTRACT_VERSION,
     SECTION_PARSER_NAME,
 )
-from echelon.v14b.id_normalization import normalize_arxiv_id, normalize_doi
+from echelon.v14b.id_normalization import normalize_arxiv_id, normalize_doi, normalize_s2_paper_id
 from echelon.v14b.utils import Checkpoint, add_common_args, make_progress, setup_logging
 
 logger = logging.getLogger("echelon.v14b.step5s_section_ingest")
@@ -991,6 +991,30 @@ def _is_probable_pdf(path: Path, max_bytes: int = RAW_PDF_MAX_BYTES) -> bool:
         return False
 
 
+def _connect_raw_pdf_manifest(path: Path, *, timeout: float = 2.0) -> sqlite3.Connection:
+    """Open the external raw-PDF manifest for read-only section reuse checks."""
+    attempts: tuple[tuple[str, bool], ...] = (
+        (f"file:{path}?mode=ro", True),
+        (str(path), False),
+    )
+    last_error: sqlite3.Error | None = None
+    for target, is_uri in attempts:
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(target, uri=is_uri, timeout=timeout)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("SELECT name FROM sqlite_master LIMIT 1").fetchone()
+            return conn
+        except sqlite3.Error as exc:
+            last_error = exc
+            if conn is not None:
+                conn.close()
+    if last_error:
+        raise last_error
+    raise sqlite3.OperationalError(f"could not open raw PDF manifest: {path}")
+
+
 def _manifest_pdf_path(
     paper: dict,
     *,
@@ -1000,28 +1024,45 @@ def _manifest_pdf_path(
     if not store_root or not manifest_path or not manifest_path.exists():
         return None
     try:
-        uri = f"file:{manifest_path}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True, timeout=2.0)
-        conn.row_factory = sqlite3.Row
+        conn = _connect_raw_pdf_manifest(manifest_path, timeout=2.0)
         try:
-            row = conn.execute(
-                """
-                SELECT storage_path
-                FROM raw_pdf_downloads
-                WHERE status = 'success'
-                  AND COALESCE(storage_path, '') != ''
-                  AND (
-                    paper_id = ?
-                    OR (COALESCE(arxiv_id, '') != '' AND arxiv_id = ?)
-                  )
-                ORDER BY downloaded_at DESC, updated_at DESC
-                LIMIT 1
-                """,
-                (
-                    str(paper.get("id") or ""),
-                    normalize_arxiv_id(paper.get("arxiv_id")) or "",
-                ),
-            ).fetchone()
+            cols = {
+                str(row[1])
+                for row in conn.execute("PRAGMA table_info(raw_pdf_downloads)").fetchall()
+            }
+            if not {"status", "storage_path"} <= cols:
+                return None
+            order_sql = ", ".join(
+                col
+                for col in ("downloaded_at", "updated_at", "first_seen_at")
+                if col in cols
+            )
+            order_clause = f"ORDER BY {order_sql} DESC" if order_sql else ""
+            candidate_keys: list[tuple[str, str, bool]] = [
+                ("paper_id", str(paper.get("id") or "").strip(), False),
+                ("arxiv_id", normalize_arxiv_id(paper.get("arxiv_id")) or "", False),
+                ("doi", normalize_doi(paper.get("doi")) or "", True),
+                ("s2_paper_id", normalize_s2_paper_id(paper.get("s2_paper_id")) or "", False),
+            ]
+            row = None
+            for col, value, use_lower in candidate_keys:
+                if not value or col not in cols:
+                    continue
+                predicate = f"lower({col}) = ?" if use_lower else f"{col} = ?"
+                row = conn.execute(
+                    f"""
+                    SELECT storage_path
+                    FROM raw_pdf_downloads
+                    WHERE status = 'success'
+                      AND COALESCE(storage_path, '') != ''
+                      AND {predicate}
+                    {order_clause}
+                    LIMIT 1
+                    """,
+                    (value.lower() if use_lower else value,),
+                ).fetchone()
+                if row:
+                    break
         finally:
             conn.close()
     except sqlite3.Error:

@@ -2471,6 +2471,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "topic-gap-section-audit",
         "topic-gap-no-target-inspect",
         "cited-work-backfill-queue",
+        "raw-pdf-store-audit",
         "direction-readiness-audit",
         "algorithm-logic-audit",
         "value-delivery-audit",
@@ -2570,8 +2571,8 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
             "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap "
-            "section triage, no-target PDF inspection, direction readiness, algorithm-logic audit, and value "
-            "delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
+            "section triage, no-target PDF inspection, raw PDF store reuse audit, direction readiness, "
+            "algorithm-logic audit, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
             "gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
             "not raw primary-section presence. "

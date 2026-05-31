@@ -373,6 +373,35 @@ def test_direction_readiness_flags_section_frontfill_soft_stall(tmp_path):
     assert any(b["gate"] == "section_frontfill_contract_efficiency" for b in blockers)
 
 
+def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
+    metrics = {
+        "linked_ref_rate": 0.31,
+        "primary_section_papers": 9000,
+        "future_candidate_edges": 0,
+        "future_directions": 0,
+        "direction_claim_cards": 0,
+        "complete_claim_cards": 0,
+        "high_confidence_claim_cards": 0,
+        "future_visual_edges": 0,
+        "openalex_w_rate": 0.72,
+        "raw_pdf_store_audit_state": {
+            "available": True,
+            "status": "warn",
+            "success_papers": 1929,
+            "local_raw_pdf_section_papers": 0,
+            "queue_raw_pdf_available_papers": 5,
+            "queue_papers": 47,
+        },
+    }
+
+    blockers = classify_blockers(metrics)
+
+    blocker = next(b for b in blockers if b["gate"] == "raw_pdf_cache_reuse")
+    assert "1,929 successful PDFs" in blocker["why"]
+    assert "5/47" in blocker["why"]
+    assert "next safe section-ingest boundary" in blocker["next_action"]
+
+
 def test_direction_readiness_infers_soft_stall_from_watchdog_log(tmp_path):
     state = tmp_path / "section_top12000_watchdog_state.json"
     state.write_text(

@@ -82,6 +82,102 @@ def test_read_local_raw_pdf_prefers_manifest_success(tmp_path):
     assert path == pdf_path
 
 
+def test_read_local_raw_pdf_matches_manifest_by_doi_when_paper_id_differs(tmp_path):
+    store = tmp_path / "raw_store"
+    pdf_path = store / "pdfs" / "other" / "doi-paper.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(b"%PDF-1.4\nlocal cache pdf bytes")
+    manifest = store / "manifests" / "raw_pdf_downloads.sqlite3"
+    manifest.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(manifest))
+    conn.execute(
+        """
+        CREATE TABLE raw_pdf_downloads (
+            paper_id TEXT PRIMARY KEY,
+            arxiv_id TEXT,
+            doi TEXT,
+            s2_paper_id TEXT,
+            status TEXT,
+            storage_path TEXT,
+            downloaded_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO raw_pdf_downloads VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "manifest-paper-id",
+            "",
+            "10.1234/example.paper",
+            "",
+            "success",
+            str(pdf_path),
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    blob, path = read_local_raw_pdf(
+        {"id": "candidate-paper-id", "doi": "10.1234/EXAMPLE.PAPER"},
+        store_root=store,
+        manifest_path=manifest,
+    )
+
+    assert blob == b"%PDF-1.4\nlocal cache pdf bytes"
+    assert path == pdf_path
+
+
+def test_read_local_raw_pdf_matches_manifest_by_s2_when_no_arxiv(tmp_path):
+    store = tmp_path / "raw_store"
+    pdf_path = store / "pdfs" / "other" / "s2-paper.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(b"%PDF-1.4\nlocal cache pdf bytes")
+    manifest = store / "manifests" / "raw_pdf_downloads.sqlite3"
+    manifest.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(manifest))
+    conn.execute(
+        """
+        CREATE TABLE raw_pdf_downloads (
+            paper_id TEXT PRIMARY KEY,
+            arxiv_id TEXT,
+            doi TEXT,
+            s2_paper_id TEXT,
+            status TEXT,
+            storage_path TEXT,
+            downloaded_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO raw_pdf_downloads VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "manifest-paper-id",
+            "",
+            "",
+            "abcdef1234567890abcdef1234567890abcdef12",
+            "success",
+            str(pdf_path),
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00Z",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    blob, path = read_local_raw_pdf(
+        {"id": "candidate-paper-id", "s2_paper_id": "S2:abcdef1234567890abcdef1234567890abcdef12"},
+        store_root=store,
+        manifest_path=manifest,
+    )
+
+    assert blob == b"%PDF-1.4\nlocal cache pdf bytes"
+    assert path == pdf_path
+
+
 def test_local_raw_pdf_rejects_non_pdf_manifest_hit(tmp_path):
     store = tmp_path / "raw_store"
     bad_path = store / "pdfs" / "arxiv" / "2401" / "2401.12345.pdf"
