@@ -416,6 +416,8 @@ def _atom_chain_summaries(conn: sqlite3.Connection, paper_ids: list[str]) -> dic
             "section_atom_chains": 0,
             "section_atom_full_chains": 0,
             "section_atom_chain_completeness": {},
+            "section_atom_chain_missing_stages": {},
+            "section_atom_chain_missing_stage_examples": [],
         }
         for pid in paper_ids
     }
@@ -481,11 +483,58 @@ def _atom_chain_summaries(conn: sqlite3.Connection, paper_ids: list[str]) -> dic
                     counts = dict(item.get("section_atom_chain_completeness") or {})
                     counts[completeness] = int(counts.get(completeness) or 0) + n
                     item["section_atom_chain_completeness"] = counts
+            if "missing_stages_json" in chain_cols:
+                for chunk in _chunks(paper_ids):
+                    ph = ",".join("?" for _ in chunk)
+                    chain_id_expr = "chain_id" if "chain_id" in chain_cols else "'' AS chain_id"
+                    completeness_expr = (
+                        "typed_chain_completeness"
+                        if "typed_chain_completeness" in chain_cols
+                        else "'unknown' AS typed_chain_completeness"
+                    )
+                    rows = conn.execute(
+                        f"""
+                        SELECT paper_id, {chain_id_expr}, {completeness_expr}, missing_stages_json
+                        FROM section_atom_chains
+                        WHERE paper_id IN ({ph})
+                          AND COALESCE(missing_stages_json, '[]') NOT IN ('[]', '', 'null')
+                        """,
+                        chunk,
+                    ).fetchall()
+                    for row in rows:
+                        pid = str(row["paper_id"])
+                        item = out.setdefault(pid, {})
+                        counts = dict(item.get("section_atom_chain_missing_stages") or {})
+                        missing = [
+                            str(stage)
+                            for stage in _loads(row["missing_stages_json"], [])
+                            if str(stage or "").strip()
+                        ]
+                        for stage in missing:
+                            counts[stage] = int(counts.get(stage) or 0) + 1
+                        item["section_atom_chain_missing_stages"] = counts
+                        examples = list(item.get("section_atom_chain_missing_stage_examples") or [])
+                        if missing and len(examples) < 5:
+                            examples.append(
+                                {
+                                    "chain_id": row["chain_id"] or "",
+                                    "typed_chain_completeness": row["typed_chain_completeness"] or "unknown",
+                                    "missing_stages": missing,
+                                }
+                            )
+                            item["section_atom_chain_missing_stage_examples"] = examples
     return out
 
 
 def _has_topic_specific_lineage_gap(gap_types: list[str]) -> bool:
     return any("bottleneck_lineage_missing_topic_specific_typed_chain" in str(gap) for gap in gap_types)
+
+
+def _missing_stage_text(atom_chain_summary: dict[str, Any] | None) -> str:
+    counts = Counter((atom_chain_summary or {}).get("section_atom_chain_missing_stages") or {})
+    if not counts:
+        return "unknown typed stages"
+    return ", ".join(f"{stage}:{int(count)}" for stage, count in counts.most_common())
 
 
 def _classify(
@@ -514,10 +563,11 @@ def _classify(
                     "run section-atom-chains or tune atom ordering before Step13 promotion.",
                 )
             if full_chains <= 0:
+                missing = _missing_stage_text(atom_chain_summary)
                 return (
                     "lineage_full_chain_missing",
                     "candidate_pool_only",
-                    "inspect missing typed stages and improve atom classification/chain assembly for this bottleneck.",
+                    f"inspect missing typed stages ({missing}) and improve atom classification/chain assembly for this bottleneck.",
                 )
             return (
                 "topic_specific_lineage_chain_mismatch",
@@ -669,6 +719,8 @@ def _repair_contract_closure(
             "closure_state": state,
             "closed": state.startswith("closed_"),
             "failure_mode": row.get("failure_mode"),
+            "missing_stages": row.get("section_atom_chain_missing_stages") or {},
+            "missing_stage_examples": row.get("section_atom_chain_missing_stage_examples") or [],
             "next_action": next_action,
         }
     )
@@ -860,6 +912,10 @@ def run_topic_gap_section_evidence_audit(
         for mode, count in failure_counts.items()
         if mode.startswith("lineage_") or mode == "topic_specific_lineage_chain_mismatch"
     }
+    missing_stage_counts: Counter[str] = Counter()
+    for row in rows:
+        if str(row.get("failure_mode") or "").startswith("lineage_"):
+            missing_stage_counts.update(row.get("section_atom_chain_missing_stages") or {})
     summary = {
         "status": "pass" if promotion_ready_rate >= PROMOTION_THRESHOLD or queue_papers == 0 else "fail",
         "queue_papers": queue_papers,
@@ -870,6 +926,7 @@ def run_topic_gap_section_evidence_audit(
         "promotion_threshold": PROMOTION_THRESHOLD,
         "failure_mode_counts": dict(failure_counts),
         "lineage_failure_mode_counts": dict(lineage_failure_counts),
+        "lineage_missing_stage_counts": dict(missing_stage_counts),
         "repair_contract_closure": _repair_contract_closure_summary(contract_closures),
         "promotion_policy_counts": dict(policy_counts),
         "topic_summary": topic_summary,
@@ -934,6 +991,8 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "section_atom_chains",
         "section_atom_full_chains",
         "section_atom_chain_completeness",
+        "section_atom_chain_missing_stages",
+        "section_atom_chain_missing_stage_examples",
         "source_url",
         "doi",
         "arxiv_id",
@@ -984,6 +1043,11 @@ def _render_markdown(result: dict[str, Any]) -> str:
         lines.extend(["", "## Typed Chain Triage", "", "| failure_mode | papers |", "|---|---:|"])
         for mode, count in lineage_counts.most_common():
             lines.append(f"| {mode} | {count:,} |")
+        missing_counts = Counter(summary.get("lineage_missing_stage_counts") or {})
+        if missing_counts:
+            lines.extend(["", "| missing_stage | chains |", "|---|---:|"])
+            for stage, count in missing_counts.most_common():
+                lines.append(f"| {stage} | {int(count):,} |")
     repair = summary.get("repair_contract_closure") or {}
     if int(repair.get("contracts") or 0):
         lines.extend(
@@ -1075,6 +1139,7 @@ def load_topic_gap_section_triage_state(path: Path) -> dict[str, Any]:
         "promotion_ready_rate": float(summary.get("promotion_ready_rate") or 0.0),
         "failure_mode_counts": summary.get("failure_mode_counts") or {},
         "lineage_failure_mode_counts": summary.get("lineage_failure_mode_counts") or {},
+        "lineage_missing_stage_counts": summary.get("lineage_missing_stage_counts") or {},
         "repair_contract_closure": summary.get("repair_contract_closure") or {},
         "promotion_policy_counts": summary.get("promotion_policy_counts") or {},
         "topic_summary": summary.get("topic_summary") or {},

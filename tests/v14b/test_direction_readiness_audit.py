@@ -163,6 +163,10 @@ def test_direction_readiness_uses_topic_gap_section_triage_for_next_action():
                 "lineage_atoms_missing_after_section_evidence": 1,
                 "lineage_chains_missing_after_atoms": 2,
             },
+            "lineage_missing_stage_counts": {
+                "local_fix": 2,
+                "new_constraint": 2,
+            },
             "next_action": "inspect parser misses or alternate full text; keep abstract-only claims weak.",
         },
         "future_candidate_edges": 0,
@@ -181,6 +185,7 @@ def test_direction_readiness_uses_topic_gap_section_triage_for_next_action():
     assert "stale-contract=1" in blocker["why"]
     assert "Typed-chain triage" in blocker["why"]
     assert "chains-missing=2" in blocker["why"]
+    assert "Missing stages: local_fix:2, new_constraint:2" in blocker["why"]
     assert "alternate full text" in blocker["next_action"]
 
 

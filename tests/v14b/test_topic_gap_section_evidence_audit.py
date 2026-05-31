@@ -270,8 +270,10 @@ def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
         );
         CREATE TABLE section_atom_chains (
             paper_id TEXT,
+            chain_id TEXT,
             typed_chain_complete INTEGER,
-            typed_chain_completeness TEXT
+            typed_chain_completeness TEXT,
+            missing_stages_json TEXT
         );
         """
     )
@@ -286,10 +288,16 @@ def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
         ],
     )
     conn.executemany(
-        "INSERT INTO section_atom_chains VALUES (?, ?, ?)",
+        "INSERT INTO section_atom_chains VALUES (?, ?, ?, ?, ?)",
         [
-            ("p_partial", 0, "constraint_failure_only"),
-            ("p_full", 1, "full"),
+            (
+                "p_partial",
+                "sac_partial",
+                0,
+                "constraint_failure_only",
+                json.dumps(["attempted_path", "local_fix", "new_constraint"]),
+            ),
+            ("p_full", "sac_full", 1, "full", "[]"),
         ],
     )
     conn.commit()
@@ -320,6 +328,13 @@ def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
     assert by_pid["p_decision"]["failure_mode"] == "lineage_atoms_missing_after_section_evidence"
     assert by_pid["p_atomized"]["failure_mode"] == "lineage_chains_missing_after_atoms"
     assert by_pid["p_partial"]["failure_mode"] == "lineage_full_chain_missing"
+    assert by_pid["p_partial"]["section_atom_chain_missing_stages"] == {
+        "attempted_path": 1,
+        "local_fix": 1,
+        "new_constraint": 1,
+    }
+    assert by_pid["p_partial"]["section_atom_chain_missing_stage_examples"][0]["chain_id"] == "sac_partial"
+    assert "attempted_path:1" in by_pid["p_partial"]["next_action"]
     assert by_pid["p_full"]["failure_mode"] == "topic_specific_lineage_chain_mismatch"
     assert by_pid["p_full"]["repair_contract_ids"] == ["repair-lineage"]
     assert by_pid["p_full"]["repair_closure_states"] == ["open_topic_chain_mismatch"]
@@ -327,6 +342,11 @@ def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
     assert result["summary"]["promotion_ready_papers"] == 0
     assert result["summary"]["promotion_policy_counts"]["candidate_pool_only"] == 4
     assert result["summary"]["lineage_failure_mode_counts"]["lineage_full_chain_missing"] == 1
+    assert result["summary"]["lineage_missing_stage_counts"] == {
+        "attempted_path": 1,
+        "local_fix": 1,
+        "new_constraint": 1,
+    }
 
 
 def test_topic_gap_section_audit_reports_repair_contract_closure(tmp_path):

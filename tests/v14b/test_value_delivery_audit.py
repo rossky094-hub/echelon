@@ -226,7 +226,12 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "topic_gap_repair_plan.py").write_text(
         "closure_state partial_atoms_available_no_chain section-evidence-topic-gaps-local "
-        "section-atom-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall\n",
+        "section-atom-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall "
+        "missing_stage_counts\n",
+        encoding="utf-8",
+    )
+    (v14 / "topic_gap_section_evidence_audit.py").write_text(
+        "missing_stages_json section_atom_chain_missing_stages lineage_missing_stage_counts\n",
         encoding="utf-8",
     )
     (v14 / "product_baseline.py").write_text(

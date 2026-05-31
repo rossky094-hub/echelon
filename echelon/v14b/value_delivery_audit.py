@@ -2886,6 +2886,7 @@ def audit_multi_topic_regression(
         section_ingest_source = repo_root / "echelon/v14b/step5s_section_ingest.py"
         section_atoms_source = repo_root / "echelon/v14b/section_atoms.py"
         section_atom_chains_source = repo_root / "echelon/v14b/section_atom_chains.py"
+        topic_gap_section_audit_source = repo_root / "echelon/v14b/topic_gap_section_evidence_audit.py"
         topic_gap_repair_plan_source = repo_root / "echelon/v14b/topic_gap_repair_plan.py"
         step13_source = repo_root / "echelon/v14b/step13_first_principles_history.py"
         makefile_source = repo_root / "Makefile"
@@ -3011,6 +3012,15 @@ def audit_multi_topic_regression(
                     "no_direct_promotion",
                     "GNN/VGAE atom generation",
                     "fuzzy vector recall",
+                    "missing_stage_counts",
+                ),
+            )
+            and _source_contains(
+                topic_gap_section_audit_source,
+                (
+                    "missing_stages_json",
+                    "section_atom_chain_missing_stages",
+                    "lineage_missing_stage_counts",
                 ),
             )
             and _source_contains(

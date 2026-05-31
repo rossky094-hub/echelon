@@ -243,6 +243,10 @@ def _closure_items(triage: dict[str, Any]) -> list[dict[str, Any]]:
                     ),
                     "section_atom_chains": _as_int(row.get("section_atom_chains")),
                     "section_atom_full_chains": _as_int(row.get("section_atom_full_chains")),
+                    "section_atom_chain_missing_stages": row.get("section_atom_chain_missing_stages") or {},
+                    "section_atom_chain_missing_stage_examples": row.get(
+                        "section_atom_chain_missing_stage_examples"
+                    ) or [],
                 }
             )
             items.append(item)
@@ -285,6 +289,17 @@ def _item_sort_key(item: dict[str, Any]) -> tuple[int, float, str]:
 
 
 def _slim_item(item: dict[str, Any]) -> dict[str, Any]:
+    state = str(item.get("closure_state") or "")
+    if state in {"partial_chain_incomplete", "open_topic_chain_mismatch"}:
+        missing_stages = item.get("missing_stages") or item.get("section_atom_chain_missing_stages") or {}
+        missing_stage_examples = (
+            item.get("missing_stage_examples")
+            or item.get("section_atom_chain_missing_stage_examples")
+            or []
+        )
+    else:
+        missing_stages = {}
+        missing_stage_examples = []
     return {
         "paper_id": item.get("paper_id") or "",
         "title": item.get("title") or "",
@@ -293,13 +308,15 @@ def _slim_item(item: dict[str, Any]) -> dict[str, Any]:
         "gap_type": item.get("gap_type") or (item.get("gap_types") or [""])[0],
         "repair_id": item.get("repair_id") or "",
         "source_contract": item.get("source_contract") or "",
-        "closure_state": item.get("closure_state") or "",
+        "closure_state": state,
         "failure_mode": item.get("row_failure_mode") or item.get("failure_mode") or "",
         "next_action": item.get("next_action") or item.get("row_next_action") or "",
         "decision_grade_primary_rows": _as_int(item.get("decision_grade_primary_rows")),
         "section_atoms": _as_int(item.get("section_atoms")),
         "section_atom_chains": _as_int(item.get("section_atom_chains")),
         "section_atom_full_chains": _as_int(item.get("section_atom_full_chains")),
+        "missing_stages": missing_stages,
+        "missing_stage_examples": missing_stage_examples,
     }
 
 
@@ -322,6 +339,14 @@ def _build_action_groups(items: list[dict[str, Any]], *, top_k: int) -> list[dic
             str(item.get("row_failure_mode") or item.get("failure_mode") or "unknown")
             for item in members
         )
+        missing_stage_counts: Counter[str] = Counter()
+        for item in members:
+            if str(item.get("closure_state") or "") in {"partial_chain_incomplete", "open_topic_chain_mismatch"}:
+                missing_stage_counts.update(
+                    item.get("missing_stages")
+                    or item.get("section_atom_chain_missing_stages")
+                    or {}
+                )
         slim_contracts = [_slim_item(item) for item in members]
         groups.append(
             {
@@ -332,6 +357,7 @@ def _build_action_groups(items: list[dict[str, Any]], *, top_k: int) -> list[dic
                 "contract_count": len(members),
                 "closure_state_counts": dict(closure_counts),
                 "failure_mode_counts": dict(failure_counts),
+                "missing_stage_counts": dict(missing_stage_counts),
                 "command_sequence": list(spec["command_sequence"]),
                 "can_run_while_broad_ingest_active": bool(
                     spec.get("can_run_while_broad_ingest_active")
@@ -446,6 +472,7 @@ def _write_csv(path: Path, plan: dict[str, Any]) -> None:
         "priority_score",
         "command_sequence",
         "next_action",
+        "missing_stages",
     ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
@@ -466,6 +493,11 @@ def _write_csv(path: Path, plan: dict[str, Any]) -> None:
                         "priority_score": item.get("priority_score") or 0,
                         "command_sequence": command_sequence,
                         "next_action": item.get("next_action") or "",
+                        "missing_stages": json.dumps(
+                            item.get("missing_stages") or {},
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ),
                     }
                 )
 
@@ -491,14 +523,18 @@ def _render_markdown(plan: dict[str, Any]) -> str:
         "",
         "## Action Groups",
         "",
-        "| group | contracts | papers | command sequence |",
-        "|---|---:|---:|---|",
+        "| group | contracts | papers | missing stages | command sequence |",
+        "|---|---:|---:|---|---|",
     ]
     for group in plan.get("action_groups") or []:
         commands = "<br>".join(f"`{cmd}`" for cmd in group.get("command_sequence") or [])
+        missing = ", ".join(
+            f"{stage}:{int(count)}"
+            for stage, count in Counter(group.get("missing_stage_counts") or {}).most_common()
+        )
         lines.append(
             f"| {group['group_id']} | {int(group['contract_count']):,} | "
-            f"{int(group['paper_count']):,} | {commands} |"
+            f"{int(group['paper_count']):,} | {missing or '-'} | {commands} |"
         )
     lines.extend(["", "## Top Examples", ""])
     for group in plan.get("action_groups") or []:
@@ -508,15 +544,19 @@ def _render_markdown(plan: dict[str, Any]) -> str:
                 "",
                 f"- policy: `{group['promotion_policy']}`; claim_scope: `{group['claim_scope']}`",
                 "",
-                "| paper_id | topic | closure_state | failure_mode | next_action |",
-                "|---|---|---|---|---|",
+                "| paper_id | topic | closure_state | failure_mode | missing_stages | next_action |",
+                "|---|---|---|---|---|---|",
             ]
         )
         for item in (group.get("candidate_examples") or [])[:10]:
+            missing = ", ".join(
+                f"{stage}:{int(count)}"
+                for stage, count in Counter(item.get("missing_stages") or {}).most_common()
+            )
             lines.append(
                 f"| `{_md(item.get('paper_id'))}` | {_md(item.get('topic'))} | "
                 f"`{_md(item.get('closure_state'))}` | `{_md(item.get('failure_mode'))}` | "
-                f"{_md(item.get('next_action'))} |"
+                f"{_md(missing or '-')} | {_md(item.get('next_action'))} |"
             )
         lines.append("")
     lines.extend(

@@ -1,6 +1,6 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T10:15:04Z`
+- audit_ts: `2026-05-31T10:25:33Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
@@ -27,6 +27,12 @@
 | lineage_full_chain_missing | 1 |
 | lineage_chains_missing_after_atoms | 1 |
 
+| missing_stage | chains |
+|---|---:|
+| constraint | 1 |
+| attempted_path | 1 |
+| local_fix | 1 |
+
 ## Repair Contract Closure
 
 - closed: `17/215` (7.9%)
@@ -47,7 +53,7 @@
 | unattempted_pdf_available | 8 | run targeted topic-gap section ingest after active broad ingest is safe. |
 | no_target_sections_unknown_contract | 5 | re-run with current parser contract before treating the miss as structural. |
 | stale_parser_contract | 4 | reparse with the current section parser contract before evidence promotion. |
-| lineage_full_chain_missing | 1 | inspect missing typed stages and improve atom classification/chain assembly for this bottleneck. |
+| lineage_full_chain_missing | 1 | inspect missing typed stages (constraint:1, attempted_path:1, local_fix:1) and improve atom classification/chain assembly for this bottleneck. |
 | current_contract_weak | 1 | manual or alternate-parser review before high-confidence promotion. |
 | lineage_chains_missing_after_atoms | 1 | run section-atom-chains or tune atom ordering before Step13 promotion. |
 

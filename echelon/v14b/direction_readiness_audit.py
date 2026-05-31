@@ -11,6 +11,7 @@ import csv
 import json
 import re
 import sqlite3
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -879,6 +880,11 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
             lineage_counts = triage.get("lineage_failure_mode_counts") or {}
             lineage_total = sum(int(v or 0) for v in lineage_counts.values())
             if lineage_total:
+                missing_stage_counts = triage.get("lineage_missing_stage_counts") or {}
+                missing_stage_text = ", ".join(
+                    f"{stage}:{int(count)}"
+                    for stage, count in Counter(missing_stage_counts).most_common()
+                )
                 triage_detail += (
                     " Typed-chain triage: "
                     f"atoms-missing={int(lineage_counts.get('lineage_atoms_missing_after_section_evidence') or 0):,}, "
@@ -886,6 +892,8 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                     f"full-chain-missing={int(lineage_counts.get('lineage_full_chain_missing') or 0):,}, "
                     f"topic-mismatch={int(lineage_counts.get('topic_specific_lineage_chain_mismatch') or 0):,}."
                 )
+                if missing_stage_text:
+                    triage_detail += f" Missing stages: {missing_stage_text}."
             repair = triage.get("repair_contract_closure") or {}
             if int(repair.get("contracts") or 0):
                 triage_detail += (
@@ -1144,6 +1152,13 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     if topic_gap_triage.get("available"):
         counts = topic_gap_triage.get("failure_mode_counts") or {}
         repair = topic_gap_triage.get("repair_contract_closure") or {}
+        missing_stage_counts = topic_gap_triage.get("lineage_missing_stage_counts") or {}
+        missing_stage_suffix = ""
+        if missing_stage_counts:
+            missing_stage_suffix = "; missing-stages=" + ",".join(
+                f"{stage}:{int(count)}"
+                for stage, count in Counter(missing_stage_counts).most_common()
+            )
         repair_suffix = ""
         if int(repair.get("contracts") or 0):
             repair_suffix = (
@@ -1155,6 +1170,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"current-parser no-target={int(counts.get('no_target_sections_after_current_parser') or 0):,}; "
             f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}; "
             f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}"
+            f"{missing_stage_suffix}"
             f"{repair_suffix}"
         ]
     no_target_inspection = metrics.get("topic_gap_no_target_inspection_state") or {}
