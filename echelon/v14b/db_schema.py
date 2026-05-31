@@ -347,6 +347,7 @@ CREATE TABLE IF NOT EXISTS fusion_evidence_audit (
     evidence_path_json        TEXT,
     candidate_tier_json       TEXT,
     calibration_json          TEXT,
+    input_signature_json      TEXT,
     adequacy_label            TEXT NOT NULL,
     remaining_risk            TEXT,
     created_at                TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -687,6 +688,7 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
     for col, ddl_type in (
         ("candidate_tier_json", "TEXT"),
         ("calibration_json", "TEXT"),
+        ("input_signature_json", "TEXT"),
     ):
         if _add_column_if_missing(conn, "fusion_evidence_audit", col, ddl_type):
             changed = True

@@ -217,3 +217,89 @@ def test_step6_resume_rejects_stale_fusion_audit(tmp_path):
     conn.close()
     assert not valid
     assert "fusion_evidence_audit" in reason
+
+
+def test_step6_resume_requires_current_upstream_input_signature(tmp_path):
+    from echelon.v14b.db_schema import init_v14b_db
+    from echelon.v14b.step6_fusion import (
+        STEP6_INPUT_SIGNATURE_VERSION,
+        _fusion_resume_state_valid,
+    )
+
+    db_v14 = tmp_path / "v14.sqlite3"
+    conn = init_v14b_db(db_v14)
+    current_signature = {
+        "version": STEP6_INPUT_SIGNATURE_VERSION,
+        "digest": "current-digest",
+    }
+    conn.execute(
+        """
+        INSERT INTO fusion_evidence_audit
+            (run_id, n_terminals, n_vgae_preds_top, n_vgae_preds_total,
+             n_cross_field_total, n_unresolved, n_candidates, n_directions,
+             limitation_quality_json, evidence_path_json, adequacy_label, remaining_risk)
+        VALUES ('r1', 0, 0, 0, 0, 0, 0, 0, '{}', '{}', 'no_user_facing_claim', '')
+        """
+    )
+    conn.commit()
+
+    valid, reason = _fusion_resume_state_valid(conn, {"records_n": 0}, current_signature)
+    assert not valid
+    assert "input_signature" in reason
+
+    valid, reason = _fusion_resume_state_valid(
+        conn,
+        {
+            "records_n": 0,
+            "input_signature": {
+                "version": STEP6_INPUT_SIGNATURE_VERSION,
+                "digest": "old-digest",
+            },
+        },
+        current_signature,
+    )
+    assert not valid
+    assert "upstream input signature changed" in reason
+
+    valid, reason = _fusion_resume_state_valid(
+        conn,
+        {"records_n": 0, "input_signature": current_signature},
+        current_signature,
+    )
+    conn.close()
+    assert valid, reason
+
+
+def test_step6_input_signature_changes_when_section_contract_evidence_changes():
+    from echelon.v14b.step6_fusion import build_step6_input_signature
+
+    base = {
+        "terminals": [{"paper_id": "p1", "title": "Terminal", "publication_year": 2024}],
+        "vgae_preds": [{"src_paper_id": "p1", "dst_paper_id": "p2", "prediction_confidence": 0.8}],
+        "calibration_context": {"has_run_audit": True, "label": "calibrated"},
+        "section_atom_chains": [],
+    }
+    weak = build_step6_input_signature(
+        **base,
+        unresolved=[
+            {
+                "atom_id": "a1",
+                "paper_id": "p3",
+                "keyword": "scalability",
+                "section_decision_grade": False,
+            }
+        ],
+    )
+    strong = build_step6_input_signature(
+        **base,
+        unresolved=[
+            {
+                "atom_id": "a1",
+                "paper_id": "p3",
+                "keyword": "scalability",
+                "section_decision_grade": True,
+            }
+        ],
+    )
+
+    assert weak["digest"] != strong["digest"]

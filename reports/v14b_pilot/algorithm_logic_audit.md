@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T06:33:51Z`
+- generated_at: `2026-05-31T06:43:57Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T06:33:50Z`
+- generated_at: `2026-05-31T06:43:55Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 311,
+    "section_frontfill_done": 312,
     "section_frontfill_no_evidence_delta": 19,
-    "section_frontfill_progress_done": 311,
+    "section_frontfill_progress_done": 312,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 513,
-      "current_contract_rate": 0.16936282601518654,
-      "decision_grade_papers": 509,
-      "decision_grade_rate": 0.16804225817101354,
+      "current_contract_papers": 514,
+      "current_contract_rate": 0.1696929679762298,
+      "decision_grade_papers": 510,
+      "decision_grade_rate": 0.1683724001320568,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1238,
-        "weak": 1791
+        "strong": 1239,
+        "weak": 1790
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4396,
-        "v14b_section_parser_contract_v3_toc_guard": 1161
+        "legacy_unknown_contract": 4395,
+        "v14b_section_parser_contract_v3_toc_guard": 1163
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4396,
-        "v14b_section_ingest_v3": 1161
+        "v14b_section_ingest_v2": 4395,
+        "v14b_section_ingest_v3": 1163
       },
       "primary_section_papers": 3029,
-      "primary_section_rows": 5557,
+      "primary_section_rows": 5558,
       "strategy_counts": {
         "embedded_heading": 52,
-        "explicit_heading": 1856,
-        "heading_continuation": 2408,
+        "explicit_heading": 1858,
+        "heading_continuation": 2410,
         "inline_heading": 722,
-        "legacy_unknown_strategy": 3072,
+        "legacy_unknown_strategy": 3071,
         "loose_inline_heading": 39,
         "parser_hint": 53,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1238,
-      "weak_only_papers": 1791,
-      "weak_only_rate": 0.5912842522284583
+      "strong_or_moderate_papers": 1239,
+      "weak_only_papers": 1790,
+      "weak_only_rate": 0.590954110267415
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",

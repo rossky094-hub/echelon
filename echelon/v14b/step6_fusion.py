@@ -20,6 +20,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -51,6 +52,7 @@ logger = logging.getLogger("echelon.v14b.step6_fusion")
 
 FUSION_VGAE_TOP_N = int(os.environ.get("V14B_FUSION_VGAE_TOP_N", "500"))
 FUSION_MIN_VGAE_CONFIDENCE = float(os.environ.get("V14B_FUSION_MIN_VGAE_CONFIDENCE", "0.55"))
+STEP6_INPUT_SIGNATURE_VERSION = "step6_input_signature_v1"
 
 # Prompt: 命名 future direction
 DIRECTION_NAMING_PROMPT = """\
@@ -122,7 +124,7 @@ def load_main_path_terminals(
         WHERE id IN ({placeholders})
           {scope_sql}
           AND (publication_year IS NULL OR publication_year >= ?)
-        ORDER BY publication_year DESC
+        ORDER BY publication_year DESC, id ASC
         LIMIT 50
     """, terminal_ids + [year_threshold]).fetchall()
     return [dict(r) for r in rows]
@@ -153,7 +155,7 @@ def load_vgae_predictions(conn_v14: sqlite3.Connection) -> List[dict]:
         SELECT src_paper_id, dst_paper_id, predicted_prob, src_year, dst_year, is_cross_field
                {optional_sql}
         FROM predicted_future_edges
-        ORDER BY {order_expr}
+        ORDER BY {order_expr}, src_paper_id ASC, dst_paper_id ASC
         LIMIT ?
     """, (FUSION_VGAE_TOP_N,)).fetchall()
     return [dict(r) for r in rows]
@@ -364,7 +366,9 @@ def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
             ON a.atom_id = r.atom_id AND r.confidence > 0.6
         GROUP BY a.atom_id
         HAVING n_resolutions = 0
-        ORDER BY CASE a.severity WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC
+        ORDER BY CASE a.severity WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC,
+                 COALESCE(a.evidence_weight, 0.0) DESC,
+                 a.atom_id ASC
         LIMIT 50
     """).fetchall()
     return [dict(r) for r in rows]
@@ -1015,6 +1019,7 @@ def write_fusion_evidence_audit(
     unresolved: list[dict],
     candidates: list[dict],
     n_directions: int,
+    input_signature: dict | None = None,
 ) -> dict:
     total_predicted = conn_v14.execute("SELECT COUNT(*) FROM predicted_future_edges").fetchone()[0]
     cross_field_total = conn_v14.execute(
@@ -1084,6 +1089,7 @@ def write_fusion_evidence_audit(
             },
             ensure_ascii=False,
         ),
+        "input_signature_json": json.dumps(input_signature or {}, ensure_ascii=False, sort_keys=True),
         "adequacy_label": adequacy,
         "remaining_risk": remaining_risk,
     }
@@ -1093,15 +1099,109 @@ def write_fusion_evidence_audit(
             (run_id, n_terminals, n_vgae_preds_top, n_vgae_preds_total,
              n_cross_field_total, n_unresolved, n_candidates, n_directions,
              limitation_quality_json, evidence_path_json, candidate_tier_json,
-             calibration_json, adequacy_label, remaining_risk)
+             calibration_json, input_signature_json, adequacy_label, remaining_risk)
         VALUES
             (:run_id, :n_terminals, :n_vgae_preds_top, :n_vgae_preds_total,
              :n_cross_field_total, :n_unresolved, :n_candidates, :n_directions,
              :limitation_quality_json, :evidence_path_json, :candidate_tier_json,
-             :calibration_json, :adequacy_label, :remaining_risk)
+             :calibration_json, :input_signature_json, :adequacy_label, :remaining_risk)
     """, audit)
     conn_v14.commit()
     return audit
+
+
+def _stable_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+
+
+def _component_signature(value: Any) -> dict[str, Any]:
+    payload = _stable_json(value).encode("utf-8")
+    count = len(value) if isinstance(value, (list, tuple, set, dict)) else 1
+    return {
+        "count": int(count),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def _compact_section_atom_chains_for_signature(chains: list[dict]) -> list[dict]:
+    """Keep only fields that Step6 uses for matching, tiering, and audit counts."""
+    keys = (
+        "chain_id",
+        "paper_id",
+        "paper_title",
+        "publication_year",
+        "section_name",
+        "section_key",
+        "constraint_text",
+        "failure_mechanism_text",
+        "attempted_path_text",
+        "local_fix_text",
+        "new_constraint_text",
+        "typed_chain_complete",
+        "typed_chain_completeness",
+        "evidence_grade",
+        "claim_scope",
+        "missing_stages",
+    )
+    return [
+        {key: chain.get(key) for key in keys if key in chain}
+        for chain in sorted(chains, key=lambda item: str(item.get("chain_id") or ""))
+    ]
+
+
+def build_step6_input_signature(
+    *,
+    terminals: list[dict],
+    vgae_preds: list[dict],
+    unresolved: list[dict],
+    calibration_context: dict,
+    section_atom_chains: list[dict],
+    corpus_id: str | None = None,
+) -> dict[str, Any]:
+    """Deterministic upstream evidence signature for Step6 checkpoint validity."""
+    components = {
+        "main_path_terminals": _component_signature(
+            sorted(terminals, key=lambda item: str(item.get("paper_id") or ""))
+        ),
+        "vgae_top_candidates": _component_signature(vgae_preds),
+        "vgae_calibration_context": _component_signature(calibration_context),
+        "unresolved_limitations": _component_signature(
+            sorted(unresolved, key=lambda item: str(item.get("atom_id") or ""))
+        ),
+        "section_atom_chains": _component_signature(
+            _compact_section_atom_chains_for_signature(section_atom_chains)
+        ),
+    }
+    digest_payload = {
+        "version": STEP6_INPUT_SIGNATURE_VERSION,
+        "corpus_id": corpus_id or "",
+        "components": components,
+    }
+    return {
+        **digest_payload,
+        "digest": hashlib.sha256(_stable_json(digest_payload).encode("utf-8")).hexdigest(),
+    }
+
+
+def compute_step6_input_signature(
+    conn_main: sqlite3.Connection,
+    conn_v14: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> dict[str, Any]:
+    terminals = load_main_path_terminals(conn_main, conn_v14, corpus_id=corpus_id)
+    vgae_preds = load_vgae_predictions(conn_v14)
+    unresolved = attach_limitation_section_contracts(load_unresolved_limitations(conn_v14), conn_main)
+    calibration_context = load_vgae_calibration_context(conn_v14)
+    section_atom_chains = load_section_atom_chains(conn_main, corpus_id=corpus_id)
+    return build_step6_input_signature(
+        terminals=terminals,
+        vgae_preds=vgae_preds,
+        unresolved=unresolved,
+        calibration_context=calibration_context,
+        section_atom_chains=section_atom_chains,
+        corpus_id=corpus_id,
+    )
 
 
 def _table_row_count(conn: sqlite3.Connection, table: str) -> int | None:
@@ -1111,7 +1211,11 @@ def _table_row_count(conn: sqlite3.Connection, table: str) -> int | None:
         return None
 
 
-def _fusion_resume_state_valid(conn_v14: sqlite3.Connection, checkpoint_data: dict) -> tuple[bool, str]:
+def _fusion_resume_state_valid(
+    conn_v14: sqlite3.Connection,
+    checkpoint_data: dict,
+    current_input_signature: dict | None = None,
+) -> tuple[bool, str]:
     """Protect Step6 from stale checkpoints and stale fusion audit rows."""
     expected = int(checkpoint_data.get("records_n") or 0)
     actual = _table_row_count(conn_v14, "future_directions")
@@ -1131,6 +1235,18 @@ def _fusion_resume_state_valid(conn_v14: sqlite3.Connection, checkpoint_data: di
     audit_n = int(row[0] or 0)
     if audit_n != actual:
         return False, f"fusion_evidence_audit n_directions={audit_n} != future_directions rows={actual}"
+
+    if current_input_signature is not None:
+        checkpoint_signature = checkpoint_data.get("input_signature") or {}
+        if not checkpoint_signature:
+            return False, "Step6 input_signature is missing from checkpoint"
+        expected_digest = checkpoint_signature.get("digest")
+        actual_digest = current_input_signature.get("digest")
+        if expected_digest != actual_digest:
+            return (
+                False,
+                f"Step6 upstream input signature changed: checkpoint={expected_digest} current={actual_digest}",
+            )
 
     return True, "ok"
 
@@ -1152,9 +1268,19 @@ def run_fusion(
 
     if resume and ck.done():
         data = ck.load()
+        conn_main_resume = sqlite3.connect(str(db_main))
+        conn_main_resume.row_factory = sqlite3.Row
+        ensure_corpus_schema(conn_main_resume)
+        create_temp_corpus_table(conn_main_resume, corpus_id)
         conn_v14_resume = get_v14b_conn(db_v14)
-        valid, reason = _fusion_resume_state_valid(conn_v14_resume, data)
+        current_input_signature = compute_step6_input_signature(
+            conn_main_resume,
+            conn_v14_resume,
+            corpus_id=corpus_id,
+        )
+        valid, reason = _fusion_resume_state_valid(conn_v14_resume, data, current_input_signature)
         conn_v14_resume.close()
+        conn_main_resume.close()
         if valid:
             logger.info("Step6 已完成 (%d directions),跳过", data.get("records_n", 0))
             return data
@@ -1184,6 +1310,14 @@ def run_fusion(
     logger.info("未解决 limitations: %d", len(unresolved))
     section_atom_chains = load_section_atom_chains(conn_main, corpus_id=corpus_id)
     logger.info("typed section atom chains: %d", len(section_atom_chains))
+    input_signature = build_step6_input_signature(
+        terminals=terminals,
+        vgae_preds=vgae_preds,
+        unresolved=unresolved,
+        calibration_context=calibration_context,
+        section_atom_chains=section_atom_chains,
+        corpus_id=corpus_id,
+    )
 
     # 三路融合
     candidates = compute_direction_clusters(
@@ -1214,6 +1348,7 @@ def run_fusion(
         unresolved=unresolved,
         candidates=candidates,
         n_directions=n_written,
+        input_signature=input_signature,
     )
 
     upsert_step_meta(
@@ -1234,6 +1369,7 @@ def run_fusion(
         "n_section_atom_chains": len(section_atom_chains),
         "corpus_id": corpus_id,
         "scoped_papers": scoped_count if corpus_id else None,
+        "input_signature": input_signature,
         "fusion_audit": audit,
         "records_n": n_written,
     }
