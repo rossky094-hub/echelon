@@ -169,6 +169,8 @@ def test_topic_gap_section_audit_classifies_repair_buckets(tmp_path):
 
     counts = result["summary"]["failure_mode_counts"]
     assert result["summary"]["status"] == "fail"
+    assert result["summary"]["decision_grade_current_contract_papers"] == 1
+    assert result["summary"]["promotion_ready_papers"] == 1
     assert counts["decision_grade_current_contract"] == 1
     assert counts["current_contract_weak"] == 1
     assert counts["stale_parser_contract"] == 1
@@ -177,6 +179,108 @@ def test_topic_gap_section_audit_classifies_repair_buckets(tmp_path):
     assert result["summary"]["topic_summary"]["metalens"]["papers"] == 5
     assert (out_dir / "topic_gap_section_evidence_audit.md").exists()
     assert (out_dir / "topic_gap_section_evidence_audit.csv").exists()
+
+
+def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    queue = tmp_path / "multi_topic_evidence_gap_queue.csv"
+    out_dir = tmp_path / "reports"
+    _make_main(db)
+    conn = sqlite3.connect(str(db))
+    current_explicit = json.dumps(
+        {
+            "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            "extraction_strategies": ["explicit_heading"],
+        }
+    )
+    conn.executemany(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("p_atomized", "Atomized paper", 2020, "2001.10001", "10/f", "W6", "S6"),
+            ("p_partial", "Partial chain paper", 2020, "2001.10002", "10/g", "W7", "S7"),
+            ("p_full", "Full chain mismatch paper", 2020, "2001.10003", "10/h", "W8", "S8"),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        [
+            (
+                pid,
+                "discussion",
+                "decision-grade section evidence " * 10,
+                "v14b_section_ingest_v3",
+                f"https://arxiv.org/pdf/{arxiv}.pdf",
+                current_explicit,
+            )
+            for pid, arxiv in (
+                ("p_atomized", "2001.10001"),
+                ("p_partial", "2001.10002"),
+                ("p_full", "2001.10003"),
+            )
+        ],
+    )
+    conn.executescript(
+        """
+        CREATE TABLE section_atoms (
+            paper_id TEXT,
+            atom_type TEXT,
+            evidence_grade TEXT
+        );
+        CREATE TABLE section_atom_chains (
+            paper_id TEXT,
+            typed_chain_complete INTEGER,
+            typed_chain_completeness TEXT
+        );
+        """
+    )
+    conn.executemany(
+        "INSERT INTO section_atoms VALUES (?, ?, ?)",
+        [
+            ("p_atomized", "constraint", "section_atom_decision_grade"),
+            ("p_partial", "constraint", "section_atom_decision_grade"),
+            ("p_partial", "failure_mechanism", "section_atom_decision_grade"),
+            ("p_full", "constraint", "section_atom_decision_grade"),
+            ("p_full", "failure_mechanism", "section_atom_decision_grade"),
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO section_atom_chains VALUES (?, ?, ?)",
+        [
+            ("p_partial", 0, "constraint_failure_only"),
+            ("p_full", 1, "full"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+    queue.write_text(
+        "\n".join(
+            [
+                "topic,gap_type,bottleneck,priority,candidate_paper_ids,frontfill_query,required_sections,why",
+                (
+                    "metalens,bottleneck_lineage_missing_topic_specific_typed_chain,efficiency,97,"
+                    "p_decision;p_atomized;p_partial;p_full,metalens efficiency,limitation,chain"
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = run_topic_gap_section_evidence_audit(
+        db_main=db,
+        topic_gap_queue=queue,
+        out_dir=out_dir,
+    )
+
+    by_pid = {row["paper_id"]: row for row in result["rows"]}
+    assert by_pid["p_decision"]["failure_mode"] == "lineage_atoms_missing_after_section_evidence"
+    assert by_pid["p_atomized"]["failure_mode"] == "lineage_chains_missing_after_atoms"
+    assert by_pid["p_partial"]["failure_mode"] == "lineage_full_chain_missing"
+    assert by_pid["p_full"]["failure_mode"] == "topic_specific_lineage_chain_mismatch"
+    assert result["summary"]["decision_grade_current_contract_papers"] == 4
+    assert result["summary"]["promotion_ready_papers"] == 0
+    assert result["summary"]["promotion_policy_counts"]["candidate_pool_only"] == 4
+    assert result["summary"]["lineage_failure_mode_counts"]["lineage_full_chain_missing"] == 1
 
 
 def test_topic_gap_section_triage_loader_exposes_summary(tmp_path):

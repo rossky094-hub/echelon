@@ -872,6 +872,16 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}, "
                 f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}."
             )
+            lineage_counts = triage.get("lineage_failure_mode_counts") or {}
+            lineage_total = sum(int(v or 0) for v in lineage_counts.values())
+            if lineage_total:
+                triage_detail += (
+                    " Typed-chain triage: "
+                    f"atoms-missing={int(lineage_counts.get('lineage_atoms_missing_after_section_evidence') or 0):,}, "
+                    f"chains-missing={int(lineage_counts.get('lineage_chains_missing_after_atoms') or 0):,}, "
+                    f"full-chain-missing={int(lineage_counts.get('lineage_full_chain_missing') or 0):,}, "
+                    f"topic-mismatch={int(lineage_counts.get('topic_specific_lineage_chain_mismatch') or 0):,}."
+                )
             next_action = str(triage.get("next_action") or next_action)
         no_target = m.get("topic_gap_no_target_inspection_state") or {}
         if no_target.get("available"):

@@ -298,13 +298,123 @@ def _summarize_sections(sections: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _atom_chain_summaries(conn: sqlite3.Connection, paper_ids: list[str]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {
+        pid: {
+            "section_atoms": 0,
+            "section_atom_decision_grade_atoms": 0,
+            "section_atom_types": [],
+            "section_atom_chains": 0,
+            "section_atom_full_chains": 0,
+            "section_atom_chain_completeness": {},
+        }
+        for pid in paper_ids
+    }
+    if not paper_ids:
+        return out
+
+    if _table_exists(conn, "section_atoms"):
+        atom_cols = _cols(conn, "section_atoms")
+        if {"paper_id", "atom_type"} <= atom_cols:
+            for chunk in _chunks(paper_ids):
+                ph = ",".join("?" for _ in chunk)
+                grade_expr = "evidence_grade" if "evidence_grade" in atom_cols else "'' AS evidence_grade"
+                rows = conn.execute(
+                    f"""
+                    SELECT paper_id, atom_type, {grade_expr}, COUNT(*) AS n
+                    FROM section_atoms
+                    WHERE paper_id IN ({ph})
+                    GROUP BY paper_id, atom_type, evidence_grade
+                    """,
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    pid = str(row["paper_id"])
+                    item = out.setdefault(pid, {})
+                    item["section_atoms"] = int(item.get("section_atoms") or 0) + int(row["n"] or 0)
+                    if str(row["evidence_grade"] or "") == "section_atom_decision_grade":
+                        item["section_atom_decision_grade_atoms"] = int(
+                            item.get("section_atom_decision_grade_atoms") or 0
+                        ) + int(row["n"] or 0)
+                    types = set(item.get("section_atom_types") or [])
+                    if row["atom_type"]:
+                        types.add(str(row["atom_type"]))
+                    item["section_atom_types"] = sorted(types)
+
+    if _table_exists(conn, "section_atom_chains"):
+        chain_cols = _cols(conn, "section_atom_chains")
+        if "paper_id" in chain_cols:
+            for chunk in _chunks(paper_ids):
+                ph = ",".join("?" for _ in chunk)
+                complete_expr = "typed_chain_complete" if "typed_chain_complete" in chain_cols else "0 AS typed_chain_complete"
+                completeness_expr = (
+                    "typed_chain_completeness"
+                    if "typed_chain_completeness" in chain_cols
+                    else "'unknown' AS typed_chain_completeness"
+                )
+                rows = conn.execute(
+                    f"""
+                    SELECT paper_id, {complete_expr}, {completeness_expr}, COUNT(*) AS n
+                    FROM section_atom_chains
+                    WHERE paper_id IN ({ph})
+                    GROUP BY paper_id, typed_chain_complete, typed_chain_completeness
+                    """,
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    pid = str(row["paper_id"])
+                    item = out.setdefault(pid, {})
+                    n = int(row["n"] or 0)
+                    item["section_atom_chains"] = int(item.get("section_atom_chains") or 0) + n
+                    if int(row["typed_chain_complete"] or 0):
+                        item["section_atom_full_chains"] = int(item.get("section_atom_full_chains") or 0) + n
+                    completeness = str(row["typed_chain_completeness"] or "unknown")
+                    counts = dict(item.get("section_atom_chain_completeness") or {})
+                    counts[completeness] = int(counts.get(completeness) or 0) + n
+                    item["section_atom_chain_completeness"] = counts
+    return out
+
+
+def _has_topic_specific_lineage_gap(gap_types: list[str]) -> bool:
+    return any("bottleneck_lineage_missing_topic_specific_typed_chain" in str(gap) for gap in gap_types)
+
+
 def _classify(
     *,
     section_summary: dict[str, Any],
     attempt: dict[str, Any] | None,
     eligible_pdf: bool,
+    atom_chain_summary: dict[str, Any] | None = None,
+    has_lineage_gap: bool = False,
 ) -> tuple[str, str, str]:
     if int(section_summary.get("decision_grade_primary_rows") or 0) > 0:
+        if has_lineage_gap:
+            atoms = int((atom_chain_summary or {}).get("section_atoms") or 0)
+            chains = int((atom_chain_summary or {}).get("section_atom_chains") or 0)
+            full_chains = int((atom_chain_summary or {}).get("section_atom_full_chains") or 0)
+            if atoms <= 0:
+                return (
+                    "lineage_atoms_missing_after_section_evidence",
+                    "candidate_pool_only",
+                    "run section-atoms for topic-gap papers, then rebuild section-atom chains.",
+                )
+            if chains <= 0:
+                return (
+                    "lineage_chains_missing_after_atoms",
+                    "candidate_pool_only",
+                    "run section-atom-chains or tune atom ordering before Step13 promotion.",
+                )
+            if full_chains <= 0:
+                return (
+                    "lineage_full_chain_missing",
+                    "candidate_pool_only",
+                    "inspect missing typed stages and improve atom classification/chain assembly for this bottleneck.",
+                )
+            return (
+                "topic_specific_lineage_chain_mismatch",
+                "candidate_pool_only",
+                "full chains exist, but none match both the topic context and expected bottleneck; keep Step13 claims weak.",
+            )
         return (
             "decision_grade_current_contract",
             "covered",
@@ -384,6 +494,7 @@ def run_topic_gap_section_evidence_audit(
         metadata = _paper_metadata(conn, paper_ids)
         attempts = _latest_attempts(conn, paper_ids)
         section_map = _section_rows(conn, paper_ids)
+        atom_chain_map = _atom_chain_summaries(conn, paper_ids)
     finally:
         conn.close()
 
@@ -400,13 +511,16 @@ def run_topic_gap_section_evidence_audit(
             or _arxiv_pdf_url(queue_row.get("arxiv_id") or meta.get("arxiv_id"))
         )
         eligible_pdf = _truthy(queue_row.get("eligible_pdf")) or bool(source_url)
+        reasons = _split_reasons(queue_row.get("reasons"))
+        topics, gap_types = _topic_gap_tags(reasons)
+        atom_chain_summary = atom_chain_map.get(pid, {})
         failure_mode, promotion_policy, next_action = _classify(
             section_summary=section_summary,
             attempt=attempt,
             eligible_pdf=eligible_pdf,
+            atom_chain_summary=atom_chain_summary,
+            has_lineage_gap=_has_topic_specific_lineage_gap(gap_types),
         )
-        reasons = _split_reasons(queue_row.get("reasons"))
-        topics, gap_types = _topic_gap_tags(reasons)
         rows.append(
             {
                 "queue_position": queue_pos,
@@ -433,14 +547,17 @@ def run_topic_gap_section_evidence_audit(
                 "latest_attempt_contract": (attempt or {}).get("parser_contract_version") or "",
                 "latest_attempt_parser": (attempt or {}).get("parser_name") or "",
                 **section_summary,
+                **atom_chain_summary,
             }
         )
 
     failure_counts = Counter(str(row["failure_mode"]) for row in rows)
     policy_counts = Counter(str(row["promotion_policy"]) for row in rows)
-    decision_grade = int(failure_counts.get("decision_grade_current_contract") or 0)
     queue_papers = len(rows)
+    decision_grade = sum(1 for row in rows if int(row.get("decision_grade_primary_rows") or 0) > 0)
+    promotion_ready = int(failure_counts.get("decision_grade_current_contract") or 0)
     decision_grade_rate = decision_grade / max(1, queue_papers)
+    promotion_ready_rate = promotion_ready / max(1, queue_papers)
     topic_summary: dict[str, dict[str, Any]] = {}
     for row in rows:
         topics = row["topics"] or ["unknown"]
@@ -454,11 +571,14 @@ def run_topic_gap_section_evidence_audit(
                 },
             )
             item["papers"] += 1
-            if row["failure_mode"] == "decision_grade_current_contract":
+            if int(row.get("decision_grade_primary_rows") or 0) > 0:
                 item["decision_grade"] += 1
+            if row["failure_mode"] == "decision_grade_current_contract":
+                item["promotion_ready"] = int(item.get("promotion_ready") or 0) + 1
             item["failure_mode_counts"][row["failure_mode"]] += 1
     for item in topic_summary.values():
         item["decision_grade_rate"] = item["decision_grade"] / max(1, item["papers"])
+        item["promotion_ready_rate"] = int(item.get("promotion_ready") or 0) / max(1, item["papers"])
         item["failure_mode_counts"] = dict(item["failure_mode_counts"])
 
     next_actions = [
@@ -472,13 +592,21 @@ def run_topic_gap_section_evidence_audit(
         for mode, count in failure_counts.most_common()
         if mode != "decision_grade_current_contract"
     ]
+    lineage_failure_counts = {
+        mode: count
+        for mode, count in failure_counts.items()
+        if mode.startswith("lineage_") or mode == "topic_specific_lineage_chain_mismatch"
+    }
     summary = {
-        "status": "pass" if decision_grade_rate >= PROMOTION_THRESHOLD or queue_papers == 0 else "fail",
+        "status": "pass" if promotion_ready_rate >= PROMOTION_THRESHOLD or queue_papers == 0 else "fail",
         "queue_papers": queue_papers,
         "decision_grade_current_contract_papers": decision_grade,
         "decision_grade_current_contract_rate": decision_grade_rate,
+        "promotion_ready_papers": promotion_ready,
+        "promotion_ready_rate": promotion_ready_rate,
         "promotion_threshold": PROMOTION_THRESHOLD,
         "failure_mode_counts": dict(failure_counts),
+        "lineage_failure_mode_counts": dict(lineage_failure_counts),
         "promotion_policy_counts": dict(policy_counts),
         "topic_summary": topic_summary,
         "next_actions": next_actions,
@@ -533,6 +661,12 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "decision_grade_primary_rows",
         "stale_primary_rows",
         "section_names",
+        "section_atoms",
+        "section_atom_decision_grade_atoms",
+        "section_atom_types",
+        "section_atom_chains",
+        "section_atom_full_chains",
+        "section_atom_chain_completeness",
         "source_url",
         "doi",
         "arxiv_id",
@@ -567,6 +701,9 @@ def _render_markdown(result: dict[str, Any]) -> str:
         f"- decision-grade current-contract coverage: "
         f"`{summary['decision_grade_current_contract_papers']}/{summary['queue_papers']}` "
         f"({summary['decision_grade_current_contract_rate'] * 100:.1f}%)",
+        f"- promotion-ready coverage: "
+        f"`{summary.get('promotion_ready_papers', 0)}/{summary['queue_papers']}` "
+        f"({float(summary.get('promotion_ready_rate') or 0.0) * 100:.1f}%)",
         "",
         "## Failure Modes",
         "",
@@ -575,6 +712,11 @@ def _render_markdown(result: dict[str, Any]) -> str:
     ]
     for mode, count in Counter(summary["failure_mode_counts"]).most_common():
         lines.append(f"| {mode} | {count:,} |")
+    lineage_counts = Counter(summary.get("lineage_failure_mode_counts") or {})
+    if lineage_counts:
+        lines.extend(["", "## Typed Chain Triage", "", "| failure_mode | papers |", "|---|---:|"])
+        for mode, count in lineage_counts.most_common():
+            lines.append(f"| {mode} | {count:,} |")
     lines.extend(["", "## Next Actions", "", "| failure_mode | papers | action |", "|---|---:|---|"])
     for action in summary["next_actions"]:
         lines.append(
@@ -646,7 +788,10 @@ def load_topic_gap_section_triage_state(path: Path) -> dict[str, Any]:
         "decision_grade_current_contract_rate": float(
             summary.get("decision_grade_current_contract_rate") or 0.0
         ),
+        "promotion_ready_papers": int(summary.get("promotion_ready_papers") or 0),
+        "promotion_ready_rate": float(summary.get("promotion_ready_rate") or 0.0),
         "failure_mode_counts": summary.get("failure_mode_counts") or {},
+        "lineage_failure_mode_counts": summary.get("lineage_failure_mode_counts") or {},
         "promotion_policy_counts": summary.get("promotion_policy_counts") or {},
         "topic_summary": summary.get("topic_summary") or {},
         "next_action": first_action,
