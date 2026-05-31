@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit topic-gap-section-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -217,14 +217,25 @@ value-delivery-audit:
 		--out-dir reports/v14b_pilot \
 		--repo-root .
 
+## Algorithm logic audit: 逐步审计算法角色、输入输出、promotion guard
+algorithm-logic-audit:
+	@echo ">>> Algorithm logic audit: step-by-step first-principles fit..."
+	$(PYTHON) -m echelon.v14b.algorithm_logic_audit \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--out-dir reports/v14b_pilot \
+		--repo-root .
+
 ## Decision audit: current acceptance loop for Topic Dossier / Evidence Map / Claim Card
 decision-audit:
 	@echo ">>> Decision audit: benchmark regression -> gap queue -> readiness -> value delivery..."
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
 	$(MAKE) topic-gap-section-audit
+	$(MAKE) topic-gap-no-target-inspect
 	$(MAKE) cited-work-backfill-queue
 	$(MAKE) direction-readiness-audit
+	$(MAKE) algorithm-logic-audit
 	$(MAKE) value-delivery-audit
 
 ## Evidence bone audit: unlinked refs + high-value section coverage + frontfill log taxonomy
@@ -351,6 +362,15 @@ topic-gap-section-audit:
 		--db $(DB_MAIN) \
 		--topic-gap-queue $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
 		--out-dir reports/v14b_pilot
+
+## Topic-gap no-target inspect: 只读检查当前 parser no-target PDF 是否真有目标 heading
+topic-gap-no-target-inspect:
+	@echo ">>> Topic-gap no-target inspection: check PDF heading signals without writing DB..."
+	$(PYTHON) -m echelon.v14b.topic_gap_no_target_inspection \
+		--db $(DB_MAIN) \
+		--triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json \
+		--out-dir reports/v14b_pilot \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
 ## 前置补齐完成后，从证据门槛断点推进产品链
 post-frontfill-chain:
@@ -627,6 +647,8 @@ help:
 	@echo "  make decision-audit            # 当前验收闭环: regression/gap/readiness/value"
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
 	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
+	@echo "  make topic-gap-no-target-inspect # 只读检查 no-target PDF heading 信号"
+	@echo "  make algorithm-logic-audit     # 逐步审计算法角色、输入输出和 promotion guard"
 	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"
 	@echo "  make cited-work-backfill       # 小批量处理 exact-ID missing cited works"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"

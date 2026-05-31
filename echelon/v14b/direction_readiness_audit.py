@@ -23,6 +23,7 @@ from echelon.v14b.evidence_contracts import (
 from echelon.v14b.cited_work_backfill import load_cited_work_backfill_run_state
 from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
+from echelon.v14b.topic_gap_no_target_inspection import load_topic_gap_no_target_inspection_state
 from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 
 WEAK_SECTION_STRATEGIES = {
@@ -863,6 +864,17 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}."
             )
             next_action = str(triage.get("next_action") or next_action)
+        no_target = m.get("topic_gap_no_target_inspection_state") or {}
+        if no_target.get("available"):
+            counts = no_target.get("classification_counts") or {}
+            triage_detail += (
+                " No-target inspection: "
+                f"parser-target-signal={int(no_target.get('parser_target_signal_papers') or 0):,}, "
+                f"subthreshold-target-signal={int(no_target.get('subthreshold_target_signal_papers') or 0):,}, "
+                f"sectionless/non-target-heading={int(counts.get('sectionless_or_non_target_heading_format') or 0):,}."
+            )
+            if int(no_target.get("parser_target_signal_papers") or 0) == 0:
+                next_action = str(no_target.get("next_action") or next_action)
         blockers.append(
             {
                 "gate": "multi_topic_evidence_gap",
@@ -1059,6 +1071,17 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}; "
             f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}"
         ]
+    no_target_inspection = metrics.get("topic_gap_no_target_inspection_state") or {}
+    no_target_inspection_line = []
+    if no_target_inspection.get("available"):
+        counts = no_target_inspection.get("classification_counts") or {}
+        no_target_inspection_line = [
+            f"- topic-gap no-target inspection: `{no_target_inspection.get('status')}`; "
+            f"parser-target-signal={int(no_target_inspection.get('parser_target_signal_papers') or 0):,}; "
+            f"subthreshold-target-signal={int(no_target_inspection.get('subthreshold_target_signal_papers') or 0):,}; "
+            f"sectionless/non-target-heading="
+            f"{int(counts.get('sectionless_or_non_target_heading_format') or 0):,}"
+        ]
     lines = [
         "# Direction Readiness Audit",
         "",
@@ -1115,6 +1138,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"raw primary={int(metrics.get('topic_gap_primary_section_papers') or 0):,} "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
         *topic_gap_triage_line,
+        *no_target_inspection_line,
         *frontfill_line,
         f"- future candidate edges: {metrics['future_candidate_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
@@ -1187,6 +1211,9 @@ def run_audit(
     )
     metrics["topic_gap_section_triage_state"] = load_topic_gap_section_triage_state(
         out_dir / "topic_gap_section_evidence_audit.json"
+    )
+    metrics["topic_gap_no_target_inspection_state"] = load_topic_gap_no_target_inspection_state(
+        out_dir / "topic_gap_no_target_inspection.json"
     )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)

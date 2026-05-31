@@ -33,6 +33,7 @@ from echelon.v14b.evidence_grade import (
     uncertainty_reasons,
 )
 from echelon.v14b.future_candidate_lifecycle import future_edge_calibration_context
+from echelon.v14b.topic_gap_no_target_inspection import load_topic_gap_no_target_inspection_state
 from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 from echelon.v14b.topic_readiness import (
     NO_LLM_PREFLIGHT_POLICY,
@@ -2466,8 +2467,10 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "topic-regression",
         "section-queue-audit",
         "topic-gap-section-audit",
+        "topic-gap-no-target-inspect",
         "cited-work-backfill-queue",
         "direction-readiness-audit",
+        "algorithm-logic-audit",
         "value-delivery-audit",
     )
     topic_gap_repair_targets = (
@@ -2565,9 +2568,9 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
             "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap "
-            "section triage, direction readiness, and value delivery. Benchmark-topic evidence gaps must have "
-            "a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies "
-            "section blockers, ingests topic-gap papers, and re-audits. "
+            "section triage, no-target PDF inspection, direction readiness, algorithm-logic audit, and value "
+            "delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression "
+            "gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
             "not raw primary-section presence. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
@@ -2711,6 +2714,9 @@ def audit_multi_topic_regression(
     topic_gap_triage = metrics.get("topic_gap_section_triage_state") or {}
     topic_gap_triage_available = bool(topic_gap_triage.get("available"))
     topic_gap_triage_failure_modes = topic_gap_triage.get("failure_mode_counts") or {}
+    topic_gap_no_target = metrics.get("topic_gap_no_target_inspection_state") or {}
+    no_target_blocking = int(topic_gap_triage_failure_modes.get("no_target_sections_after_current_parser") or 0) > 0
+    no_target_inspection_available = bool(topic_gap_no_target.get("available"))
     return {
         "issue": "Multi-topic Regression",
         "status": (
@@ -2731,6 +2737,9 @@ def audit_multi_topic_regression(
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available
             ),
+            "topic_gap_no_target_inspection_available_when_needed": (
+                not no_target_blocking or no_target_inspection_available
+            ),
             "current_plan_docs_avoid_gold_topic_language": current_plan_docs_avoid_gold_topic_language,
         },
         "benchmark_topics": sorted(defined),
@@ -2746,13 +2755,20 @@ def audit_multi_topic_regression(
         "topic_gap_section_triage_available": topic_gap_triage_available,
         "topic_gap_section_triage_status": topic_gap_triage.get("status") or "",
         "topic_gap_section_triage_failure_modes": topic_gap_triage_failure_modes,
+        "topic_gap_no_target_inspection_available": no_target_inspection_available,
+        "topic_gap_no_target_inspection_status": topic_gap_no_target.get("status") or "",
+        "topic_gap_no_target_inspection_classifications": topic_gap_no_target.get("classification_counts") or {},
+        "topic_gap_no_target_parser_signal_papers": int(
+            topic_gap_no_target.get("parser_target_signal_papers") or 0
+        ),
         "policy": (
             "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
             "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; "
             "the active regression and product-baseline entrypoints must default to the full benchmark suite, "
             "and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. "
             "When blocked, a topic-gap section triage report must identify whether the next repair is current-contract "
-            "reparse, parser/full-text inspection, access recovery, or targeted ingest."
+            "reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target "
+            "papers require a no-target PDF inspection before parser thresholds can be loosened."
         ),
     }
 
@@ -2797,6 +2813,9 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
     )
     metrics["topic_gap_section_triage_state"] = load_topic_gap_section_triage_state(
         report_dir / "topic_gap_section_evidence_audit.json"
+    )
+    metrics["topic_gap_no_target_inspection_state"] = load_topic_gap_no_target_inspection_state(
+        report_dir / "topic_gap_no_target_inspection.json"
     )
     with sqlite3.connect(str(db_v14)) as conn_v14:
         metrics["vgae_calibration_audit"] = (
