@@ -16,7 +16,11 @@ from pathlib import Path
 from typing import Any
 
 from echelon.v14b.config import DB_MAIN, RAW_PDF_MANIFEST, RAW_PDF_STORE_ROOT, REPORT_DIR
-from echelon.v14b.evidence_contracts import PRIMARY_SECTION_NAMES, SECTION_PARSER_CONTRACT_VERSION
+from echelon.v14b.evidence_contracts import (
+    PRIMARY_SECTION_NAMES,
+    SECTION_PARSER_CONTRACT_VERSION,
+    section_provenance_strength,
+)
 from echelon.v14b.step5s_section_ingest import (
     SECTION_INGEST_MIN_CHARS,
     _local_raw_pdf_path,
@@ -71,17 +75,10 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
     sections = extract_sections_with_metadata(blocks)
     primary_sections = sorted(sec for sec in sections if sec in PRIMARY_SECTION_NAMES)
     secondary_sections = sorted(sec for sec in sections if sec not in PRIMARY_SECTION_NAMES)
-    no_target_probe: dict[str, Any] = {}
-    if primary_sections:
-        classification = "parser_success_primary"
-    elif sections:
-        classification = "parser_success_secondary_only"
-    else:
-        classification = "parser_no_target_sections"
-        no_target_probe = inspect_no_target_blocks(blocks)
     strategies: dict[str, list[str]] = {}
     section_chars: dict[str, int] = {}
     section_pages: dict[str, list[int]] = {}
+    provenance_strengths: dict[str, str] = {}
     for name, payload in sections.items():
         strategies[name] = sorted(str(item) for item in (payload.get("extraction_strategies") or []))
         section_chars[name] = len(str(payload.get("text") or ""))
@@ -90,6 +87,25 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
             for p in (payload.get("pages") or [])
             if isinstance(p, (int, float)) and int(p) > 0
         ]
+        provenance_strengths[name] = section_provenance_strength(
+            {
+                "section_name": name,
+                "extraction_strategies": strategies[name],
+                "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            }
+        )
+    no_target_probe: dict[str, Any] = {}
+    if primary_sections:
+        strong_or_moderate = any(
+            provenance_strengths.get(sec) in {"strong", "moderate"}
+            for sec in primary_sections
+        )
+        classification = "parser_success_primary" if strong_or_moderate else "parser_success_weak_primary"
+    elif sections:
+        classification = "parser_success_secondary_only"
+    else:
+        classification = "parser_no_target_sections"
+        no_target_probe = inspect_no_target_blocks(blocks)
     return {
         "classification": classification,
         "text_blocks": len(blocks),
@@ -97,6 +113,7 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
         "primary_sections": primary_sections,
         "secondary_sections": secondary_sections,
         "extraction_strategies": strategies,
+        "provenance_strengths": provenance_strengths,
         "section_chars": section_chars,
         "section_pages": section_pages,
         "min_section_chars": SECTION_INGEST_MIN_CHARS,
@@ -110,6 +127,8 @@ def classify_recommended_action(row: dict[str, Any]) -> str:
     classification = str(row.get("classification") or "")
     if classification == "parser_exception":
         return "parser_exception_reparse"
+    if classification == "parser_success_weak_primary":
+        return "weak_primary_context_only"
     if classification == "parser_success_primary":
         if (
             row.get("promotion_policy") != "covered"
@@ -200,6 +219,7 @@ def run_topic_gap_raw_pdf_inspection(
         if row.get("classification") == "parser_no_target_sections"
     )
     primary_ready = int(counts.get("parser_success_primary") or 0)
+    weak_primary = int(counts.get("parser_success_weak_primary") or 0)
     primary_ready_repair_candidates = sum(
         1
         for row in rows
@@ -219,6 +239,7 @@ def run_topic_gap_raw_pdf_inspection(
         "local_pdf_available_papers": len(rows),
         "skipped_no_local_pdf": skipped_no_local,
         "parser_primary_ready_papers": primary_ready,
+        "parser_weak_primary_papers": weak_primary,
         "parser_primary_ready_repair_candidates": primary_ready_repair_candidates,
         "parser_primary_ready_already_covered": primary_ready_already_covered,
         "parser_no_target_papers": no_target,
@@ -231,8 +252,9 @@ def run_topic_gap_raw_pdf_inspection(
         "policy": (
             "This is a read-only parser dry run. Rows with parser_success_primary and candidate_pool_only policy "
             "are local-cache candidates for the next safe Step5s ingest boundary; already-covered rows are useful "
-            "parser controls but not counted as repair lift. No row is promoted until paper_sections, section_atoms, "
-            "and typed chains are rebuilt with provenance."
+            "parser controls but not counted as repair lift. Rows with parser_success_weak_primary are weak "
+            "terminal-cue context only and remain blocked from decision-grade promotion. No row is promoted until "
+            "paper_sections, section_atoms, and typed chains are rebuilt with provenance."
         ),
     }
     result = {
@@ -278,6 +300,7 @@ def load_topic_gap_raw_pdf_inspection_state(path: Path) -> dict[str, Any]:
             summary.get("parser_primary_ready_already_covered") or 0
         ),
         "parser_no_target_papers": int(summary.get("parser_no_target_papers") or 0),
+        "parser_weak_primary_papers": int(summary.get("parser_weak_primary_papers") or 0),
         "parser_no_target_shape_counts": summary.get("parser_no_target_shape_counts") or {},
         "parser_no_target_repair_signal_papers": int(
             summary.get("parser_no_target_repair_signal_papers") or 0
@@ -339,6 +362,7 @@ def _render_markdown(result: dict[str, Any]) -> str:
         f"- local PDF available papers: {summary['local_pdf_available_papers']}",
         f"- skipped no local PDF: {summary['skipped_no_local_pdf']}",
         f"- parser primary-ready papers: {summary['parser_primary_ready_papers']}",
+        f"- parser weak-primary papers: {summary.get('parser_weak_primary_papers', 0)}",
         f"- parser primary-ready repair candidates: {summary['parser_primary_ready_repair_candidates']}",
         f"- parser primary-ready already covered: {summary['parser_primary_ready_already_covered']}",
         f"- parser no-target papers: {summary['parser_no_target_papers']}",

@@ -144,6 +144,15 @@ STOP_SECTION_PATTERNS: list[re.Pattern] = [
     re.compile(r"^\s*(\d+(\.\d+)*|[ivx]+|[a-z])?[\).:\s-]*(references|bibliography|acknowledg(e)?ments?|appendix|supplementary|supporting information|data availability|code availability|author contributions?|conflicts? of interest)\s*[:.\-–—]*\s*$", re.I),
 ]
 
+TERMINAL_SUMMARY_CUE_RE = re.compile(
+    r"\b(in summary|in conclusion|to summarize|to conclude)\b\s*[,:\-–—]?\s+",
+    re.I,
+)
+TERMINAL_SUMMARY_STOP_RE = re.compile(
+    r"\b(references|bibliography|acknowledg(?:e)?ments?|appendix|supplementary|supporting information)\b",
+    re.I,
+)
+
 TOC_DOT_LEADER_RE = re.compile(r"\.\s*(?:\.\s*){2,}\d{1,4}(?:\s|$)")
 TOC_NUMBERED_ENTRY_RE = re.compile(
     r"^\s*(?:section\s+)?(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)?)\s+"
@@ -739,6 +748,72 @@ def _embedded_heading_sections(text: str) -> list[tuple[str, str]]:
     return out
 
 
+def _terminal_summary_sections(blocks) -> list[dict[str, Any]]:
+    """Weak fallback for old short papers with no explicit target headings.
+
+    This intentionally does not infer a full decision-grade section.  It only
+    captures terminal summary cues from the final page window so downstream atom
+    search can inspect traceable context without promoting it as strong section
+    evidence.
+    """
+    block_items: list[tuple[int, int, str]] = []
+    page_values: list[int] = []
+    for idx, block in enumerate(blocks):
+        text = (getattr(block, "text", "") or "").replace("\x00", " ").strip()
+        if not text:
+            continue
+        raw_page = getattr(block, "page_no", None)
+        page_no = int(raw_page) if isinstance(raw_page, (int, float)) and int(raw_page) > 0 else 0
+        if page_no:
+            page_values.append(page_no)
+        block_items.append((idx, page_no, text))
+    if not block_items:
+        return []
+
+    max_page = max(page_values) if page_values else 0
+    if max_page <= 0:
+        min_final_page = 0
+        min_final_index = int(len(block_items) * 0.65)
+    elif max_page == 1:
+        min_final_page = 1
+        min_final_index = 0
+    elif max_page == 2:
+        min_final_page = 2
+        min_final_index = 0
+    else:
+        min_final_page = max_page - 1
+        min_final_index = 0
+
+    candidates: list[dict[str, Any]] = []
+    for idx, page_no, text in block_items:
+        in_final_window = (
+            (page_no and page_no >= min_final_page)
+            or (not page_no and idx >= min_final_index)
+        )
+        if not in_final_window:
+            continue
+        clean = re.sub(r"\s+", " ", text).strip()
+        match = TERMINAL_SUMMARY_CUE_RE.search(clean)
+        if not match:
+            continue
+        body = clean[match.start():].strip()
+        stop = TERMINAL_SUMMARY_STOP_RE.search(body, pos=max(1, match.end() - match.start()))
+        if stop:
+            body = body[: stop.start()].strip(" .;:-–—")
+        if len(body) < SECTION_INGEST_MIN_CHARS:
+            continue
+        candidates.append(
+            {
+                "section_name": "conclusion",
+                "text": body[:1200],
+                "pages": [page_no] if page_no else [],
+                "n_blocks": 1,
+                "extraction_strategies": ["terminal_cue_summary"],
+            }
+        )
+    return candidates[:1]
+
+
 def extract_sections_with_metadata(blocks) -> dict[str, dict[str, Any]]:
     sections: dict[str, list[str]] = {name: [] for name, _ in SECTION_PATTERNS}
     section_pages: dict[str, set[int]] = {name: set() for name, _ in SECTION_PATTERNS}
@@ -799,6 +874,16 @@ def extract_sections_with_metadata(blocks) -> dict[str, dict[str, Any]]:
         if not block_had_section_signal:
             for embedded_section, embedded_text in _embedded_heading_sections(text):
                 append_section(embedded_section, embedded_text, page_no, "embedded_heading")
+
+    if not any(sections.values()):
+        for fallback in _terminal_summary_sections(blocks):
+            sec_name = str(fallback.get("section_name") or "conclusion")
+            sections[sec_name].append(str(fallback.get("text") or "")[:1200])
+            section_blocks[sec_name] += int(fallback.get("n_blocks") or 1)
+            section_strategies[sec_name].update(fallback.get("extraction_strategies") or [])
+            for page_no in fallback.get("pages") or []:
+                if isinstance(page_no, (int, float)) and int(page_no) > 0:
+                    section_pages[sec_name].add(int(page_no))
 
     merged: dict[str, dict[str, Any]] = {}
     for sec_name, lines in sections.items():

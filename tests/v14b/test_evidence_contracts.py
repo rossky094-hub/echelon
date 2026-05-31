@@ -59,3 +59,23 @@ def test_traced_primary_is_not_decision_grade_without_current_contract():
 
     assert paper_has_traced_primary_section(paper)
     assert not paper_has_decision_grade_primary_section(paper)
+
+
+def test_terminal_summary_cue_is_weak_context_not_decision_grade():
+    provenance = summarize_primary_section_provenance(
+        [
+            {
+                "section_name": "conclusion",
+                "extraction_strategies": ["terminal_cue_summary"],
+                "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            }
+        ]
+    )
+    flags = evidence_availability_flags(provenance)
+
+    assert provenance["weak"] == 1
+    assert provenance["current_contract"] == 1
+    assert provenance["decision_grade"] == 0
+    assert flags["has_primary_evidence_sections"] is True
+    assert flags["has_decision_grade_primary_evidence_sections"] is False
+    assert flags["primary_section_evidence_grade"] == "weak"

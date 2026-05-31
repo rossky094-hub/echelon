@@ -63,6 +63,7 @@ WEAK_SECTION_STRATEGIES = frozenset(
     {
         "loose_inline_heading",
         "parser_hint",
+        "terminal_cue_summary",
         "legacy_unknown_strategy",
     }
 )

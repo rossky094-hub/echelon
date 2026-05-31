@@ -1,6 +1,6 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T05:36:10Z`
+- audit_ts: `2026-05-31T05:46:21Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
@@ -11,8 +11,9 @@
 
 | failure_mode | papers |
 |---|---:|
-| no_target_sections_after_current_parser | 22 |
+| no_target_sections_after_current_parser | 18 |
 | decision_grade_current_contract | 14 |
+| current_contract_weak | 4 |
 | lineage_full_chain_missing | 1 |
 | lineage_chains_missing_after_atoms | 1 |
 
@@ -27,7 +28,8 @@
 
 | failure_mode | papers | action |
 |---|---:|---|
-| no_target_sections_after_current_parser | 22 | inspect parser misses or alternate full text; keep abstract-only claims weak. |
+| no_target_sections_after_current_parser | 18 | inspect parser misses or alternate full text; keep abstract-only claims weak. |
+| current_contract_weak | 4 | manual or alternate-parser review before high-confidence promotion. |
 | lineage_full_chain_missing | 1 | inspect missing typed stages and improve atom classification/chain assembly for this bottleneck. |
 | lineage_chains_missing_after_atoms | 1 | run section-atom-chains or tune atom ordering before Step13 promotion. |
 
@@ -37,19 +39,19 @@
 |---|---:|---:|---:|---|
 | metalens | 9 | 4 | 44.4% | no_target_sections_after_current_parser:5, decision_grade_current_contract:4 |
 | metasurface holography | 8 | 4 | 50.0% | no_target_sections_after_current_parser:4, decision_grade_current_contract:4 |
-| photonic crystal cavity | 8 | 2 | 25.0% | no_target_sections_after_current_parser:6, lineage_full_chain_missing:1, lineage_chains_missing_after_atoms:1 |
-| quantum light source | 20 | 12 | 60.0% | decision_grade_current_contract:12, no_target_sections_after_current_parser:8 |
+| photonic crystal cavity | 8 | 2 | 25.0% | no_target_sections_after_current_parser:3, current_contract_weak:3, lineage_full_chain_missing:1 |
+| quantum light source | 20 | 12 | 60.0% | decision_grade_current_contract:12, no_target_sections_after_current_parser:7, current_contract_weak:1 |
 
 ## Queued Papers
 
 | pos | paper_id | topics | failure_mode | latest_attempt | title |
 |---:|---|---|---|---|---|
 | 1 | `01KS5KM2ECB6AESTQYWAX0M8SF` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | An open cavity formed with a photonic crystal of negative refraction |
-| 2 | `01KS5KM369VWG4F2AV2MS14S3E` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | Surface state photonic bandgap cavities |
-| 3 | `01KS5KMDAC6220S2FEJCB6XVTB` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | Silicon-based photonic crystal nanocavity light emitters |
+| 2 | `01KS5KM369VWG4F2AV2MS14S3E` | photonic crystal cavity | `current_contract_weak` | `success_primary` | Surface state photonic bandgap cavities |
+| 3 | `01KS5KMDAC6220S2FEJCB6XVTB` | photonic crystal cavity | `current_contract_weak` | `success_primary` | Silicon-based photonic crystal nanocavity light emitters |
 | 4 | `01KS5KVWY6VAA6HXWFJV2SXZ48` | photonic crystal cavity | `lineage_full_chain_missing` | `already_has_primary` | Hybrid photonic crystal cavity and waveguide for coupling to diamond NV-centers |
-| 5 | `01KS5KW8C34R9WN637BH5ABW1R` | quantum light source | `no_target_sections_after_current_parser` | `no_target_sections` | Ultra-bright source of polarization-entangled photons |
-| 6 | `01KS5KWKMCV3DHKBFJH2Z0JN6A` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | Fabrication-tolerant high quality factor photonic crystal microcavities |
+| 5 | `01KS5KW8C34R9WN637BH5ABW1R` | quantum light source | `current_contract_weak` | `success_primary` | Ultra-bright source of polarization-entangled photons |
+| 6 | `01KS5KWKMCV3DHKBFJH2Z0JN6A` | photonic crystal cavity | `current_contract_weak` | `success_primary` | Fabrication-tolerant high quality factor photonic crystal microcavities |
 | 7 | `01KS6FFJF6XNCHFY2X589F6QD5` | photonic crystal cavity | `lineage_chains_missing_after_atoms` | `already_has_primary` | Efficient Terahertz Generation in Triply Resonant Nonlinear Photonic Crystal Microcavities |
 | 8 | `01KS6FG0VYNT6MYBBYMX8TBYDR` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | All-optical conditional logic with a nonlinear photonic crystal nanocavity |
 | 9 | `01KS6FGD433ZJXYBXPYVZ727SG` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | Demonstration of an air-slot mode-gap confined photonic crystal slab nanocavity with ultrasmall mode volumes |

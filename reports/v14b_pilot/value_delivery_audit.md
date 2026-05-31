@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T05:36:29Z`
+- generated_at: `2026-05-31T05:47:09Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -54,47 +54,48 @@
     "openalex_frontfill_status": "stalled_after_cooldown",
     "openalex_frontfill_total": 22643,
     "openalex_w_rate": 0.6439053446688688,
-    "primary_section_papers": 3025,
+    "primary_section_papers": 3029,
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 270,
+    "section_frontfill_done": 284,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 270,
+    "section_frontfill_progress_done": 284,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 468,
-      "current_contract_rate": 0.1547107438016529,
-      "decision_grade_papers": 468,
-      "decision_grade_rate": 0.1547107438016529,
+      "current_contract_papers": 486,
+      "current_contract_rate": 0.16044899306701882,
+      "decision_grade_papers": 482,
+      "decision_grade_rate": 0.15912842522284582,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1219,
-        "weak": 1806
+        "strong": 1229,
+        "weak": 1800
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4462,
-        "v14b_section_parser_contract_v3_toc_guard": 1085
+        "legacy_unknown_contract": 4440,
+        "v14b_section_parser_contract_v3_toc_guard": 1115
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4462,
-        "v14b_section_ingest_v3": 1085
+        "v14b_section_ingest_v2": 4440,
+        "v14b_section_ingest_v3": 1115
       },
-      "primary_section_papers": 3025,
-      "primary_section_rows": 5547,
+      "primary_section_papers": 3029,
+      "primary_section_rows": 5555,
       "strategy_counts": {
         "embedded_heading": 52,
-        "explicit_heading": 1823,
-        "heading_continuation": 2370,
-        "inline_heading": 717,
-        "legacy_unknown_strategy": 3105,
+        "explicit_heading": 1839,
+        "heading_continuation": 2389,
+        "inline_heading": 720,
+        "legacy_unknown_strategy": 3089,
         "loose_inline_heading": 38,
-        "parser_hint": 50
+        "parser_hint": 52,
+        "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1219,
-      "weak_only_papers": 1806,
-      "weak_only_rate": 0.5970247933884297
+      "strong_or_moderate_papers": 1229,
+      "weak_only_papers": 1800,
+      "weak_only_rate": 0.5942555298778475
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -632,15 +633,16 @@
   },
   "topic_gap_no_target_inspection_status": "pass",
   "topic_gap_no_target_parser_signal_papers": 0,
-  "topic_gap_primary_section_papers": 16,
-  "topic_gap_primary_section_rate": 0.42105263157894735,
+  "topic_gap_primary_section_papers": 20,
+  "topic_gap_primary_section_rate": 0.5263157894736842,
   "topic_gap_queue_papers": 38,
   "topic_gap_section_triage_available": true,
   "topic_gap_section_triage_failure_modes": {
+    "current_contract_weak": 4,
     "decision_grade_current_contract": 14,
     "lineage_chains_missing_after_atoms": 1,
     "lineage_full_chain_missing": 1,
-    "no_target_sections_after_current_parser": 22
+    "no_target_sections_after_current_parser": 18
   },
   "topic_gap_section_triage_status": "fail"
 }

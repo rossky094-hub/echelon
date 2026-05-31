@@ -348,6 +348,48 @@ def test_extract_sections_rejects_lowercase_perspectives_fragment():
     assert "future_work" not in sections
 
 
+def test_extract_sections_uses_terminal_summary_as_weak_conclusion_only_on_final_pages():
+    long_tail = " This terminal paragraph reports constraints, failed attempts, and measured tradeoffs." * 8
+    blocks = [
+        _Block(
+            "Abstract\nIn summary, this abstract sentence should not become section evidence."
+            + long_tail,
+            page_no=1,
+        ),
+        _Block(
+            "The middle body has no target headings and remains ordinary narrative." + long_tail,
+            page_no=2,
+        ),
+        _Block(
+            "In summary, the device improves quality factor but still suffers from fabrication "
+            "drift and packaging sensitivity."
+            + long_tail
+            + " References [1] bibliography text",
+            page_no=3,
+        ),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert list(sections) == ["conclusion"]
+    assert sections["conclusion"]["pages"] == [3]
+    assert sections["conclusion"]["extraction_strategies"] == ["terminal_cue_summary"]
+    assert "References" not in sections["conclusion"]["text"]
+
+
+def test_extract_sections_does_not_use_terminal_summary_when_heading_evidence_exists():
+    long_tail = " This paragraph carries concrete claim evidence." * 10
+    blocks = [
+        _Block("1 Discussion\nThe discussion heading is explicit." + long_tail, page_no=2),
+        _Block("In summary, terminal prose exists but should not create a duplicate." + long_tail, page_no=3),
+    ]
+
+    sections = extract_sections_with_metadata(blocks)
+
+    assert "discussion" in sections
+    assert "conclusion" not in sections
+
+
 def test_extract_sections_stops_at_references_heading():
     long_tail = " This paragraph carries concrete claim evidence." * 10
     reference_tail = " [1] unrelated bibliography text should not become evidence." * 20

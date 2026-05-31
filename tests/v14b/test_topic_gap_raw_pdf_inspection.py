@@ -49,6 +49,25 @@ def test_inspect_parsed_blocks_reports_no_target_when_current_parser_extracts_no
     assert result["section_names"] == []
 
 
+def test_inspect_parsed_blocks_marks_terminal_summary_as_weak_primary():
+    result = inspect_parsed_blocks(
+        [
+            _block("Abstract\nThis opening cue is not enough. " * 12, page_no=1),
+            _block(
+                "In summary, the device improves brightness but still has packaging drift "
+                "and fabrication sensitivity. "
+                + "This terminal context is intentionally long enough for weak extraction. " * 8,
+                page_no=2,
+            ),
+        ]
+    )
+
+    assert result["classification"] == "parser_success_weak_primary"
+    assert result["primary_sections"] == ["conclusion"]
+    assert result["provenance_strengths"]["conclusion"] == "weak"
+    assert classify_recommended_action(result) == "weak_primary_context_only"
+
+
 def test_run_topic_gap_raw_pdf_inspection_uses_local_cache_without_db_writes(tmp_path, monkeypatch):
     db = tmp_path / "main.sqlite3"
     conn = sqlite3.connect(str(db))

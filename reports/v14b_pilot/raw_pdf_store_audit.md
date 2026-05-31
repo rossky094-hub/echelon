@@ -1,6 +1,6 @@
 # Raw PDF Store Audit
 
-- generated_at: `2026-05-31T05:33:17Z`
+- generated_at: `2026-05-31T05:46:50Z`
 - status: **pass**
 - store_root: `/Volumes/LaCie/Echelon_Paper_Raw_Data`
 - manifest: `/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3`
@@ -10,18 +10,18 @@
 | status | papers | GB |
 |---|---:|---:|
 | failed | 1 | 0.00 |
-| http_error | 37 | 0.00 |
-| queued | 52767 | 0.00 |
-| success | 2586 | 0.89 |
+| http_error | 38 | 0.00 |
+| queued | 52673 | 0.00 |
+| success | 2679 | 0.93 |
 
-- success probable PDFs: 2586/2586 (100.0%)
-- success existing paths: 2586
+- success probable PDFs: 2679/2679 (100.0%)
+- success existing paths: 2679
 
 ## Section Reuse
 
-- section rows from local raw PDF cache: 2
-- papers from local raw PDF cache: 2
-- successful local-cache section attempts: 2
+- section rows from local raw PDF cache: 6
+- papers from local raw PDF cache: 6
+- successful local-cache section attempts: 8
 
 ## Candidate Queue Coverage
 
