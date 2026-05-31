@@ -33,6 +33,7 @@ from echelon.v14b.evidence_grade import (
     uncertainty_reasons,
 )
 from echelon.v14b.future_candidate_lifecycle import future_edge_calibration_context
+from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 from echelon.v14b.topic_readiness import (
     NO_LLM_PREFLIGHT_POLICY,
     build_topic_readiness_preflight,
@@ -2464,6 +2465,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     decision_audit_targets = (
         "topic-regression",
         "section-queue-audit",
+        "topic-gap-section-audit",
         "cited-work-backfill-queue",
         "direction-readiness-audit",
         "value-delivery-audit",
@@ -2471,9 +2473,11 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
     topic_gap_repair_targets = (
         "topic-regression",
         "section-queue-audit",
+        "topic-gap-section-audit",
         "section-evidence-topic-gaps",
         "topic-regression",
         "section-queue-audit",
+        "topic-gap-section-audit",
         "direction-readiness-audit",
         "value-delivery-audit",
     )
@@ -2560,9 +2564,10 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
         "unguarded_legacy_arxiv_scripts": unguarded_legacy_scripts,
         "policy": (
             "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must "
-            "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction "
-            "readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that "
-            "refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. "
+            "finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap "
+            "section triage, direction readiness, and value delivery. Benchmark-topic evidence gaps must have "
+            "a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies "
+            "section blockers, ingests topic-gap papers, and re-audits. "
             "Post-frontfill downstream promotion must require decision-grade current-contract section coverage, "
             "not raw primary-section presence. "
             "Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets."
@@ -2703,6 +2708,9 @@ def audit_multi_topic_regression(
     topic_gap_primary_rate = float(metrics.get("topic_gap_primary_section_rate") or 0.0)
     topic_gap_decision_grade_rate = float(metrics.get("topic_gap_decision_grade_section_rate") or 0.0)
     topic_gap_blocking = topic_gap_queue_papers > 0 and topic_gap_decision_grade_rate < 0.70
+    topic_gap_triage = metrics.get("topic_gap_section_triage_state") or {}
+    topic_gap_triage_available = bool(topic_gap_triage.get("available"))
+    topic_gap_triage_failure_modes = topic_gap_triage.get("failure_mode_counts") or {}
     return {
         "issue": "Multi-topic Regression",
         "status": (
@@ -2720,6 +2728,9 @@ def audit_multi_topic_regression(
             "makefile_product_baseline_defaults_to_suite": makefile_product_baseline_defaults_to_suite,
             "section_queue_defaults_to_multi_topic": section_queue_defaults_to_multi_topic,
             "section_queue_tracks_decision_grade_gap_coverage": section_queue_tracks_decision_grade_gap_coverage,
+            "topic_gap_section_triage_available_when_blocking": (
+                not topic_gap_blocking or topic_gap_triage_available
+            ),
             "current_plan_docs_avoid_gold_topic_language": current_plan_docs_avoid_gold_topic_language,
         },
         "benchmark_topics": sorted(defined),
@@ -2732,11 +2743,16 @@ def audit_multi_topic_regression(
         "topic_gap_decision_grade_section_papers": int(metrics.get("topic_gap_decision_grade_section_papers") or 0),
         "topic_gap_decision_grade_section_rate": topic_gap_decision_grade_rate,
         "topic_gap_blocking": topic_gap_blocking,
+        "topic_gap_section_triage_available": topic_gap_triage_available,
+        "topic_gap_section_triage_status": topic_gap_triage.get("status") or "",
+        "topic_gap_section_triage_failure_modes": topic_gap_triage_failure_modes,
         "policy": (
             "Topic value must be tested across multiple optics themes, not tuned only for Metalens. "
             "Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; "
             "the active regression and product-baseline entrypoints must default to the full benchmark suite, "
-            "and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence."
+            "and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. "
+            "When blocked, a topic-gap section triage report must identify whether the next repair is current-contract "
+            "reparse, parser/full-text inspection, access recovery, or targeted ingest."
         ),
     }
 
@@ -2778,6 +2794,9 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
     )
     metrics["cited_work_backfill_run_state"] = load_cited_work_backfill_run_state(
         report_dir / "cited_work_backfill_run.json"
+    )
+    metrics["topic_gap_section_triage_state"] = load_topic_gap_section_triage_state(
+        report_dir / "topic_gap_section_evidence_audit.json"
     )
     with sqlite3.connect(str(db_v14)) as conn_v14:
         metrics["vgae_calibration_audit"] = (

@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit topic-gap-section-audit post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -222,6 +222,7 @@ decision-audit:
 	@echo ">>> Decision audit: benchmark regression -> gap queue -> readiness -> value delivery..."
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
+	$(MAKE) topic-gap-section-audit
 	$(MAKE) cited-work-backfill-queue
 	$(MAKE) direction-readiness-audit
 	$(MAKE) value-delivery-audit
@@ -326,9 +327,11 @@ topic-gap-repair:
 	$(PYTHON) scripts/guard_topic_gap_repair.py
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
+	$(MAKE) topic-gap-section-audit
 	$(MAKE) section-evidence-topic-gaps
 	$(MAKE) topic-regression
 	$(MAKE) section-queue-audit
+	$(MAKE) topic-gap-section-audit
 	$(MAKE) direction-readiness-audit
 	$(MAKE) value-delivery-audit
 
@@ -340,6 +343,14 @@ section-queue-audit:
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_SECTION_INGEST_TOP_N:-12000} \
 		$${V14B_SECTION_AUDIT_TOPIC_ARGS:-}
+
+## Topic-gap section audit: 将 multi-topic section 缺口分类成可行动桶
+topic-gap-section-audit:
+	@echo ">>> Topic-gap section evidence audit: classify benchmark-topic section blockers..."
+	$(PYTHON) -m echelon.v14b.topic_gap_section_evidence_audit \
+		--db $(DB_MAIN) \
+		--topic-gap-queue $${V14B_TOPIC_GAP_SECTION_QUEUE:-data/v14b/topic_evidence_gap_delta_queue.csv} \
+		--out-dir reports/v14b_pilot
 
 ## 前置补齐完成后，从证据门槛断点推进产品链
 post-frontfill-chain:
@@ -615,6 +626,7 @@ help:
 	@echo "  make post-frontfill-chain      # section/frontfill 完成后的断点推进"
 	@echo "  make decision-audit            # 当前验收闭环: regression/gap/readiness/value"
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
+	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
 	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"
 	@echo "  make cited-work-backfill       # 小批量处理 exact-ID missing cited works"
 	@echo "  make value-delivery-audit      # 证据边界与交付门槛审计"

@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T00:22:44Z`
+- generated_at: `2026-05-31T00:40:52Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -20,8 +20,8 @@
 | 10 | Evolution Evidence Map Contract | pass | Each Evidence Map layer, top-level Evidence Map section, and recommended layer combination must say what it shows, what it can explain, what it cannot explain, required evidence, claim_scope, evidence_grade, and uncertainty; individual visual edges must carry the same evidence boundary when exposed in API or paper detail. |
 | 11 | R&D Radar Promotion Contract | pass | R&D Radar main view may contain only complete Step13 Claim Cards. Incomplete cards and GNN/VGAE future edges remain visible only as candidate_pool evidence-gathering targets. |
 | 12 | Main Path Uncertainty Contract | pass | When linked refs are below 30%, citation evolution, main-path claims, Story Mode timeline narratives, selected-paper roles, and visual node hover roles must carry claim_scope, evidence_grade, and uncertainty_reasons. |
-| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
-| 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. |
+| 13 | Legacy Flow Isolation Contract | pass | Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets. |
+| 14 | Multi-topic Regression | fail | Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. |
 | 15 | Quarterly / Multi-corpus | pass | Quarterly optics/cs/materials runs must use corpus_id scoping and snapshots; no step should be hardwired to optics-only product logic. |
 
 ## Gate Details
@@ -58,43 +58,43 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 310,
+    "section_frontfill_done": 311,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 310,
+    "section_frontfill_progress_done": 311,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 284,
-      "current_contract_rate": 0.09403973509933775,
-      "decision_grade_papers": 284,
-      "decision_grade_rate": 0.09403973509933775,
+      "current_contract_papers": 285,
+      "current_contract_rate": 0.09437086092715231,
+      "decision_grade_papers": 285,
+      "decision_grade_rate": 0.09437086092715231,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1040,
-        "weak": 1980
+        "strong": 1041,
+        "weak": 1979
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4784,
-        "v14b_section_parser_contract_v3_toc_guard": 645
+        "legacy_unknown_contract": 4783,
+        "v14b_section_parser_contract_v3_toc_guard": 647
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4784,
-        "v14b_section_ingest_v3": 645
+        "v14b_section_ingest_v2": 4783,
+        "v14b_section_ingest_v3": 647
       },
       "primary_section_papers": 3020,
-      "primary_section_rows": 5429,
+      "primary_section_rows": 5430,
       "strategy_counts": {
         "embedded_heading": 45,
-        "explicit_heading": 1460,
-        "heading_continuation": 1952,
-        "inline_heading": 627,
-        "legacy_unknown_strategy": 3421,
+        "explicit_heading": 1461,
+        "heading_continuation": 1954,
+        "inline_heading": 628,
+        "legacy_unknown_strategy": 3420,
         "loose_inline_heading": 31,
         "parser_hint": 34
       },
-      "strong_or_moderate_papers": 1040,
-      "weak_only_papers": 1980,
-      "weak_only_rate": 0.6556291390728477
+      "strong_or_moderate_papers": 1041,
+      "weak_only_papers": 1979,
+      "weak_only_rate": 0.6552980132450331
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -543,6 +543,7 @@
   "decision_audit_required_targets": [
     "topic-regression",
     "section-queue-audit",
+    "topic-gap-section-audit",
     "cited-work-backfill-queue",
     "direction-readiness-audit",
     "value-delivery-audit"
@@ -565,14 +566,16 @@
     "pilot-graph",
     "pilot-visual"
   ],
-  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
+  "policy": "Current V14B acceptance must run product-chain or post-frontfill-chain, and product-chain must finish with the decision-audit loop: multi-topic regression, topic gap queue refresh, topic-gap section triage, direction readiness, and value delivery. Benchmark-topic evidence gaps must have a targeted repair loop that refreshes regression gaps, refreshes the section queue, classifies section blockers, ingests topic-gap papers, and re-audits. Post-frontfill downstream promotion must require decision-grade current-contract section coverage, not raw primary-section presence. Old enrich/pilot/arXiv-gap-era flows may remain only as explicitly labeled legacy compatibility targets.",
   "status": "pass",
   "topic_gap_repair_required_targets": [
     "topic-regression",
     "section-queue-audit",
+    "topic-gap-section-audit",
     "section-evidence-topic-gaps",
     "topic-regression",
     "section-queue-audit",
+    "topic-gap-section-audit",
     "direction-readiness-audit",
     "value-delivery-audit"
   ],
@@ -600,6 +603,7 @@
     "product_baseline_defaults_to_suite": true,
     "section_queue_defaults_to_multi_topic": true,
     "section_queue_tracks_decision_grade_gap_coverage": true,
+    "topic_gap_section_triage_available_when_blocking": true,
     "topic_regression_avoids_gold_topic_aliases": true,
     "topic_regression_cli_defaults_to_suite": true
   },
@@ -610,14 +614,21 @@
   "issue": "Multi-topic Regression",
   "live_regression_status": "fail",
   "missing_topics": [],
-  "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence.",
+  "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest.",
   "status": "fail",
   "topic_gap_blocking": true,
   "topic_gap_decision_grade_section_papers": 0,
   "topic_gap_decision_grade_section_rate": 0.0,
   "topic_gap_primary_section_papers": 6,
   "topic_gap_primary_section_rate": 0.1935483870967742,
-  "topic_gap_queue_papers": 31
+  "topic_gap_queue_papers": 31,
+  "topic_gap_section_triage_available": true,
+  "topic_gap_section_triage_failure_modes": {
+    "no_target_sections_after_current_parser": 22,
+    "stale_parser_contract": 6,
+    "unattempted_pdf_available": 3
+  },
+  "topic_gap_section_triage_status": "fail"
 }
 ```
 

@@ -139,6 +139,44 @@ def test_direction_readiness_flags_multi_topic_evidence_gap_queue(tmp_path):
     )
 
 
+def test_direction_readiness_uses_topic_gap_section_triage_for_next_action():
+    metrics = {
+        "linked_ref_rate": 0.35,
+        "primary_section_papers": 9000,
+        "primary_section_rate": 0.8,
+        "section_evidence_quality": {"strong_or_moderate_papers": 9000, "weak_only_rate": 0.0},
+        "topic_gap_queue_papers": 3,
+        "topic_gap_primary_section_papers": 0,
+        "topic_gap_primary_section_rate": 0.0,
+        "topic_gap_decision_grade_section_papers": 0,
+        "topic_gap_decision_grade_section_rate": 0.0,
+        "topic_gap_section_evidence_quality": {},
+        "topic_gap_section_triage_state": {
+            "available": True,
+            "failure_mode_counts": {
+                "no_target_sections_after_current_parser": 2,
+                "stale_parser_contract": 1,
+                "unattempted_pdf_available": 0,
+            },
+            "next_action": "inspect parser misses or alternate full text; keep abstract-only claims weak.",
+        },
+        "future_candidate_edges": 0,
+        "future_directions": 0,
+        "direction_claim_cards": 0,
+        "complete_claim_cards": 0,
+        "high_confidence_claim_cards": 0,
+        "future_visual_edges": 0,
+        "openalex_w_rate": 0.80,
+    }
+
+    blockers = classify_blockers(metrics)
+    blocker = next(b for b in blockers if b["gate"] == "multi_topic_evidence_gap")
+
+    assert "current-parser no-target=2" in blocker["why"]
+    assert "stale-contract=1" in blocker["why"]
+    assert "alternate full text" in blocker["next_action"]
+
+
 def test_direction_readiness_reads_regression_candidate_gap_queue(tmp_path):
     main = tmp_path / "main.sqlite3"
     v14 = tmp_path / "v14.sqlite3"

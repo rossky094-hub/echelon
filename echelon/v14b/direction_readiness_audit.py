@@ -23,6 +23,7 @@ from echelon.v14b.evidence_contracts import (
 from echelon.v14b.cited_work_backfill import load_cited_work_backfill_run_state
 from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
+from echelon.v14b.topic_gap_section_evidence_audit import load_topic_gap_section_triage_state
 
 WEAK_SECTION_STRATEGIES = {
     "loose_inline_heading",
@@ -846,6 +847,22 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
             }
         )
     if m.get("topic_gap_queue_papers", 0) and m.get("topic_gap_decision_grade_section_rate", 0.0) < 0.70:
+        triage = m.get("topic_gap_section_triage_state") or {}
+        triage_detail = ""
+        next_action = (
+            "Run make topic-gap-section-audit, then repair the largest concrete bucket: "
+            "stale parser-contract rows need current-contract reparse, current-parser no-target rows "
+            "need parser/full-text inspection, and unattempted PDF rows need targeted ingest."
+        )
+        if triage.get("available"):
+            counts = triage.get("failure_mode_counts") or {}
+            triage_detail = (
+                " Triage: "
+                f"current-parser no-target={int(counts.get('no_target_sections_after_current_parser') or 0):,}, "
+                f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}, "
+                f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}."
+            )
+            next_action = str(triage.get("next_action") or next_action)
         blockers.append(
             {
                 "gate": "multi_topic_evidence_gap",
@@ -858,12 +875,9 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                     f"raw primary-section coverage is {int(m.get('topic_gap_primary_section_papers') or 0):,}/"
                     f"{int(m.get('topic_gap_queue_papers') or 0):,} "
                     f"({pct(float(m.get('topic_gap_primary_section_rate') or 0.0))})."
+                    f"{triage_detail}"
                 ),
-                "next_action": (
-                    "After the active top12000 ingest finishes, run make topic-gap-repair "
-                    "to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted "
-                    "papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions."
-                ),
+                "next_action": next_action,
             }
         )
     topic_gap_quality = m.get("topic_gap_section_evidence_quality") or {}
@@ -1035,6 +1049,16 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"fail={openalex_frontfill.get('fail')}, cooldown_hours="
             f"{float(openalex_frontfill.get('cooldown_remaining_s') or 0) / 3600.0:.1f})"
         ]
+    topic_gap_triage = metrics.get("topic_gap_section_triage_state") or {}
+    topic_gap_triage_line = []
+    if topic_gap_triage.get("available"):
+        counts = topic_gap_triage.get("failure_mode_counts") or {}
+        topic_gap_triage_line = [
+            f"- topic-gap section triage: `{topic_gap_triage.get('status')}`; "
+            f"current-parser no-target={int(counts.get('no_target_sections_after_current_parser') or 0):,}; "
+            f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}; "
+            f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}"
+        ]
     lines = [
         "# Direction Readiness Audit",
         "",
@@ -1090,6 +1114,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
         f"({pct(float(metrics.get('topic_gap_decision_grade_section_rate') or 0.0))}); "
         f"raw primary={int(metrics.get('topic_gap_primary_section_papers') or 0):,} "
         f"({pct(float(metrics.get('topic_gap_primary_section_rate') or 0.0))})",
+        *topic_gap_triage_line,
         *frontfill_line,
         f"- future candidate edges: {metrics['future_candidate_edges']:,}",
         f"- visual future edges: {metrics['future_visual_edges']:,}",
@@ -1159,6 +1184,9 @@ def run_audit(
     )
     metrics["cited_work_backfill_run_state"] = load_cited_work_backfill_run_state(
         out_dir / "cited_work_backfill_run.json"
+    )
+    metrics["topic_gap_section_triage_state"] = load_topic_gap_section_triage_state(
+        out_dir / "topic_gap_section_evidence_audit.json"
     )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)

@@ -1,6 +1,6 @@
 # Metalens Topic Regression
 
-- Audit: `2026-05-31T00:22:39Z`
+- Audit: `2026-05-31T00:40:30Z`
 - Topic: `metalens`
 - Overall status: **warn**
 
