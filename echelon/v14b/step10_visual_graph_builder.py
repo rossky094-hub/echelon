@@ -1878,10 +1878,74 @@ def write_recommendations(
     top_k: int,
 ) -> None:
     future_score = Counter()
+    future_contracts_by_paper: dict[str, list[dict]] = defaultdict(list)
     for pred in future_predictions:
         prob = float(pred.get("candidate_score") or pred.get("raw_candidate_score") or 0)
         future_score[pred["src_paper_id"]] += prob * 0.5
         future_score[pred["dst_paper_id"]] += prob
+        src_id = str(pred.get("src_paper_id") or "")
+        dst_id = str(pred.get("dst_paper_id") or "")
+        contract = future_candidate_visual_contract(
+            pred,
+            source_paper_id=src_id,
+            target_paper_id=dst_id,
+            candidate_score=prob,
+        )
+        for paper_id in (src_id, dst_id):
+            if paper_id:
+                future_contracts_by_paper[paper_id].append(contract)
+
+    def future_recommendation_reason(pid: str) -> dict:
+        contracts = future_contracts_by_paper.get(pid) or []
+        evidence_grade = (
+            "calibrated_candidate_generator"
+            if any(c.get("evidence_grade") == "calibrated_candidate_generator" for c in contracts)
+            else "uncalibrated_candidate_generator"
+            if contracts
+            else "future_candidate_generation_gap"
+        )
+        uncertainty = sorted(
+            {
+                str(reason)
+                for contract in contracts
+                for reason in (contract.get("uncertainty_reasons") or [])
+                if str(reason).strip()
+            }
+        ) or [
+            "future recommendation has no matched future-candidate evidence and must remain exploratory",
+        ]
+        required_evidence = list(
+            dict.fromkeys(
+                str(item)
+                for contract in contracts
+                for item in (contract.get("required_evidence") or [])
+                if str(item).strip()
+            )
+        ) or [
+            "rolling held-out-year calibration audit",
+            "Step6 fusion evidence",
+            "Step13 five-question Claim Card",
+            "section-level bottleneck evidence",
+        ]
+        evidence_objects = [
+            obj
+            for contract in contracts[:5]
+            for obj in (contract.get("evidence_objects") or [])
+            if isinstance(obj, dict)
+        ][:5]
+        return {
+            "why": "future candidate generator support",
+            "claim_scope": "candidate_pool_only",
+            "evidence_grade": evidence_grade,
+            "uncertainty_reasons": uncertainty,
+            "required_evidence": required_evidence,
+            "evidence_objects": evidence_objects,
+            "candidate_score": float(future_score.get(pid) or 0.0),
+            "score_semantics": (
+                "candidate_score is aggregated future-candidate ranking support, "
+                "not validation confidence or a Radar recommendation"
+            ),
+        }
 
     def cite_norm(p):
         return math.log((p.get("cited_by_count") or 0) + 1)
@@ -1902,7 +1966,10 @@ def write_recommendations(
         modes["frontier"].append((pid, 0.45 * recent + 0.35 * burst + 0.20 * key, {"why": "recent + burst + keystone"}))
         modes["bridge"].append((pid, 0.65 * bridge + 0.20 * key + 0.15 * cite, {"why": "cross-field bridge"}))
         modes["bottleneck"].append((pid, 0.60 * min(lim_count / 3, 1) + 0.25 * key + 0.15 * cite, {"why": "unresolved limitations"}))
-        modes["future"].append((pid, future_score[pid] + 0.20 * recent + 0.20 * key, {"why": "future prediction support"}))
+        if future_score[pid] > 0:
+            modes["future"].append(
+                (pid, future_score[pid] + 0.20 * recent + 0.20 * key, future_recommendation_reason(pid))
+            )
 
     rows = []
     for mode, items in modes.items():

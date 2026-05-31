@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T06:58:30Z`
+- generated_at: `2026-05-31T07:12:43Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -190,6 +190,7 @@
     "edge_level_calibration_not_confused_with_run_audit": true,
     "future_direction_report_uses_candidate_score_labels": true,
     "future_lifecycle_uses_candidate_score_labels": true,
+    "future_recommendations_carry_contract": true,
     "future_report_filename_is_candidate_contract": true,
     "public_future_candidate_language_avoids_prediction_copy": true,
     "public_future_evidence_objects_use_candidate_score_labels": true,
@@ -229,6 +230,12 @@
     "checked": true,
     "examples": [],
     "future_edges": 1000
+  },
+  "future_visual_recommendation_contract": {
+    "bad_contract_recommendations": 0,
+    "checked": true,
+    "examples": [],
+    "future_recommendations": 200
   },
   "issue": "Future Growth Calibration",
   "policy": "VGAE/GNN is a future candidate generator only. Direction claims require run-level rolling held-out-year calibration; Radar promotion also requires Step6 fusion plus Step13 complete Claim Card.",
@@ -622,7 +629,8 @@
   },
   "failed_topics": [
     "metasurface holography",
-    "photonic crystal cavity"
+    "photonic crystal cavity",
+    "quantum light source"
   ],
   "issue": "Multi-topic Regression",
   "live_regression_status": "fail",
@@ -630,8 +638,8 @@
   "policy": "Topic value must be tested across multiple optics themes, not tuned only for Metalens. Benchmark topics are regression fixtures, not product allowlists or LLM cost-control gates; the active regression and product-baseline entrypoints must default to the full benchmark suite, and topic-gap repair is blocked until queued papers have decision-grade current-contract section evidence. When blocked, a topic-gap section triage report must identify whether the next repair is current-contract reparse, parser/full-text inspection, access recovery, or targeted ingest. Current-parser no-target papers require a no-target PDF inspection before parser thresholds can be loosened.",
   "status": "fail",
   "topic_gap_blocking": true,
-  "topic_gap_decision_grade_section_papers": 15,
-  "topic_gap_decision_grade_section_rate": 0.42857142857142855,
+  "topic_gap_decision_grade_section_papers": 14,
+  "topic_gap_decision_grade_section_rate": 0.30434782608695654,
   "topic_gap_no_target_inspection_available": true,
   "topic_gap_no_target_inspection_classifications": {
     "heading_like_but_not_target_section": 9,
@@ -640,9 +648,9 @@
   },
   "topic_gap_no_target_inspection_status": "pass",
   "topic_gap_no_target_parser_signal_papers": 0,
-  "topic_gap_primary_section_papers": 18,
-  "topic_gap_primary_section_rate": 0.5142857142857142,
-  "topic_gap_queue_papers": 35,
+  "topic_gap_primary_section_papers": 16,
+  "topic_gap_primary_section_rate": 0.34782608695652173,
+  "topic_gap_queue_papers": 46,
   "topic_gap_section_triage_available": true,
   "topic_gap_section_triage_failure_modes": {
     "current_contract_weak": 4,

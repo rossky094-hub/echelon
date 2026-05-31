@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-31T06:58:31Z`
+- generated_at: `2026-05-31T07:12:44Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
@@ -16,7 +16,7 @@
 - primary section provenance: 1,239 strong/moderate papers; weak-only=59.1%
 - current section parser contract: 514 papers (17.0%)
 - section parser contracts: legacy_unknown_contract:4,395, v14b_section_parser_contract_v3_toc_guard:1,163
-- multi-topic evidence-gap queue: 15 / 35 decision-grade section covered (42.9%); raw primary=18 (51.4%)
+- multi-topic evidence-gap queue: 14 / 46 decision-grade section covered (30.4%); raw primary=16 (34.8%)
 - topic-gap section triage: `fail`; current-parser no-target=18; stale-contract=0; unattempted-PDF=0
 - topic-gap no-target inspection: `pass`; parser-target-signal=0; subthreshold-target-signal=2; sectionless/non-target-heading=11
 - section frontfill health: running_or_unknown [section_delta] (done=312/8373, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=514, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
@@ -33,7 +33,7 @@
 - **section_evidence** (high): primary section evidence covers only 3,029 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
 - **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 1,239 papers have strong/moderate parser provenance; weak-only rate is 59.1%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
 - **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 514/3,029 papers (17.0%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
-- **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 15/35 queued benchmark-topic papers (42.9%); raw primary-section coverage is 18/35 (51.4%). Triage: current-parser no-target=18, stale-contract=0, unattempted-PDF=0. Typed-chain triage: atoms-missing=0, chains-missing=1, full-chain-missing=1, topic-mismatch=0. No-target inspection: parser-target-signal=0, subthreshold-target-signal=2, sectionless/non-target-heading=11. Next: Do not loosen the current parser for the no-target bucket; keep those papers as weak full-text or metadata evidence and focus repair effort on stale-contract reparse and unattempted PDFs.
+- **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 14/46 queued benchmark-topic papers (30.4%); raw primary-section coverage is 16/46 (34.8%). Triage: current-parser no-target=18, stale-contract=0, unattempted-PDF=0. Typed-chain triage: atoms-missing=0, chains-missing=1, full-chain-missing=1, topic-mismatch=0. No-target inspection: parser-target-signal=0, subthreshold-target-signal=2, sectionless/non-target-heading=11. Next: Do not loosen the current parser for the no-target bucket; keep those papers as weak full-text or metadata evidence and focus repair effort on stale-contract reparse and unattempted PDFs.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 
 ## Latest Fusion Audit

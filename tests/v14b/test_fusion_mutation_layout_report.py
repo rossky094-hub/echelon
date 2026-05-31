@@ -259,6 +259,64 @@ class TestFusion:
         assert evidence["evidence_objects"][0]["candidate_score"] == 0.72
         assert "confidence" not in evidence["evidence_objects"][0]
 
+    def test_future_recommendations_carry_candidate_pool_contract(self, tmp_path):
+        from echelon.v14b.step10_visual_graph_builder import ensure_visual_schema, write_recommendations
+
+        _, conn_v14 = create_full_test_db(tmp_path)
+        ensure_visual_schema(conn_v14)
+        papers = [
+            {
+                "id": "p1",
+                "year": 2024,
+                "cited_by_count": 10,
+                "keystone_score_v14": 0.2,
+                "c_bridging_centrality": 0.1,
+                "c_recent_burst": 0.1,
+            },
+            {
+                "id": "p2",
+                "year": 2025,
+                "cited_by_count": 5,
+                "keystone_score_v14": 0.3,
+                "c_bridging_centrality": 0.1,
+                "c_recent_burst": 0.1,
+            },
+        ]
+
+        write_recommendations(
+            conn_v14,
+            papers=papers,
+            assignment={"p1": "C0001", "p2": "C0001"},
+            limitations={},
+            future_predictions=[
+                {
+                    "src_paper_id": "p1",
+                    "dst_paper_id": "p2",
+                    "candidate_score": 0.72,
+                    "raw_candidate_score": 0.81,
+                    "calibrated_candidate_score": 0.76,
+                    "lifecycle_calibration_status": "calibrated_with_run_audit",
+                    "missing_gates_json": json.dumps(["Step13 Claim Card"]),
+                    "uncertainty_reasons_json": json.dumps(["linked refs below target"]),
+                }
+            ],
+            top_k=10,
+        )
+
+        rows = conn_v14.execute(
+            "SELECT reason_json FROM visual_recommendations WHERE mode='future'"
+        ).fetchall()
+        conn_v14.close()
+        assert rows
+        for row in rows:
+            reason = json.loads(row[0])
+            assert reason["why"] == "future candidate generator support"
+            assert reason["claim_scope"] == "candidate_pool_only"
+            assert reason["evidence_grade"] == "calibrated_candidate_generator"
+            assert reason["required_evidence"]
+            assert reason["evidence_objects"][0]["type"] == "future_candidate"
+            assert "prediction support" not in reason["why"]
+
     def test_write_fusion_evidence_audit_marks_limited_output(self, tmp_path):
         from echelon.v14b.step6_fusion import write_fusion_evidence_audit
 

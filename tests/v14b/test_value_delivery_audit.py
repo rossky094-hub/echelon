@@ -1474,6 +1474,33 @@ def test_future_growth_audit_rejects_visual_future_edges_without_contract(tmp_pa
     assert result["future_visual_edge_contract"]["bad_contract_edges"] == 1
 
 
+def test_future_growth_audit_rejects_future_recommendations_without_contract(tmp_path):
+    _write_product_sources(tmp_path)
+    v14 = tmp_path / "v14.sqlite3"
+    _make_v14(v14)
+    conn = sqlite3.connect(str(v14))
+    conn.executescript(
+        """
+        CREATE TABLE visual_recommendations (
+            mode TEXT,
+            reason_json TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO visual_recommendations VALUES (?, ?)",
+        ("future", json.dumps({"why": "future prediction support", "candidate_score": 0.72})),
+    )
+    conn.commit()
+
+    result = audit_future_growth(conn, tmp_path)
+    conn.close()
+
+    assert result["status"] == "fail"
+    assert result["checks"]["future_recommendations_carry_contract"] is False
+    assert result["future_visual_recommendation_contract"]["bad_contract_recommendations"] == 1
+
+
 def test_future_growth_audit_rejects_ui_future_calibration_probability_copy(tmp_path):
     _write_product_sources(tmp_path)
     v14 = tmp_path / "v14.sqlite3"
