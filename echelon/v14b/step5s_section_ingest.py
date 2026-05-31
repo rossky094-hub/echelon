@@ -29,10 +29,14 @@ from echelon.v14b.config import (
     DB_V14,
     LIMIT,
     LIMITATION_TOP_N,
+    RAW_PDF_MANIFEST,
+    RAW_PDF_MAX_BYTES,
+    RAW_PDF_STORE_ROOT,
     SEMANTIC_SCHOLAR_API_KEY,
     SECTION_INGEST_CONCURRENCY,
     SECTION_INGEST_MAX_CHARS,
     SECTION_INGEST_MIN_CHARS,
+    SECTION_INGEST_PREFER_LOCAL_RAW_PDF,
     SECTION_INGEST_REQUIRE_ARXIV,
     SECTION_INGEST_TIMEOUT_SEC,
     SECTION_INGEST_TOP_N,
@@ -844,6 +848,8 @@ def upsert_sections(
     paper_id: str,
     sections: dict[str, dict[str, Any]],
     source_url: str,
+    *,
+    source_storage_uri: str = "",
 ) -> int:
     inserted = 0
     for sec_name, payload in sections.items():
@@ -859,16 +865,19 @@ def upsert_sections(
         else:
             pages = []
         section_pages_json = json.dumps(sorted(set(pages)), ensure_ascii=False)
-        section_meta_json = json.dumps(
-            {
-                "n_pages": len(set(pages)),
-                "n_blocks": int((payload or {}).get("n_blocks") or 0),
-                "extraction_strategies": list((payload or {}).get("extraction_strategies") or []),
-                "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
-                "parser_contract_guards": list(SECTION_PARSER_CONTRACT_GUARDS),
-            },
-            ensure_ascii=False,
-        )
+        section_meta = {
+            "n_pages": len(set(pages)),
+            "n_blocks": int((payload or {}).get("n_blocks") or 0),
+            "extraction_strategies": list((payload or {}).get("extraction_strategies") or []),
+            "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+            "parser_contract_guards": list(SECTION_PARSER_CONTRACT_GUARDS),
+        }
+        if source_storage_uri:
+            section_meta["source_delivery"] = "local_raw_pdf_cache"
+            section_meta["source_storage_uri"] = source_storage_uri
+        else:
+            section_meta["source_delivery"] = "network_pdf_fetch"
+        section_meta_json = json.dumps(section_meta, ensure_ascii=False)
         existing = conn.execute(
             """
             SELECT section_text, section_meta_json
@@ -922,6 +931,113 @@ def upsert_sections(
             )
         inserted += 1
     return inserted
+
+
+def _sanitize_raw_pdf_path_part(value: str) -> str:
+    clean = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    return clean.strip("._") or "unknown"
+
+
+def _raw_pdf_storage_relpath_for_arxiv(arxiv_id: str) -> Path:
+    aid = normalize_arxiv_id(arxiv_id) or arxiv_id
+    if "/" in aid:
+        category, paper = aid.split("/", 1)
+        return Path("pdfs") / "arxiv" / _sanitize_raw_pdf_path_part(category) / f"{_sanitize_raw_pdf_path_part(paper)}.pdf"
+    prefix = _sanitize_raw_pdf_path_part(aid[:4] or "misc")
+    return Path("pdfs") / "arxiv" / prefix / f"{_sanitize_raw_pdf_path_part(aid)}.pdf"
+
+
+def _is_probable_pdf(path: Path, max_bytes: int = RAW_PDF_MAX_BYTES) -> bool:
+    try:
+        st = path.stat()
+        if st.st_size <= 0 or st.st_size > max_bytes:
+            return False
+        with path.open("rb") as fh:
+            return fh.read(4) == b"%PDF"
+    except OSError:
+        return False
+
+
+def _manifest_pdf_path(
+    paper: dict,
+    *,
+    store_root: Path | None = RAW_PDF_STORE_ROOT,
+    manifest_path: Path | None = RAW_PDF_MANIFEST,
+) -> Path | None:
+    if not store_root or not manifest_path or not manifest_path.exists():
+        return None
+    try:
+        uri = f"file:{manifest_path}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=2.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            row = conn.execute(
+                """
+                SELECT storage_path
+                FROM raw_pdf_downloads
+                WHERE status = 'success'
+                  AND COALESCE(storage_path, '') != ''
+                  AND (
+                    paper_id = ?
+                    OR (COALESCE(arxiv_id, '') != '' AND arxiv_id = ?)
+                  )
+                ORDER BY downloaded_at DESC, updated_at DESC
+                LIMIT 1
+                """,
+                (
+                    str(paper.get("id") or ""),
+                    normalize_arxiv_id(paper.get("arxiv_id")) or "",
+                ),
+            ).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+    if not row:
+        return None
+    path = Path(str(row["storage_path"] or ""))
+    return path if path.is_absolute() else store_root / path
+
+
+def _local_raw_pdf_path(
+    paper: dict,
+    *,
+    store_root: Path | None = RAW_PDF_STORE_ROOT,
+    manifest_path: Path | None = RAW_PDF_MANIFEST,
+) -> Path | None:
+    if not (SECTION_INGEST_PREFER_LOCAL_RAW_PDF and store_root):
+        return None
+    candidates: list[Path] = []
+    manifest_hit = _manifest_pdf_path(paper, store_root=store_root, manifest_path=manifest_path)
+    if manifest_hit:
+        candidates.append(manifest_hit)
+    arxiv_id = normalize_arxiv_id(paper.get("arxiv_id"))
+    if arxiv_id:
+        candidates.append(store_root / _raw_pdf_storage_relpath_for_arxiv(arxiv_id))
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        if _is_probable_pdf(path):
+            return path
+    return None
+
+
+def read_local_raw_pdf(
+    paper: dict,
+    *,
+    store_root: Path | None = RAW_PDF_STORE_ROOT,
+    manifest_path: Path | None = RAW_PDF_MANIFEST,
+) -> tuple[bytes | None, Path | None]:
+    path = _local_raw_pdf_path(paper, store_root=store_root, manifest_path=manifest_path)
+    if not path:
+        return None, None
+    try:
+        return path.read_bytes(), path
+    except OSError:
+        return None, None
 
 
 def download_pdf(client: httpx.Client, url: str) -> Optional[bytes]:
@@ -1051,6 +1167,8 @@ def run_section_ingest(
     skipped_existing = 0
     skipped_no_pdf = 0
     failed_parse = 0
+    local_cache_hits = 0
+    network_pdf_fetches = 0
     section_counter = {name: 0 for name, _ in SECTION_PATTERNS}
     run_id = f"section_ingest_{utc_now()}"
 
@@ -1075,7 +1193,13 @@ def run_section_ingest(
                     conn_main.commit()
                     continue
 
-                pdf_url = resolve_pdf_url(client, paper)
+                blob, local_pdf_path = read_local_raw_pdf(paper)
+                pdf_url = _arxiv_pdf_url(paper.get("arxiv_id"), paper.get("doi"))
+                if blob and local_pdf_path:
+                    local_cache_hits += 1
+                    pdf_url = pdf_url or f"file://{local_pdf_path}"
+                else:
+                    pdf_url = resolve_pdf_url(client, paper)
                 if not pdf_url:
                     skipped_no_pdf += 1
                     record_ingest_attempt(
@@ -1093,7 +1217,9 @@ def run_section_ingest(
                         "Re-parsing legacy primary section evidence with current parser contract: paper=%s",
                         pid,
                     )
-                blob = download_pdf(client, pdf_url)
+                if not blob:
+                    network_pdf_fetches += 1
+                    blob = download_pdf(client, pdf_url)
                 if not blob:
                     skipped_no_pdf += 1
                     record_ingest_attempt(
@@ -1176,7 +1302,13 @@ def run_section_ingest(
                     continue
 
                 parsed_papers += 1
-                inserted_now = upsert_sections(conn_main, pid, sections, pdf_url)
+                inserted_now = upsert_sections(
+                    conn_main,
+                    pid,
+                    sections,
+                    pdf_url,
+                    source_storage_uri=str(local_pdf_path or ""),
+                )
                 inserted_sections += inserted_now
                 for sec_name in sections:
                     section_counter[sec_name] = section_counter.get(sec_name, 0) + 1
@@ -1187,6 +1319,11 @@ def run_section_ingest(
                     outcome="success_primary" if primary_now else "success_secondary_only",
                     run_id=run_id,
                     source_url=pdf_url,
+                    detail=(
+                        f"PDF bytes loaded from raw cache: {local_pdf_path}"
+                        if local_pdf_path
+                        else ""
+                    ),
                     inserted_sections=inserted_now,
                     primary_sections=primary_now,
                     candidate_file=candidate_file,
@@ -1213,6 +1350,8 @@ def run_section_ingest(
         "skipped_existing": skipped_existing,
         "skipped_no_pdf": skipped_no_pdf,
         "failed_parse": failed_parse,
+        "local_raw_pdf_cache_hits": local_cache_hits,
+        "network_pdf_fetches": network_pdf_fetches,
         "section_counter": section_counter,
         "claim_supporting_sections_enabled": list(PRIMARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,

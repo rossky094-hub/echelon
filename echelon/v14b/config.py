@@ -240,6 +240,27 @@ SECTION_INGEST_REQUIRE_ARXIV: bool = (
     os.environ.get("V14B_SECTION_INGEST_REQUIRE_ARXIV", "true").lower()
     in ("1", "true", "yes")
 )
+RAW_PDF_STORE_ROOT: Path | None = (
+    Path(os.environ["V14B_RAW_PDF_STORE_ROOT"]).expanduser()
+    if os.environ.get("V14B_RAW_PDF_STORE_ROOT")
+    else None
+)
+RAW_PDF_MANIFEST: Path | None = (
+    Path(os.environ["V14B_RAW_PDF_MANIFEST"]).expanduser()
+    if os.environ.get("V14B_RAW_PDF_MANIFEST")
+    else (
+        RAW_PDF_STORE_ROOT / "manifests" / "raw_pdf_downloads.sqlite3"
+        if RAW_PDF_STORE_ROOT
+        else None
+    )
+)
+SECTION_INGEST_PREFER_LOCAL_RAW_PDF: bool = (
+    os.environ.get("V14B_SECTION_INGEST_PREFER_LOCAL_RAW_PDF", "true").lower()
+    in ("1", "true", "yes")
+)
+RAW_PDF_MAX_BYTES: int = int(
+    os.environ.get("V14B_RAW_PDF_MAX_BYTES", str(200 * 1024 * 1024))
+)
 
 # Sci-Bot 抽取 top N 论文
 LIMITATION_TOP_N: int = 1000

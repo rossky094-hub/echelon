@@ -806,6 +806,14 @@ tail -f /Volumes/LaCie/Echelon_Paper_Raw_Data/logs/raw_pdf_full.log
 
 当前策略：raw PDF 全量低速常驻下载；section 抽取仍按高价值队列优先推进。等 raw PDF 覆盖稳定后，再让 section ingest 优先读本地 PDF 来缩短调优周期。
 
+要让 Step5s 优先复用外接盘 PDF cache，设置：
+
+```bash
+export V14B_RAW_PDF_STORE_ROOT=/Volumes/LaCie/Echelon_Paper_Raw_Data
+export V14B_RAW_PDF_MANIFEST=/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3
+export V14B_SECTION_INGEST_PREFER_LOCAL_RAW_PDF=true
+```
+
 ---
 
 *Echelon V14-B | 演化树 Pilot 运行手册 v1.0*

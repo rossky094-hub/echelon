@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import json
+from pathlib import Path
 import sqlite3
 
 from echelon.v14b.step5s_section_ingest import (
@@ -6,6 +8,8 @@ from echelon.v14b.step5s_section_ingest import (
     SECTION_PARSER_NAME,
     _arxiv_pdf_url,
     _checkpoint_step_name,
+    _local_raw_pdf_path,
+    _raw_pdf_storage_relpath_for_arxiv,
     _has_current_primary_sections,
     _has_primary_sections,
     _parser_contract_digest,
@@ -15,6 +19,7 @@ from echelon.v14b.step5s_section_ingest import (
     extract_sections_with_metadata,
     load_candidates,
     record_ingest_attempt,
+    read_local_raw_pdf,
     read_candidate_file,
     upsert_sections,
 )
@@ -31,6 +36,84 @@ def test_arxiv_pdf_url_from_arxiv_id_and_doi():
     assert _arxiv_pdf_url("2401.12345v2", None) == "https://arxiv.org/pdf/2401.12345.pdf"
     assert _arxiv_pdf_url(None, "10.48550/arXiv.2301.00001v3") == "https://arxiv.org/pdf/2301.00001.pdf"
     assert _arxiv_pdf_url(None, "10.1000/journal.paper") is None
+
+
+def test_raw_pdf_storage_path_matches_downloader_layout():
+    assert _raw_pdf_storage_relpath_for_arxiv("2401.12345") == Path("pdfs/arxiv/2401/2401.12345.pdf")
+    assert _raw_pdf_storage_relpath_for_arxiv("cond-mat/9704085") == Path(
+        "pdfs/arxiv/cond-mat/9704085.pdf"
+    )
+
+
+def test_read_local_raw_pdf_prefers_manifest_success(tmp_path):
+    store = tmp_path / "raw_store"
+    pdf_path = store / "pdfs" / "arxiv" / "2401" / "2401.12345.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(b"%PDF-1.4\nlocal cache pdf bytes")
+    manifest = store / "manifests" / "raw_pdf_downloads.sqlite3"
+    manifest.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(manifest))
+    conn.execute(
+        """
+        CREATE TABLE raw_pdf_downloads (
+            paper_id TEXT PRIMARY KEY,
+            arxiv_id TEXT,
+            status TEXT,
+            storage_path TEXT,
+            downloaded_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO raw_pdf_downloads VALUES (?, ?, ?, ?, ?, ?)",
+        ("p1", "2401.12345", "success", str(pdf_path), "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"),
+    )
+    conn.commit()
+    conn.close()
+
+    blob, path = read_local_raw_pdf(
+        {"id": "p1", "arxiv_id": "2401.12345"},
+        store_root=store,
+        manifest_path=manifest,
+    )
+
+    assert blob == b"%PDF-1.4\nlocal cache pdf bytes"
+    assert path == pdf_path
+
+
+def test_local_raw_pdf_rejects_non_pdf_manifest_hit(tmp_path):
+    store = tmp_path / "raw_store"
+    bad_path = store / "pdfs" / "arxiv" / "2401" / "2401.12345.pdf"
+    bad_path.parent.mkdir(parents=True)
+    bad_path.write_bytes(b"not a pdf")
+    manifest = store / "manifests" / "raw_pdf_downloads.sqlite3"
+    manifest.parent.mkdir(parents=True)
+    conn = sqlite3.connect(str(manifest))
+    conn.execute(
+        """
+        CREATE TABLE raw_pdf_downloads (
+            paper_id TEXT PRIMARY KEY,
+            arxiv_id TEXT,
+            status TEXT,
+            storage_path TEXT,
+            downloaded_at TEXT,
+            updated_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO raw_pdf_downloads VALUES (?, ?, ?, ?, ?, ?)",
+        ("p1", "2401.12345", "success", str(bad_path), "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"),
+    )
+    conn.commit()
+    conn.close()
+
+    assert _local_raw_pdf_path(
+        {"id": "p1", "arxiv_id": "2401.12345"},
+        store_root=store,
+        manifest_path=manifest,
+    ) is None
 
 
 def test_extract_sections_from_blocks_captures_primary_and_secondary_sections():
@@ -381,6 +464,34 @@ def test_upsert_sections_records_parser_contract_version():
     assert row["parser_name"] == SECTION_PARSER_NAME
     assert SECTION_PARSER_CONTRACT_VERSION in row["section_meta_json"]
     assert "toc_dot_leader" in row["section_meta_json"]
+
+
+def test_upsert_sections_records_local_raw_pdf_delivery():
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    ensure_sections_table(conn)
+
+    upsert_sections(
+        conn,
+        "p1",
+        {
+            "discussion": {
+                "text": "This discussion section carries decision evidence. " * 5,
+                "pages": [2],
+                "n_blocks": 1,
+                "extraction_strategies": ["explicit_heading"],
+            }
+        },
+        "https://arxiv.org/pdf/2401.00001.pdf",
+        source_storage_uri="/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/arxiv/2401/2401.00001.pdf",
+    )
+
+    row = conn.execute(
+        "SELECT section_meta_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    meta = json.loads(row["section_meta_json"])
+    assert meta["source_delivery"] == "local_raw_pdf_cache"
+    assert meta["source_storage_uri"].endswith("2401.00001.pdf")
 
 
 def test_legacy_primary_sections_do_not_block_current_parser_contract():
