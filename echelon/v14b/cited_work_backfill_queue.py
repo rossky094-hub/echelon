@@ -59,6 +59,7 @@ REASON_BOOSTS: tuple[tuple[str, float], ...] = (
 QUEUE_FIELDNAMES = [
     "rank",
     "priority_score",
+    "raw_priority_score",
     "provider",
     "normalized_id",
     "doi",
@@ -72,6 +73,9 @@ QUEUE_FIELDNAMES = [
     "top_citing_papers",
     "top_citing_titles",
     "provider_backfill_strategy",
+    "last_backfill_status",
+    "last_backfill_attempted_at",
+    "backfill_attempt_penalty",
     "claim_scope",
     "evidence_grade",
     "uncertainty_reasons_json",
@@ -96,14 +100,33 @@ class BackfillTarget:
     reasons: set[str] = field(default_factory=set)
     categories: set[str] = field(default_factory=set)
     provider_boost: float = 0.0
+    last_backfill_status: str = ""
+    last_backfill_error: str = ""
+    last_backfill_attempted_at: str = ""
 
-    def priority_score(self) -> float:
+    def raw_priority_score(self) -> float:
         scores = list(self.citing_scores.values())
         max_score = max(scores, default=0.0)
         support = len(scores)
         support_boost = 18.0 * math.sqrt(max(0, support - 1))
         breadth_boost = min(80.0, 0.05 * sum(scores))
         return round(max_score + support_boost + breadth_boost, 4)
+
+    def attempt_penalty(self) -> float:
+        status = self.last_backfill_status
+        error = self.last_backfill_error.lower()
+        if status in {"identity_mismatch"}:
+            return 2200.0
+        if status == "fetch_failed" and "not_found" in error:
+            return 1800.0
+        if status == "fetch_failed":
+            return 450.0
+        if status in {"dry_run_pending_fetch"}:
+            return 0.0
+        return 0.0
+
+    def priority_score(self) -> float:
+        return round(max(0.0, self.raw_priority_score() - self.attempt_penalty()), 4)
 
 
 def utc_now() -> str:
@@ -179,6 +202,31 @@ def _provider_strategy(provider: str) -> str:
         "s2": "Fetch Semantic Scholar paper metadata/references by paperId when available, then rerun exact reference relinking.",
     }
     return strategies.get(provider, "Resolve by exact provider ID, insert locally, then rerun exact reference relinking.")
+
+
+def _load_backfill_attempts(conn: sqlite3.Connection) -> dict[tuple[str, str], dict[str, Any]]:
+    if not table_exists(conn, "cited_work_backfill_attempts"):
+        return {}
+    cols = table_columns(conn, "cited_work_backfill_attempts")
+    required = {"target_provider", "target_norm", "status"}
+    if not required.issubset(cols):
+        return {}
+    error_sql = "error" if "error" in cols else "NULL AS error"
+    attempted_sql = "attempted_at" if "attempted_at" in cols else "NULL AS attempted_at"
+    rows = conn.execute(
+        f"""
+        SELECT target_provider, target_norm, status, {error_sql}, {attempted_sql}
+        FROM cited_work_backfill_attempts
+        """
+    ).fetchall()
+    return {
+        (str(row["target_provider"] or ""), str(row["target_norm"] or "")): {
+            "status": str(row["status"] or ""),
+            "error": str(row["error"] or ""),
+            "attempted_at": str(row["attempted_at"] or ""),
+        }
+        for row in rows
+    }
 
 
 def _merge_seed(seeds: dict[str, SeedPaper], seed: SeedPaper) -> None:
@@ -338,6 +386,7 @@ def collect_targets(
         }
 
     id_maps = build_paper_id_maps(conn_main)
+    attempts = _load_backfill_attempts(conn_main)
     _prepare_seed_temp_table(conn_main, seeds)
     rows = _candidate_reference_rows(conn_main)
     targets: dict[tuple[str, str], BackfillTarget] = {}
@@ -375,6 +424,10 @@ def collect_targets(
                 external_sample=str(candidate.cited_paper_id_external or ""),
                 provider_boost=provider_boost,
             )
+            attempt = attempts.get(key) or {}
+            target.last_backfill_status = str(attempt.get("status") or "")
+            target.last_backfill_error = str(attempt.get("error") or "")
+            target.last_backfill_attempted_at = str(attempt.get("attempted_at") or "")
             targets[key] = target
         target.citing_scores[citing_id] = max(target.citing_scores.get(citing_id, 0.0), score)
         title = str(row["citing_title"] or "")
@@ -394,6 +447,11 @@ def collect_targets(
             if status != "no_local_match"
         },
         "provider_reference_counts": dict(sorted(provider_counts.items())),
+        "attempt_feedback_counts": dict(Counter(
+            str(target.last_backfill_status)
+            for target in targets.values()
+            if target.last_backfill_status
+        )),
     }
     return targets, summary
 
@@ -413,6 +471,7 @@ def rows_from_targets(targets: dict[tuple[str, str], BackfillTarget], *, limit: 
             {
                 "rank": rank,
                 "priority_score": target.priority_score(),
+                "raw_priority_score": target.raw_priority_score(),
                 "provider": target.provider,
                 "normalized_id": target.norm,
                 **provider_cols,
@@ -423,6 +482,9 @@ def rows_from_targets(targets: dict[tuple[str, str], BackfillTarget], *, limit: 
                 "top_citing_papers": ";".join(top_citing_ids),
                 "top_citing_titles": ";".join(_clean_cell(title) for title in top_titles[:8]),
                 "provider_backfill_strategy": _provider_strategy(target.provider),
+                "last_backfill_status": target.last_backfill_status,
+                "last_backfill_attempted_at": target.last_backfill_attempted_at,
+                "backfill_attempt_penalty": target.attempt_penalty(),
                 "claim_scope": "evidence_frontfill_task",
                 "evidence_grade": "missing_local_cited_work",
                 "uncertainty_reasons_json": json.dumps(
@@ -492,19 +554,25 @@ def write_outputs(
         lines.extend(["", "## Excluded Local States", "", "| status | references |", "| --- | ---: |"])
         for status, count in sorted(excluded.items()):
             lines.append(f"| {status} | {int(count):,} |")
+    attempt_feedback = summary.get("attempt_feedback_counts") or {}
+    if attempt_feedback:
+        lines.extend(["", "## Prior Backfill Attempts", "", "| last status | targets still queued |", "| --- | ---: |"])
+        for status, count in sorted(attempt_feedback.items()):
+            lines.append(f"| {status} | {int(count):,} |")
     lines.extend(
         [
             "",
             "## Top Targets",
             "",
-            "| rank | provider | normalized_id | score | citing papers | categories |",
-            "| ---: | --- | --- | ---: | ---: | --- |",
+            "| rank | provider | normalized_id | score | penalty | last status | citing papers | categories |",
+            "| ---: | --- | --- | ---: | ---: | --- | ---: | --- |",
         ]
     )
     for row in rows[:30]:
         lines.append(
             f"| {row['rank']} | {row['provider']} | `{row['normalized_id']}` | "
-            f"{float(row['priority_score']):.2f} | {int(row['citing_paper_count'])} | "
+            f"{float(row['priority_score']):.2f} | {float(row.get('backfill_attempt_penalty') or 0.0):.2f} | "
+            f"{row.get('last_backfill_status') or ''} | {int(row['citing_paper_count'])} | "
             f"{_clean_cell(row['high_value_categories'])} |"
         )
     lines.extend(

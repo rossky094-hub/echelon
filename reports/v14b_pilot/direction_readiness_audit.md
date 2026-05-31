@@ -1,22 +1,23 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-30T23:58:32Z`
+- generated_at: `2026-05-31T00:16:50Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
 
-- linked refs: 445,957 / 3,215,130 (13.9%)
-- reference relink audit: `local_corpus_gap_dominates`; exact-linkable=4; no-local-match=2,769,169
-- cited-work backfill queue: `ready`; targets=2,000; providers={"arxiv": 1, "doi": 899, "openalex": 1057, "s2": 43}
-- OpenAlex W IDs: 35,663 (64.4%)
-- OpenAlex frontfill health: cooling_down_or_stopped [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=0.0)
-- section evidence: 5,414 rows / 3,020 papers
+- linked refs: 449,041 / 3,215,350 (14.0%)
+- reference relink audit: `local_corpus_gap_dominates`; exact-linkable=0; no-local-match=2,766,309
+- cited-work backfill queue: `ready`; targets=2,000; providers={"arxiv": 1, "doi": 902, "openalex": 1054, "s2": 43}
+- cited-work backfill run: `ran`; processed=5; inserted_or_updated=4
+- OpenAlex W IDs: 35,667 (64.4%)
+- OpenAlex frontfill health: stalled_after_cooldown [openalex_backfill_current] (processed=3000/22643, ok=2898, fail=102, cooldown_hours=0.0)
+- section evidence: 5,429 rows / 3,020 papers
 - primary section evidence: 3,020 papers (5.5%)
-- primary section provenance: 1,014 strong/moderate papers; weak-only=66.4%
-- current section parser contract: 257 papers (8.5%)
-- section parser contracts: legacy_unknown_contract:4,831, v14b_section_parser_contract_v3_toc_guard:583
+- primary section provenance: 1,040 strong/moderate papers; weak-only=65.6%
+- current section parser contract: 284 papers (9.4%)
+- section parser contracts: legacy_unknown_contract:4,784, v14b_section_parser_contract_v3_toc_guard:645
 - multi-topic evidence-gap queue: 0 / 31 decision-grade section covered (0.0%); raw primary=6 (19.4%)
-- section frontfill health: running_or_unknown [section_delta] (done=283/8592, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=257, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
+- section frontfill health: running_or_unknown [section_delta] (done=310/8592, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=257, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
 - future candidate edges: 1,000
 - visual future edges: 1,000
 - future directions: 5
@@ -24,13 +25,13 @@
 
 ## Blockers
 
-- **citation_graph_bone** (high): linked refs are 13.9%; branch/main-path claims need uncertainty labels. Reference relink audit: 4 exact-linkable, 2,769,169 no-local-match. Next: Process the high-value cited-work backfill queue, then rerun reference-relink-apply, graph features, and downstream audits.
+- **citation_graph_bone** (high): linked refs are 14.0%; branch/main-path claims need uncertainty labels. Reference relink audit: 0 exact-linkable, 2,766,309 no-local-match. Next: Continue processing the remaining cited-work queue in small exact-ID batches; rerun exact relink and graph features after each applied batch.
 - **section_evidence** (high): primary section evidence covers only 3,020 papers. Next: Finish top12000 section ingest, then run delta section queue for main/future/branch/keystone papers.
-- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 1,014 papers have strong/moderate parser provenance; weak-only rate is 66.4%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
-- **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 257/3,020 papers (8.5%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
+- **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 1,040 papers have strong/moderate parser provenance; weak-only rate is 65.6%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
+- **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 284/3,020 papers (9.4%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
 - **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 0/31 queued benchmark-topic papers (0.0%); raw primary-section coverage is 6/31 (19.4%). Next: After the active top12000 ingest finishes, run make topic-gap-repair to refresh regression gaps, rebuild the topic-gap section queue, ingest targeted papers, and re-audit before promoting Topic Dossier, bottleneck lineage, or Claim Card conclusions.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
-- **openalex_frontfill_health** (medium): OpenAlex frontfill is cooling_down_or_stopped; processed=3000/22643, cooldown_remaining_hours=0.0. Next: Respect the OpenAlex 429 cooldown; resume conservative backfill after cooldown before promoting cross-field/topic claims.
+- **openalex_frontfill_health** (high): OpenAlex frontfill is stalled_after_cooldown; processed=3000/22643, cooldown_remaining_hours=0.0. Next: Restart conservative OpenAlex backfill or run local field-topic repair before cross-corpus or cross-field claims are treated as decision-grade.
 
 ## Latest Fusion Audit
 

@@ -24,6 +24,7 @@ from echelon.v14b.direction_readiness_audit import (
     select_section_frontfill_state,
     table_exists,
 )
+from echelon.v14b.cited_work_backfill import load_cited_work_backfill_run_state
 from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.evidence_grade import (
     claim_scope_policy,
@@ -179,8 +180,13 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
         )
     relink = metrics.get("reference_relink_state") or {}
     cited_work_queue = metrics.get("cited_work_backfill_queue_state") or {}
+    cited_work_run = metrics.get("cited_work_backfill_run_state") or {}
     if relink.get("status") == "local_corpus_gap_dominates":
-        if cited_work_queue.get("available") and int(cited_work_queue.get("queue_rows") or 0):
+        if cited_work_run.get("available") and int(cited_work_run.get("inserted_or_updated") or 0):
+            reasons.append(
+                "cited-work backfill inserted local works, but citation claims stay weak until exact relinking and graph features are rerun"
+            )
+        elif cited_work_queue.get("available") and int(cited_work_queue.get("queue_rows") or 0):
             reasons.append(
                 "reference relink audit shows no-local-match refs dominate; cited-work backfill queue is ready but must be ingested before citation claims strengthen"
             )
@@ -227,6 +233,10 @@ def audit_evidence_bone(metrics: dict[str, Any]) -> dict[str, Any]:
             "cited_work_backfill_queue_status": cited_work_queue.get("status"),
             "cited_work_backfill_queue_rows": cited_work_queue.get("queue_rows"),
             "cited_work_backfill_provider_counts": cited_work_queue.get("provider_counts"),
+            "cited_work_backfill_run_status": cited_work_run.get("status"),
+            "cited_work_backfill_run_processed": cited_work_run.get("processed_targets"),
+            "cited_work_backfill_inserted_or_updated": cited_work_run.get("inserted_or_updated"),
+            "cited_work_backfill_run_status_counts": cited_work_run.get("status_counts"),
             "section_provenance": section_quality,
         },
         "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -2765,6 +2775,9 @@ def collect_value_gates(db_main: Path, db_v14: Path, repo_root: Path, report_dir
     metrics["reference_relink_state"] = select_reference_relink_state(repo_root, report_dir)
     metrics["cited_work_backfill_queue_state"] = load_cited_work_backfill_state(
         repo_root / "data/v14b/cited_work_backfill_queue.csv"
+    )
+    metrics["cited_work_backfill_run_state"] = load_cited_work_backfill_run_state(
+        report_dir / "cited_work_backfill_run.json"
     )
     with sqlite3.connect(str(db_v14)) as conn_v14:
         metrics["vgae_calibration_audit"] = (

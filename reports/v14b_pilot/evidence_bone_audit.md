@@ -1,41 +1,49 @@
 # V14B Evidence Bone Audit
 
-- generated_at: `2026-05-30T23:58:16Z`
+- generated_at: `2026-05-31T00:16:49Z`
 
 ## Reference Linkage
 
-- linked refs: 445,957 / 3,215,130 (13.9%)
-- unlinked refs: 2,769,173
+- linked refs: 449,041 / 3,215,350 (14.0%)
+- unlinked refs: 2,766,309
 
 | unlinked kind | count |
 | --- | ---: |
-| doi_unlinked | 1,412,488 |
-| openalex_unlinked | 1,293,263 |
+| doi_unlinked | 1,410,283 |
+| openalex_unlinked | 1,292,604 |
 | s2_unlinked | 55,806 |
 | arxiv_unlinked | 7,616 |
 
 ### Reference Relink Diagnosis
 
 - status: `local_corpus_gap_dominates`
-- scanned unlinked refs: 2,769,173
-- exact-linkable refs: 4
-- no-local-match refs: 2,769,169
+- scanned unlinked refs: 2,766,309
+- exact-linkable refs: 0
+- no-local-match refs: 2,766,309
 - next action: Prioritize high-value cited-work backfill for missing DOI/OpenAlex/S2/arXiv references; broad relinking has little remaining yield until the cited papers exist locally.
 
 ### Cited Work Backfill Queue
 
 - status: `ready`
 - queued exact provider-ID targets: 2,000
-- provider mix: `{"arxiv": 1, "doi": 899, "openalex": 1057, "s2": 43}`
+- provider mix: `{"arxiv": 1, "doi": 902, "openalex": 1054, "s2": 43}`
 - path: `data/v14b/cited_work_backfill_queue.csv`
+
+### Cited Work Backfill Run
+
+- status: `ran`
+- processed targets: 5
+- inserted/updated local works: 4
+- status counts: `{"fetch_failed": 1, "inserted": 4}`
+- relink updates applied: `3084`
 
 ## Section Evidence
 
-- section rows: 5,414
+- section rows: 5,429
 - section papers: 3,020
 - primary section papers: 3,020
-- current parser-contract primary section papers: 257
-- decision-grade primary section papers: 257
+- current parser-contract primary section papers: 284
+- decision-grade primary section papers: 284
 
 ### High-Value Priority Coverage
 
@@ -62,8 +70,8 @@
 | outcome | papers |
 | --- | ---: |
 | no_target_sections | 4,976 |
-| success_primary | 1,927 |
-| already_has_primary | 407 |
+| success_primary | 1,939 |
+| already_has_primary | 401 |
 | success_secondary_only | 283 |
 | pdf_download_failed | 46 |
 | parse_no_blocks | 1 |
@@ -72,26 +80,26 @@
 
 | event | count |
 | --- | ---: |
-| pdf_graphics_warning | 55,903 |
+| pdf_graphics_warning | 55,916 |
 | download_failure | 22,646 |
 | parser_exception | 3 |
 | timeout | 1 |
 
-- section progress: 283/8592 (logs/v14b/step5s_section_delta.log)
+- section progress: 310/8592 (logs/v14b/step5s_section_delta.log)
 
 ## Frontfill Health
 
 - status: `insufficient_but_running`
 - source: `section_delta`
-- progress: `283/8592`
-- rows / papers / primary papers: `5,414` / `3,020` / `3,020`
+- progress: `310/8592`
+- rows / papers / primary papers: `5,429` / `3,020` / `3,020`
 - candidates since last evidence growth: `0`
 - seconds since last evidence growth: `0`
 - recommendation: Continue section frontfill and keep all bottleneck/Claim Card conclusions scoped until the high-value primary-section budget is met.
 
 ## Recommended Next Actions
 
-- Process the high-value cited-work backfill queue, then rerun reference-relink-apply and graph features.
+- Continue cited-work backfill in small exact-ID batches; rerun exact relink and graph features after each batch.
 - Use DOI refs as exact cited-work backfill targets; avoid fuzzy title matching for citation evidence.
 - Continue OpenAlex W cited-work backfill and rerun exact relink after each successful batch.
 - Normalize arXiv version/category variants, then ingest high-value missing arXiv cited works.

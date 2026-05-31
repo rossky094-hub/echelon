@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-30T23:58:41Z`
+- generated_at: `2026-05-31T00:16:52Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -33,61 +33,68 @@
   "evidence_grade": "very_thin_evidence_bone",
   "issue": "Evidence Bone",
   "metrics": {
+    "cited_work_backfill_inserted_or_updated": 4,
     "cited_work_backfill_provider_counts": {
       "arxiv": 1,
-      "doi": 899,
-      "openalex": 1057,
+      "doi": 902,
+      "openalex": 1054,
       "s2": 43
     },
     "cited_work_backfill_queue_rows": 2000,
     "cited_work_backfill_queue_status": "ready",
-    "linked_ref_rate": 0.13870574440224812,
-    "openalex_frontfill_cooldown_remaining_s": 78,
+    "cited_work_backfill_run_processed": 5,
+    "cited_work_backfill_run_status": "ran",
+    "cited_work_backfill_run_status_counts": {
+      "fetch_failed": 1,
+      "inserted": 4
+    },
+    "linked_ref_rate": 0.13965540298878815,
+    "openalex_frontfill_cooldown_remaining_s": 0,
     "openalex_frontfill_processed": 3000,
-    "openalex_frontfill_status": "cooling_down_or_stopped",
+    "openalex_frontfill_status": "stalled_after_cooldown",
     "openalex_frontfill_total": 22643,
-    "openalex_w_rate": 0.6438410572114603,
+    "openalex_w_rate": 0.6438667749796914,
     "primary_section_papers": 3020,
-    "reference_relink_exact_linkable_refs": 4,
-    "reference_relink_no_local_match_refs": 2769169,
+    "reference_relink_exact_linkable_refs": 0,
+    "reference_relink_no_local_match_refs": 2766309,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 283,
+    "section_frontfill_done": 310,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 283,
+    "section_frontfill_progress_done": 310,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8592,
     "section_provenance": {
-      "current_contract_papers": 257,
-      "current_contract_rate": 0.08509933774834437,
-      "decision_grade_papers": 257,
-      "decision_grade_rate": 0.08509933774834437,
+      "current_contract_papers": 284,
+      "current_contract_rate": 0.09403973509933775,
+      "decision_grade_papers": 284,
+      "decision_grade_rate": 0.09403973509933775,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1014,
-        "weak": 2006
+        "strong": 1040,
+        "weak": 1980
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4831,
-        "v14b_section_parser_contract_v3_toc_guard": 583
+        "legacy_unknown_contract": 4784,
+        "v14b_section_parser_contract_v3_toc_guard": 645
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4831,
-        "v14b_section_ingest_v3": 583
+        "v14b_section_ingest_v2": 4784,
+        "v14b_section_ingest_v3": 645
       },
       "primary_section_papers": 3020,
-      "primary_section_rows": 5414,
+      "primary_section_rows": 5429,
       "strategy_counts": {
-        "embedded_heading": 44,
-        "explicit_heading": 1405,
-        "heading_continuation": 1893,
-        "inline_heading": 618,
-        "legacy_unknown_strategy": 3467,
+        "embedded_heading": 45,
+        "explicit_heading": 1460,
+        "heading_continuation": 1952,
+        "inline_heading": 627,
+        "legacy_unknown_strategy": 3421,
         "loose_inline_heading": 31,
-        "parser_hint": 31
+        "parser_hint": 34
       },
-      "strong_or_moderate_papers": 1014,
-      "weak_only_papers": 2006,
-      "weak_only_rate": 0.6642384105960265
+      "strong_or_moderate_papers": 1040,
+      "weak_only_papers": 1980,
+      "weak_only_rate": 0.6556291390728477
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -96,8 +103,8 @@
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
-    "OpenAlex frontfill cooling_down_or_stopped; field/topic claims need local fallback and uncertainty",
-    "reference relink audit shows no-local-match refs dominate; cited-work backfill queue is ready but must be ingested before citation claims strengthen",
+    "OpenAlex frontfill stalled_after_cooldown; field/topic claims need local fallback and uncertainty",
+    "cited-work backfill inserted local works, but citation claims stay weak until exact relinking and graph features are rerun",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]
 }

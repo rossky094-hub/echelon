@@ -20,6 +20,7 @@ from echelon.v14b.evidence_contracts import (
     SECTION_PARSER_CONTRACT_VERSION,
     section_strategy_quality,
 )
+from echelon.v14b.cited_work_backfill import load_cited_work_backfill_run_state
 from echelon.v14b.cited_work_backfill_queue import load_cited_work_backfill_state
 from echelon.v14b.future_candidate_lifecycle import run_audit as run_lifecycle_audit
 
@@ -761,15 +762,28 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 f"{int(relink.get('no_local_match_refs') or 0):,} no-local-match."
             )
             next_action = str(relink.get("next_action") or next_action)
+            cited_work_run = m.get("cited_work_backfill_run_state") or {}
             if (
                 relink.get("status") == "local_corpus_gap_dominates"
                 and cited_work_queue.get("available")
                 and int(cited_work_queue.get("queue_rows") or 0)
             ):
-                next_action = (
-                    "Process the high-value cited-work backfill queue, then rerun reference-relink-apply, "
-                    "graph features, and downstream audits."
-                )
+                if cited_work_run.get("available") and int(cited_work_run.get("inserted_or_updated") or 0):
+                    if int(cited_work_run.get("relink_updates_applied") or 0):
+                        next_action = (
+                            "Continue processing the remaining cited-work queue in small exact-ID batches; "
+                            "rerun exact relink and graph features after each applied batch."
+                        )
+                    else:
+                        next_action = (
+                            "Rerun reference-relink-apply, graph features, and downstream audits after the cited-work "
+                            "backfill run; continue processing the remaining queue in small exact-ID batches."
+                        )
+                else:
+                    next_action = (
+                        "Process the high-value cited-work backfill queue, then rerun reference-relink-apply, "
+                        "graph features, and downstream audits."
+                    )
         blockers.append(
             {
                 "gate": "citation_graph_bone",
@@ -1048,6 +1062,15 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             if (metrics.get("cited_work_backfill_queue_state") or {}).get("available")
             else []
         ),
+        *(
+            [
+                f"- cited-work backfill run: `{(metrics.get('cited_work_backfill_run_state') or {}).get('status')}`; "
+                f"processed={(int((metrics.get('cited_work_backfill_run_state') or {}).get('processed_targets') or 0)):,}; "
+                f"inserted_or_updated={(int((metrics.get('cited_work_backfill_run_state') or {}).get('inserted_or_updated') or 0)):,}"
+            ]
+            if (metrics.get("cited_work_backfill_run_state") or {}).get("available")
+            else []
+        ),
         f"- OpenAlex W IDs: {metrics['openalex_w']:,} ({pct(metrics['openalex_w_rate'])})",
         *openalex_frontfill_line,
         f"- section evidence: {metrics['section_rows']:,} rows / {metrics['section_papers']:,} papers",
@@ -1133,6 +1156,9 @@ def run_audit(
     metrics["reference_relink_state"] = select_reference_relink_state(Path("."), out_dir)
     metrics["cited_work_backfill_queue_state"] = load_cited_work_backfill_state(
         Path("data/v14b/cited_work_backfill_queue.csv")
+    )
+    metrics["cited_work_backfill_run_state"] = load_cited_work_backfill_run_state(
+        out_dir / "cited_work_backfill_run.json"
     )
     blockers = classify_blockers(metrics)
     level = readiness_level(metrics, blockers)
