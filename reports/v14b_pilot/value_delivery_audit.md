@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T05:17:00Z`
+- generated_at: `2026-05-31T05:36:29Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -148,8 +148,8 @@
     "local_fix->new_constraint"
   ],
   "status": "pass",
-  "triples": 22196,
-  "triples_with_page": 21312
+  "triples": 22268,
+  "triples_with_page": 21384
 }
 ```
 
@@ -637,11 +637,10 @@
   "topic_gap_queue_papers": 38,
   "topic_gap_section_triage_available": true,
   "topic_gap_section_triage_failure_modes": {
-    "decision_grade_current_contract": 11,
-    "lineage_chains_missing_after_atoms": 7,
-    "lineage_full_chain_missing": 5,
-    "no_target_sections_after_current_parser": 22,
-    "unattempted_pdf_available": 2
+    "decision_grade_current_contract": 14,
+    "lineage_chains_missing_after_atoms": 1,
+    "lineage_full_chain_missing": 1,
+    "no_target_sections_after_current_parser": 22
   },
   "topic_gap_section_triage_status": "fail"
 }

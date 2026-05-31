@@ -152,6 +152,7 @@ TOC_NUMBERED_ENTRY_RE = re.compile(
 
 SECTION_INGEST_OUTCOMES = {
     "already_has_primary",
+    "no_local_raw_pdf",
     "no_pdf_url",
     "pdf_download_failed",
     "parse_timeout",
@@ -311,13 +312,16 @@ def _parser_contract_digest() -> str:
     return hashlib.sha256(SECTION_PARSER_CONTRACT_VERSION.encode("utf-8")).hexdigest()[:8]
 
 
-def _checkpoint_step_name(candidate_file: Path | None) -> tuple[str, str]:
+def _checkpoint_step_name(candidate_file: Path | None, mode_key: str = "") -> tuple[str, str]:
     """Use separate checkpoints for queue content and parser evidence contract."""
     digest = _candidate_file_digest(candidate_file)
     contract_digest = _parser_contract_digest()
+    mode_suffix = ""
+    if mode_key:
+        mode_suffix = "_" + re.sub(r"[^A-Za-z0-9._-]+", "_", mode_key.strip()).strip("._")
     if candidate_file:
-        return f"step5s_section_ingest_delta_{digest}_{contract_digest}", digest
-    return f"step5s_section_ingest_{contract_digest}", digest
+        return f"step5s_section_ingest_delta_{digest}_{contract_digest}{mode_suffix}", digest
+    return f"step5s_section_ingest_{contract_digest}{mode_suffix}", digest
 
 
 def _arxiv_pdf_url(arxiv_id: Optional[str], doi: Optional[str]) -> Optional[str]:
@@ -1078,8 +1082,10 @@ def _local_raw_pdf_path(
     *,
     store_root: Path | None = RAW_PDF_STORE_ROOT,
     manifest_path: Path | None = RAW_PDF_MANIFEST,
+    prefer_local_raw_pdf: bool | None = None,
 ) -> Path | None:
-    if not (SECTION_INGEST_PREFER_LOCAL_RAW_PDF and store_root):
+    prefer = SECTION_INGEST_PREFER_LOCAL_RAW_PDF if prefer_local_raw_pdf is None else prefer_local_raw_pdf
+    if not (prefer and store_root):
         return None
     candidates: list[Path] = []
     manifest_hit = _manifest_pdf_path(paper, store_root=store_root, manifest_path=manifest_path)
@@ -1104,8 +1110,14 @@ def read_local_raw_pdf(
     *,
     store_root: Path | None = RAW_PDF_STORE_ROOT,
     manifest_path: Path | None = RAW_PDF_MANIFEST,
+    prefer_local_raw_pdf: bool | None = None,
 ) -> tuple[bytes | None, Path | None]:
-    path = _local_raw_pdf_path(paper, store_root=store_root, manifest_path=manifest_path)
+    path = _local_raw_pdf_path(
+        paper,
+        store_root=store_root,
+        manifest_path=manifest_path,
+        prefer_local_raw_pdf=prefer_local_raw_pdf,
+    )
     if not path:
         return None, None
     try:
@@ -1184,8 +1196,22 @@ def run_section_ingest(
     resume: bool = True,
     corpus_id: str | None = None,
     candidate_file: Path | None = None,
+    raw_pdf_store_root: Path | None = RAW_PDF_STORE_ROOT,
+    raw_pdf_manifest: Path | None = RAW_PDF_MANIFEST,
+    prefer_local_raw_pdf: bool = SECTION_INGEST_PREFER_LOCAL_RAW_PDF,
+    local_raw_pdf_only: bool = False,
+    refresh_local_raw_pdf: bool = False,
 ) -> dict:
-    step_name, candidate_digest = _checkpoint_step_name(candidate_file)
+    checkpoint_mode = (
+        "local_raw_pdf_only_refresh"
+        if local_raw_pdf_only and refresh_local_raw_pdf
+        else "local_raw_pdf_only"
+        if local_raw_pdf_only
+        else "local_raw_pdf_refresh"
+        if refresh_local_raw_pdf
+        else ""
+    )
+    step_name, candidate_digest = _checkpoint_step_name(candidate_file, checkpoint_mode)
     ck = Checkpoint(step_name)
     if resume and ck.done():
         data = ck.load()
@@ -1240,6 +1266,7 @@ def run_section_ingest(
     parsed_papers = 0
     skipped_existing = 0
     skipped_no_pdf = 0
+    skipped_no_local_raw_pdf = 0
     failed_parse = 0
     local_cache_hits = 0
     network_pdf_fetches = 0
@@ -1253,7 +1280,14 @@ def run_section_ingest(
             for paper in pbar:
                 pid = paper["id"]
                 has_any_primary = _has_primary_sections(conn_main, pid)
-                if _has_current_primary_sections(conn_main, pid):
+                has_current_primary = _has_current_primary_sections(conn_main, pid)
+                blob, local_pdf_path = read_local_raw_pdf(
+                    paper,
+                    store_root=raw_pdf_store_root,
+                    manifest_path=raw_pdf_manifest,
+                    prefer_local_raw_pdf=prefer_local_raw_pdf,
+                )
+                if has_current_primary and not (refresh_local_raw_pdf and local_pdf_path):
                     skipped_existing += 1
                     primary_hit += 1
                     record_ingest_attempt(
@@ -1261,17 +1295,33 @@ def run_section_ingest(
                         paper_id=pid,
                         outcome="already_has_primary",
                         run_id=run_id,
+                        detail=(
+                            "Current primary section exists; local raw PDF refresh disabled."
+                            if local_pdf_path
+                            else ""
+                        ),
                         primary_sections=1,
                         candidate_file=candidate_file,
                     )
                     conn_main.commit()
                     continue
 
-                blob, local_pdf_path = read_local_raw_pdf(paper)
                 pdf_url = _arxiv_pdf_url(paper.get("arxiv_id"), paper.get("doi"))
                 if blob and local_pdf_path:
                     local_cache_hits += 1
                     pdf_url = pdf_url or f"file://{local_pdf_path}"
+                elif local_raw_pdf_only:
+                    skipped_no_local_raw_pdf += 1
+                    record_ingest_attempt(
+                        conn_main,
+                        paper_id=pid,
+                        outcome="no_local_raw_pdf",
+                        run_id=run_id,
+                        detail="Local raw PDF only mode is enabled and no reusable cache hit was found.",
+                        candidate_file=candidate_file,
+                    )
+                    conn_main.commit()
+                    continue
                 else:
                     pdf_url = resolve_pdf_url(client, paper)
                 if not pdf_url:
@@ -1423,9 +1473,14 @@ def run_section_ingest(
         "primary_section_coverage": coverage,
         "skipped_existing": skipped_existing,
         "skipped_no_pdf": skipped_no_pdf,
+        "skipped_no_local_raw_pdf": skipped_no_local_raw_pdf,
         "failed_parse": failed_parse,
         "local_raw_pdf_cache_hits": local_cache_hits,
         "network_pdf_fetches": network_pdf_fetches,
+        "local_raw_pdf_only": bool(local_raw_pdf_only),
+        "refresh_local_raw_pdf": bool(refresh_local_raw_pdf),
+        "raw_pdf_store_root": str(raw_pdf_store_root or ""),
+        "raw_pdf_manifest": str(raw_pdf_manifest or ""),
         "section_counter": section_counter,
         "claim_supporting_sections_enabled": list(PRIMARY_SECTION_NAMES),
         "candidate_file": str(candidate_file) if candidate_file else None,
@@ -1459,6 +1514,41 @@ def main(argv=None) -> None:
             "or one paper id per line; used for delta evidence queues."
         ),
     )
+    parser.add_argument(
+        "--raw-pdf-store-root",
+        type=Path,
+        default=RAW_PDF_STORE_ROOT,
+        help="Local/external raw PDF store root used before network fetch.",
+    )
+    parser.add_argument(
+        "--raw-pdf-manifest",
+        type=Path,
+        default=RAW_PDF_MANIFEST,
+        help="SQLite manifest for the local/external raw PDF store.",
+    )
+    parser.add_argument(
+        "--prefer-local-raw-pdf",
+        dest="prefer_local_raw_pdf",
+        action="store_true",
+        default=SECTION_INGEST_PREFER_LOCAL_RAW_PDF,
+        help="Prefer local raw PDF cache before resolving network PDF URLs.",
+    )
+    parser.add_argument(
+        "--no-prefer-local-raw-pdf",
+        dest="prefer_local_raw_pdf",
+        action="store_false",
+        help="Disable local raw PDF cache lookup for this run.",
+    )
+    parser.add_argument(
+        "--local-raw-pdf-only",
+        action="store_true",
+        help="Only parse papers that have a local raw PDF cache hit; do not fetch network PDFs.",
+    )
+    parser.add_argument(
+        "--refresh-local-raw-pdf",
+        action="store_true",
+        help="Reparse current-contract papers when a local raw PDF exists so source_storage_uri is materialized.",
+    )
     args = parser.parse_args(argv)
 
     log_level = getattr(logging, args.log_level)
@@ -1471,6 +1561,11 @@ def main(argv=None) -> None:
         resume=args.resume,
         corpus_id=args.corpus_id,
         candidate_file=args.candidate_file,
+        raw_pdf_store_root=Path(args.raw_pdf_store_root).expanduser() if args.raw_pdf_store_root else None,
+        raw_pdf_manifest=Path(args.raw_pdf_manifest).expanduser() if args.raw_pdf_manifest else None,
+        prefer_local_raw_pdf=bool(args.prefer_local_raw_pdf),
+        local_raw_pdf_only=bool(args.local_raw_pdf_only),
+        refresh_local_raw_pdf=bool(args.refresh_local_raw_pdf),
     )
 
 

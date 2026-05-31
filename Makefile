@@ -309,6 +309,8 @@ section-evidence:
 		--db $(DB_MAIN) \
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_SECTION_INGEST_TOP_N:-1200} \
+		--raw-pdf-store-root "$${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data}" \
+		--raw-pdf-manifest "$${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3}" \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
@@ -320,6 +322,8 @@ section-evidence-delta:
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_SECTION_DELTA_TOP_N:-12000} \
 		--candidate-file $${V14B_SECTION_DELTA_QUEUE:-data/v14b/section_delta_queue.csv} \
+		--raw-pdf-store-root "$${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data}" \
+		--raw-pdf-manifest "$${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3}" \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
@@ -331,6 +335,23 @@ section-evidence-topic-gaps:
 		--db-v14 $(DB_V14) \
 		--top-n $${V14B_TOPIC_GAP_SECTION_TOP_N:-1000} \
 		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-reports/v14b_pilot/multi_topic_evidence_gap_queue.csv} \
+		--raw-pdf-store-root "$${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data}" \
+		--raw-pdf-manifest "$${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3}" \
+		$(CORPUS_ARG) \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Step 5s-topic-gaps-local: 只消费外接盘/本地 raw PDF, 不触发网络下载
+section-evidence-topic-gaps-local:
+	@echo ">>> Step 5s: Topic evidence-gap local raw PDF ingestion..."
+	$(PYTHON) -m echelon.v14b.step5s_section_ingest \
+		--db $(DB_MAIN) \
+		--db-v14 $(DB_V14) \
+		--top-n $${V14B_TOPIC_GAP_SECTION_TOP_N:-1000} \
+		--candidate-file $${V14B_TOPIC_GAP_SECTION_QUEUE:-reports/v14b_pilot/multi_topic_evidence_gap_queue.csv} \
+		--raw-pdf-store-root "$${V14B_RAW_PDF_STORE_ROOT:-/Volumes/LaCie/Echelon_Paper_Raw_Data}" \
+		--raw-pdf-manifest "$${V14B_RAW_PDF_MANIFEST:-/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3}" \
+		--local-raw-pdf-only \
+		--refresh-local-raw-pdf \
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 

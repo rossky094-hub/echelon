@@ -218,7 +218,10 @@ def _latest_attempts(conn: sqlite3.Connection, paper_ids: list[str]) -> dict[str
                 SELECT {', '.join(select)},
                        ROW_NUMBER() OVER (
                            PARTITION BY paper_id
-                           ORDER BY attempt_ts DESC, attempt_id DESC
+                           ORDER BY
+                               CASE WHEN outcome = 'no_local_raw_pdf' THEN 1 ELSE 0 END,
+                               attempt_ts DESC,
+                               attempt_id DESC
                        ) AS rn
                 FROM section_ingest_attempts
                 WHERE paper_id IN ({ph})

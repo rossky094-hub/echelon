@@ -181,6 +181,48 @@ def test_topic_gap_section_audit_classifies_repair_buckets(tmp_path):
     assert (out_dir / "topic_gap_section_evidence_audit.csv").exists()
 
 
+def test_topic_gap_section_audit_ignores_local_cache_miss_when_parser_attempt_exists(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    queue = tmp_path / "topic_gap.csv"
+    out_dir = tmp_path / "reports"
+    _make_main(db)
+    _write_queue(queue)
+
+    conn = sqlite3.connect(str(db))
+    conn.execute(
+        """
+        INSERT INTO section_ingest_attempts
+            (paper_id, attempt_ts, outcome, source_url, detail, inserted_sections,
+             primary_sections, candidate_file, parser_name, parser_contract_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p_notarget",
+            "2026-05-31T01:00:00Z",
+            "no_local_raw_pdf",
+            "",
+            "Local raw PDF only mode is enabled and no reusable cache hit was found.",
+            0,
+            0,
+            "reports/v14b_pilot/multi_topic_evidence_gap_queue.csv",
+            "v14b_section_ingest_v3",
+            SECTION_PARSER_CONTRACT_VERSION,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    result = run_topic_gap_section_evidence_audit(
+        db_main=db,
+        topic_gap_queue=queue,
+        out_dir=out_dir,
+    )
+
+    row = next(item for item in result["rows"] if item["paper_id"] == "p_notarget")
+    assert row["latest_attempt_outcome"] == "no_target_sections"
+    assert row["failure_mode"] == "no_target_sections_after_current_parser"
+
+
 def test_topic_gap_section_audit_triages_lineage_atom_chain_blockers(tmp_path):
     db = tmp_path / "main.sqlite3"
     queue = tmp_path / "multi_topic_evidence_gap_queue.csv"

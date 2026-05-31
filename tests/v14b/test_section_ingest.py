@@ -21,6 +21,7 @@ from echelon.v14b.step5s_section_ingest import (
     record_ingest_attempt,
     read_local_raw_pdf,
     read_candidate_file,
+    run_section_ingest,
     upsert_sections,
 )
 
@@ -80,6 +81,23 @@ def test_read_local_raw_pdf_prefers_manifest_success(tmp_path):
 
     assert blob == b"%PDF-1.4\nlocal cache pdf bytes"
     assert path == pdf_path
+
+
+def test_read_local_raw_pdf_can_be_disabled_for_network_control(tmp_path):
+    store = tmp_path / "raw_store"
+    pdf_path = store / "pdfs" / "arxiv" / "2401" / "2401.12345.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(b"%PDF-1.4\nlocal cache pdf bytes")
+
+    blob, path = read_local_raw_pdf(
+        {"id": "p1", "arxiv_id": "2401.12345"},
+        store_root=store,
+        manifest_path=None,
+        prefer_local_raw_pdf=False,
+    )
+
+    assert blob is None
+    assert path is None
 
 
 def test_read_local_raw_pdf_matches_manifest_by_doi_when_paper_id_differs(tmp_path):
@@ -747,6 +765,18 @@ def test_checkpoint_name_changes_with_parser_contract_version(tmp_path):
     assert _parser_contract_digest() in step_name
 
 
+def test_checkpoint_name_separates_local_raw_pdf_refresh_mode(tmp_path):
+    queue = tmp_path / "section_delta_queue.csv"
+    queue.write_text("paper_id\np1\n", encoding="utf-8")
+
+    normal_name, digest = _checkpoint_step_name(queue)
+    local_name, local_digest = _checkpoint_step_name(queue, "local_raw_pdf_only_refresh")
+
+    assert digest == local_digest
+    assert normal_name != local_name
+    assert local_name.endswith("_local_raw_pdf_only_refresh")
+
+
 def test_section_ingest_records_attempt_outcomes(tmp_path):
     db = tmp_path / "main.sqlite3"
     conn = sqlite3.connect(str(db))
@@ -778,3 +808,137 @@ def test_section_ingest_records_attempt_outcomes(tmp_path):
         "parsed but no target section",
         SECTION_PARSER_CONTRACT_VERSION,
     )
+
+
+def test_run_section_ingest_refreshes_current_sections_from_local_raw_pdf(tmp_path, monkeypatch):
+    import echelon.v14b.config as config
+    import echelon.v14b.step5s_section_ingest as mod
+
+    monkeypatch.setattr(config, "CHECKPOINT_DIR", tmp_path / "checkpoints")
+    monkeypatch.setattr(
+        mod,
+        "parse_pdf_pages_with_timeout",
+        lambda _path: [
+            _Block(
+                "1 Results\n"
+                + "Local raw cache evidence gives traceable result-section provenance. " * 8,
+                page_no=3,
+            )
+        ],
+    )
+
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = tmp_path / "v14.sqlite3"
+    store = tmp_path / "raw_store"
+    pdf_path = store / "pdfs" / "arxiv" / "2401" / "2401.12345.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(b"%PDF-1.4\nlocal cache pdf bytes")
+    manifest = store / "manifests" / "raw_pdf_downloads.sqlite3"
+    manifest.parent.mkdir(parents=True)
+
+    conn_manifest = sqlite3.connect(str(manifest))
+    conn_manifest.execute(
+        """
+        CREATE TABLE raw_pdf_downloads (
+            paper_id TEXT PRIMARY KEY,
+            arxiv_id TEXT,
+            status TEXT,
+            storage_path TEXT,
+            downloaded_at TEXT
+        )
+        """
+    )
+    conn_manifest.execute(
+        "INSERT INTO raw_pdf_downloads VALUES (?, ?, ?, ?, ?)",
+        ("p1", "2401.12345", "success", str(pdf_path), "2026-01-01T00:00:00Z"),
+    )
+    conn_manifest.commit()
+    conn_manifest.close()
+
+    conn = sqlite3.connect(str(db_main))
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            arxiv_id TEXT,
+            doi TEXT,
+            s2_paper_id TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?)",
+        ("p1", "Local cache paper", "2401.12345", "", ""),
+    )
+    ensure_sections_table(conn)
+    conn.execute(
+        """
+        INSERT INTO paper_sections
+            (paper_id, section_name, section_text, source_type, parser_name, source_url,
+             section_pages_json, section_meta_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p1",
+            "results",
+            "Short current result evidence. " * 6,
+            "arxiv_pdf",
+            SECTION_PARSER_NAME,
+            "https://arxiv.org/pdf/2401.12345.pdf",
+            "[2]",
+            json.dumps(
+                {
+                    "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                    "extraction_strategies": ["explicit_heading"],
+                    "source_delivery": "network_pdf_fetch",
+                }
+            ),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    queue = tmp_path / "queue.csv"
+    queue.write_text("paper_id\np1\n", encoding="utf-8")
+
+    stats = run_section_ingest(
+        db_main=db_main,
+        db_v14=db_v14,
+        top_n=1,
+        limit=1,
+        resume=False,
+        candidate_file=queue,
+        raw_pdf_store_root=store,
+        raw_pdf_manifest=manifest,
+        local_raw_pdf_only=True,
+        refresh_local_raw_pdf=True,
+    )
+
+    conn = sqlite3.connect(str(db_main))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT section_text, section_pages_json, section_meta_json FROM paper_sections WHERE paper_id='p1'"
+    ).fetchone()
+    attempt = conn.execute(
+        """
+        SELECT outcome, detail
+        FROM section_ingest_attempts
+        WHERE paper_id='p1'
+        ORDER BY attempt_id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    conn.close()
+
+    meta = json.loads(row["section_meta_json"])
+    assert stats["local_raw_pdf_cache_hits"] == 1
+    assert stats["network_pdf_fetches"] == 0
+    assert stats["refresh_local_raw_pdf"] is True
+    assert row["section_text"].startswith("Local raw cache evidence")
+    assert row["section_pages_json"] == "[3]"
+    assert meta["source_delivery"] == "local_raw_pdf_cache"
+    assert meta["source_storage_uri"] == str(pdf_path)
+    assert attempt["outcome"] == "success_primary"
+    assert "PDF bytes loaded from raw cache" in attempt["detail"]

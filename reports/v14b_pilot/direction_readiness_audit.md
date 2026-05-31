@@ -1,6 +1,6 @@
 # Direction Readiness Audit
 
-- generated_at: `2026-05-31T05:19:30Z`
+- generated_at: `2026-05-31T05:36:29Z`
 - readiness_level: `actionable_but_not_high_confidence`
 
 ## Metrics
@@ -20,7 +20,7 @@
 - topic-gap section triage: `fail`; current-parser no-target=22; stale-contract=0; unattempted-PDF=0
 - topic-gap no-target inspection: `pass`; parser-target-signal=0; subthreshold-target-signal=2; sectionless/non-target-heading=11
 - section frontfill health: running_or_unknown [section_delta] (done=270/8373, no_evidence_delta=0, no_evidence_hours=0.0, current_contract_primary=468, contract_status=running_or_unknown, no_current_contract_delta=0, no_current_contract_hours=0.0)
-- raw PDF store: `warn`; success=2,489; probable_pdf_rate=100.0%; section_cache_papers=0; topic_gap_local_pdf=7/38
+- raw PDF store: `pass`; success=2,586; probable_pdf_rate=100.0%; section_cache_papers=2; topic_gap_local_pdf=7/38
 - topic-gap raw PDF parser dry run: `warn`; local=7; primary-ready=2; repair-ready=0; no-target=5; parser-exception=0; no-target-shapes=heading_like_but_not_target_section:3, sectionless_or_non_target_heading_format:2; actions=heading_taxonomy_review:3, already_covered_parser_control:2, weak_fulltext_or_metadata_only:2
 - future candidate edges: 1,000
 - visual future edges: 1,000
@@ -34,7 +34,6 @@
 - **section_evidence_provenance** (medium): primary section evidence quality is still fragile: 1,219 papers have strong/moderate parser provenance; weak-only rate is 59.7%. Next: Use explicit/embedded heading evidence for bottleneck and Claim Card promotion; keep loose/legacy section matches as weak evidence until manually audited or re-parsed.
 - **section_parser_contract_coverage** (medium): primary section evidence has current parser-contract coverage for only 468/3,025 papers (15.5%); legacy parser-contract sections may predate TOC/fragment guards. Next: Re-run section evidence with the current parser contract before promoting section-derived bottleneck, Topic Dossier, or Claim Card claims.
 - **multi_topic_evidence_gap** (high): multi-topic regression still has decision-grade section evidence for only 16/38 queued benchmark-topic papers (42.1%); raw primary-section coverage is 16/38 (42.1%). Triage: current-parser no-target=22, stale-contract=0, unattempted-PDF=0. Typed-chain triage: atoms-missing=0, chains-missing=1, full-chain-missing=1, topic-mismatch=0. No-target inspection: parser-target-signal=0, subthreshold-target-signal=2, sectionless/non-target-heading=11. Next: Do not loosen the current parser for the no-target bucket; keep those papers as weak full-text or metadata evidence and focus repair effort on stale-contract reparse and unattempted PDFs.
-- **raw_pdf_cache_reuse** (medium): external raw PDF cache has 2,489 successful PDFs, but section evidence has not yet consumed local-cache PDFs. Topic-gap queue local PDF availability is 7/38. Local topic-gap parser dry run: primary-ready=2, repair-ready=0, no-target=5, parser-exception=0. No-target shapes: target-signal=0, subthreshold=0, sectionless=2, heading-like=3, no-heading=0. Actions: heading-taxonomy=3, weak-fulltext=2, ingest-candidate=0. Next: At the next safe section-ingest boundary, start Step5s with V14B_RAW_PDF_STORE_ROOT, V14B_RAW_PDF_MANIFEST, and V14B_SECTION_INGEST_PREFER_LOCAL_RAW_PDF=true.
 - **openalex_topic_coverage** (medium): OpenAlex W coverage is 64.4%; cross-field claims need uncertainty. Next: Keep conservative OpenAlex backfill; use local field/topic fallback while labeling uncertainty.
 - **openalex_frontfill_health** (high): OpenAlex frontfill is stalled_after_cooldown; processed=3000/22643, cooldown_remaining_hours=0.0. Next: Restart conservative OpenAlex backfill or run local field-topic repair before cross-corpus or cross-field claims are treated as decision-grade.
 
@@ -42,7 +41,7 @@
 
 ```json
 {
-  "run_id": "20260531T051625Z",
+  "run_id": "20260531T053224Z",
   "terminals_considered": 50,
   "candidate_edges_used": 500,
   "future_candidate_edges_total": 1000,
@@ -52,7 +51,7 @@
   "fusion_directions": 5,
   "adequacy_label": "limited_but_usable_with_uncertainty",
   "remaining_risk": "If Step5b/Step5c evidence remains sparse, Step6 should output few or zero directions. Do not lower thresholds blindly; improve branch-lineage, candidate generation, limitation section evidence, and calibration first.",
-  "created_at": "2026-05-31 05:16:25",
+  "created_at": "2026-05-31 05:32:24",
   "limitation_quality_distribution": {
     "section_level": 50
   },
