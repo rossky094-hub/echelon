@@ -699,6 +699,42 @@ def load_resolution_rows(conn_v14: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def load_section_atom_chains(
+    conn_main: sqlite3.Connection,
+    *,
+    corpus_id: str | None = None,
+) -> list[dict]:
+    if not table_exists(conn_main, "section_atom_chains"):
+        return []
+    scope_sql = (
+        "WHERE c.paper_id IN (SELECT paper_id FROM temp.v14b_corpus_papers)"
+        if corpus_id
+        else ""
+    )
+    rows = conn_main.execute(
+        f"""
+        SELECT
+            c.*,
+            COALESCE(p.title, '') AS paper_title,
+            COALESCE(p.publication_year, 0) AS publication_year,
+            COALESCE(p.primary_field_id, '') AS primary_field_id
+        FROM section_atom_chains c
+        LEFT JOIN papers p ON p.id = c.paper_id
+        {scope_sql}
+        ORDER BY c.paper_id, c.section_key, c.chain_index
+        """
+    ).fetchall()
+    out: list[dict] = []
+    for row in rows:
+        chain = dict(row)
+        chain["relation_edges"] = _safe_json_loads(chain.get("relation_edges_json") or "[]", [])
+        chain["missing_stages"] = _safe_json_loads(chain.get("missing_stages_json") or "[]", [])
+        chain["uncertainty_reasons"] = _safe_json_loads(chain.get("uncertainty_reasons_json") or "[]", [])
+        chain["evidence_objects"] = _safe_json_loads(chain.get("evidence_objects_json") or "[]", [])
+        out.append(chain)
+    return out
+
+
 def load_vgae_calibration_audit(conn_v14: sqlite3.Connection) -> dict:
     if not table_exists(conn_v14, "vgae_calibration_audit"):
         return {}
@@ -1281,6 +1317,7 @@ def build_bottleneck_lineage_triples(
     resolution_rows: list[dict],
     section_pages: dict[tuple[str, str], list[int]],
     future_directions: list[dict],
+    section_atom_chains: list[dict] | None = None,
 ) -> list[dict]:
     direction_by_paper: dict[str, list[dict]] = defaultdict(list)
     direction_tokens: dict[int, set[str]] = {}
@@ -1297,6 +1334,16 @@ def build_bottleneck_lineage_triples(
             t for t in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", (d.get("direction_name") or "").lower())
         }
 
+    triples: list[dict] = []
+    if section_atom_chains:
+        triples.extend(
+            build_section_atom_chain_lineage_triples(
+                section_atom_chains=section_atom_chains,
+                direction_by_paper=direction_by_paper,
+                direction_tokens=direction_tokens,
+            )
+        )
+
     resolution_by_atom: dict[int, list[dict]] = defaultdict(list)
     for r in resolution_rows:
         resolution_by_atom[int(r.get("atom_id") or 0)].append(r)
@@ -1309,7 +1356,6 @@ def build_bottleneck_lineage_triples(
     for kw in keyword_future_atoms:
         keyword_future_atoms[kw].sort(key=lambda x: int(x.get("publication_year") or 0))
 
-    triples: list[dict] = []
     for atom in atoms:
         atom_id = int(atom.get("atom_id") or 0)
         desc = str(atom.get("description") or "").strip()
@@ -1496,6 +1542,197 @@ def build_bottleneck_lineage_triples(
             "local_fix_reveals_new_constraint",
         )
     return triples
+
+
+def build_section_atom_chain_lineage_triples(
+    *,
+    section_atom_chains: list[dict],
+    direction_by_paper: dict[str, list[dict]],
+    direction_tokens: dict[int, set[str]],
+) -> list[dict]:
+    triples: list[dict] = []
+    for chain in section_atom_chains:
+        chain_id = str(chain.get("chain_id") or "")
+        if not chain_id:
+            continue
+        paper_id = str(chain.get("paper_id") or "")
+        section_name = _normalize_section_name(str(chain.get("section_name") or chain.get("section_key") or ""))
+        stage_texts = {
+            "constraint": str(chain.get("constraint_text") or ""),
+            "failure_mechanism": str(chain.get("failure_mechanism_text") or ""),
+            "attempt_path": str(chain.get("attempted_path_text") or ""),
+            "local_fix": str(chain.get("local_fix_text") or ""),
+            "new_constraint": str(chain.get("new_constraint_text") or ""),
+        }
+        stage_atom_ids = {
+            "constraint": chain.get("constraint_atom_id"),
+            "failure_mechanism": chain.get("failure_mechanism_atom_id"),
+            "attempt_path": chain.get("attempted_path_atom_id"),
+            "local_fix": chain.get("local_fix_atom_id"),
+            "new_constraint": chain.get("new_constraint_atom_id"),
+        }
+        present_stages = {stage for stage, atom_id in stage_atom_ids.items() if atom_id}
+        missing_stages = [
+            _normalize_chain_stage(stage)
+            for stage in (chain.get("missing_stages") or _safe_json_loads(chain.get("missing_stages_json") or "[]", []))
+        ]
+        typed_chain_complete = bool(int(chain.get("typed_chain_complete") or 0))
+        typed_chain_completeness = str(chain.get("typed_chain_completeness") or "partial")
+        evidence_grade = str(chain.get("evidence_grade") or "partial_typed_section_lineage")
+        claim_scope = str(chain.get("claim_scope") or "exploratory_bottleneck_lineage")
+        evidence_objects = chain.get("evidence_objects") or _safe_json_loads(chain.get("evidence_objects_json") or "[]", [])
+        uncertainty_reasons = chain.get("uncertainty_reasons") or _safe_json_loads(
+            chain.get("uncertainty_reasons_json") or "[]",
+            [],
+        )
+        page_candidates = _chain_page_candidates(evidence_objects)
+        combined_text = " ".join(
+            [
+                str(chain.get("paper_title") or ""),
+                *(text for text in stage_texts.values() if text),
+            ]
+        )
+        principle = classify_principle(combined_text)
+        root_type = infer_root_constraint_type(principle.principle_id, combined_text)
+        direction_id = _direction_id_for_lineage(
+            paper_id=paper_id,
+            text=combined_text,
+            direction_by_paper=direction_by_paper,
+            direction_tokens=direction_tokens,
+        )
+        event_year = int(chain.get("publication_year") or 0)
+        evidence_weight = _chain_evidence_weight(evidence_grade, typed_chain_complete=typed_chain_complete)
+        stage_evidence = {
+            stage: (
+                f"section_atom:{stage_atom_ids[stage]}"
+                if stage_atom_ids.get(stage)
+                else "missing_in_section_atom_chain"
+            )
+            for stage in ("constraint", "failure_mechanism", "attempt_path", "local_fix", "new_constraint")
+        }
+        lineage_missing_reasons = [
+            {"stage": stage, "reason": "missing_in_section_atom_chain"}
+            for stage in missing_stages
+        ]
+        relation_specs = [
+            ("constraint", "failure_mechanism", "constraint_causes_failure"),
+            ("failure_mechanism", "attempt_path", "failure_triggers_attempt"),
+            ("attempt_path", "local_fix", "attempt_produces_local_fix"),
+            ("local_fix", "new_constraint", "local_fix_reveals_new_constraint"),
+        ]
+        for edge_order, (src_stage, dst_stage, relation_type) in enumerate(relation_specs, start=1):
+            src_text = stage_texts.get(src_stage) or f"missing evidence: no {src_stage}"
+            dst_text = stage_texts.get(dst_stage) or f"missing evidence: no {dst_stage}"
+            triples.append(
+                {
+                    "triple_id": f"chain:{chain_id}:{edge_order}:{direction_id or 'na'}",
+                    "principle_id": principle.principle_id,
+                    "direction_id": direction_id,
+                    "atom_id": None,
+                    "edge_order": edge_order,
+                    "source_stage": src_stage,
+                    "target_stage": dst_stage,
+                    "source_text": src_text[:280],
+                    "target_text": dst_text[:280],
+                    "relation_type": relation_type,
+                    "paper_id": paper_id,
+                    "resolver_paper_id": None,
+                    "event_year": event_year,
+                    "evidence_section": section_name or None,
+                    "evidence_page": int(page_candidates[0]) if page_candidates else None,
+                    "evidence_quality": "section_level",
+                    "evidence_weight": evidence_weight,
+                    "metadata_json": jdumps(
+                        {
+                            "source": "section_atom_chain",
+                            "section_atom_chain_id": chain_id,
+                            "root_constraint_type": root_type,
+                            "page_candidates": page_candidates,
+                            "lineage_schema": [
+                                "constraint",
+                                "failure_mechanism",
+                                "attempt_path",
+                                "local_fix",
+                                "new_constraint",
+                            ],
+                            "evidence_grade": evidence_grade,
+                            "claim_scope": claim_scope,
+                            "evidence_objects": evidence_objects,
+                            "section_atom_ids": stage_atom_ids,
+                            "stage_evidence": stage_evidence,
+                            "typed_chain_complete": typed_chain_complete,
+                            "typed_chain_completeness": typed_chain_completeness,
+                            "placeholder_stages": missing_stages,
+                            "lineage_missing_reasons": lineage_missing_reasons,
+                            "chain_uncertainty_reasons": uncertainty_reasons,
+                            "source_stage_evidence": stage_evidence.get(src_stage),
+                            "target_stage_evidence": stage_evidence.get(dst_stage),
+                            "source_stage_is_placeholder": src_stage not in present_stages,
+                            "target_stage_is_placeholder": dst_stage not in present_stages,
+                            "lineage_contract": (
+                                "complete_typed_chain"
+                                if typed_chain_complete
+                                else "partial_typed_chain_with_explicit_missing_stages"
+                            ),
+                            "claim_policy": "lineage evidence only; Step13 Claim Card gates decide promotion",
+                        }
+                    ),
+                }
+            )
+    return triples
+
+
+def _normalize_chain_stage(stage: Any) -> str:
+    raw = str(stage or "")
+    return "attempt_path" if raw == "attempted_path" else raw
+
+
+def _chain_page_candidates(evidence_objects: Any) -> list[int]:
+    pages: set[int] = set()
+    if not isinstance(evidence_objects, list):
+        return []
+    for obj in evidence_objects:
+        if not isinstance(obj, dict):
+            continue
+        for key in ("page_start", "page_end"):
+            value = obj.get(key)
+            if isinstance(value, (int, float)) and int(value) > 0:
+                pages.add(int(value))
+    return sorted(pages)
+
+
+def _chain_evidence_weight(evidence_grade: str, *, typed_chain_complete: bool) -> float:
+    if evidence_grade == "typed_section_lineage":
+        return 0.92
+    if evidence_grade == "typed_section_lineage_traced":
+        return 0.85
+    if typed_chain_complete:
+        return 0.70
+    if evidence_grade == "partial_typed_section_lineage":
+        return 0.68
+    return 0.45
+
+
+def _direction_id_for_lineage(
+    *,
+    paper_id: str,
+    text: str,
+    direction_by_paper: dict[str, list[dict]],
+    direction_tokens: dict[int, set[str]],
+) -> int | None:
+    if direction_by_paper.get(paper_id):
+        return int(direction_by_paper[paper_id][0].get("direction_id") or 0) or None
+    text_tokens = {
+        t for t in re.findall(r"[a-zA-Z][a-zA-Z0-9\-]{2,}", (text or "").lower())
+    }
+    best_direction = None
+    best_overlap = 0
+    for did, toks in direction_tokens.items():
+        overlap = len(text_tokens & toks)
+        if overlap > best_overlap:
+            best_direction = did
+            best_overlap = overlap
+    return best_direction if best_overlap >= 2 else None
 
 
 def build_direction_claim_cards(
@@ -2041,6 +2278,7 @@ def run_first_principles_history(
     atoms = load_atoms(conn_main, conn_v14, corpus_id=corpus_id)
     section_pages = load_section_page_index(conn_main, corpus_id=corpus_id)
     resolution_rows = load_resolution_rows(conn_v14)
+    section_atom_chains = load_section_atom_chains(conn_main, corpus_id=corpus_id)
     future_edges = load_future_edges(conn_main, conn_v14, corpus_id=corpus_id)
     future_directions = load_future_directions(conn_v14)
     calibration_audit = load_vgae_calibration_audit(conn_v14)
@@ -2054,6 +2292,7 @@ def run_first_principles_history(
         resolution_rows=resolution_rows,
         section_pages=section_pages,
         future_directions=future_directions,
+        section_atom_chains=section_atom_chains,
     )
     claim_cards, direction_updates = build_direction_claim_cards(
         atoms=atoms,
@@ -2070,6 +2309,12 @@ def run_first_principles_history(
     )
 
     totals["lineage_triples_total"] = len(lineage_triples)
+    totals["section_atom_chains_total"] = len(section_atom_chains)
+    totals["section_atom_chain_lineage_triples"] = sum(
+        1
+        for triple in lineage_triples
+        if (_safe_json_loads(triple.get("metadata_json") or "{}", {}) or {}).get("source") == "section_atom_chain"
+    )
     totals["claim_cards_total"] = len(claim_cards)
     totals["high_confidence_eligible_directions"] = sum(
         int(c.get("high_confidence_eligible") or 0) for c in claim_cards

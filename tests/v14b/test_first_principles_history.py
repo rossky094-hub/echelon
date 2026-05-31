@@ -183,6 +183,110 @@ def test_bottleneck_lineage_triples_can_be_full_with_validated_fix_and_follow_on
     assert first_atom_triples[2]["target_text"].startswith("Measured mitigation")
 
 
+def test_bottleneck_lineage_triples_consume_section_atom_chains_as_full_evidence():
+    from echelon.v14b.step13_first_principles_history import build_bottleneck_lineage_triples
+
+    chain = {
+        "chain_id": "sac1",
+        "paper_id": "p1",
+        "paper_title": "Wafer-scale fabrication paper",
+        "publication_year": 2024,
+        "section_name": "discussion",
+        "section_key": "discussion",
+        "constraint_atom_id": "sa1",
+        "failure_mechanism_atom_id": "sa2",
+        "attempted_path_atom_id": "sa3",
+        "local_fix_atom_id": "sa4",
+        "new_constraint_atom_id": "sa5",
+        "constraint_text": "Fabrication tolerance is the root physical constraint.",
+        "failure_mechanism_text": "Overlay mismatch creates phase loss.",
+        "attempted_path_text": "The authors attempted calibration and inverse design.",
+        "local_fix_text": "Calibration mitigates mismatch in the prototype.",
+        "new_constraint_text": "Packaging drift remains as a new constraint.",
+        "typed_chain_complete": 1,
+        "typed_chain_completeness": "full",
+        "missing_stages": [],
+        "evidence_grade": "typed_section_lineage",
+        "claim_scope": "bottleneck_lineage_evidence",
+        "uncertainty_reasons": ["chain is evidence context only until Step13 Claim Card promotion"],
+        "evidence_objects": [
+            {
+                "type": "section_atom",
+                "role": "constraint",
+                "atom_id": "sa1",
+                "paper_id": "p1",
+                "page_start": 4,
+                "page_end": 5,
+            }
+        ],
+    }
+
+    triples = build_bottleneck_lineage_triples(
+        atoms=[],
+        resolution_rows=[],
+        section_pages={},
+        future_directions=[{"direction_id": 7, "direction_name": "wafer scale fabrication", "paper_ids_json": '["p1"]'}],
+        section_atom_chains=[chain],
+    )
+
+    assert len(triples) == 4
+    assert [t["source_stage"] for t in triples] == ["constraint", "failure_mechanism", "attempt_path", "local_fix"]
+    assert triples[1]["target_stage"] == "attempt_path"
+    assert triples[0]["direction_id"] == 7
+    assert triples[0]["evidence_page"] == 4
+    metadata = json.loads(triples[0]["metadata_json"])
+    assert metadata["source"] == "section_atom_chain"
+    assert metadata["section_atom_chain_id"] == "sac1"
+    assert metadata["typed_chain_complete"] is True
+    assert metadata["typed_chain_completeness"] == "full"
+    assert metadata["evidence_grade"] == "typed_section_lineage"
+    assert metadata["placeholder_stages"] == []
+    assert metadata["section_atom_ids"]["attempt_path"] == "sa3"
+    assert metadata["evidence_objects"][0]["atom_id"] == "sa1"
+
+
+def test_bottleneck_lineage_triples_keep_partial_section_atom_chains_exploratory():
+    from echelon.v14b.step13_first_principles_history import build_bottleneck_lineage_triples
+
+    triples = build_bottleneck_lineage_triples(
+        atoms=[],
+        resolution_rows=[],
+        section_pages={},
+        future_directions=[],
+        section_atom_chains=[
+            {
+                "chain_id": "sac_partial",
+                "paper_id": "p2",
+                "publication_year": 2025,
+                "section_name": "results",
+                "constraint_atom_id": "sa10",
+                "failure_mechanism_atom_id": "sa11",
+                "attempted_path_atom_id": "sa12",
+                "constraint_text": "Efficiency remains limited.",
+                "failure_mechanism_text": "Coupling loss dominates.",
+                "attempted_path_text": "A grating coupler was attempted.",
+                "typed_chain_complete": 0,
+                "typed_chain_completeness": "attempted_path_partial",
+                "missing_stages": ["local_fix", "new_constraint"],
+                "evidence_grade": "partial_typed_section_lineage",
+                "claim_scope": "exploratory_bottleneck_lineage",
+                "uncertainty_reasons": ["typed lineage is partial"],
+                "evidence_objects": [],
+            }
+        ],
+    )
+
+    assert len(triples) == 4
+    assert triples[2]["target_text"].startswith("missing evidence: no local_fix")
+    metadata = json.loads(triples[2]["metadata_json"])
+    assert metadata["source"] == "section_atom_chain"
+    assert metadata["typed_chain_complete"] is False
+    assert metadata["typed_chain_completeness"] == "attempted_path_partial"
+    assert metadata["target_stage_is_placeholder"] is True
+    assert "local_fix" in metadata["placeholder_stages"]
+    assert metadata["claim_scope"] == "exploratory_bottleneck_lineage"
+
+
 def test_step13_builds_first_principles_outputs(tmp_path):
     from echelon.v14b.db_schema import init_v14b_db
     from echelon.v14b.step13_first_principles_history import run_first_principles_history
@@ -211,6 +315,32 @@ def test_step13_builds_first_principles_outputs(tmp_path):
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (paper_id, section_name)
         );
+        CREATE TABLE section_atom_chains (
+            chain_id TEXT PRIMARY KEY,
+            paper_id TEXT NOT NULL,
+            section_name TEXT NOT NULL,
+            section_key TEXT NOT NULL,
+            chain_index INTEGER NOT NULL,
+            constraint_atom_id TEXT,
+            failure_mechanism_atom_id TEXT,
+            attempted_path_atom_id TEXT,
+            local_fix_atom_id TEXT,
+            new_constraint_atom_id TEXT,
+            constraint_text TEXT,
+            failure_mechanism_text TEXT,
+            attempted_path_text TEXT,
+            local_fix_text TEXT,
+            new_constraint_text TEXT,
+            relation_edges_json TEXT NOT NULL,
+            typed_chain_complete INTEGER NOT NULL,
+            typed_chain_completeness TEXT NOT NULL,
+            missing_stages_json TEXT NOT NULL,
+            evidence_grade TEXT NOT NULL,
+            claim_scope TEXT NOT NULL,
+            uncertainty_reasons_json TEXT NOT NULL,
+            evidence_objects_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         INSERT INTO papers VALUES
             ('p1', 'Fabrication-limited metasurface', 'thermal loss and fabrication tolerance remain key bottlenecks', 2020, 'F1'),
             ('p2', 'Sim2real policy transfer', 'domain shift remains a major generalization challenge', 2021, 'F2'),
@@ -223,6 +353,25 @@ def test_step13_builds_first_principles_outputs(tmp_path):
             ('p2', 'discussion', 'domain shift failures remain under distribution shift', '[6]', '{"n_pages":1,"extraction_strategies":["embedded_heading"]}');
         """
     )
+    conn_main.execute(
+        """
+        INSERT INTO section_atom_chains VALUES (
+            'sac1', 'p1', 'limitations', 'limitations', 0,
+            'sa1', 'sa2', 'sa3', 'sa4', 'sa5',
+            'fabrication tolerance is the physical constraint',
+            'thermal loss reduces efficiency',
+            'inverse design was attempted',
+            'calibration mitigates part of the loss',
+            'packaging drift remains unresolved',
+            '[]', 1, 'full', '[]', 'typed_section_lineage',
+            'bottleneck_lineage_evidence',
+            '["chain is evidence context only"]',
+            '[{"type":"section_atom","role":"constraint","atom_id":"sa1","paper_id":"p1","page_start":4,"page_end":5}]',
+            '2026-05-31T00:00:00Z'
+        )
+        """
+    )
+    conn_main.commit()
     conn_main.close()
 
     db_v14 = tmp_path / "v14.sqlite3"
@@ -273,6 +422,9 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     claim_rows = conn_v14.execute(
         "SELECT COUNT(*), SUM(five_question_complete), SUM(high_confidence_eligible) FROM direction_claim_cards"
     ).fetchone()
+    chain_lineage = conn_v14.execute(
+        "SELECT metadata_json FROM bottleneck_lineage_triples WHERE triple_id LIKE 'chain:%' LIMIT 1"
+    ).fetchone()
     claim_contract = conn_v14.execute(
         """
         SELECT evidence_grade, claim_scope, uncertainty_reasons_json, evidence_objects_json
@@ -287,6 +439,8 @@ def test_step13_builds_first_principles_outputs(tmp_path):
     assert rows
     assert any((r[1] or 0) > 0 for r in rows)
     assert lineage_n > 0
+    assert chain_lineage is not None
+    assert json.loads(chain_lineage[0])["source"] == "section_atom_chain"
     assert claim_rows[0] >= 1
     assert claim_contract is not None
     assert claim_contract[0]
