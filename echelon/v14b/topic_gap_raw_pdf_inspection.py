@@ -23,6 +23,7 @@ from echelon.v14b.step5s_section_ingest import (
     extract_sections_with_metadata,
     parse_pdf_pages_with_timeout,
 )
+from echelon.v14b.topic_gap_no_target_inspection import inspect_no_target_blocks
 
 
 def utc_now() -> str:
@@ -70,12 +71,14 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
     sections = extract_sections_with_metadata(blocks)
     primary_sections = sorted(sec for sec in sections if sec in PRIMARY_SECTION_NAMES)
     secondary_sections = sorted(sec for sec in sections if sec not in PRIMARY_SECTION_NAMES)
+    no_target_probe: dict[str, Any] = {}
     if primary_sections:
         classification = "parser_success_primary"
     elif sections:
         classification = "parser_success_secondary_only"
     else:
         classification = "parser_no_target_sections"
+        no_target_probe = inspect_no_target_blocks(blocks)
     strategies: dict[str, list[str]] = {}
     section_chars: dict[str, int] = {}
     section_pages: dict[str, list[int]] = {}
@@ -97,6 +100,8 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
         "section_chars": section_chars,
         "section_pages": section_pages,
         "min_section_chars": SECTION_INGEST_MIN_CHARS,
+        "no_target_classification": no_target_probe.get("classification") or "",
+        "no_target_probe": no_target_probe,
     }
 
 
@@ -150,10 +155,17 @@ def run_topic_gap_raw_pdf_inspection(
                     "section_chars": {},
                     "section_pages": {},
                     "min_section_chars": SECTION_INGEST_MIN_CHARS,
+                    "no_target_classification": "",
+                    "no_target_probe": {},
                 }
             )
 
     counts = Counter(str(row.get("classification") or "unknown") for row in rows)
+    no_target_shape_counts = Counter(
+        str(row.get("no_target_classification") or "unknown")
+        for row in rows
+        if row.get("classification") == "parser_no_target_sections"
+    )
     primary_ready = int(counts.get("parser_success_primary") or 0)
     primary_ready_repair_candidates = sum(
         1
@@ -164,6 +176,8 @@ def run_topic_gap_raw_pdf_inspection(
     )
     primary_ready_already_covered = primary_ready - primary_ready_repair_candidates
     no_target = int(counts.get("parser_no_target_sections") or 0)
+    no_target_parser_repair_signal = int(no_target_shape_counts.get("target_heading_signal_present") or 0)
+    no_target_subthreshold_signal = int(no_target_shape_counts.get("target_heading_signal_subthreshold") or 0)
     parser_exceptions = int(counts.get("parser_exception") or 0)
     status = "pass" if primary_ready_repair_candidates else ("warn" if rows else "missing_local_pdf")
     summary = {
@@ -175,6 +189,9 @@ def run_topic_gap_raw_pdf_inspection(
         "parser_primary_ready_repair_candidates": primary_ready_repair_candidates,
         "parser_primary_ready_already_covered": primary_ready_already_covered,
         "parser_no_target_papers": no_target,
+        "parser_no_target_shape_counts": dict(no_target_shape_counts),
+        "parser_no_target_repair_signal_papers": no_target_parser_repair_signal,
+        "parser_no_target_subthreshold_signal_papers": no_target_subthreshold_signal,
         "parser_exception_papers": parser_exceptions,
         "classification_counts": dict(counts),
         "policy": (
@@ -227,6 +244,13 @@ def load_topic_gap_raw_pdf_inspection_state(path: Path) -> dict[str, Any]:
             summary.get("parser_primary_ready_already_covered") or 0
         ),
         "parser_no_target_papers": int(summary.get("parser_no_target_papers") or 0),
+        "parser_no_target_shape_counts": summary.get("parser_no_target_shape_counts") or {},
+        "parser_no_target_repair_signal_papers": int(
+            summary.get("parser_no_target_repair_signal_papers") or 0
+        ),
+        "parser_no_target_subthreshold_signal_papers": int(
+            summary.get("parser_no_target_subthreshold_signal_papers") or 0
+        ),
         "parser_exception_papers": int(summary.get("parser_exception_papers") or 0),
         "classification_counts": summary.get("classification_counts") or {},
     }
@@ -269,6 +293,8 @@ def _render_markdown(result: dict[str, Any]) -> str:
         f"- parser primary-ready repair candidates: {summary['parser_primary_ready_repair_candidates']}",
         f"- parser primary-ready already covered: {summary['parser_primary_ready_already_covered']}",
         f"- parser no-target papers: {summary['parser_no_target_papers']}",
+        f"- parser no-target repair-signal papers: {summary['parser_no_target_repair_signal_papers']}",
+        f"- parser no-target subthreshold-signal papers: {summary['parser_no_target_subthreshold_signal_papers']}",
         f"- parser exception papers: {summary['parser_exception_papers']}",
         "",
         "## Classification Counts",
@@ -278,19 +304,32 @@ def _render_markdown(result: dict[str, Any]) -> str:
     ]
     for name, count in Counter(summary["classification_counts"]).most_common():
         lines.append(f"| {name} | {count:,} |")
+    if summary.get("parser_no_target_shape_counts"):
+        lines.extend(
+            [
+                "",
+                "## No-Target Shape Counts",
+                "",
+                "| no_target_classification | papers |",
+                "|---|---:|",
+            ]
+        )
+        for name, count in Counter(summary["parser_no_target_shape_counts"]).most_common():
+            lines.append(f"| {name} | {count:,} |")
     lines.extend(
         [
             "",
             "## Local PDF Rows",
             "",
-            "| paper_id | topics | triage failure | parser classification | primary sections | section strategies | title |",
-            "|---|---|---|---|---|---|---|",
+            "| paper_id | topics | triage failure | parser classification | no-target shape | primary sections | section strategies | title |",
+            "|---|---|---|---|---|---|---|---|",
         ]
     )
     for row in result.get("rows") or []:
         lines.append(
             f"| `{_md_cell(row.get('paper_id'))}` | {_md_cell(row.get('topics'))} | "
             f"`{_md_cell(row.get('failure_mode'))}` | `{_md_cell(row.get('classification'))}` | "
+            f"`{_md_cell(row.get('no_target_classification'))}` | "
             f"{_md_cell(row.get('primary_sections'))} | {_md_cell(_section_strategy_cell(row))} | "
             f"{_md_cell(row.get('title'))} |"
         )

@@ -399,6 +399,10 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
             "parser_primary_ready_papers": 2,
             "parser_primary_ready_repair_candidates": 1,
             "parser_no_target_papers": 3,
+            "parser_no_target_shape_counts": {
+                "sectionless_or_non_target_heading_format": 2,
+                "heading_like_but_not_target_section": 1,
+            },
             "parser_exception_papers": 0,
         },
     }
@@ -410,6 +414,8 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
     assert "5/47" in blocker["why"]
     assert "primary-ready=2" in blocker["why"]
     assert "repair-ready=1" in blocker["why"]
+    assert "sectionless=2" in blocker["why"]
+    assert "heading-like=1" in blocker["why"]
     assert "next safe section-ingest boundary" in blocker["next_action"]
 
 
