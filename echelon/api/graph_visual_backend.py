@@ -37,13 +37,10 @@ from echelon.v14b.evidence_contracts import (
 )
 from echelon.v14b.topic_readiness import build_topic_readiness_preflight
 from echelon.v14b.section_atoms import (
-    EXACT_SEARCH_SEMANTICS,
-    FUZZY_SEARCH_SEMANTICS,
-    GRAPH_EXPANSION_SEMANTICS,
-    HYBRID_SEARCH_SEMANTICS,
     search_section_atoms,
     search_section_atoms_fuzzy,
     search_section_atoms_hybrid,
+    section_atom_search_contract,
 )
 
 SCHEMA_VERSION = "V14B.visual.1"
@@ -1112,18 +1109,7 @@ def search_visual_graph(query: GraphSearchQuery) -> dict:
 
 
 def _evidence_atom_search_contract(search_mode: str) -> dict[str, Any]:
-    return {
-        "claim_scope": "retrieval_context_only",
-        "search_mode": search_mode,
-        "exact_semantics": EXACT_SEARCH_SEMANTICS,
-        "fuzzy_semantics": FUZZY_SEARCH_SEMANTICS,
-        "hybrid_semantics": HYBRID_SEARCH_SEMANTICS,
-        "graph_expansion_semantics": GRAPH_EXPANSION_SEMANTICS,
-        "promotion_rule": (
-            "exact and fuzzy atom hits can seed Step5c/Step13 evidence work; "
-            "they cannot become scientific conclusions without typed chains and Claim Card gates"
-        ),
-    }
+    return section_atom_search_contract(search_mode)
 
 
 def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
@@ -1175,6 +1161,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 query.query_text,
                 top_k=query.top_k,
                 filters=query.filters,
+                phrase_query=query.phrase_query,
                 ensure_schema=False,
             )
             exact_hits = hits
@@ -1205,6 +1192,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 embedding_model=query.embedding_model,
                 embedding_dim=query.embedding_dim,
                 min_fuzzy_score=query.min_fuzzy_score,
+                phrase_query=query.phrase_query,
                 ensure_schema=False,
             )
             hits = result["merged_hits"]

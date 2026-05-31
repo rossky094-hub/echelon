@@ -217,7 +217,14 @@ class EvidenceAtomSearchQuery(BaseModel):
         default="hybrid",
         description="exact=FTS/BM25; fuzzy=atom vector recall; hybrid=exact first, fuzzy candidates second",
     )
-    filters: dict = Field(default_factory=dict, description="paper_id/atom_type/section_name 等过滤条件")
+    phrase_query: bool = Field(
+        default=False,
+        description="对 exact 分支启用可复现 phrase query；fuzzy 分支仍只做候选召回",
+    )
+    filters: dict = Field(
+        default_factory=dict,
+        description="paper_id/doi/arxiv_id/s2_paper_id/title/atom_type/section_name 等过滤条件",
+    )
     top_k: int = Field(default=50, ge=1, le=200, description="返回结果上限")
     exact_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid exact 分支上限")
     fuzzy_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid fuzzy 分支上限")
@@ -239,7 +246,8 @@ class EvidenceAtomSearchQuery(BaseModel):
                 {
                     "query_text": "fabrication loss thermal instability",
                     "search_mode": "hybrid",
-                    "filters": {"section_name": "Discussion"},
+                    "phrase_query": False,
+                    "filters": {"section_name": "Discussion", "doi": "10.1234/example"},
                     "top_k": 20,
                     "expert_id": "expert_alice",
                 }

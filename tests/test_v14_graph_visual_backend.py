@@ -344,6 +344,9 @@ def _make_section_atom_db(path):
         """
         CREATE TABLE papers (
             id TEXT PRIMARY KEY,
+            doi TEXT,
+            arxiv_id TEXT,
+            s2_paper_id TEXT,
             title TEXT
         );
         CREATE TABLE paper_sections (
@@ -362,8 +365,26 @@ def _make_section_atom_db(path):
         "source_storage_uri": "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
         "source_delivery": "local_raw_pdf",
     }
-    conn.execute("INSERT INTO papers VALUES ('p1', 'Thermal fabrication loss in photonic cavities')")
-    conn.execute("INSERT INTO papers VALUES ('p2', 'Low loss process window for integrated optics')")
+    conn.execute(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "10.1234/p1",
+            "2401.00001",
+            "abcdef1234567890abcdef1234567890abcdef12",
+            "Thermal fabrication loss in photonic cavities",
+        ),
+    )
+    conn.execute(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?)",
+        (
+            "p2",
+            "10.1234/p2",
+            "2401.00002",
+            "bbcdef1234567890abcdef1234567890abcdef12",
+            "Low loss process window for integrated optics",
+        ),
+    )
     conn.execute(
         "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
         (
@@ -445,6 +466,8 @@ def test_evidence_atom_search_endpoint_returns_exact_and_fuzzy_contracts(tmp_pat
     assert data["ready"] is True
     assert data["search_mode"] == "hybrid"
     assert data["search_contract"]["claim_scope"] == "retrieval_context_only"
+    assert data["search_contract"]["contract_version"].startswith("section_atom_layer_contract_v1")
+    assert "doi" in data["search_contract"]["dual_retrieval_layer"]["exact_addressable_fields"]
     assert "graph/GNN expansion may rank" in data["search_contract"]["graph_expansion_semantics"]
     assert "Step5c/Step13" in data["search_contract"]["promotion_rule"]
     assert data["exact_hits"]
@@ -454,6 +477,36 @@ def test_evidence_atom_search_endpoint_returns_exact_and_fuzzy_contracts(tmp_pat
     assert all(hit["claim_scope"] == "retrieval_context_only" for hit in data["hits"])
     assert all("embedding_json" not in hit for hit in data["hits"])
     assert data["hits"][0]["source_storage_uri"].endswith("/p1.pdf")
+    assert data["hits"][0]["span"]["unit"] == "normalized_section_text_char_offsets"
+
+
+def test_evidence_atom_search_endpoint_supports_exact_identifier_title_and_phrase(tmp_path, monkeypatch):
+    db_path = tmp_path / "echelon_library.sqlite3"
+    _make_section_atom_db(db_path)
+    monkeypatch.setenv("V14B_DB_MAIN", str(db_path))
+
+    resp = client.post(
+        "/graph/visual/evidence-atoms/search",
+        headers=VIEWER_HEADERS,
+        json={
+            "query_text": "Fabrication loss",
+            "search_mode": "exact",
+            "phrase_query": True,
+            "filters": {
+                "doi": "https://doi.org/10.1234/p1",
+                "title": "Thermal fabrication loss in photonic cavities",
+            },
+            "top_k": 5,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is True
+    assert data["hits"]
+    assert data["hits"][0]["paper_id"] == "p1"
+    assert data["hits"][0]["doi"] == "10.1234/p1"
+    assert "Fabrication loss" in data["hits"][0]["atom_text"]
 
 
 def test_evidence_atom_search_endpoint_is_read_only_and_requires_fts(tmp_path, monkeypatch):

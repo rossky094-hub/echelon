@@ -152,7 +152,7 @@ def _write_product_sources(root: Path) -> None:
         'def _reading_path_item(): return {"can_explain": can_explain, "cannot_explain": cannot_explain, "note": "Radar promotion without complete Step13 Claim Cards GNN/VGAE is a candidate generator, not a conclusion generator"}\n'
         'def _paper_hit_contract(): return visual_search_hit + retrieval_context_only + claim_scope + evidence_grade + uncertainty_reasons + reason.get("claim_scope") + reason.get("evidence_objects")\n'
         "def _hydrate_hits(): return _paper_hit_contract\n"
-        "def search_evidence_atoms(): return _connect_main(readonly=True) + section_atoms_fts + section_atom_embeddings + search_section_atoms_hybrid + ensure_schema=False + retrieval_context_only\n"
+        "def search_evidence_atoms(): return _connect_main(readonly=True) + section_atoms_fts + section_atom_embeddings + search_section_atoms_hybrid + ensure_schema=False + phrase_query + section_atom_search_contract + retrieval_context_only\n"
         "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"

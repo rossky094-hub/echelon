@@ -273,7 +273,8 @@ async def search_graph(
     response_model=dict,
     summary="[V14B] Evidence atom exact/fuzzy search",
     description=(
-        "在 section_atoms 上执行精准 FTS/BM25、atom embedding 模糊召回或 hybrid 检索。\n\n"
+        "在 section_atoms 上执行精准 ID/DOI/arXiv/title/section/phrase/FTS/BM25、"
+        "atom embedding 模糊召回或 hybrid 检索。\n\n"
         "所有返回结果都保持 `retrieval_context_only`；GNN/graph expansion 只能作为候选扩展，"
         "不能直接生成 section atom 或晋升为 Step13 结论。"
     ),

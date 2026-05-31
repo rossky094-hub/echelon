@@ -74,9 +74,10 @@ Incorrect uses:
 Current implementation:
 
 - `echelon.v14b.section_atoms` builds `section_atoms` from `paper_sections`.
+- Each atom now carries normalized section-text span offsets (`span_start`, `span_end`, `span_unit`) plus `paper_id`, DOI, arXiv, OpenAlex, S2, title, page, raw-PDF URI, and parser-contract provenance.
 - `make section-atoms` materializes the atom table and exact FTS/BM25 index.
 - `make section-atom-embeddings` materializes deterministic atom vectors for fuzzy candidate recall.
-- `search_section_atoms_hybrid()` returns exact hits and fuzzy candidates under one retrieval contract.
+- `search_section_atoms_hybrid()` returns exact hits and fuzzy candidates under one retrieval contract; exact search supports ID/DOI/arXiv/OpenAlex/S2/title/section/atom-type/parser-contract/source-URI filters plus phrase query.
 - `POST /graph/visual/evidence-atoms/search` exposes exact, fuzzy, and hybrid atom retrieval to API clients through a read-only DB path.
 - `echelon.v14b.section_atom_chains` assembles co-located atoms into typed bottleneck-chain evidence candidates.
 - `make section-atom-chains` materializes `section_atom_chains` with explicit missing stages.

@@ -1702,6 +1702,8 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "section_atom_embeddings",
                     "search_section_atoms_hybrid",
                     "ensure_schema=False",
+                    "phrase_query",
+                    "section_atom_search_contract",
                     "retrieval_context_only",
                 ),
             ),

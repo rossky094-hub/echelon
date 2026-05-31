@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 
 from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
@@ -55,6 +56,9 @@ def test_extract_section_atoms_marks_current_traced_decision_sections_decision_g
     assert atoms[0]["source_delivery"] == "local_raw_pdf_cache"
     assert atoms[0]["source_storage_uri"].endswith("/p1.pdf")
     assert atoms[0]["page_start"] == 4
+    assert atoms[0]["span_unit"] == "normalized_section_text_char_offsets"
+    normalized_text = re.sub(r"\s+", " ", row["section_text"]).strip()
+    assert normalized_text[atoms[0]["span_start"]:atoms[0]["span_end"]] == atoms[0]["atom_text"]
     assert "deterministic heuristic classification" in atoms[0]["uncertainty_reasons_json"]
 
 
@@ -146,6 +150,83 @@ def test_build_and_search_section_atoms_exact_fts(tmp_path):
     assert hits[0]["search_semantics"].startswith("retrieval hit only")
     assert metric_hits and metric_hits[0]["paper_id"] == "p2"
     assert discussion_hits and discussion_hits[0]["section_key"] == "discussion"
+
+
+def test_exact_section_atom_search_supports_identifiers_titles_and_phrase_spans(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            openalex_id TEXT,
+            doi TEXT,
+            arxiv_id TEXT,
+            s2_paper_id TEXT,
+            title TEXT
+        );
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            source_url TEXT,
+            section_pages_json TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO papers VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "https://openalex.org/W123",
+            "https://doi.org/10.1234/EXAMPLE.PAPER",
+            "2401.12345v2",
+            "S2:abcdef1234567890abcdef1234567890abcdef12",
+            "Traceable photonic limitation paper",
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "Discussion",
+            (
+                "Thermal drift appears after packaging and remains a reproducible bottleneck. "
+                "The authors report fabrication loss as the limiting constraint."
+            ),
+            "https://example.test/p1.pdf",
+            json.dumps([7]),
+            _meta(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    build_section_atoms(db)
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    doi_hits = search_section_atoms(conn, "thermal", top_k=5, filters={"doi": "10.1234/example.paper"})
+    arxiv_hits = search_section_atoms(conn, "2401.12345", top_k=5)
+    title_hits = search_section_atoms(
+        conn,
+        "fabrication loss",
+        top_k=5,
+        filters={"title": "Traceable photonic limitation paper"},
+    )
+    phrase_hits = search_section_atoms(conn, "Thermal drift", top_k=5, phrase_query=True)
+    conn.close()
+
+    hit = doi_hits[0]
+    assert hit["paper_id"] == "p1"
+    assert hit["doi"] == "10.1234/example.paper"
+    assert hit["arxiv_id"] == "2401.12345"
+    assert hit["openalex_id"] == "W123"
+    assert hit["s2_paper_id"] == "abcdef1234567890abcdef1234567890abcdef12"
+    assert hit["span"]["unit"] == "normalized_section_text_char_offsets"
+    assert arxiv_hits and arxiv_hits[0]["paper_id"] == "p1"
+    assert title_hits and title_hits[0]["title"] == "Traceable photonic limitation paper"
+    assert phrase_hits and "Thermal drift" in phrase_hits[0]["atom_text"]
 
 
 def test_build_section_atom_embeddings_and_fuzzy_search_are_context_only(tmp_path):
