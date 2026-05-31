@@ -469,6 +469,42 @@ def test_rd_radar_promotes_only_complete_claim_cards():
     assert "confidence" not in edge_items[0]["evidence_objects"][0]
 
 
+def test_rd_radar_keeps_future_edge_overlap_only_claim_cards_in_candidate_pool():
+    radar = _build_rd_radar(
+        future_directions=[
+            {
+                "direction_id": 9,
+                "direction_name": "Complete but weakly linked direction",
+                "confidence": 0.8,
+                "claim_scope": "exploratory_with_claim_card",
+                "topic_relevance_contract": {
+                    "relationship_scope": "future_edge_overlap_only",
+                    "future_edge_paper_overlap": ["p1", "p2"],
+                    "uncertainty_reasons": ["direction matched this topic only through selected future-edge paper overlap"],
+                    "required_evidence": ["topic-specific bottleneck evidence"],
+                },
+                "claim_card": {
+                    "claim_card_id": "cc9",
+                    "minimal_validation_experiment": {"experiment": "measure candidate"},
+                    "five_question_complete": True,
+                    "high_confidence_eligible": False,
+                    "quality_gate": {},
+                },
+            }
+        ],
+        future_growth=[],
+    )
+
+    assert radar["claim_cards"] == []
+    assert len(radar["context_claim_cards"]) == 1
+    context_card = radar["context_claim_cards"][0]
+    assert context_card["kind"] == "claim_card_context"
+    assert context_card["claim_scope"] == "candidate_pool_only"
+    assert context_card["topic_relevance_contract"]["relationship_scope"] == "future_edge_overlap_only"
+    assert "weak topic context" in context_card["plain_language"]
+    assert any(item["kind"] == "claim_card_context" for item in radar["candidate_pool"])
+
+
 def test_validation_directions_from_claim_cards_carry_five_question_evidence():
     radar = _build_rd_radar(
         future_directions=[

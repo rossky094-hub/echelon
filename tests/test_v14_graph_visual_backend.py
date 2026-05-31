@@ -629,6 +629,88 @@ def test_visual_topic_lens_prioritizes_promotable_typed_lineage(tmp_path, monkey
     assert constraint["evidence_objects"][0]["section_atom_chain_id"] == "sac_promotable"
 
 
+def test_visual_topic_lens_links_claim_cards_by_future_edge_overlap(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.executescript(
+        """
+        CREATE TABLE future_directions (
+            direction_id INTEGER PRIMARY KEY,
+            direction_name TEXT,
+            confidence REAL,
+            evidence_tier TEXT,
+            claim_scope TEXT,
+            main_path_evidence TEXT,
+            vgae_evidence TEXT,
+            limitation_evidence TEXT,
+            paper_ids_json TEXT
+        );
+        CREATE TABLE direction_claim_cards (
+            claim_card_id TEXT PRIMARY KEY,
+            direction_id INTEGER,
+            root_constraint_json TEXT,
+            attempts_last_10y_json TEXT,
+            enabling_conditions_json TEXT,
+            unresolved_bottleneck_json TEXT,
+            minimal_validation_experiment_json TEXT,
+            evidence_strength_level TEXT,
+            evidence_grade TEXT,
+            uncertainty_reasons_json TEXT,
+            evidence_objects_json TEXT,
+            five_question_complete INTEGER,
+            high_confidence_eligible INTEGER,
+            quality_gate_json TEXT
+        );
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO visual_edges
+            (edge_id, source_paper_id, target_paper_id, edge_type, layer,
+             weight, confidence, is_directed, is_main_path, lod_min,
+             style_json, evidence_json)
+        VALUES ('future:p1:p2', 'p1', 'p2', 'future_growth', 'future',
+                0.8, 0.8, 1, 0, 1, '{}',
+                '{"calibrated_candidate_score":0.7,"calibration_status":"calibrated_with_run_audit"}')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO future_directions VALUES (
+            9, 'Frequency-comb validation direction', 0.8, 'exploratory',
+            'exploratory_with_claim_card', '', '', '', '["p1","p2"]'
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO direction_claim_cards VALUES (
+            'cc9', 9, '{}', '[]', '{}', '{}',
+            '{"experiment":"measure future candidate"}',
+            'strong', 'complete_claim_card_pending_high_confidence_evidence',
+            '[]', '[]', 1, 0, '{}'
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get(
+        "/graph/visual/topic-lens",
+        headers=VIEWER_HEADERS,
+        params={"topic": "laser optics", "top_k": 20},
+    )
+
+    assert resp.status_code == 200
+    radar = resp.json()["rd_radar"]
+    assert len(radar["claim_cards"]) == 1
+    assert radar["claim_cards"][0]["direction_id"] == 9
+    assert radar["claim_cards"][0]["topic_relevance_contract"]["future_edge_paper_overlap"] == ["p1", "p2"]
+    assert radar["claim_cards"][0]["topic_relevance_contract"]["relationship_scope"] == "topic_text_or_context"
+
+
 def test_visual_clusters_branch_lineages_carry_evidence_contract(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

@@ -4133,6 +4133,7 @@ def _build_rd_radar(
     future_growth: list[dict[str, Any]],
 ) -> dict[str, Any]:
     claim_cards: list[dict[str, Any]] = []
+    context_cards: list[dict[str, Any]] = []
     incomplete_cards: list[dict[str, Any]] = []
     for d in future_directions[:12]:
         card = d.get("claim_card") or {}
@@ -4141,6 +4142,10 @@ def _build_rd_radar(
         eligible = bool(card.get("high_confidence_eligible"))
         missing_gates = list(quality_gate.get("missing_gates") or [])
         missing_high_conf = list(quality_gate.get("missing_high_confidence_gates") or [])
+        topic_relevance = d.get("topic_relevance_contract") or {}
+        relevance_uncertainty = list(topic_relevance.get("uncertainty_reasons") or [])
+        relevance_scope = str(topic_relevance.get("relationship_scope") or "")
+        weak_topic_context = relevance_scope == "future_edge_overlap_only"
         evidence_grade = str(
             card.get("evidence_grade")
             or d.get("evidence_grade")
@@ -4155,16 +4160,22 @@ def _build_rd_radar(
         uncertainty = [
             *list(d.get("uncertainty_reasons") or []),
             *list(card.get("uncertainty_reasons") or []),
+            *relevance_uncertainty,
             *[f"missing five-question gate: {gate}" for gate in missing_gates],
             *[f"missing high-confidence gate: {gate}" for gate in missing_high_conf],
         ]
         if five_complete and not eligible:
             uncertainty.append("complete Claim Card remains exploratory until high-confidence evidence gates pass")
+        if five_complete and weak_topic_context:
+            uncertainty.append(
+                "complete Claim Card is linked only through topic future-edge paper overlap; keep it in the candidate pool until topic-specific bottleneck evidence links it to this topic"
+            )
         required_evidence = [
             "strong/moderate section evidence for unresolved bottleneck claims",
             "rolling held-out-year calibration audit for linked future candidates",
             "successful minimal validation experiment with explicit falsification conditions",
             "expert review before investment-grade interpretation",
+            *list(topic_relevance.get("required_evidence") or []),
             *[f"missing five-question gate: {gate}" for gate in missing_gates],
             *[f"missing high-confidence gate: {gate}" for gate in missing_high_conf],
         ]
@@ -4173,6 +4184,7 @@ def _build_rd_radar(
             candidate_score = d.get("confidence")
         item = {
             "kind": "claim_card" if five_complete else "incomplete_claim_card",
+            "direction_id": d.get("direction_id"),
             "title": d.get("direction_name") or d.get("direction_id"),
             "priority": candidate_score,
             "candidate_score": candidate_score,
@@ -4186,10 +4198,13 @@ def _build_rd_radar(
             "evidence_tier": d.get("evidence_tier"),
             "eligible": eligible,
             "claim_card": card,
+            "topic_relevance_contract": topic_relevance,
             "missing_gates": missing_gates,
             "missing_high_confidence_gates": missing_high_conf,
             "plain_language": (
-                "Decision-grade Claim Card is complete; read eligibility gates before treating it as high confidence."
+                "Complete Claim Card is available only as weak topic context; use it to plan evidence frontfill, not as a Radar direction."
+                if five_complete and weak_topic_context
+                else "Decision-grade Claim Card is complete; read eligibility gates before treating it as high confidence."
                 if five_complete
                 else "Incomplete Claim Card: this direction remains in the candidate pool until all five questions are answered."
             ),
@@ -4209,11 +4224,16 @@ def _build_rd_radar(
             for obj in item["evidence_objects"]
             if obj.get("paper_id")
         ][:6]
-        if five_complete:
+        if five_complete and weak_topic_context:
+            item["kind"] = "claim_card_context"
+            item["claim_scope"] = "candidate_pool_only"
+            context_cards.append(item)
+        elif five_complete:
             claim_cards.append(item)
         else:
             incomplete_cards.append(item)
     candidate_pool: list[dict[str, Any]] = []
+    candidate_pool.extend(context_cards)
     candidate_pool.extend(incomplete_cards)
     for e in future_growth[:20]:
         evidence = _normalise_future_candidate_evidence(e)
@@ -4316,6 +4336,7 @@ def _build_rd_radar(
         ),
         "items": items,
         "claim_cards": claim_cards,
+        "context_claim_cards": context_cards,
         "incomplete_claim_cards": incomplete_cards,
         "candidate_pool": candidate_pool,
         "claim_cards_ready": bool(claim_cards),
@@ -5339,6 +5360,13 @@ def get_topic_lens(
                 "until Step6/Step13 Claim Cards are materialized."
             )
         _apply_future_edge_contracts(future_growth)
+        future_edge_paper_ids = {
+            str(pid)
+            for edge in future_growth[:80]
+            for pid in (edge.get("source_paper_id"), edge.get("target_paper_id"))
+            if pid
+        }
+        context_seed_set = {str(pid) for pid in context_seed_ids if pid}
 
         unresolved_limitations = []
         for h in hits:
@@ -5451,14 +5479,55 @@ def get_topic_lens(
                     str(item.get(k) or "")
                     for k in ("direction_name", "main_path_evidence", "vgae_evidence", "limitation_evidence")
                 ).lower()
-                score = 0
-                if topic_tokens:
-                    score += sum(1 for t in topic_tokens if t in text)
+                token_matches = sorted(t for t in topic_tokens if t in text)
+                token_score = len(token_matches)
                 paper_ids = _loads(item.get("paper_ids_json"), [])
+                context_overlap: list[str] = []
+                future_edge_overlap: list[str] = []
                 if isinstance(paper_ids, list):
-                    score += sum(1 for pid in paper_ids if pid in context_seed_ids)
+                    paper_ids = [str(pid) for pid in paper_ids if pid]
+                    context_overlap = [pid for pid in paper_ids if pid in context_seed_set]
+                    future_edge_overlap = [pid for pid in paper_ids if pid in future_edge_paper_ids]
+                score = token_score * 4 + len(context_overlap) * 2 + len(future_edge_overlap)
                 if score > 0:
+                    relationship_scope = (
+                        "topic_text_or_context"
+                        if token_score or context_overlap
+                        else "future_edge_overlap_only"
+                    )
                     item["_topic_score"] = score
+                    item["topic_relevance_contract"] = {
+                        "relationship_scope": relationship_scope,
+                        "topic_token_matches": token_matches[:12],
+                        "context_seed_paper_overlap": context_overlap[:12],
+                        "future_edge_paper_overlap": future_edge_overlap[:12],
+                        "claim_scope": (
+                            "topic_relevant_claim_card_candidate"
+                            if relationship_scope == "topic_text_or_context"
+                            else "candidate_pool_context_only"
+                        ),
+                        "evidence_grade": (
+                            "topic_text_or_context_linked_claim_card"
+                            if relationship_scope == "topic_text_or_context"
+                            else "weak_future_edge_overlap_claim_card_context"
+                        ),
+                        "uncertainty_reasons": (
+                            []
+                            if relationship_scope == "topic_text_or_context"
+                            else [
+                                "direction matched this topic only through selected future-edge paper overlap",
+                                "topic-specific bottleneck evidence is still required before Radar promotion",
+                            ]
+                        ),
+                        "required_evidence": (
+                            []
+                            if relationship_scope == "topic_text_or_context"
+                            else [
+                                "topic-specific limitation or bottleneck lineage evidence linking this direction to the requested topic",
+                                "Step6/Step13 rerun after targeted section evidence frontfill",
+                            ]
+                        ),
+                    }
                     item["claim_card"] = {
                         "claim_card_id": item.pop("claim_card_id", None),
                         "root_constraint": _loads(item.pop("root_constraint_json", "{}"), {}),

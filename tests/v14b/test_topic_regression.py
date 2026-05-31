@@ -182,6 +182,30 @@ def test_metalens_regression_flags_missing_claim_cards_and_evidence():
     assert future_gap["candidate_paper_ids"] == "p1;p2"
 
 
+def test_future_candidate_gap_rows_include_claim_card_missing_gates():
+    result = {
+        "topic": "metalens",
+        "future_candidates": {"total": 3, "complete_claim_cards": 0},
+        "future_candidate_gap_paper_ids": ["p1", "p2"],
+        "claim_card_gap_summary": {
+            "incomplete_claim_cards": 2,
+            "context_claim_cards": 1,
+            "candidate_direction_ids": ["83", "84"],
+            "context_direction_ids": ["82"],
+            "missing_five_question_gates": {"past_attempts_10y": 2, "unresolved_bottleneck": 1},
+            "missing_high_confidence_gates": {"section_evidence": 1},
+        },
+    }
+
+    rows = build_evidence_gap_rows(result)
+
+    future_gap = [row for row in rows if row["gap_type"] == "future_candidates_missing_claim_card"][0]
+    assert "past_attempts_10y=2" in future_gap["why"]
+    assert "unresolved_bottleneck=1" in future_gap["why"]
+    assert "incomplete direction ids: 83,84" in future_gap["why"]
+    assert "weak topic context: 82" in future_gap["why"]
+
+
 def test_topic_regression_does_not_count_weak_full_lineage_as_promotable():
     fragments = _evidence_contract_fragments()
     fragments["bottleneck_lineage"]["constraints"][0].update(

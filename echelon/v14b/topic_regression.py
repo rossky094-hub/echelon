@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -362,6 +363,42 @@ def _claim_cards(lens: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _claim_card_gap_summary(lens: dict[str, Any]) -> dict[str, Any]:
+    radar = lens.get("rd_radar") or {}
+    incomplete = [
+        c for c in (radar.get("incomplete_claim_cards") or [])
+        if isinstance(c, dict)
+    ]
+    context_cards = [
+        c for c in (radar.get("context_claim_cards") or [])
+        if isinstance(c, dict)
+    ]
+    missing_five_question_gates: Counter[str] = Counter()
+    missing_high_confidence_gates: Counter[str] = Counter()
+    candidate_direction_ids: list[str] = []
+    context_direction_ids: list[str] = []
+    for card in incomplete:
+        did = card.get("direction_id")
+        if did is not None:
+            candidate_direction_ids.append(str(did))
+        for gate in card.get("missing_gates") or []:
+            missing_five_question_gates[str(gate)] += 1
+        for gate in card.get("missing_high_confidence_gates") or []:
+            missing_high_confidence_gates[str(gate)] += 1
+    for card in context_cards:
+        did = card.get("direction_id")
+        if did is not None:
+            context_direction_ids.append(str(did))
+    return {
+        "incomplete_claim_cards": len(incomplete),
+        "context_claim_cards": len(context_cards),
+        "candidate_direction_ids": sorted(set(candidate_direction_ids)),
+        "context_direction_ids": sorted(set(context_direction_ids)),
+        "missing_five_question_gates": dict(missing_five_question_gates),
+        "missing_high_confidence_gates": dict(missing_high_confidence_gates),
+    }
+
+
 def _has_evidence_contract(item: dict[str, Any]) -> bool:
     return bool(
         item.get("claim_scope")
@@ -545,6 +582,7 @@ def build_evidence_gap_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
     """
     topic = str(result.get("topic") or "")
     rows: list[dict[str, Any]] = []
+    claim_gap = result.get("claim_card_gap_summary") or {}
     for row in result.get("bottleneck_results") or []:
         if row.get("present_in_evidence"):
             continue
@@ -581,6 +619,29 @@ def build_evidence_gap_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
         )
     if (result.get("future_candidates") or {}).get("total") and not (result.get("future_candidates") or {}).get("complete_claim_cards"):
         candidate_ids = result.get("future_candidate_gap_paper_ids") or []
+        missing_five = claim_gap.get("missing_five_question_gates") or {}
+        missing_high = claim_gap.get("missing_high_confidence_gates") or {}
+        context_cards = int(claim_gap.get("context_claim_cards") or 0)
+        candidate_dirs = claim_gap.get("candidate_direction_ids") or []
+        context_dirs = claim_gap.get("context_direction_ids") or []
+        claim_gap_bits = []
+        if missing_five:
+            claim_gap_bits.append(
+                "missing five-question gates: "
+                + ", ".join(f"{k}={v}" for k, v in sorted(missing_five.items()))
+            )
+        if missing_high:
+            claim_gap_bits.append(
+                "missing high-confidence gates: "
+                + ", ".join(f"{k}={v}" for k, v in sorted(missing_high.items()))
+            )
+        if candidate_dirs:
+            claim_gap_bits.append("incomplete direction ids: " + ",".join(str(x) for x in candidate_dirs[:8]))
+        if context_cards:
+            claim_gap_bits.append(
+                "complete Claim Cards found only as weak topic context: "
+                + ",".join(str(x) for x in context_dirs[:8])
+            )
         rows.append(
             {
                 "topic": topic,
@@ -593,6 +654,7 @@ def build_evidence_gap_rows(result: dict[str, Any]) -> list[dict[str, Any]]:
                 "why": (
                     "Future candidates exist but Step6/Step13 has not produced a complete Claim Card; "
                     "frontfill these candidate endpoints so Step5c/Step13 can test bottleneck and history evidence"
+                    + (". " + "; ".join(claim_gap_bits) if claim_gap_bits else "")
                 ),
             }
         )
@@ -696,6 +758,7 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
     turning = _turning_papers(lens)
     future_edges = _future_edges(lens)
     claim_cards = _claim_cards(lens)
+    claim_card_gap_summary = _claim_card_gap_summary(lens)
     five_question_contracts = _five_question_contract_summary(lens)
     lineage_contracts = _bottleneck_lineage_contract_summary(lens)
     reading_path_contracts = _reading_path_contract_summary(lens)
@@ -869,6 +932,7 @@ def run_topic_regression(lens: dict[str, Any], benchmark: BenchmarkTopic = METAL
             "claim_cards": len(claim_cards),
             "complete_claim_cards": complete_claim_cards,
         },
+        "claim_card_gap_summary": claim_card_gap_summary,
         "first_principles_contracts": five_question_contracts,
         "bottleneck_lineage_contracts": lineage_contracts,
         "reading_path_contracts": reading_path_contracts,

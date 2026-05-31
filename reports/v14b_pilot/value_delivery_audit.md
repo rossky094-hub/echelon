@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T03:05:08Z`
+- generated_at: `2026-05-31T03:15:09Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -64,37 +64,37 @@
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 408,
-      "current_contract_rate": 0.1349206349206349,
-      "decision_grade_papers": 408,
-      "decision_grade_rate": 0.1349206349206349,
+      "current_contract_papers": 409,
+      "current_contract_rate": 0.13525132275132276,
+      "decision_grade_papers": 409,
+      "decision_grade_rate": 0.13525132275132276,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1159,
-        "weak": 1865
+        "strong": 1160,
+        "weak": 1864
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4566,
-        "v14b_section_parser_contract_v3_toc_guard": 938
+        "legacy_unknown_contract": 4563,
+        "v14b_section_parser_contract_v3_toc_guard": 941
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4566,
-        "v14b_section_ingest_v3": 938
+        "v14b_section_ingest_v2": 4563,
+        "v14b_section_ingest_v3": 941
       },
       "primary_section_papers": 3024,
       "primary_section_rows": 5504,
       "strategy_counts": {
         "embedded_heading": 51,
-        "explicit_heading": 1703,
-        "heading_continuation": 2228,
-        "inline_heading": 685,
-        "legacy_unknown_strategy": 3209,
+        "explicit_heading": 1706,
+        "heading_continuation": 2231,
+        "inline_heading": 686,
+        "legacy_unknown_strategy": 3206,
         "loose_inline_heading": 37,
         "parser_hint": 45
       },
-      "strong_or_moderate_papers": 1159,
-      "weak_only_papers": 1865,
-      "weak_only_rate": 0.6167328042328042
+      "strong_or_moderate_papers": 1160,
+      "weak_only_papers": 1864,
+      "weak_only_rate": 0.6164021164021164
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -613,8 +613,6 @@
     "topic_regression_cli_defaults_to_suite": true
   },
   "failed_topics": [
-    "metalens",
-    "metasurface holography",
     "photonic crystal cavity",
     "quantum light source"
   ],
