@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T11:12:44Z`
+- generated_at: `2026-05-31T11:41:51Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,030`
@@ -9,6 +9,8 @@
 - section_atoms_fts: `yes`
 - section_atom_embeddings: `61,708`
 - section_atom_embeddings_retrieval_only: `61,708`
+- section_embeddings: `0`
+- section_embeddings_retrieval_only: `0`
 - section_atom_chains: `4,494`
 - section_atom_chain_full: `6`
 - section_atom_chain_decision_grade: `3`
@@ -51,7 +53,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5a citation function | `aligned` | `warn` | Label citation roles as weak/moderate evidence for fusion, not ground truth. | citation_function_edges=38,538; evidence remains weak without citation sentences. | Prefer deterministic weak labels now; add citation-context extraction before increasing weights. |
 | Step5b calibrated future candidate generator | `aligned` | `pass` | Generate future candidates from temporal evidence; never produce conclusions directly. | future_candidate_edges=1,000; calibration_audits=1. | Continue rolling held-out-year calibration and stratified external audit; do not expose VGAE as Radar claims. |
 | Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,030; topic_gap_decision_grade=57.7%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
-| Step5s-a section atom search | `aligned` | `pass` | Split trusted sections into span-bound retrieval atoms with exact hard-evidence search and fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only. | section_atoms=61,708; decision_grade_atoms=11,505; exact_atom_fts=yes; fuzzy_atom_embeddings=61,708; retrieval_only_embeddings=61,708; GNN/VGAE must not atomize sections. | Feed exact hits and fuzzy candidate recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text. |
+| Step5s-a section atom search | `aligned` | `warn` | Split trusted sections into span-bound retrieval atoms with exact hard-evidence search plus atom/section fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only. | section_atoms=61,708; decision_grade_atoms=11,505; exact_atom_fts=yes; fuzzy_atom_embeddings=61,708; retrieval_only_embeddings=61,708; fuzzy_section_embeddings=0; retrieval_only_section_embeddings=0; GNN/VGAE must not atomize sections. | Feed exact hits, atom fuzzy recall, and section context recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text. |
 | Step5s-b section atom typed chains | `aligned` | `pass` | Assemble co-located section atoms into typed bottleneck-chain evidence candidates before Step13 claim reasoning. | section_atom_chains=4,494; full_chains=6; decision_grade_chains=3; these chains are evidence substrate, not conclusions. | Wire full/partial section_atom_chains into Step13 so bottleneck_lineage_triples stop relying on placeholder stages. |
 | Step5c limitation / resolution extraction | `aligned` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=772; exact_section_atoms=772; aggregate_section_atoms=0; section_atom_bridge_atoms=389; current_contract_atoms=317; typed_chain_atoms=245; current_contract_typed_chain_atoms=196; abstract_atoms=0; section coverage is still the limiting input. | Use Step5c limitation atoms as section-atom/typed-chain evidence; keep abstract fallback disabled for claims. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
@@ -78,7 +80,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5a citation function | Citation edge endpoints plus metadata/context when available. | Citation-function labels, confidence, and evidence level. | No-context labels must remain low weight. |
 | Step5b calibrated future candidate generator | Time-forward evolution edges, graph features, embeddings, and calibration split. | Candidate edges with raw/calibrated scores and lifecycle state. | Uncalibrated or unfused edges stay candidate pool only. |
 | Step5s section evidence | OA PDFs and prioritized topic/claim/branch queues. | Current-contract decision-grade primary section rows plus failure taxonomy. | No section coverage for key papers means no high-confidence bottleneck/Claim Card. |
-| Step5s-a section atom search | paper_sections with parser contract, extraction provenance, pages, and raw-PDF storage URI when available. | section_atoms plus FTS/BM25 hard-evidence hits and atom embeddings labeled retrieval_context_only. | Exact atom hits can seed evidence work; fuzzy hits are candidate recall only and cannot become scientific conclusions without typed chains and promotion gates. |
+| Step5s-a section atom search | paper_sections with parser contract, extraction provenance, pages, and raw-PDF storage URI when available. | section_atoms plus FTS/BM25 hard-evidence hits, atom embeddings, and section embeddings labeled retrieval_context_only. | Exact atom hits can seed evidence work; fuzzy hits are candidate recall only and cannot become scientific conclusions without typed chains and promotion gates. |
 | Step5s-b section atom typed chains | section_atoms with atom_type, section order, parser contract, pages, and source URI. | section_atom_chains carrying typed_chain_completeness, evidence objects, claim_scope, and uncertainty reasons. | Partial chains are exploratory context only; full chains still require Step13 Claim Card promotion. |
 | Step5c limitation / resolution extraction | Current-contract section atoms and typed chains first, weak abstract metadata only as scoped fallback. | Typed limitations/resolutions with section atom, typed-chain, parser-contract, and weight provenance. | Abstract-only bottlenecks cannot support high-confidence Claim Cards. |
 | Step6 fusion | Main path terminals, calibrated future candidates, limitations, field/topic context. | Future directions with evidence tier, claim scope, and adequacy label. | Sparse fusion should output few/zero directions instead of placeholders. |

@@ -37,6 +37,7 @@ from echelon.v14b.evidence_contracts import (
 )
 from echelon.v14b.topic_readiness import build_topic_readiness_preflight
 from echelon.v14b.section_atoms import (
+    search_sections_fuzzy,
     search_section_atoms,
     search_section_atoms_fuzzy,
     search_section_atoms_hybrid,
@@ -1123,6 +1124,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
             "hits": [],
             "exact_hits": [],
             "fuzzy_candidate_hits": [],
+            "section_context_hits": [],
             "total_matches": 0,
             "elapsed_ms": _elapsed_ms(start),
             "schema_version": SCHEMA_VERSION,
@@ -1138,6 +1140,8 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
             required_tables.append("section_atoms_fts")
         if query.search_mode in {"fuzzy", "hybrid"}:
             required_tables.append("section_atom_embeddings")
+        if query.include_section_context:
+            required_tables.append("section_embeddings")
         missing = [table for table in required_tables if not _table_exists(conn, table)]
         if missing:
             return {
@@ -1146,13 +1150,14 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
                 "hits": [],
                 "exact_hits": [],
                 "fuzzy_candidate_hits": [],
+                "section_context_hits": [],
                 "total_matches": 0,
                 "elapsed_ms": _elapsed_ms(start),
                 "schema_version": SCHEMA_VERSION,
                 "search_mode": query.search_mode,
                 "search_contract": _evidence_atom_search_contract(query.search_mode),
                 "missing_tables": missing,
-                "message": "section atom search substrate is not materialized; run section-atoms and section-atom-embeddings",
+                "message": "section atom search substrate is not materialized; run section-atoms, section-atom-embeddings, and section-embeddings when section context is requested",
             }
 
         if query.search_mode == "exact":
@@ -1200,6 +1205,20 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
             fuzzy_hits = result["fuzzy_candidate_hits"]
             contract = result["search_contract"]
             contract["promotion_rule"] = _evidence_atom_search_contract("hybrid")["promotion_rule"]
+        section_hits = (
+            search_sections_fuzzy(
+                conn,
+                query.query_text,
+                top_k=query.section_top_k or query.top_k,
+                filters=query.filters,
+                embedding_model=query.section_embedding_model,
+                embedding_dim=query.section_embedding_dim,
+                min_score=query.min_fuzzy_score,
+                ensure_schema=False,
+            )
+            if query.include_section_context
+            else []
+        )
 
         return {
             "query_id": query.query_id,
@@ -1207,12 +1226,18 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
             "hits": hits,
             "exact_hits": exact_hits,
             "fuzzy_candidate_hits": fuzzy_hits,
+            "section_context_hits": section_hits,
             "total_matches": len(hits),
             "elapsed_ms": _elapsed_ms(start),
             "schema_version": SCHEMA_VERSION,
             "search_mode": query.search_mode,
             "filters": dict(query.filters or {}),
             "search_contract": contract,
+            "section_context_contract": (
+                _evidence_atom_search_contract("section_fuzzy_context")
+                if query.include_section_context
+                else None
+            ),
         }
     except sqlite3.OperationalError as exc:
         return {
@@ -1221,6 +1246,7 @@ def search_evidence_atoms(query: EvidenceAtomSearchQuery) -> dict:
             "hits": [],
             "exact_hits": [],
             "fuzzy_candidate_hits": [],
+            "section_context_hits": [],
             "total_matches": 0,
             "elapsed_ms": _elapsed_ms(start),
             "schema_version": SCHEMA_VERSION,

@@ -201,6 +201,13 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
             {"claim_scope", "search_semantics"},
             "claim_scope = 'retrieval_context_only' AND search_semantics LIKE '%candidate recall only%'",
         )
+        metrics["section_embeddings"] = _count(main, "section_embeddings")
+        metrics["section_embeddings_retrieval_only"] = _count_when_columns(
+            main,
+            "section_embeddings",
+            {"claim_scope", "search_semantics"},
+            "claim_scope = 'retrieval_context_only' AND search_semantics LIKE '%candidate recall only%'",
+        )
         metrics["section_atom_chains"] = _count(main, "section_atom_chains")
         metrics["section_atom_chain_full"] = _count_when_columns(
             main,
@@ -310,6 +317,8 @@ def build_algorithm_logic_audit(
     section_atoms_fts = int(m.get("section_atoms_fts") or 0)
     section_atom_embeddings = int(m.get("section_atom_embeddings") or 0)
     section_atom_embeddings_retrieval_only = int(m.get("section_atom_embeddings_retrieval_only") or 0)
+    section_embeddings = int(m.get("section_embeddings") or 0)
+    section_embeddings_retrieval_only = int(m.get("section_embeddings_retrieval_only") or 0)
     section_atom_chains = int(m.get("section_atom_chains") or 0)
     section_atom_chain_full = int(m.get("section_atom_chain_full") or 0)
     section_atom_chain_decision_grade = int(m.get("section_atom_chain_decision_grade") or 0)
@@ -499,22 +508,30 @@ def build_algorithm_logic_audit(
         ),
         StepAudit(
             "Step5s-a section atom search",
-            "Split trusted sections into span-bound retrieval atoms with exact hard-evidence search and fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only.",
+            "Split trusted sections into span-bound retrieval atoms with exact hard-evidence search plus atom/section fuzzy candidate recall; keep GNN/VGAE as ranking or expansion only.",
             "paper_sections with parser contract, extraction provenance, pages, and raw-PDF storage URI when available.",
-            "section_atoms plus FTS/BM25 hard-evidence hits and atom embeddings labeled retrieval_context_only.",
+            "section_atoms plus FTS/BM25 hard-evidence hits, atom embeddings, and section embeddings labeled retrieval_context_only.",
             "Exact atom hits can seed evidence work; fuzzy hits are candidate recall only and cannot become scientific conclusions without typed chains and promotion gates.",
             "aligned",
             "fail"
             if not section_atoms
-            else ("warn" if not section_atoms_fts or not section_atom_embeddings_retrieval_only else "pass"),
+            else (
+                "warn"
+                if not section_atoms_fts
+                or not section_atom_embeddings_retrieval_only
+                or not section_embeddings_retrieval_only
+                else "pass"
+            ),
             (
                 f"section_atoms={section_atoms:,}; decision_grade_atoms={section_atom_decision_grade:,}; "
                 f"exact_atom_fts={'yes' if section_atoms_fts else 'no'}; "
                 f"fuzzy_atom_embeddings={section_atom_embeddings:,}; "
                 f"retrieval_only_embeddings={section_atom_embeddings_retrieval_only:,}; "
+                f"fuzzy_section_embeddings={section_embeddings:,}; "
+                f"retrieval_only_section_embeddings={section_embeddings_retrieval_only:,}; "
                 "GNN/VGAE must not atomize sections."
             ),
-            "Feed exact hits and fuzzy candidate recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text.",
+            "Feed exact hits, atom fuzzy recall, and section context recall into Step5c/Step13 through evidence contracts instead of re-parsing ad hoc text.",
         ),
         StepAudit(
             "Step5s-b section atom typed chains",
@@ -683,6 +700,8 @@ def build_algorithm_logic_audit(
             "section_atoms_fts": section_atoms_fts,
             "section_atom_embeddings": section_atom_embeddings,
             "section_atom_embeddings_retrieval_only": section_atom_embeddings_retrieval_only,
+            "section_embeddings": section_embeddings,
+            "section_embeddings_retrieval_only": section_embeddings_retrieval_only,
             "section_atom_chains": section_atom_chains,
             "section_atom_chain_full": section_atom_chain_full,
             "section_atom_chain_decision_grade": section_atom_chain_decision_grade,
@@ -740,6 +759,8 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- section_atoms_fts: `{'yes' if int(result['metrics']['section_atoms_fts']) else 'no'}`",
         f"- section_atom_embeddings: `{int(result['metrics']['section_atom_embeddings']):,}`",
         f"- section_atom_embeddings_retrieval_only: `{int(result['metrics']['section_atom_embeddings_retrieval_only']):,}`",
+        f"- section_embeddings: `{int(result['metrics']['section_embeddings']):,}`",
+        f"- section_embeddings_retrieval_only: `{int(result['metrics']['section_embeddings_retrieval_only']):,}`",
         f"- section_atom_chains: `{int(result['metrics']['section_atom_chains']):,}`",
         f"- section_atom_chain_full: `{int(result['metrics']['section_atom_chain_full']):,}`",
         f"- section_atom_chain_decision_grade: `{int(result['metrics']['section_atom_chain_decision_grade']):,}`",

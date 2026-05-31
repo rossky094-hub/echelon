@@ -228,6 +228,11 @@ class EvidenceAtomSearchQuery(BaseModel):
     top_k: int = Field(default=50, ge=1, le=200, description="返回结果上限")
     exact_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid exact 分支上限")
     fuzzy_top_k: Optional[int] = Field(default=None, ge=1, le=500, description="hybrid fuzzy 分支上限")
+    include_section_context: bool = Field(
+        default=False,
+        description="可选返回 section embedding fuzzy context；仍为 retrieval_context_only",
+    )
+    section_top_k: Optional[int] = Field(default=None, ge=1, le=200, description="section context fuzzy 召回上限")
     min_fuzzy_score: float = Field(default=0.0, ge=0.0, le=1.0, description="fuzzy 召回最低分")
     embedding_model: str = Field(
         default="deterministic_hashing_atom_embedding_v1",
@@ -235,6 +240,12 @@ class EvidenceAtomSearchQuery(BaseModel):
         description="atom embedding 模型标识",
     )
     embedding_dim: int = Field(default=256, ge=1, le=4096, description="atom embedding 维度")
+    section_embedding_model: str = Field(
+        default="deterministic_hashing_section_embedding_v1",
+        max_length=200,
+        description="section embedding 模型标识",
+    )
+    section_embedding_dim: int = Field(default=256, ge=1, le=4096, description="section embedding 维度")
     expert_id: Optional[str] = Field(
         default=None, pattern=r"^[a-zA-Z0-9_-]+$", description="发起查询的专家 ID"
     )

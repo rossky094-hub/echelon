@@ -33,12 +33,13 @@ def test_post_frontfill_rebuilds_evidence_sensitive_steps_with_no_resume(tmp_pat
     assert cmd[cmd.index("--corpus-id") + 1] == "optics"
 
 
-def test_post_frontfill_default_chain_rebuilds_section_atom_substrate_before_step5c():
+def test_post_frontfill_default_chain_rebuilds_section_retrieval_substrate_before_step5c():
     mod = _load_module()
 
-    assert list(mod.DEFAULT_STEPS[:4]) == [
+    assert list(mod.DEFAULT_STEPS[:5]) == [
         "section-atoms",
         "section-atom-embeddings",
+        "section-embeddings",
         "section-atom-chains",
         "limitation",
     ]
@@ -59,6 +60,24 @@ def test_post_frontfill_section_atom_embedding_step_rebuilds_vectors(tmp_path):
     assert "--skip-atom-build" in cmd
     assert "--build-embeddings" in cmd
     assert "--embedding-rebuild" in cmd
+    assert "--no-resume" in cmd
+
+
+def test_post_frontfill_section_embedding_step_rebuilds_vectors(tmp_path):
+    mod = _load_module()
+
+    cmd = mod.build_step_command(
+        python_exe="python3",
+        step="section-embeddings",
+        db_main=tmp_path / "main.sqlite3",
+        db_v14=tmp_path / "v14.sqlite3",
+        force_rerun=True,
+    )
+
+    assert cmd[:3] == ["python3", "-m", "echelon.v14b.section_atoms"]
+    assert "--skip-atom-build" in cmd
+    assert "--build-section-embeddings" in cmd
+    assert "--section-embedding-rebuild" in cmd
     assert "--no-resume" in cmd
 
 

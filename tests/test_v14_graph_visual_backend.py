@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from echelon.api.main import app
 from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
-from echelon.v14b.section_atoms import build_section_atom_embeddings, build_section_atoms
+from echelon.v14b.section_atoms import build_section_atom_embeddings, build_section_atoms, build_section_embeddings
 
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -419,6 +419,7 @@ def _make_section_atom_db(path):
     conn.close()
     build_section_atoms(path, max_atoms_per_section=6)
     build_section_atom_embeddings(path, rebuild=True, embedding_dim=64)
+    build_section_embeddings(path, rebuild=True, embedding_dim=64)
 
 
 def test_visual_search_uses_materialized_tables(tmp_path, monkeypatch):
@@ -478,6 +479,38 @@ def test_evidence_atom_search_endpoint_returns_exact_and_fuzzy_contracts(tmp_pat
     assert all("embedding_json" not in hit for hit in data["hits"])
     assert data["hits"][0]["source_storage_uri"].endswith("/p1.pdf")
     assert data["hits"][0]["span"]["unit"] == "normalized_section_text_char_offsets"
+
+
+def test_evidence_atom_search_endpoint_can_return_section_context_hits(tmp_path, monkeypatch):
+    db_path = tmp_path / "echelon_library.sqlite3"
+    _make_section_atom_db(db_path)
+    monkeypatch.setenv("V14B_DB_MAIN", str(db_path))
+
+    resp = client.post(
+        "/graph/visual/evidence-atoms/search",
+        headers=VIEWER_HEADERS,
+        json={
+            "query_text": "thermal fabrication loss bottleneck",
+            "search_mode": "hybrid",
+            "top_k": 5,
+            "embedding_dim": 64,
+            "include_section_context": True,
+            "section_embedding_dim": 64,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ready"] is True
+    assert data["section_context_hits"]
+    section_hit = data["section_context_hits"][0]
+    assert section_hit["paper_id"] == "p1"
+    assert section_hit["retrieval_context_kind"] == "paper_section_embedding_context"
+    assert section_hit["claim_scope"] == "retrieval_context_only"
+    assert section_hit["search_mode"] == "section_fuzzy_vector_recall"
+    assert "embedding_json" not in json.dumps(section_hit)
+    assert data["section_context_contract"]["claim_scope"] == "retrieval_context_only"
+    assert "section_embeddings" in data["search_contract"]["dual_retrieval_layer"]["fuzzy_substrates"]
 
 
 def test_evidence_atom_search_endpoint_supports_exact_identifier_title_and_phrase(tmp_path, monkeypatch):

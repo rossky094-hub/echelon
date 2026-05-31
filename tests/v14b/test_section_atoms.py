@@ -8,11 +8,13 @@ from echelon.v14b.evidence_contracts import SECTION_PARSER_CONTRACT_VERSION
 from echelon.v14b.section_atoms import (
     build_section_atom_embeddings,
     build_section_atoms,
+    build_section_embeddings,
     classify_atom_type,
     extract_section_atoms_from_row,
     search_section_atoms,
     search_section_atoms_fuzzy,
     search_section_atoms_hybrid,
+    search_sections_fuzzy,
 )
 
 
@@ -361,6 +363,82 @@ def test_build_section_atom_embeddings_and_fuzzy_search_are_context_only(tmp_pat
     assert "embedding_json" not in hits[0]
     assert metric_hits and all(hit["atom_type"] == "metric_result" for hit in metric_hits)
     assert discussion_hits and all(hit["section_key"] == "discussion" for hit in discussion_hits)
+
+
+def test_build_section_embeddings_and_fuzzy_search_are_context_only(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """
+        CREATE TABLE papers (id TEXT PRIMARY KEY, title TEXT, doi TEXT);
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            source_url TEXT,
+            section_pages_json TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.execute("INSERT INTO papers VALUES ('p1', 'Photonic fabrication loss study', '10.1234/p1')")
+    conn.execute("INSERT INTO papers VALUES ('p2', 'Efficiency benchmark study', '10.1234/p2')")
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "Discussion",
+            (
+                "A central limitation is fabrication error, optical loss, and thermal drift in dense photonic arrays. "
+                "The authors describe this as an unresolved constraint for scalable deployment."
+            ),
+            "https://example.test/p1.pdf",
+            json.dumps([6]),
+            _meta(),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p2",
+            "Methods",
+            (
+                "The method uses a prototype validation setup and simulation benchmark for a different device class. "
+                "It is useful context, but it is not the thermal fabrication-loss discussion."
+            ),
+            "https://example.test/p2.pdf",
+            json.dumps([8]),
+            _meta(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    stats = build_section_embeddings(db, rebuild=True, embedding_dim=64)
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    hits = search_sections_fuzzy(conn, "thermal fabrication loss unresolved constraint", top_k=5, embedding_dim=64)
+    filtered = search_sections_fuzzy(
+        conn,
+        "thermal fabrication loss unresolved constraint",
+        top_k=5,
+        filters={"doi": "10.1234/p1", "section_name": "Discussion"},
+        embedding_dim=64,
+    )
+    conn.close()
+
+    assert stats["sections_seen"] == 2
+    assert stats["embeddings_written"] == 2
+    assert stats["claim_scope"] == "retrieval_context_only"
+    assert hits[0]["paper_id"] == "p1"
+    assert hits[0]["search_mode"] == "section_fuzzy_vector_recall"
+    assert hits[0]["retrieval_context_kind"] == "paper_section_embedding_context"
+    assert hits[0]["claim_scope"] == "retrieval_context_only"
+    assert hits[0]["search_semantics"].startswith("candidate recall only")
+    assert hits[0]["evidence_grade"] == "section_context_decision_grade"
+    assert "embedding_json" not in hits[0]
+    assert filtered and filtered[0]["paper_id"] == "p1"
+    assert filtered[0]["section_key"] == "discussion"
 
 
 def test_hybrid_section_atom_search_keeps_exact_and_fuzzy_contracts(tmp_path):

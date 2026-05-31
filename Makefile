@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-stage-candidate-recall topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-repair-plan topic-gap-stage-candidate-recall topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -139,7 +139,7 @@ graph-prep: id-repair openalex-backfill graph-features embeddings
 	@echo ">>> Graph prep done."
 
 ## Step 0.9: Evidence-ready data before user-facing claims
-evidence-prep: openalex-backfill section-evidence section-atoms section-atom-embeddings section-atom-chains
+evidence-prep: openalex-backfill section-evidence section-atoms section-atom-embeddings section-embeddings section-atom-chains
 	@echo ">>> Evidence prep done: OpenAlex backfill + section evidence atom search/chains are complete for configured scope."
 
 ## Step 0.1: Reset old derived graph outputs
@@ -376,6 +376,17 @@ section-atom-embeddings:
 		--embedding-dim $${V14B_SECTION_ATOM_EMBEDDING_DIM:-256} \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
+## Step 5s-a3: section-level deterministic vector embeddings for long-context fuzzy recall
+section-embeddings:
+	@echo ">>> Step 5s-a3: Section fuzzy recall embeddings..."
+	$(PYTHON) -m echelon.v14b.section_atoms \
+		--db $(DB_MAIN) \
+		--skip-atom-build \
+		--build-section-embeddings \
+		--section-embedding-rebuild \
+		--section-embedding-dim $${V14B_SECTION_EMBEDDING_DIM:-256} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
 ## Step 5s-b: section atom typed chain substrate
 section-atom-chains:
 	@echo ">>> Step 5s-b: Section atom typed chains..."
@@ -573,7 +584,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 快速产品链路: 不等待 OpenAlex backfill, 仅用于调试/冒烟验证
-product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence section-atoms section-atom-embeddings section-atom-chains limitation fusion first-principles mutation layout report visual-graph goal-audit
+product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence section-atoms section-atom-embeddings section-embeddings section-atom-chains limitation fusion first-principles mutation layout report visual-graph goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Fast Visual Graph 产品链路完成!"
@@ -748,6 +759,7 @@ help:
 	@echo "  make raw-pdf-store-audit # 检查外接盘 raw PDF 库及 section 复用状态"
 	@echo "  make topic-gap-raw-pdf-inspect # 只读解析本地 topic-gap PDF"
 	@echo "  make section-atoms             # 从 paper_sections 生成可检索证据 atoms"
+	@echo "  make section-embeddings        # 从 paper_sections 生成 section fuzzy context"
 	@echo "  make section-atom-chains       # 从 section atoms 生成 typed bottleneck chains"
 	@echo "  make algorithm-logic-audit     # 逐步审计算法角色、输入输出和 promotion guard"
 	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"

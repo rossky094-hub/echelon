@@ -152,7 +152,7 @@ def _write_product_sources(root: Path) -> None:
         'def _reading_path_item(): return {"can_explain": can_explain, "cannot_explain": cannot_explain, "note": "Radar promotion without complete Step13 Claim Cards GNN/VGAE is a candidate generator, not a conclusion generator"}\n'
         'def _paper_hit_contract(): return visual_search_hit + retrieval_context_only + claim_scope + evidence_grade + uncertainty_reasons + reason.get("claim_scope") + reason.get("evidence_objects")\n'
         "def _hydrate_hits(): return _paper_hit_contract\n"
-        "def search_evidence_atoms(): return _connect_main(readonly=True) + section_atoms_fts + section_atom_embeddings + search_section_atoms_hybrid + ensure_schema=False + phrase_query + section_atom_search_contract + retrieval_context_only\n"
+        "def search_evidence_atoms(): return _connect_main(readonly=True) + section_atoms_fts + section_atom_embeddings + section_embeddings + search_section_atoms_hybrid + search_sections_fuzzy + include_section_context + ensure_schema=False + phrase_query + section_atom_search_contract + retrieval_context_only\n"
         "def _story_step_contract(): return timeline_context_only + future_candidate_story_context + evidence_objects\n"
         "def get_visual_story_steps(): return _story_step_contract\n"
         "def _paper_role_contract(): return claim_scope + evidence_grade + uncertainty_reasons + evidence_objects\n"
@@ -227,7 +227,7 @@ def _write_product_sources(root: Path) -> None:
     )
     (v14 / "topic_gap_repair_plan.py").write_text(
         "closure_state partial_atoms_available_no_chain section-evidence-topic-gaps-local "
-        "section-atom-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall "
+        "section-atom-embeddings section-embeddings no_direct_promotion GNN/VGAE atom generation fuzzy vector recall "
         "typed_stage_candidate_recall missing_stage_counts\n",
         encoding="utf-8",
     )
@@ -268,6 +268,8 @@ def _write_product_sources(root: Path) -> None:
         'def _repair_contracts_from_meta(meta): return meta.get("repair_contracts_json")\n'
         'section_atom = {"repair_contracts": [], "claim_scope": "retrieval_context_only"}\n'
         'repair_contracts_json = "[]"\n'
+        "def build_section_embeddings(): return 'section_embeddings retrieval_context_only'\n"
+        "def search_sections_fuzzy(): return 'paper_section_embedding_context retrieval_context_only'\n"
         "CHAIN_STAGE_PRECEDENCE STAGEFUL_SENTENCE_MIN_CHARS _is_stageful_sentence new_constraint local_fix\n",
         encoding="utf-8",
     )
@@ -417,7 +419,8 @@ def _write_product_sources(root: Path) -> None:
     scripts.mkdir(parents=True, exist_ok=True)
     (scripts / "run_after_frontfill_product_chain.py").write_text(
         "V14B_TOPIC_GAP_FRONTFILL_CMD make topic-gap-repair\n"
-        "section-atoms section-atom-embeddings section-atom-chains\n"
+        "section-atoms section-atom-embeddings section-embeddings section-atom-chains\n"
+        "--build-section-embeddings V14B_SECTION_EMBEDDING_DIM\n"
         "active_section_ingest still running\n"
         "decision_grade_primary_section_papers\n"
         "topic_gap_decision_grade_section_rate\n"
@@ -489,6 +492,8 @@ def _write_makefile_contracts(root: Path) -> None:
         "\tpython -m echelon.v14b.topic_gap_repair_plan --triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json\n"
         "topic-gap-stage-candidate-recall:\n"
         "\tpython -m echelon.v14b.topic_gap_stage_candidate_recall --triage-json reports/v14b_pilot/topic_gap_section_evidence_audit.json\n"
+        "section-embeddings:\n"
+        "\tpython -m echelon.v14b.section_atoms --build-section-embeddings --section-embedding-dim $${V14B_SECTION_EMBEDDING_DIM:-256}\n"
         "post-frontfill-chain:\n"
         "\tpython scripts/run_after_frontfill_product_chain.py\n"
         "## LEGACY compatibility: Step 1 OpenAlex enrich; not current V14B decision workflow\n"
@@ -685,6 +690,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["section_atom_layer_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["topic_gap_repair_plan_uses_closure_states"] is True
     assert multi_gate["checks"]["section_ingest_defaults_to_local_raw_pdf_store"] is True
+    assert multi_gate["checks"]["section_retrieval_layer_includes_section_embeddings"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"

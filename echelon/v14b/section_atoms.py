@@ -57,6 +57,9 @@ STAGEFUL_SENTENCE_MIN_CHARS = 35
 
 ATOM_EMBEDDING_MODEL = "deterministic_hashing_atom_embedding_v1"
 ATOM_EMBEDDING_DIM = 256
+SECTION_EMBEDDING_MODEL = "deterministic_hashing_section_embedding_v1"
+SECTION_EMBEDDING_DIM = ATOM_EMBEDDING_DIM
+SECTION_EMBEDDING_MAX_SOURCE_CHARS = 12000
 SPAN_UNIT = "normalized_section_text_char_offsets"
 EXACT_SEARCH_ADDRESSABLE_FIELDS = (
     "paper_id",
@@ -74,7 +77,8 @@ EXACT_SEARCH_ADDRESSABLE_FIELDS = (
 )
 EXACT_SEARCH_SEMANTICS = "retrieval hit only; not a Topic Dossier or Claim Card conclusion"
 FUZZY_SEARCH_SEMANTICS = (
-    "candidate recall only; retrieval_context_only; not a Topic Dossier or Claim Card conclusion"
+    "candidate recall only for atom/section embeddings; retrieval_context_only; "
+    "not a Topic Dossier or Claim Card conclusion"
 )
 HYBRID_SEARCH_SEMANTICS = (
     "exact hits are retrieval evidence and fuzzy hits are candidate recall; "
@@ -115,6 +119,8 @@ def section_atom_search_contract(search_mode: str) -> dict[str, Any]:
         },
         "dual_retrieval_layer": {
             "exact_addressable_fields": list(EXACT_SEARCH_ADDRESSABLE_FIELDS),
+            "fuzzy_addressable_units": ["section_atoms", "paper_sections"],
+            "fuzzy_substrates": ["section_atom_embeddings", "section_embeddings"],
             "exact_semantics": EXACT_SEARCH_SEMANTICS,
             "fuzzy_semantics": FUZZY_SEARCH_SEMANTICS,
             "hybrid_semantics": HYBRID_SEARCH_SEMANTICS,
@@ -328,6 +334,39 @@ def ensure_section_atom_embeddings_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def ensure_section_embeddings_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS section_embeddings (
+            section_id TEXT PRIMARY KEY,
+            paper_id TEXT NOT NULL,
+            section_name TEXT NOT NULL,
+            section_key TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedding_dim INTEGER NOT NULL,
+            embedding_json TEXT NOT NULL,
+            source_text_hash TEXT NOT NULL,
+            claim_scope TEXT NOT NULL,
+            search_semantics TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_section_embeddings_model "
+        "ON section_embeddings(embedding_model, embedding_dim)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_section_embeddings_paper "
+        "ON section_embeddings(paper_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_section_embeddings_section "
+        "ON section_embeddings(section_key)"
+    )
+    conn.commit()
+
+
 def _sentence_chunks(text: str, *, min_chars: int = 80, max_chars: int = 700) -> list[str]:
     clean = re.sub(r"\s+", " ", str(text or "")).strip()
     if not clean:
@@ -437,6 +476,12 @@ def _section_evidence_grade(section: dict[str, Any], meta: dict[str, Any]) -> tu
 def _atom_id(paper_id: str, section_key: str, atom_index: int, atom_text: str) -> str:
     digest = hashlib.sha1(f"{paper_id}|{section_key}|{atom_index}|{atom_text}".encode("utf-8")).hexdigest()[:20]
     return f"sa_{digest}"
+
+
+def _section_id(paper_id: str, section_name: str) -> str:
+    section_key = normalize_section_key(section_name)
+    digest = hashlib.sha1(f"{paper_id}|{section_key}".encode("utf-8")).hexdigest()[:20]
+    return f"se_{digest}"
 
 
 def _text_hash(text: str) -> str:
@@ -735,6 +780,20 @@ def _embedding_source_text(row: sqlite3.Row | dict[str, Any]) -> str:
     )
 
 
+def _section_embedding_source_text(row: sqlite3.Row | dict[str, Any]) -> str:
+    item = dict(row)
+    text = " ".join(
+        part
+        for part in (
+            str(item.get("title") or ""),
+            str(item.get("section_name") or ""),
+            str(item.get("section_text") or ""),
+        )
+        if part
+    )
+    return text[:SECTION_EMBEDDING_MAX_SOURCE_CHARS]
+
+
 def _insert_atom_embeddings(
     conn: sqlite3.Connection,
     rows: list[sqlite3.Row],
@@ -769,6 +828,52 @@ def _insert_atom_embeddings(
             source_text_hash, claim_scope, search_semantics, created_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        payload,
+    )
+    return len(payload)
+
+
+def _insert_section_embeddings(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+    *,
+    embedding_model: str,
+    embedding_dim: int,
+) -> int:
+    if not rows:
+        return 0
+    created_at = utc_now()
+    payload = []
+    for row in rows:
+        item = dict(row)
+        paper_id = str(item.get("paper_id") or "")
+        section_name = str(item.get("section_name") or "")
+        section_key = normalize_section_key(section_name)
+        source_text = _section_embedding_source_text(item)
+        payload.append(
+            (
+                _section_id(paper_id, section_name),
+                paper_id,
+                section_name,
+                section_key,
+                embedding_model,
+                int(embedding_dim),
+                json.dumps(embed_atom_text(source_text, embedding_dim=embedding_dim), separators=(",", ":")),
+                _text_hash(source_text),
+                "retrieval_context_only",
+                FUZZY_SEARCH_SEMANTICS,
+                created_at,
+            )
+        )
+    conn.executemany(
+        """
+        INSERT OR REPLACE INTO section_embeddings (
+            section_id, paper_id, section_name, section_key, embedding_model,
+            embedding_dim, embedding_json, source_text_hash, claim_scope,
+            search_semantics, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         payload,
     )
@@ -859,6 +964,121 @@ def build_section_atom_embeddings(
     }
 
 
+def build_section_embeddings(
+    db_main: Path = DB_MAIN,
+    *,
+    limit: int | None = None,
+    rebuild: bool = False,
+    embedding_model: str = SECTION_EMBEDDING_MODEL,
+    embedding_dim: int = SECTION_EMBEDDING_DIM,
+) -> dict[str, Any]:
+    conn = sqlite3.connect(str(db_main), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    ensure_section_embeddings_schema(conn)
+    if not _table_exists(conn, "paper_sections"):
+        conn.close()
+        return {
+            "sections_seen": 0,
+            "embeddings_written": 0,
+            "embedding_model": embedding_model,
+            "embedding_dim": int(embedding_dim),
+            "claim_scope": "retrieval_context_only",
+            "status": "paper_sections_missing",
+        }
+    if rebuild:
+        conn.execute(
+            "DELETE FROM section_embeddings WHERE embedding_model = ? AND embedding_dim = ?",
+            (embedding_model, int(embedding_dim)),
+        )
+        conn.commit()
+    section_count_row = conn.execute(
+        "SELECT COUNT(*) FROM paper_sections WHERE COALESCE(section_text, '') != ''"
+    ).fetchone()
+    section_count = int(section_count_row[0] or 0) if section_count_row else 0
+    paper_columns = _columns(conn, "papers")
+    section_columns = _columns(conn, "paper_sections")
+    source_url = "s.source_url" if "source_url" in section_columns else "'' AS source_url"
+    section_pages = "s.section_pages_json" if "section_pages_json" in section_columns else "'[]' AS section_pages_json"
+    section_meta = "s.section_meta_json" if "section_meta_json" in section_columns else "'{}' AS section_meta_json"
+    title_expr = "p.title" if {"id", "title"} <= paper_columns else "'' AS title"
+    doi_expr = "p.doi AS doi" if "doi" in paper_columns else "'' AS doi"
+    arxiv_expr = "p.arxiv_id AS arxiv_id" if "arxiv_id" in paper_columns else "'' AS arxiv_id"
+    openalex_expr = "p.openalex_id AS openalex_id" if "openalex_id" in paper_columns else "'' AS openalex_id"
+    s2_expr = "p.s2_paper_id AS s2_paper_id" if "s2_paper_id" in paper_columns else "'' AS s2_paper_id"
+    join_expr = "LEFT JOIN papers p ON p.id = s.paper_id" if "id" in paper_columns else ""
+    sql = f"""
+        SELECT s.paper_id, s.section_name, s.section_text, {source_url},
+               {section_pages}, {section_meta}, {title_expr},
+               {doi_expr}, {arxiv_expr}, {openalex_expr}, {s2_expr}
+        FROM paper_sections s
+        {join_expr}
+        WHERE COALESCE(s.section_text, '') != ''
+        ORDER BY s.paper_id, s.section_name
+    """
+    if limit is not None:
+        sql += " LIMIT ?"
+        raw_rows = conn.execute(sql, (int(limit),)).fetchall()
+    else:
+        raw_rows = conn.execute(sql).fetchall()
+    rows: list[sqlite3.Row] = []
+    for row in raw_rows:
+        source_hash = _text_hash(_section_embedding_source_text(row))
+        existing = conn.execute(
+            """
+            SELECT source_text_hash
+            FROM section_embeddings
+            WHERE section_id = ?
+              AND embedding_model = ?
+              AND embedding_dim = ?
+            """,
+            (
+                _section_id(str(row["paper_id"] or ""), str(row["section_name"] or "")),
+                embedding_model,
+                int(embedding_dim),
+            ),
+        ).fetchone()
+        if not existing or existing["source_text_hash"] != source_hash:
+            rows.append(row)
+    total = 0
+    pending: list[sqlite3.Row] = []
+    for row in rows:
+        pending.append(row)
+        if len(pending) >= 1000:
+            total += _insert_section_embeddings(
+                conn,
+                pending,
+                embedding_model=embedding_model,
+                embedding_dim=int(embedding_dim),
+            )
+            conn.commit()
+            pending = []
+    if pending:
+        total += _insert_section_embeddings(
+            conn,
+            pending,
+            embedding_model=embedding_model,
+            embedding_dim=int(embedding_dim),
+        )
+    conn.commit()
+    total_available = _count_section_embeddings(
+        conn,
+        embedding_model=embedding_model,
+        embedding_dim=int(embedding_dim),
+    )
+    conn.close()
+    return {
+        "sections_seen": section_count,
+        "sections_pending": len(rows),
+        "embeddings_written": total,
+        "embeddings_available": total_available,
+        "embedding_model": embedding_model,
+        "embedding_dim": int(embedding_dim),
+        "claim_scope": "retrieval_context_only",
+        "search_semantics": FUZZY_SEARCH_SEMANTICS,
+    }
+
+
 def _count_embeddings(conn: sqlite3.Connection, *, embedding_model: str, embedding_dim: int) -> int:
     if not _table_exists(conn, "section_atom_embeddings"):
         return 0
@@ -866,6 +1086,20 @@ def _count_embeddings(conn: sqlite3.Connection, *, embedding_model: str, embeddi
         """
         SELECT COUNT(*)
         FROM section_atom_embeddings
+        WHERE embedding_model = ? AND embedding_dim = ?
+        """,
+        (embedding_model, int(embedding_dim)),
+    ).fetchone()
+    return int(row[0] or 0) if row else 0
+
+
+def _count_section_embeddings(conn: sqlite3.Connection, *, embedding_model: str, embedding_dim: int) -> int:
+    if not _table_exists(conn, "section_embeddings"):
+        return 0
+    row = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM section_embeddings
         WHERE embedding_model = ? AND embedding_dim = ?
         """,
         (embedding_model, int(embedding_dim)),
@@ -1154,6 +1388,178 @@ def search_section_atoms_fuzzy(
     return hits[: int(top_k)]
 
 
+def _section_filter_sql(filters: dict[str, Any], *, paper_alias: str = "p", section_alias: str = "s") -> tuple[list[str], list[Any]]:
+    effective_filters = dict(filters or {})
+    where: list[str] = []
+    params: list[Any] = []
+    _append_exact_values(where, params, f"{section_alias}.paper_id", _filter_values(
+        effective_filters.get("paper_id") or effective_filters.get("paper_ids")
+    ))
+    _append_exact_values(where, params, f"{section_alias}.section_key", [
+        normalize_section_key(value)
+        for value in _filter_values(
+            effective_filters.get("section_name")
+            or effective_filters.get("section_names")
+            or effective_filters.get("section_key")
+            or effective_filters.get("section_keys")
+        )
+    ])
+    _append_exact_values(where, params, f"{paper_alias}.doi", [
+        normalized
+        for normalized in (normalize_doi(v) for v in _filter_values(
+            effective_filters.get("doi") or effective_filters.get("dois")
+        ))
+        if normalized
+    ])
+    _append_exact_values(where, params, f"{paper_alias}.arxiv_id", [
+        normalized
+        for normalized in (normalize_arxiv_id(v) for v in _filter_values(
+            effective_filters.get("arxiv_id") or effective_filters.get("arxiv_ids")
+        ))
+        if normalized
+    ])
+    _append_exact_values(where, params, f"{paper_alias}.openalex_id", [
+        normalized
+        for normalized in (normalize_openalex_work_id(v) for v in _filter_values(
+            effective_filters.get("openalex_id") or effective_filters.get("openalex_ids")
+        ))
+        if normalized
+    ])
+    _append_exact_values(where, params, f"{paper_alias}.s2_paper_id", [
+        normalized
+        for normalized in (normalize_s2_paper_id(v) for v in _filter_values(
+            effective_filters.get("s2_paper_id") or effective_filters.get("s2_paper_ids")
+        ))
+        if normalized
+    ])
+    title_values = _filter_values(effective_filters.get("title") or effective_filters.get("titles"))
+    if title_values:
+        lowered = [title.lower() for title in title_values]
+        if len(lowered) == 1:
+            where.append(f"lower(COALESCE({paper_alias}.title, '')) = ?")
+            params.append(lowered[0])
+        else:
+            placeholders = ",".join("?" * len(lowered))
+            where.append(f"lower(COALESCE({paper_alias}.title, '')) IN ({placeholders})")
+            params.extend(lowered)
+    title_contains = str(effective_filters.get("title_contains") or "").strip()
+    if title_contains:
+        where.append(f"lower(COALESCE({paper_alias}.title, '')) LIKE ?")
+        params.append(f"%{title_contains.lower()}%")
+    return where, params
+
+
+def _section_post_filter(hit: dict[str, Any], filters: dict[str, Any]) -> bool:
+    parser_contracts = set(_filter_values(
+        filters.get("parser_contract_version") or filters.get("parser_contract_versions")
+    ))
+    if parser_contracts and str(hit.get("parser_contract_version") or "") not in parser_contracts:
+        return False
+    storage_uris = set(_filter_values(
+        filters.get("source_storage_uri") or filters.get("source_storage_uris")
+    ))
+    if storage_uris and str(hit.get("source_storage_uri") or "") not in storage_uris:
+        return False
+    return True
+
+
+def search_sections_fuzzy(
+    conn: sqlite3.Connection,
+    query_text: str,
+    *,
+    top_k: int = 20,
+    filters: dict[str, Any] | None = None,
+    embedding_model: str = SECTION_EMBEDDING_MODEL,
+    embedding_dim: int = SECTION_EMBEDDING_DIM,
+    min_score: float = 0.0,
+    ensure_schema: bool = True,
+) -> list[dict[str, Any]]:
+    filters = filters or {}
+    if ensure_schema:
+        ensure_section_embeddings_schema(conn)
+    elif not (_table_exists(conn, "paper_sections") and _table_exists(conn, "section_embeddings")):
+        return []
+    if not query_text or not _table_exists(conn, "section_embeddings") or not _table_exists(conn, "paper_sections"):
+        return []
+    section_columns = _columns(conn, "paper_sections")
+    paper_columns = _columns(conn, "papers")
+    source_url = "ps.source_url" if "source_url" in section_columns else "'' AS source_url"
+    section_pages = "ps.section_pages_json" if "section_pages_json" in section_columns else "'[]' AS section_pages_json"
+    section_meta = "ps.section_meta_json" if "section_meta_json" in section_columns else "'{}' AS section_meta_json"
+    title_select = "title" if "title" in paper_columns else "'' AS title"
+    doi_select = "doi" if "doi" in paper_columns else "'' AS doi"
+    arxiv_select = "arxiv_id" if "arxiv_id" in paper_columns else "'' AS arxiv_id"
+    openalex_select = "openalex_id" if "openalex_id" in paper_columns else "'' AS openalex_id"
+    s2_select = "s2_paper_id" if "s2_paper_id" in paper_columns else "'' AS s2_paper_id"
+    if "id" in paper_columns:
+        join_expr = (
+            "LEFT JOIN ("
+            f"SELECT id, {title_select}, {doi_select}, {arxiv_select}, {openalex_select}, {s2_select} "
+            "FROM papers"
+            ") p ON p.id = ps.paper_id"
+        )
+    else:
+        join_expr = (
+            "LEFT JOIN ("
+            "SELECT '' AS id, '' AS title, '' AS doi, '' AS arxiv_id, "
+            "'' AS openalex_id, '' AS s2_paper_id"
+            ") p ON 1=0"
+        )
+    where = ["e.embedding_model = ?", "e.embedding_dim = ?"]
+    params: list[Any] = [embedding_model, int(embedding_dim)]
+    filter_where, filter_params = _section_filter_sql(filters, paper_alias="p", section_alias="e")
+    where.extend(filter_where)
+    params.extend(filter_params)
+    rows = conn.execute(
+        f"""
+        SELECT
+            e.section_id, e.paper_id, e.section_name, e.section_key,
+            e.embedding_model, e.embedding_dim, e.embedding_json,
+            e.source_text_hash AS embedding_source_text_hash,
+            e.search_semantics AS embedding_search_semantics,
+            ps.section_text, {source_url}, {section_pages}, {section_meta},
+            p.title, p.doi, p.arxiv_id, p.openalex_id, p.s2_paper_id
+        FROM section_embeddings e
+        JOIN paper_sections ps
+          ON ps.paper_id = e.paper_id AND ps.section_name = e.section_name
+        {join_expr}
+        WHERE {" AND ".join(where)}
+        """,
+        tuple(params),
+    ).fetchall()
+    query_vector = embed_atom_text(query_text, embedding_dim=int(embedding_dim))
+    query_tokens = set(_embedding_tokens(query_text))
+    hits: list[dict[str, Any]] = []
+    for row in rows:
+        section_vector = _loads_vector(row["embedding_json"])
+        vector_score = max(_cosine_similarity(query_vector, section_vector), 0.0)
+        lexical_score = _token_overlap_score(query_tokens, _section_embedding_source_text(row))
+        score = (0.70 * lexical_score) + (0.30 * vector_score)
+        if score < float(min_score):
+            continue
+        hit = _row_to_section_hit(row)
+        if not _section_post_filter(hit, filters):
+            continue
+        hit["rank_score"] = round(score, 6)
+        hit["similarity_score"] = round(score, 6)
+        hit["vector_score"] = round(vector_score, 6)
+        hit["lexical_overlap_score"] = round(lexical_score, 6)
+        hit["search_mode"] = "section_fuzzy_vector_recall"
+        hit["claim_scope"] = "retrieval_context_only"
+        hit["search_semantics"] = FUZZY_SEARCH_SEMANTICS
+        hit["embedding_model"] = embedding_model
+        hit["embedding_dim"] = int(embedding_dim)
+        hits.append(hit)
+    hits.sort(
+        key=lambda item: (
+            -float(item.get("similarity_score") or 0.0),
+            item.get("paper_id") or "",
+            item.get("section_name") or "",
+        )
+    )
+    return hits[: int(top_k)]
+
+
 def search_section_atoms_hybrid(
     conn: sqlite3.Connection,
     query_text: str,
@@ -1271,6 +1677,64 @@ def _row_to_hit(row: sqlite3.Row) -> dict[str, Any]:
     return item
 
 
+def _row_to_section_hit(row: sqlite3.Row) -> dict[str, Any]:
+    item = dict(row)
+    meta = _loads(item.get("section_meta_json"), {})
+    pages = _loads(item.get("section_pages_json"), [])
+    page_values = [int(p) for p in pages if isinstance(p, (int, float)) and int(p) > 0]
+    section = {
+        "section_name": item.get("section_name"),
+        "extraction_strategies": meta.get("extraction_strategies") or [],
+        "parser_contract_version": meta.get("parser_contract_version"),
+    }
+    strength = section_provenance_strength(section)
+    current_contract = meta.get("parser_contract_version") == SECTION_PARSER_CONTRACT_VERSION
+    decision_section = is_decision_section(item.get("section_name"))
+    if current_contract and decision_section and strength in {"strong", "moderate"}:
+        evidence_grade = "section_context_decision_grade"
+    elif strength in {"strong", "moderate"}:
+        evidence_grade = "section_context_traced"
+    else:
+        evidence_grade = "section_context_weak"
+    reasons = [
+        "section embedding hit is retrieval context, not a standalone conclusion",
+        "section-level fuzzy recall can widen candidates but cannot promote Step13/Radar claims",
+    ]
+    if not decision_section:
+        reasons.append("section is not a primary decision section")
+    if not current_contract:
+        reasons.append("section parser contract is legacy or unknown")
+    if strength == "weak":
+        reasons.append("section extraction provenance is weak")
+    section_text = " ".join(str(item.get("section_text") or "").split())
+    return {
+        "section_id": item.get("section_id") or _section_id(
+            str(item.get("paper_id") or ""),
+            str(item.get("section_name") or ""),
+        ),
+        "paper_id": item.get("paper_id") or "",
+        "title": item.get("title") or "",
+        "section_name": item.get("section_name") or "",
+        "section_key": item.get("section_key") or normalize_section_key(item.get("section_name")),
+        "section_text": section_text[:1200],
+        "doi": normalize_doi(item.get("doi")) or "",
+        "arxiv_id": normalize_arxiv_id(item.get("arxiv_id")) or "",
+        "openalex_id": normalize_openalex_work_id(item.get("openalex_id")) or "",
+        "s2_paper_id": normalize_s2_paper_id(item.get("s2_paper_id")) or "",
+        "page_start": min(page_values) if page_values else None,
+        "page_end": max(page_values) if page_values else None,
+        "source_url": item.get("source_url") or "",
+        "source_storage_uri": meta.get("source_storage_uri") or "",
+        "source_delivery": meta.get("source_delivery") or "",
+        "parser_contract_version": meta.get("parser_contract_version") or "legacy_unknown_contract",
+        "extraction_strategies": list(meta.get("extraction_strategies") or []),
+        "evidence_grade": evidence_grade,
+        "claim_scope": "retrieval_context_only",
+        "uncertainty_reasons": reasons,
+        "retrieval_context_kind": "paper_section_embedding_context",
+    }
+
+
 def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
     if not _table_exists(conn, table):
         return set()
@@ -1287,8 +1751,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--embedding-rebuild", action="store_true")
     parser.add_argument("--embedding-model", default=ATOM_EMBEDDING_MODEL)
     parser.add_argument("--embedding-dim", type=int, default=ATOM_EMBEDDING_DIM)
+    parser.add_argument("--build-section-embeddings", action="store_true")
+    parser.add_argument("--section-embedding-rebuild", action="store_true")
+    parser.add_argument("--section-embedding-model", default=SECTION_EMBEDDING_MODEL)
+    parser.add_argument("--section-embedding-dim", type=int, default=SECTION_EMBEDDING_DIM)
     parser.add_argument("--query", default=None, help="Optional smoke-test query after building atoms.")
-    parser.add_argument("--query-mode", choices=("exact", "fuzzy", "hybrid"), default="exact")
+    parser.add_argument("--query-mode", choices=("exact", "fuzzy", "hybrid", "section-fuzzy"), default="exact")
     parser.add_argument("--phrase-query", action="store_true", help="Use exact phrase matching for FTS smoke tests.")
     args = parser.parse_args(argv)
     setup_logging("section_atoms", level=getattr(logging, args.log_level))
@@ -1310,6 +1778,14 @@ def main(argv: list[str] | None = None) -> None:
             embedding_model=args.embedding_model,
             embedding_dim=args.embedding_dim,
         )
+    if args.build_section_embeddings:
+        stats["section_embeddings"] = build_section_embeddings(
+            db_main,
+            limit=args.limit,
+            rebuild=args.section_embedding_rebuild,
+            embedding_model=args.section_embedding_model,
+            embedding_dim=args.section_embedding_dim,
+        )
     print(json.dumps(stats, ensure_ascii=False, sort_keys=True))
     if args.query:
         conn = sqlite3.connect(str(db_main))
@@ -1330,6 +1806,14 @@ def main(argv: list[str] | None = None) -> None:
                 top_k=5,
                 embedding_model=args.embedding_model,
                 embedding_dim=args.embedding_dim,
+            )
+        elif args.query_mode == "section-fuzzy":
+            hits = search_sections_fuzzy(
+                conn,
+                args.query,
+                top_k=5,
+                embedding_model=args.section_embedding_model,
+                embedding_dim=args.section_embedding_dim,
             )
         else:
             hits = search_section_atoms(conn, args.query, top_k=5, phrase_query=args.phrase_query)

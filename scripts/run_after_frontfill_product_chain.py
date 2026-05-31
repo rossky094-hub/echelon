@@ -33,6 +33,7 @@ from echelon.v14b.evidence_contracts import (
 DEFAULT_STEPS = (
     "section-atoms",
     "section-atom-embeddings",
+    "section-embeddings",
     "section-atom-chains",
     "limitation",
     "fusion",
@@ -56,6 +57,16 @@ STEP_MODULES = {
             os.getenv("V14B_SECTION_ATOM_EMBEDDING_DIM", "256"),
         ),
     ),
+    "section-embeddings": (
+        "echelon.v14b.section_atoms",
+        (
+            "--skip-atom-build",
+            "--build-section-embeddings",
+            "--section-embedding-rebuild",
+            "--section-embedding-dim",
+            os.getenv("V14B_SECTION_EMBEDDING_DIM", "256"),
+        ),
+    ),
     "section-atom-chains": ("echelon.v14b.section_atom_chains", ()),
     "limitation": ("echelon.v14b.step5c_limitation", ()),
     "fusion": ("echelon.v14b.step6_fusion", ()),
@@ -70,6 +81,7 @@ STEP_MODULES = {
 EVIDENCE_SENSITIVE_STEPS = {
     "section-atoms",
     "section-atom-embeddings",
+    "section-embeddings",
     "section-atom-chains",
     "limitation",
     "fusion",

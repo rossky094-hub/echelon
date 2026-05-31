@@ -163,6 +163,7 @@ def test_topic_gap_repair_plan_groups_closure_states_into_safe_actions(tmp_path)
     assert "fuzzy" in plan["execution_contract"]["dual_retrieval_layer"]["fuzzy"]
     assert "make section-atom-chains" in groups["rebuild_section_atom_chains_quick_close"]["command_sequence"]
     assert "make section-evidence-topic-gaps-local" in groups["targeted_local_raw_pdf_ingest_when_safe"]["command_sequence"]
+    assert "make section-embeddings" in groups["targeted_local_raw_pdf_ingest_when_safe"]["command_sequence"]
     assert "make topic-gap-no-target-inspect" in groups["inspect_current_parser_no_target"]["command_sequence"]
     assert "make topic-gap-stage-candidate-recall" in groups["inspect_typed_chain_stage_gaps"]["command_sequence"]
     assert groups["inspect_typed_chain_stage_gaps"]["missing_stage_counts"] == {

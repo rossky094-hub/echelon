@@ -1702,7 +1702,10 @@ def audit_online_topic_readiness_contract(repo_root: Path | None = None) -> dict
                     "_connect_main(readonly=True)",
                     "section_atoms_fts",
                     "section_atom_embeddings",
+                    "section_embeddings",
                     "search_section_atoms_hybrid",
+                    "search_sections_fuzzy",
+                    "include_section_context",
                     "ensure_schema=False",
                     "phrase_query",
                     "section_atom_search_contract",
@@ -2763,6 +2766,7 @@ def audit_legacy_flow_isolation_contract(repo_root: Path | None = None) -> dict[
             (
                 "section-atoms",
                 "section-atom-embeddings",
+                "section-embeddings",
                 "section-atom-chains",
                 "active_section_ingest still running",
             ),
@@ -2883,6 +2887,7 @@ def audit_multi_topic_regression(
     section_atom_chain_assembler_marks_inferred_order = True
     inferred_order_chain_consumers_keep_moderate_boundary = True
     section_ingest_defaults_to_local_raw_pdf_store = True
+    section_retrieval_layer_includes_section_embeddings = True
     topic_regression_exports_topic_dossier_repair_plan = True
     topic_gap_repair_plan_uses_closure_states = True
     topic_gap_stage_candidate_recall_available = True
@@ -3058,6 +3063,34 @@ def audit_multi_topic_regression(
                 "RAW_PDF_MANIFEST",
             ),
         )
+        section_retrieval_layer_includes_section_embeddings = (
+            _source_contains(
+                section_atoms_source,
+                (
+                    "section_embeddings",
+                    "build_section_embeddings",
+                    "search_sections_fuzzy",
+                    "paper_section_embedding_context",
+                    "retrieval_context_only",
+                ),
+            )
+            and _source_contains(
+                makefile_source,
+                (
+                    "section-embeddings:",
+                    "--build-section-embeddings",
+                    "V14B_SECTION_EMBEDDING_DIM",
+                ),
+            )
+            and _source_contains(
+                repo_root / "scripts/run_after_frontfill_product_chain.py",
+                (
+                    "section-embeddings",
+                    "--build-section-embeddings",
+                    "V14B_SECTION_EMBEDDING_DIM",
+                ),
+            )
+        )
         topic_gap_repair_plan_uses_closure_states = (
             _source_contains(
                 topic_gap_repair_plan_source,
@@ -3066,6 +3099,7 @@ def audit_multi_topic_regression(
                     "partial_atoms_available_no_chain",
                     "section-evidence-topic-gaps-local",
                     "section-atom-embeddings",
+                    "section-embeddings",
                     "no_direct_promotion",
                     "GNN/VGAE atom generation",
                     "fuzzy vector recall",
@@ -3143,6 +3177,7 @@ def audit_multi_topic_regression(
         and section_atom_chain_assembler_marks_inferred_order
         and inferred_order_chain_consumers_keep_moderate_boundary
         and section_ingest_defaults_to_local_raw_pdf_store
+        and section_retrieval_layer_includes_section_embeddings
         and topic_regression_exports_topic_dossier_repair_plan
         and topic_gap_repair_plan_uses_closure_states
         and topic_gap_stage_candidate_recall_available
@@ -3183,6 +3218,7 @@ def audit_multi_topic_regression(
             "section_atom_chain_assembler_marks_inferred_order": section_atom_chain_assembler_marks_inferred_order,
             "inferred_order_chain_consumers_keep_moderate_boundary": inferred_order_chain_consumers_keep_moderate_boundary,
             "section_ingest_defaults_to_local_raw_pdf_store": section_ingest_defaults_to_local_raw_pdf_store,
+            "section_retrieval_layer_includes_section_embeddings": section_retrieval_layer_includes_section_embeddings,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_repair_plan_uses_closure_states": topic_gap_repair_plan_uses_closure_states,
             "topic_gap_stage_candidate_recall_available": topic_gap_stage_candidate_recall_available,
