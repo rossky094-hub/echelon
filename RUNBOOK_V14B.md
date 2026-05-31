@@ -155,6 +155,9 @@ make keystone    # Step 3: ~1h  (需 Step 1 完成)
 make subgraph    # Step 4: ~0.5h (需 Steps 1,2,3 完成)
 make scibert     # Step 5a: ~4h  (需 Step 4 完成)
 make vgae        # Step 5b: ~4h  (需 Step 4 完成)
+make section-atoms           # Step 5s-a: section atoms + exact FTS/BM25
+make section-atom-embeddings # Step 5s-a2: atom fuzzy recall embeddings
+make section-atom-chains     # Step 5s-b: typed evidence chains
 make limitation  # Step 5c: ~4h  (需 Step 4 完成)
 make fusion      # Step 6: ~1h  (需 Steps 5a,5b,5c 完成)
 make mutation    # Step 7: ~0.5h (需 Step 4 完成)
@@ -289,6 +292,23 @@ VGAE_PREDICT_THRESHOLD = 0.7
 ```
 
 ---
+
+### Step 5s: Section Atom Evidence Substrate
+
+```bash
+make section-atoms
+make section-atom-embeddings
+make section-atom-chains
+```
+
+| 项目 | 说明 |
+|---|---|
+| 输入 | paper_sections, local raw PDF provenance when available |
+| 输出表 | section_atoms, section_atoms_fts, section_atom_embeddings, section_atom_chains |
+| 精准搜索 | ID/section/title/FTS/BM25/phrase hit,用于证据链硬证据入口 |
+| 模糊搜索 | deterministic atom embedding recall,只能作为 candidate recall |
+| 晋升约束 | fuzzy hit 必须保持 retrieval_context_only,不能直接成为 Step13 结论 |
+| 图算法边界 | GNN/VGAE 只能做候选扩展/排序/邻域发现,不能生成 atom |
 
 ### Step 5c: Limitation Tracking
 

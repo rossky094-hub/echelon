@@ -403,6 +403,10 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
                 "sectionless_or_non_target_heading_format": 2,
                 "heading_like_but_not_target_section": 1,
             },
+            "recommended_action_counts": {
+                "weak_fulltext_or_metadata_only": 2,
+                "heading_taxonomy_review": 1,
+            },
             "parser_exception_papers": 0,
         },
     }
@@ -416,6 +420,8 @@ def test_direction_readiness_flags_raw_pdf_cache_not_consumed():
     assert "repair-ready=1" in blocker["why"]
     assert "sectionless=2" in blocker["why"]
     assert "heading-like=1" in blocker["why"]
+    assert "heading-taxonomy=1" in blocker["why"]
+    assert "weak-fulltext=2" in blocker["why"]
     assert "next safe section-ingest boundary" in blocker["next_action"]
 
 

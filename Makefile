@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-atom-embeddings section-atom-chains raw-pdf-store-audit section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect topic-gap-raw-pdf-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -340,6 +340,17 @@ section-atoms:
 	$(PYTHON) -m echelon.v14b.section_atoms \
 		--db $(DB_MAIN) \
 		--max-atoms-per-section $${V14B_SECTION_ATOM_MAX_PER_SECTION:-12} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
+## Step 5s-a2: section atom deterministic vector embeddings for fuzzy candidate recall
+section-atom-embeddings:
+	@echo ">>> Step 5s-a2: Section atom fuzzy recall embeddings..."
+	$(PYTHON) -m echelon.v14b.section_atoms \
+		--db $(DB_MAIN) \
+		--skip-atom-build \
+		--build-embeddings \
+		--embedding-rebuild \
+		--embedding-dim $${V14B_SECTION_ATOM_EMBEDDING_DIM:-256} \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
 ## Step 5s-b: section atom typed chain substrate

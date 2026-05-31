@@ -1,9 +1,10 @@
-"""Section evidence atomization and exact atom search.
+"""Section evidence atomization, exact atom search, and fuzzy atom recall.
 
 This step sits between `paper_sections` and downstream reasoning.  It creates
-span-bound, provenance-carrying evidence atoms that can be searched exactly and
-later consumed by Step5c/Step13.  GNN/VGAE must not create these atoms; graph
-models may only rank or expand already-materialized evidence.
+span-bound, provenance-carrying evidence atoms that can be searched exactly or
+recalled fuzzily as candidates and later consumed by Step5c/Step13.  GNN/VGAE
+must not create these atoms; graph models may only rank or expand
+already-materialized evidence.
 """
 from __future__ import annotations
 
@@ -36,6 +37,13 @@ ATOM_TYPES = (
     "metric_result",
     "validation_setup",
     "cost_or_scaling_signal",
+)
+
+ATOM_EMBEDDING_MODEL = "deterministic_hashing_atom_embedding_v1"
+ATOM_EMBEDDING_DIM = 256
+EXACT_SEARCH_SEMANTICS = "retrieval hit only; not a Topic Dossier or Claim Card conclusion"
+FUZZY_SEARCH_SEMANTICS = (
+    "candidate recall only; retrieval_context_only; not a Topic Dossier or Claim Card conclusion"
 )
 
 TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -158,6 +166,35 @@ def ensure_section_atoms_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def ensure_section_atom_embeddings_schema(conn: sqlite3.Connection) -> None:
+    ensure_section_atoms_schema(conn)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS section_atom_embeddings (
+            atom_id TEXT PRIMARY KEY,
+            paper_id TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedding_dim INTEGER NOT NULL,
+            embedding_json TEXT NOT NULL,
+            source_text_hash TEXT NOT NULL,
+            claim_scope TEXT NOT NULL,
+            search_semantics TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(atom_id) REFERENCES section_atoms(atom_id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_section_atom_embeddings_model "
+        "ON section_atom_embeddings(embedding_model, embedding_dim)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_section_atom_embeddings_paper "
+        "ON section_atom_embeddings(paper_id)"
+    )
+    conn.commit()
+
+
 def _sentence_chunks(text: str, *, min_chars: int = 80, max_chars: int = 700) -> list[str]:
     clean = re.sub(r"\s+", " ", str(text or "")).strip()
     if not clean:
@@ -231,6 +268,35 @@ def _section_evidence_grade(section: dict[str, Any], meta: dict[str, Any]) -> tu
 def _atom_id(paper_id: str, section_key: str, atom_index: int, atom_text: str) -> str:
     digest = hashlib.sha1(f"{paper_id}|{section_key}|{atom_index}|{atom_text}".encode("utf-8")).hexdigest()[:20]
     return f"sa_{digest}"
+
+
+def _text_hash(text: str) -> str:
+    return hashlib.sha1((text or "").encode("utf-8")).hexdigest()
+
+
+def _embedding_tokens(text: str) -> list[str]:
+    return [token.lower() for token in re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", text or "") if token.strip()]
+
+
+def embed_atom_text(text: str, *, embedding_dim: int = ATOM_EMBEDDING_DIM) -> list[float]:
+    """Build a deterministic local vector for candidate recall.
+
+    This is a reproducible hashed bag-of-words baseline.  It is intentionally
+    low authority: the vector can widen recall, but the returned atoms remain
+    retrieval context only and cannot promote a scientific claim.
+    """
+    if embedding_dim <= 0:
+        raise ValueError("embedding_dim must be positive")
+    vector = [0.0] * int(embedding_dim)
+    for token in _embedding_tokens(text):
+        digest = hashlib.blake2b(token.encode("utf-8"), digest_size=8).digest()
+        bucket = int.from_bytes(digest[:4], "big") % embedding_dim
+        sign = 1.0 if digest[4] & 1 else -1.0
+        vector[bucket] += sign
+    norm = sum(value * value for value in vector) ** 0.5
+    if not norm:
+        return vector
+    return [round(value / norm, 6) for value in vector]
 
 
 def extract_section_atoms_from_row(row: sqlite3.Row | dict[str, Any], *, max_atoms_per_section: int = 12) -> list[dict[str, Any]]:
@@ -387,6 +453,8 @@ def build_section_atoms(
         conn.execute("DELETE FROM section_atoms")
         if _table_exists(conn, "section_atoms_fts"):
             conn.execute("DELETE FROM section_atoms_fts")
+        if _table_exists(conn, "section_atom_embeddings"):
+            conn.execute("DELETE FROM section_atom_embeddings")
         conn.commit()
     paper_columns = _columns(conn, "papers")
     section_columns = _columns(conn, "paper_sections")
@@ -434,6 +502,158 @@ def build_section_atoms(
         "by_evidence_grade": by_grade,
         "fts_enabled": fts_enabled,
     }
+
+
+def _embedding_source_text(row: sqlite3.Row | dict[str, Any]) -> str:
+    item = dict(row)
+    return " ".join(
+        part
+        for part in (
+            str(item.get("title") or ""),
+            str(item.get("section_name") or ""),
+            str(item.get("atom_type") or ""),
+            str(item.get("atom_text") or ""),
+        )
+        if part
+    )
+
+
+def _insert_atom_embeddings(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+    *,
+    embedding_model: str,
+    embedding_dim: int,
+) -> int:
+    if not rows:
+        return 0
+    created_at = utc_now()
+    payload = []
+    for row in rows:
+        item = dict(row)
+        source_text = _embedding_source_text(item)
+        payload.append(
+            (
+                item["atom_id"],
+                item["paper_id"],
+                embedding_model,
+                int(embedding_dim),
+                json.dumps(embed_atom_text(source_text, embedding_dim=embedding_dim), separators=(",", ":")),
+                _text_hash(source_text),
+                "retrieval_context_only",
+                FUZZY_SEARCH_SEMANTICS,
+                created_at,
+            )
+        )
+    conn.executemany(
+        """
+        INSERT OR REPLACE INTO section_atom_embeddings (
+            atom_id, paper_id, embedding_model, embedding_dim, embedding_json,
+            source_text_hash, claim_scope, search_semantics, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        payload,
+    )
+    return len(payload)
+
+
+def build_section_atom_embeddings(
+    db_main: Path = DB_MAIN,
+    *,
+    limit: int | None = None,
+    rebuild: bool = False,
+    embedding_model: str = ATOM_EMBEDDING_MODEL,
+    embedding_dim: int = ATOM_EMBEDDING_DIM,
+) -> dict[str, Any]:
+    conn = sqlite3.connect(str(db_main), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    ensure_section_atom_embeddings_schema(conn)
+    if not _table_exists(conn, "section_atoms"):
+        conn.close()
+        return {
+            "atoms_seen": 0,
+            "embeddings_written": 0,
+            "embedding_model": embedding_model,
+            "embedding_dim": int(embedding_dim),
+            "claim_scope": "retrieval_context_only",
+            "status": "section_atoms_missing",
+        }
+    if rebuild:
+        conn.execute(
+            "DELETE FROM section_atom_embeddings WHERE embedding_model = ? AND embedding_dim = ?",
+            (embedding_model, int(embedding_dim)),
+        )
+        conn.commit()
+    atom_count_row = conn.execute("SELECT COUNT(*) FROM section_atoms").fetchone()
+    atom_count = int(atom_count_row[0] or 0) if atom_count_row else 0
+    sql = """
+        SELECT a.*, e.source_text_hash AS existing_source_text_hash
+        FROM section_atoms a
+        LEFT JOIN section_atom_embeddings e
+            ON e.atom_id = a.atom_id
+           AND e.embedding_model = ?
+           AND e.embedding_dim = ?
+        ORDER BY a.paper_id, a.section_key, a.atom_index
+    """
+    if limit is not None:
+        sql += " LIMIT ?"
+        raw_rows = conn.execute(sql, (embedding_model, int(embedding_dim), int(limit))).fetchall()
+    else:
+        raw_rows = conn.execute(sql, (embedding_model, int(embedding_dim))).fetchall()
+    rows = [
+        row
+        for row in raw_rows
+        if row["existing_source_text_hash"] != _text_hash(_embedding_source_text(row))
+    ]
+    total = 0
+    pending: list[sqlite3.Row] = []
+    for row in rows:
+        pending.append(row)
+        if len(pending) >= 1000:
+            total += _insert_atom_embeddings(
+                conn,
+                pending,
+                embedding_model=embedding_model,
+                embedding_dim=int(embedding_dim),
+            )
+            conn.commit()
+            pending = []
+    if pending:
+        total += _insert_atom_embeddings(
+            conn,
+            pending,
+            embedding_model=embedding_model,
+            embedding_dim=int(embedding_dim),
+        )
+    conn.commit()
+    total_available = _count_embeddings(conn, embedding_model=embedding_model, embedding_dim=int(embedding_dim))
+    conn.close()
+    return {
+        "atoms_seen": atom_count,
+        "atoms_pending": len(rows),
+        "embeddings_written": total,
+        "embeddings_available": total_available,
+        "embedding_model": embedding_model,
+        "embedding_dim": int(embedding_dim),
+        "claim_scope": "retrieval_context_only",
+        "search_semantics": FUZZY_SEARCH_SEMANTICS,
+    }
+
+
+def _count_embeddings(conn: sqlite3.Connection, *, embedding_model: str, embedding_dim: int) -> int:
+    if not _table_exists(conn, "section_atom_embeddings"):
+        return 0
+    row = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM section_atom_embeddings
+        WHERE embedding_model = ? AND embedding_dim = ?
+        """,
+        (embedding_model, int(embedding_dim)),
+    ).fetchone()
+    return int(row[0] or 0) if row else 0
 
 
 def _fts_query(text: str) -> str:
@@ -494,11 +714,112 @@ def search_section_atoms(
     return [_row_to_hit(row) for row in rows]
 
 
+def _cosine_similarity(left: list[float], right: list[float]) -> float:
+    size = min(len(left), len(right))
+    if not size:
+        return 0.0
+    return sum(left[idx] * right[idx] for idx in range(size))
+
+
+def _loads_vector(raw: Any) -> list[float]:
+    vector = _loads(raw, [])
+    if not isinstance(vector, list):
+        return []
+    out: list[float] = []
+    for value in vector:
+        try:
+            out.append(float(value))
+        except (TypeError, ValueError):
+            return []
+    return out
+
+
+def _token_overlap_score(query_tokens: set[str], text: str) -> float:
+    if not query_tokens:
+        return 0.0
+    candidate_tokens = set(_embedding_tokens(text))
+    if not candidate_tokens:
+        return 0.0
+    return len(query_tokens & candidate_tokens) / len(query_tokens)
+
+
+def search_section_atoms_fuzzy(
+    conn: sqlite3.Connection,
+    query_text: str,
+    *,
+    top_k: int = 20,
+    filters: dict[str, Any] | None = None,
+    embedding_model: str = ATOM_EMBEDDING_MODEL,
+    embedding_dim: int = ATOM_EMBEDDING_DIM,
+    min_score: float = 0.0,
+) -> list[dict[str, Any]]:
+    filters = filters or {}
+    ensure_section_atom_embeddings_schema(conn)
+    if not query_text or not _table_exists(conn, "section_atom_embeddings"):
+        return []
+    where = ["e.embedding_model = ?", "e.embedding_dim = ?"]
+    params: list[Any] = [embedding_model, int(embedding_dim)]
+    if filters.get("paper_id"):
+        where.append("a.paper_id = ?")
+        params.append(str(filters["paper_id"]))
+    if filters.get("atom_type"):
+        where.append("a.atom_type = ?")
+        params.append(str(filters["atom_type"]))
+    if filters.get("section_name"):
+        where.append("a.section_key = ?")
+        params.append(normalize_section_key(filters["section_name"]))
+    rows = conn.execute(
+        f"""
+        SELECT
+            a.*,
+            e.embedding_model AS embedding_model,
+            e.embedding_dim AS embedding_dim,
+            e.embedding_json AS embedding_json,
+            e.source_text_hash AS embedding_source_text_hash,
+            e.search_semantics AS embedding_search_semantics
+        FROM section_atoms a
+        JOIN section_atom_embeddings e ON e.atom_id = a.atom_id
+        WHERE {" AND ".join(where)}
+        """,
+        tuple(params),
+    ).fetchall()
+    query_vector = embed_atom_text(query_text, embedding_dim=int(embedding_dim))
+    query_tokens = set(_embedding_tokens(query_text))
+    hits: list[dict[str, Any]] = []
+    for row in rows:
+        atom_vector = _loads_vector(row["embedding_json"])
+        vector_score = max(_cosine_similarity(query_vector, atom_vector), 0.0)
+        lexical_score = _token_overlap_score(query_tokens, _embedding_source_text(row))
+        score = (0.70 * lexical_score) + (0.30 * vector_score)
+        if score < float(min_score):
+            continue
+        hit = _row_to_hit(row)
+        hit.pop("embedding_json", None)
+        hit["rank_score"] = round(score, 6)
+        hit["similarity_score"] = round(score, 6)
+        hit["vector_score"] = round(vector_score, 6)
+        hit["lexical_overlap_score"] = round(lexical_score, 6)
+        hit["search_mode"] = "fuzzy_vector_recall"
+        hit["claim_scope"] = "retrieval_context_only"
+        hit["search_semantics"] = FUZZY_SEARCH_SEMANTICS
+        hit["embedding_model"] = embedding_model
+        hit["embedding_dim"] = int(embedding_dim)
+        hits.append(hit)
+    hits.sort(
+        key=lambda item: (
+            -float(item.get("similarity_score") or 0.0),
+            item.get("paper_id") or "",
+            item.get("atom_id") or "",
+        )
+    )
+    return hits[: int(top_k)]
+
+
 def _row_to_hit(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     item["uncertainty_reasons"] = _loads(item.pop("uncertainty_reasons_json", "[]"), [])
     item["features"] = _loads(item.pop("features_json", "{}"), {})
-    item["search_semantics"] = "retrieval hit only; not a Topic Dossier or Claim Card conclusion"
+    item["search_semantics"] = EXACT_SEARCH_SEMANTICS
     return item
 
 
@@ -513,23 +834,55 @@ def main(argv: list[str] | None = None) -> None:
     add_common_args(parser)
     parser.add_argument("--max-atoms-per-section", type=int, default=12)
     parser.add_argument("--no-rebuild", action="store_true")
+    parser.add_argument("--skip-atom-build", action="store_true")
+    parser.add_argument("--build-embeddings", action="store_true")
+    parser.add_argument("--embedding-rebuild", action="store_true")
+    parser.add_argument("--embedding-model", default=ATOM_EMBEDDING_MODEL)
+    parser.add_argument("--embedding-dim", type=int, default=ATOM_EMBEDDING_DIM)
     parser.add_argument("--query", default=None, help="Optional smoke-test query after building atoms.")
+    parser.add_argument("--query-mode", choices=("exact", "fuzzy"), default="exact")
     args = parser.parse_args(argv)
     setup_logging("section_atoms", level=getattr(logging, args.log_level))
     db_main = Path(args.db) if args.db else DB_MAIN
-    stats = build_section_atoms(
-        db_main,
-        limit=args.limit,
-        rebuild=not args.no_rebuild,
-        max_atoms_per_section=args.max_atoms_per_section,
-    )
+    if args.skip_atom_build:
+        stats = {"status": "atom_build_skipped"}
+    else:
+        stats = build_section_atoms(
+            db_main,
+            limit=args.limit,
+            rebuild=not args.no_rebuild,
+            max_atoms_per_section=args.max_atoms_per_section,
+        )
+    if args.build_embeddings:
+        stats["embeddings"] = build_section_atom_embeddings(
+            db_main,
+            limit=args.limit,
+            rebuild=args.embedding_rebuild,
+            embedding_model=args.embedding_model,
+            embedding_dim=args.embedding_dim,
+        )
     print(json.dumps(stats, ensure_ascii=False, sort_keys=True))
     if args.query:
         conn = sqlite3.connect(str(db_main))
         conn.row_factory = sqlite3.Row
-        hits = search_section_atoms(conn, args.query, top_k=5)
+        if args.query_mode == "fuzzy":
+            hits = search_section_atoms_fuzzy(
+                conn,
+                args.query,
+                top_k=5,
+                embedding_model=args.embedding_model,
+                embedding_dim=args.embedding_dim,
+            )
+        else:
+            hits = search_section_atoms(conn, args.query, top_k=5)
         conn.close()
-        print(json.dumps({"query": args.query, "hits": hits}, ensure_ascii=False, sort_keys=True))
+        print(
+            json.dumps(
+                {"query": args.query, "query_mode": args.query_mode, "hits": hits},
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
 
 
 if __name__ == "__main__":

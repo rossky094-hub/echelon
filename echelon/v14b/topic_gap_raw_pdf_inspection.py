@@ -105,6 +105,35 @@ def inspect_parsed_blocks(blocks: list[Any]) -> dict[str, Any]:
     }
 
 
+def classify_recommended_action(row: dict[str, Any]) -> str:
+    """Map parser dry-run evidence to the next safe repair action."""
+    classification = str(row.get("classification") or "")
+    if classification == "parser_exception":
+        return "parser_exception_reparse"
+    if classification == "parser_success_primary":
+        if (
+            row.get("promotion_policy") != "covered"
+            and row.get("failure_mode") != "decision_grade_current_contract"
+        ):
+            return "local_cache_ingest_candidate"
+        return "already_covered_parser_control"
+    if classification == "parser_success_secondary_only":
+        return "secondary_section_review"
+    if classification == "parser_no_target_sections":
+        shape = str(row.get("no_target_classification") or "")
+        if shape == "target_heading_signal_present":
+            return "parser_repair_candidate"
+        if shape == "target_heading_signal_subthreshold":
+            return "target_fragment_manual_review"
+        if shape == "heading_like_but_not_target_section":
+            return "heading_taxonomy_review"
+        if shape in {"sectionless_or_non_target_heading_format", "no_heading_signal_detected"}:
+            return "weak_fulltext_or_metadata_only"
+        if shape == "parse_no_text":
+            return "pdf_text_extraction_failure"
+    return "manual_inspection"
+
+
 def run_topic_gap_raw_pdf_inspection(
     *,
     db_main: Path = DB_MAIN,
@@ -160,7 +189,11 @@ def run_topic_gap_raw_pdf_inspection(
                 }
             )
 
+    for row in rows:
+        row["recommended_action"] = classify_recommended_action(row)
+
     counts = Counter(str(row.get("classification") or "unknown") for row in rows)
+    action_counts = Counter(str(row.get("recommended_action") or "unknown") for row in rows)
     no_target_shape_counts = Counter(
         str(row.get("no_target_classification") or "unknown")
         for row in rows
@@ -194,6 +227,7 @@ def run_topic_gap_raw_pdf_inspection(
         "parser_no_target_subthreshold_signal_papers": no_target_subthreshold_signal,
         "parser_exception_papers": parser_exceptions,
         "classification_counts": dict(counts),
+        "recommended_action_counts": dict(action_counts),
         "policy": (
             "This is a read-only parser dry run. Rows with parser_success_primary and candidate_pool_only policy "
             "are local-cache candidates for the next safe Step5s ingest boundary; already-covered rows are useful "
@@ -253,6 +287,7 @@ def load_topic_gap_raw_pdf_inspection_state(path: Path) -> dict[str, Any]:
         ),
         "parser_exception_papers": int(summary.get("parser_exception_papers") or 0),
         "classification_counts": summary.get("classification_counts") or {},
+        "recommended_action_counts": summary.get("recommended_action_counts") or {},
     }
 
 
@@ -270,6 +305,20 @@ def _section_strategy_cell(row: dict[str, Any]) -> str:
     for section_name, values in sorted(strategies.items()):
         parts.append(f"{section_name}:{','.join(str(v) for v in values)}")
     return "; ".join(parts)
+
+
+def _probe_examples_cell(row: dict[str, Any]) -> str:
+    probe = row.get("no_target_probe") or {}
+    if not isinstance(probe, dict):
+        return ""
+    examples: list[str] = []
+    for key in ("target_heading_candidates", "heading_like_examples", "non_target_heading_examples"):
+        for item in (probe.get(key) or [])[:2]:
+            if isinstance(item, dict) and item.get("text"):
+                examples.append(str(item.get("text")))
+        if examples:
+            break
+    return "; ".join(examples[:2])
 
 
 def _render_markdown(result: dict[str, Any]) -> str:
@@ -304,6 +353,18 @@ def _render_markdown(result: dict[str, Any]) -> str:
     ]
     for name, count in Counter(summary["classification_counts"]).most_common():
         lines.append(f"| {name} | {count:,} |")
+    if summary.get("recommended_action_counts"):
+        lines.extend(
+            [
+                "",
+                "## Recommended Action Counts",
+                "",
+                "| action | papers |",
+                "|---|---:|",
+            ]
+        )
+        for name, count in Counter(summary["recommended_action_counts"]).most_common():
+            lines.append(f"| {name} | {count:,} |")
     if summary.get("parser_no_target_shape_counts"):
         lines.extend(
             [
@@ -321,8 +382,8 @@ def _render_markdown(result: dict[str, Any]) -> str:
             "",
             "## Local PDF Rows",
             "",
-            "| paper_id | topics | triage failure | parser classification | no-target shape | primary sections | section strategies | title |",
-            "|---|---|---|---|---|---|---|---|",
+            "| paper_id | topics | triage failure | parser classification | no-target shape | recommended action | examples | primary sections | section strategies | title |",
+            "|---|---|---|---|---|---|---|---|---|---|",
         ]
     )
     for row in result.get("rows") or []:
@@ -330,6 +391,7 @@ def _render_markdown(result: dict[str, Any]) -> str:
             f"| `{_md_cell(row.get('paper_id'))}` | {_md_cell(row.get('topics'))} | "
             f"`{_md_cell(row.get('failure_mode'))}` | `{_md_cell(row.get('classification'))}` | "
             f"`{_md_cell(row.get('no_target_classification'))}` | "
+            f"`{_md_cell(row.get('recommended_action'))}` | {_md_cell(_probe_examples_cell(row))} | "
             f"{_md_cell(row.get('primary_sections'))} | {_md_cell(_section_strategy_cell(row))} | "
             f"{_md_cell(row.get('title'))} |"
         )

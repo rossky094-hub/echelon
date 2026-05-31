@@ -1,6 +1,6 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T04:33:14Z`
+- audit_ts: `2026-05-31T04:49:02Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
@@ -13,27 +13,24 @@
 |---|---:|
 | no_target_sections_after_current_parser | 22 |
 | decision_grade_current_contract | 11 |
-| lineage_chains_missing_after_atoms | 5 |
-| lineage_full_chain_missing | 4 |
-| lineage_atoms_missing_after_section_evidence | 3 |
+| lineage_chains_missing_after_atoms | 7 |
+| lineage_full_chain_missing | 5 |
 | unattempted_pdf_available | 2 |
 
 ## Typed Chain Triage
 
 | failure_mode | papers |
 |---|---:|
-| lineage_chains_missing_after_atoms | 5 |
-| lineage_full_chain_missing | 4 |
-| lineage_atoms_missing_after_section_evidence | 3 |
+| lineage_chains_missing_after_atoms | 7 |
+| lineage_full_chain_missing | 5 |
 
 ## Next Actions
 
 | failure_mode | papers | action |
 |---|---:|---|
 | no_target_sections_after_current_parser | 22 | inspect parser misses or alternate full text; keep abstract-only claims weak. |
-| lineage_chains_missing_after_atoms | 5 | run section-atom-chains or tune atom ordering before Step13 promotion. |
-| lineage_full_chain_missing | 4 | inspect missing typed stages and improve atom classification/chain assembly for this bottleneck. |
-| lineage_atoms_missing_after_section_evidence | 3 | run section-atoms for topic-gap papers, then rebuild section-atom chains. |
+| lineage_chains_missing_after_atoms | 7 | run section-atom-chains or tune atom ordering before Step13 promotion. |
+| lineage_full_chain_missing | 5 | inspect missing typed stages and improve atom classification/chain assembly for this bottleneck. |
 | unattempted_pdf_available | 2 | run targeted topic-gap section ingest after active broad ingest is safe. |
 
 ## Topic Coverage
@@ -43,7 +40,7 @@
 | metalens | 12 | 7 | 58.3% | no_target_sections_after_current_parser:5, decision_grade_current_contract:4, lineage_full_chain_missing:3 |
 | metasurface holography | 12 | 8 | 66.7% | no_target_sections_after_current_parser:4, lineage_chains_missing_after_atoms:4, decision_grade_current_contract:4 |
 | photonic crystal cavity | 20 | 11 | 55.0% | no_target_sections_after_current_parser:9, decision_grade_current_contract:9, lineage_full_chain_missing:1 |
-| quantum light source | 22 | 12 | 54.5% | decision_grade_current_contract:9, no_target_sections_after_current_parser:8, lineage_atoms_missing_after_section_evidence:3 |
+| quantum light source | 22 | 12 | 54.5% | decision_grade_current_contract:9, no_target_sections_after_current_parser:8, lineage_chains_missing_after_atoms:2 |
 
 ## Queued Papers
 
@@ -58,10 +55,10 @@
 | 7 | `01KS6FFJF6XNCHFY2X589F6QD5` | photonic crystal cavity | `lineage_chains_missing_after_atoms` | `success_primary` | Efficient Terahertz Generation in Triply Resonant Nonlinear Photonic Crystal Microcavities |
 | 8 | `01KS6FG0VYNT6MYBBYMX8TBYDR` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | All-optical conditional logic with a nonlinear photonic crystal nanocavity |
 | 9 | `01KS6FGD433ZJXYBXPYVZ727SG` | photonic crystal cavity | `no_target_sections_after_current_parser` | `no_target_sections` | Demonstration of an air-slot mode-gap confined photonic crystal slab nanocavity with ultrasmall mode volumes |
-| 10 | `01KS6FK557AWZRGP7QFMMBVT17` | quantum light source | `lineage_atoms_missing_after_section_evidence` | `success_primary` | Quantum interface between frequency-uncorrelated down-converted entanglement and atomic-ensemble quantum memory |
-| 11 | `01KS6GKT1AN2MQ1NXP1ZJY5EKA` | quantum light source | `lineage_atoms_missing_after_section_evidence` | `success_primary` | Ultra-broadband continuously-tunable polarization entangled photon pair source covering the C+L telecom bands based on a single type-II PPKTP crystal |
+| 10 | `01KS6FK557AWZRGP7QFMMBVT17` | quantum light source | `lineage_chains_missing_after_atoms` | `success_primary` | Quantum interface between frequency-uncorrelated down-converted entanglement and atomic-ensemble quantum memory |
+| 11 | `01KS6GKT1AN2MQ1NXP1ZJY5EKA` | quantum light source | `lineage_chains_missing_after_atoms` | `success_primary` | Ultra-broadband continuously-tunable polarization entangled photon pair source covering the C+L telecom bands based on a single type-II PPKTP crystal |
 | 12 | `01KS6GND5KCR5HPW1YFZYW5ANY` | quantum light source | `no_target_sections_after_current_parser` | `no_target_sections` | Characterization of a Quantum Light Source Based on Spontaneous Parametric Down-Conversion |
-| 13 | `01KS6H25PCS743PEWJ8HF8YGEH` | quantum light source | `lineage_atoms_missing_after_section_evidence` | `success_primary` | Tunable narrow band source via the strong coupling between optical emitter and nanowire surface plasmons |
+| 13 | `01KS6H25PCS743PEWJ8HF8YGEH` | quantum light source | `lineage_full_chain_missing` | `success_primary` | Tunable narrow band source via the strong coupling between optical emitter and nanowire surface plasmons |
 | 14 | `01KS5KJ583SB217NBQYZSWC42R` | metalens | `lineage_full_chain_missing` | `success_primary` | Metalens With Artificial Focus Pattern |
 | 15 | `01KS6FNC3F3SNBJ0QH1E8PRPRV` | quantum light source | `unattempted_pdf_available` | `not_attempted` | Classification of light sources and their interaction with active and passive environments |
 | 16 | `01KS6FQ18T1VR46Z69BXKVAYYJ` | metasurface holography | `no_target_sections_after_current_parser` | `no_target_sections` | Specular holography |

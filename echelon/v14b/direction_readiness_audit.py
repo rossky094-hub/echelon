@@ -978,6 +978,7 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
         dry_run_detail = ""
         if raw_pdf_inspection.get("available"):
             no_target_shapes = raw_pdf_inspection.get("parser_no_target_shape_counts") or {}
+            action_counts = raw_pdf_inspection.get("recommended_action_counts") or {}
             dry_run_detail = (
                 " Local topic-gap parser dry run: "
                 f"primary-ready={int(raw_pdf_inspection.get('parser_primary_ready_papers') or 0):,}, "
@@ -989,7 +990,11 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                 f"subthreshold={int(no_target_shapes.get('target_heading_signal_subthreshold') or 0):,}, "
                 f"sectionless={int(no_target_shapes.get('sectionless_or_non_target_heading_format') or 0):,}, "
                 f"heading-like={int(no_target_shapes.get('heading_like_but_not_target_section') or 0):,}, "
-                f"no-heading={int(no_target_shapes.get('no_heading_signal_detected') or 0):,}."
+                f"no-heading={int(no_target_shapes.get('no_heading_signal_detected') or 0):,}. "
+                "Actions: "
+                f"heading-taxonomy={int(action_counts.get('heading_taxonomy_review') or 0):,}, "
+                f"weak-fulltext={int(action_counts.get('weak_fulltext_or_metadata_only') or 0):,}, "
+                f"ingest-candidate={int(action_counts.get('local_cache_ingest_candidate') or 0):,}."
             )
         blockers.append(
             {
@@ -1160,6 +1165,7 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     raw_pdf_inspection_line = []
     if raw_pdf_inspection.get("available"):
         no_target_shapes = raw_pdf_inspection.get("parser_no_target_shape_counts") or {}
+        action_counts = raw_pdf_inspection.get("recommended_action_counts") or {}
         raw_pdf_inspection_line = [
             f"- topic-gap raw PDF parser dry run: `{raw_pdf_inspection.get('status')}`; "
             f"local={int(raw_pdf_inspection.get('local_pdf_available_papers') or 0):,}; "
@@ -1167,7 +1173,8 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
             f"repair-ready={int(raw_pdf_inspection.get('parser_primary_ready_repair_candidates') or 0):,}; "
             f"no-target={int(raw_pdf_inspection.get('parser_no_target_papers') or 0):,}; "
             f"parser-exception={int(raw_pdf_inspection.get('parser_exception_papers') or 0):,}; "
-            f"no-target-shapes={_top_counts(no_target_shapes)}"
+            f"no-target-shapes={_top_counts(no_target_shapes)}; "
+            f"actions={_top_counts(action_counts)}"
         ]
     lines = [
         "# Direction Readiness Audit",

@@ -22,6 +22,16 @@ def _make_main(path: Path) -> None:
             claim_scope TEXT
         );
         CREATE VIRTUAL TABLE section_atoms_fts USING fts5(atom_id UNINDEXED, atom_text);
+        CREATE TABLE section_atom_embeddings (
+            atom_id TEXT PRIMARY KEY,
+            paper_id TEXT,
+            embedding_model TEXT,
+            embedding_dim INTEGER,
+            embedding_json TEXT,
+            source_text_hash TEXT,
+            claim_scope TEXT,
+            search_semantics TEXT
+        );
         CREATE TABLE section_atom_chains (
             chain_id TEXT PRIMARY KEY,
             paper_id TEXT,
@@ -39,6 +49,15 @@ def _make_main(path: Path) -> None:
     conn.execute("INSERT INTO paper_sections VALUES ('p1', 'discussion', ?)", ("section evidence " * 20,))
     conn.execute("INSERT INTO section_atoms VALUES ('sa1', 'p1', 'section_atom_decision_grade', 'retrieval_context_only')")
     conn.execute("INSERT INTO section_atoms_fts VALUES ('sa1', 'section evidence atom')")
+    conn.execute(
+        """
+        INSERT INTO section_atom_embeddings VALUES (
+            'sa1', 'p1', 'deterministic_hashing_atom_embedding_v1', 256, '[1.0]',
+            'hash', 'retrieval_context_only',
+            'candidate recall only; retrieval_context_only; not a Topic Dossier or Claim Card conclusion'
+        )
+        """
+    )
     conn.execute(
         "INSERT INTO section_atom_chains VALUES ('sac1', 'p1', 1, 'typed_section_lineage', 'bottleneck_lineage_evidence')"
     )
@@ -140,6 +159,7 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert "Step5s-a section atom search" in md
     assert "Step5s-b section atom typed chains" in md
     assert "GNN/VGAE must not atomize sections" in md
+    assert "fuzzy candidate recall" in md
     assert "Do not loosen parser" in md
     assert "resolution_candidate_partial" in md
     payload = json.loads((reports / "algorithm_logic_audit.json").read_text(encoding="utf-8"))
@@ -148,6 +168,8 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert payload["metrics"]["section_atoms"] == 1
     assert payload["metrics"]["section_atom_decision_grade"] == 1
     assert payload["metrics"]["section_atoms_fts"] == 1
+    assert payload["metrics"]["section_atom_embeddings"] == 1
+    assert payload["metrics"]["section_atom_embeddings_retrieval_only"] == 1
     assert payload["metrics"]["section_atom_chains"] == 1
     assert payload["metrics"]["section_atom_chain_full"] == 1
     assert payload["metrics"]["section_atom_chain_decision_grade"] == 1
