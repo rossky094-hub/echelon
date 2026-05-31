@@ -17,7 +17,7 @@
 #   make help
 # ========================================================
 
-.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
+.PHONY: setup id-repair reference-relink-audit reference-relink-apply cited-work-backfill-queue cited-work-backfill openalex-backfill graph-features embeddings evidence-prep graph-prep reset-pilot quality-audit product-baseline topic-regression access-audit recover-vgae-calibration-audit future-lifecycle-audit direction-readiness-audit value-delivery-audit evidence-bone-audit algorithm-logic-audit decision-audit topic-gap-repair enrich mainpath keystone subgraph scibert vgae section-evidence section-evidence-delta section-evidence-topic-gaps section-atoms section-queue-audit topic-gap-section-audit topic-gap-no-target-inspect post-frontfill-chain limitation \
         fusion mutation layout report visual-graph first-principles goal-audit llm-edge-audit-plan llm-edge-audit-run product-chain product-chain-fast pilot pilot-graph pilot-visual pilot-full \
         quarterly-run quarterly-run-optics quarterly-run-cs quarterly-run-materials clean help
 
@@ -139,8 +139,8 @@ graph-prep: id-repair openalex-backfill graph-features embeddings
 	@echo ">>> Graph prep done."
 
 ## Step 0.9: Evidence-ready data before user-facing claims
-evidence-prep: openalex-backfill section-evidence
-	@echo ">>> Evidence prep done: OpenAlex backfill + section evidence are complete for configured scope."
+evidence-prep: openalex-backfill section-evidence section-atoms
+	@echo ">>> Evidence prep done: OpenAlex backfill + section evidence atoms are complete for configured scope."
 
 ## Step 0.1: Reset old derived graph outputs
 reset-pilot:
@@ -332,6 +332,14 @@ section-evidence-topic-gaps:
 		$(CORPUS_ARG) \
 		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
 
+## Step 5s-a: section evidence atoms + exact FTS search substrate
+section-atoms:
+	@echo ">>> Step 5s-a: Section evidence atoms and exact search..."
+	$(PYTHON) -m echelon.v14b.section_atoms \
+		--db $(DB_MAIN) \
+		--max-atoms-per-section $${V14B_SECTION_ATOM_MAX_PER_SECTION:-12} \
+		$(if $(V14B_LIMIT),--limit $(V14B_LIMIT),)
+
 ## Topic gap repair: regression gaps -> queue refresh -> targeted ingest -> re-audit
 topic-gap-repair:
 	@echo ">>> Topic gap repair: refresh gaps, ingest targeted sections, then re-audit..."
@@ -478,7 +486,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 快速产品链路: 不等待 OpenAlex backfill, 仅用于调试/冒烟验证
-product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence limitation fusion first-principles mutation layout report visual-graph goal-audit
+product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence section-atoms limitation fusion first-principles mutation layout report visual-graph goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Fast Visual Graph 产品链路完成!"
@@ -648,6 +656,7 @@ help:
 	@echo "  make topic-gap-repair          # 精准修复 multi-topic evidence gap"
 	@echo "  make topic-gap-section-audit   # 分类 multi-topic section evidence 缺口"
 	@echo "  make topic-gap-no-target-inspect # 只读检查 no-target PDF heading 信号"
+	@echo "  make section-atoms             # 从 paper_sections 生成可检索证据 atoms"
 	@echo "  make algorithm-logic-audit     # 逐步审计算法角色、输入输出和 promotion guard"
 	@echo "  make cited-work-backfill-queue # 精准生成 missing cited-work 补齐队列"
 	@echo "  make cited-work-backfill       # 小批量处理 exact-ID missing cited works"

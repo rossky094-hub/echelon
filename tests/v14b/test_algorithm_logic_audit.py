@@ -15,6 +15,13 @@ def _make_main(path: Path) -> None:
         CREATE TABLE paper_references (cited_paper_id_internal TEXT);
         CREATE TABLE paper_embeddings (paper_id TEXT);
         CREATE TABLE paper_sections (paper_id TEXT, section_name TEXT, section_text TEXT);
+        CREATE TABLE section_atoms (
+            atom_id TEXT PRIMARY KEY,
+            paper_id TEXT,
+            evidence_grade TEXT,
+            claim_scope TEXT
+        );
+        CREATE VIRTUAL TABLE section_atoms_fts USING fts5(atom_id UNINDEXED, atom_text);
         CREATE TABLE corpus_registry (corpus_id TEXT PRIMARY KEY);
         CREATE TABLE corpus_snapshots (snapshot_id TEXT PRIMARY KEY, corpus_id TEXT);
         """
@@ -23,6 +30,8 @@ def _make_main(path: Path) -> None:
     conn.executemany("INSERT INTO paper_references VALUES (?)", [("p1",), ("",), ("",)])
     conn.executemany("INSERT INTO paper_embeddings VALUES (?)", [("p1",), ("p2",)])
     conn.execute("INSERT INTO paper_sections VALUES ('p1', 'discussion', ?)", ("section evidence " * 20,))
+    conn.execute("INSERT INTO section_atoms VALUES ('sa1', 'p1', 'section_atom_decision_grade', 'retrieval_context_only')")
+    conn.execute("INSERT INTO section_atoms_fts VALUES ('sa1', 'section evidence atom')")
     conn.execute("INSERT INTO corpus_registry VALUES ('optics')")
     conn.commit()
     conn.close()
@@ -118,9 +127,14 @@ def test_algorithm_logic_audit_writes_stepwise_contracts(tmp_path):
     assert "Step5b calibrated future candidate generator" in md
     assert "never produce conclusions directly" in md
     assert "Step5s section evidence" in md
+    assert "Step5s-a section atom search" in md
+    assert "GNN/VGAE must not atomize sections" in md
     assert "Do not loosen parser" in md
     assert "resolution_candidate_partial" in md
     payload = json.loads((reports / "algorithm_logic_audit.json").read_text(encoding="utf-8"))
     assert payload["metrics"]["lineage_completeness_counts"]["resolution_candidate_partial"] == 1
     assert payload["metrics"]["complete_typed_lineage_triples"] == 1
+    assert payload["metrics"]["section_atoms"] == 1
+    assert payload["metrics"]["section_atom_decision_grade"] == 1
+    assert payload["metrics"]["section_atoms_fts"] == 1
     assert result["status_counts"]["readiness"]["fail"] >= 1

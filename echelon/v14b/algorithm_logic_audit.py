@@ -123,6 +123,14 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
     metrics["multi_topic_regression"] = _load_json(report_dir / "multi_topic_regression.json", [])
     with sqlite3.connect(str(db_main)) as main:
         metrics["embeddings"] = _count(main, "paper_embeddings")
+        metrics["section_atoms"] = _count(main, "section_atoms")
+        metrics["section_atom_decision_grade"] = _count_when_columns(
+            main,
+            "section_atoms",
+            {"evidence_grade"},
+            "evidence_grade = 'section_atom_decision_grade'",
+        )
+        metrics["section_atoms_fts"] = 1 if table_exists(main, "section_atoms_fts") else 0
     with sqlite3.connect(str(db_v14)) as v14:
         metrics["main_path_edges"] = _count(v14, "main_path_edges")
         metrics["main_path_core_edges"] = _count(v14, "main_path_edges", "is_main_path=1")
@@ -164,6 +172,9 @@ def build_algorithm_logic_audit(
     linked_ref_rate = float(m.get("linked_ref_rate") or 0.0)
     openalex_w_rate = float(m.get("openalex_w_rate") or 0.0)
     primary_sections = int(m.get("primary_section_papers") or 0)
+    section_atoms = int(m.get("section_atoms") or 0)
+    section_atom_decision_grade = int(m.get("section_atom_decision_grade") or 0)
+    section_atoms_fts = int(m.get("section_atoms_fts") or 0)
     limitation_atoms = int(m.get("limitation_atoms") or 0)
     limitation_exact_section_atoms = int(m.get("limitation_exact_section_atoms") or 0)
     limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
@@ -307,6 +318,20 @@ def build_algorithm_logic_audit(
             "Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe.",
         ),
         StepAudit(
+            "Step5s-a section atom search",
+            "Split trusted sections into span-bound retrieval atoms with exact search; keep GNN/VGAE as ranking or expansion only.",
+            "paper_sections with parser contract, extraction provenance, pages, and raw-PDF storage URI when available.",
+            "section_atoms plus FTS/BM25 retrieval hits labeled retrieval_context_only.",
+            "Atom hits can seed Step5c/Step13 evidence work, but cannot become scientific conclusions without typed chains and promotion gates.",
+            "aligned",
+            "fail" if not section_atoms else ("warn" if not section_atoms_fts else "pass"),
+            (
+                f"section_atoms={section_atoms:,}; decision_grade_atoms={section_atom_decision_grade:,}; "
+                f"exact_atom_fts={'yes' if section_atoms_fts else 'no'}; GNN/VGAE must not atomize sections."
+            ),
+            "Add atom embeddings for fuzzy search, then let Step5c/Step13 consume atoms through evidence contracts instead of re-parsing ad hoc text.",
+        ),
+        StepAudit(
             "Step5c limitation / resolution extraction",
             "Extract unresolved constraints and resolution attempts from trusted sections.",
             "Decision-grade sections first, weak abstract metadata only as scoped fallback.",
@@ -432,6 +457,9 @@ def build_algorithm_logic_audit(
             "linked_ref_rate": linked_ref_rate,
             "openalex_w_rate": openalex_w_rate,
             "primary_section_papers": primary_sections,
+            "section_atoms": section_atoms,
+            "section_atom_decision_grade": section_atom_decision_grade,
+            "section_atoms_fts": section_atoms_fts,
             "limitation_atoms": limitation_atoms,
             "limitation_exact_section_atoms": limitation_exact_section_atoms,
             "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
@@ -466,6 +494,9 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- linked_ref_rate: `{float(result['metrics']['linked_ref_rate']):.1%}`",
         f"- openalex_w_rate: `{float(result['metrics']['openalex_w_rate']):.1%}`",
         f"- primary_section_papers: `{int(result['metrics']['primary_section_papers']):,}`",
+        f"- section_atoms: `{int(result['metrics']['section_atoms']):,}`",
+        f"- section_atom_decision_grade: `{int(result['metrics']['section_atom_decision_grade']):,}`",
+        f"- section_atoms_fts: `{'yes' if int(result['metrics']['section_atoms_fts']) else 'no'}`",
         f"- limitation_exact_section_atoms: `{int(result['metrics']['limitation_exact_section_atoms']):,}`",
         f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
         f"- complete_typed_lineage_triples: `{int(result['metrics']['complete_typed_lineage_triples']):,}`",
