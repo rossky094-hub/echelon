@@ -1,6 +1,6 @@
 # Photonic Crystal Cavity Topic Regression
 
-- Audit: `2026-05-31T00:54:50Z`
+- Audit: `2026-05-31T01:13:41Z`
 - Topic: `photonic crystal cavity`
 - Overall status: **fail**
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | expected branches found | 1.00 | 1.0 | pass |
 | branches with driver papers | 4 | 3 | pass |
-| expected bottlenecks evidenced | 4 | 5 | fail |
+| expected bottlenecks evidenced | 3 | 5 | fail |
 | key turning papers | 9 | 4 | pass |
 | turning papers with access links | 9 | 3 | pass |
 | turning papers with primary sections | 3 | 2 | pass |
@@ -38,7 +38,7 @@
 | mode volume | False | True | 5 | fail |
 | coupling loss | True | True | 3 | pass |
 | fabrication disorder | True | True | 3 | pass |
-| thermal stability | True | True | 3 | pass |
+| thermal stability | False | True | 3 | fail |
 
 ## Interpretation
 
@@ -59,6 +59,7 @@
 | Gap | Bottleneck | Priority | Candidate Papers | Why |
 | --- | --- | ---: | ---: | --- |
 | missing_bottleneck_section_evidence | mode volume | 100 | 5 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
+| missing_bottleneck_section_evidence | thermal stability | 100 | 3 | Expected bottleneck appears in branch hypothesis but lacks limitation/section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |
 | key_turning_paper_missing_primary_section |  | 90 | 1 | key turning paper lacks local primary section evidence |

@@ -48,6 +48,23 @@ def _count(conn: sqlite3.Connection, table: str, where: str = "1=1") -> int:
     return int(row[0] or 0) if row else 0
 
 
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    if not table_exists(conn, table):
+        return set()
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _count_when_columns(
+    conn: sqlite3.Connection,
+    table: str,
+    required_columns: set[str],
+    where: str,
+) -> int:
+    if not required_columns <= _columns(conn, table):
+        return 0
+    return _count(conn, table, where)
+
+
 def _load_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
@@ -78,6 +95,18 @@ def _metric_snapshot(db_main: Path, db_v14: Path, report_dir: Path, repo_root: P
         metrics["subgraph_edges"] = _count(v14, "subgraph_edges")
         metrics["citation_function_edges"] = _count(v14, "subgraph_edges", "citation_function IS NOT NULL")
         metrics["limitation_atoms"] = _count(v14, "limitation_atoms")
+        metrics["limitation_exact_section_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"source_section_name"},
+            "COALESCE(source_section_name, '') != '' AND source_section_name NOT LIKE '%,%'",
+        )
+        metrics["limitation_aggregate_section_atoms"] = _count_when_columns(
+            v14,
+            "limitation_atoms",
+            {"source_section_name"},
+            "COALESCE(source_section_name, '') LIKE '%,%'",
+        )
         metrics["bottleneck_triples"] = _count(v14, "bottleneck_lineage_triples")
         metrics["vgae_calibration_audit"] = _count(v14, "vgae_calibration_audit")
         metrics["branch_lineages"] = _count(v14, "branch_lineages")
@@ -99,6 +128,9 @@ def build_algorithm_logic_audit(
     linked_ref_rate = float(m.get("linked_ref_rate") or 0.0)
     openalex_w_rate = float(m.get("openalex_w_rate") or 0.0)
     primary_sections = int(m.get("primary_section_papers") or 0)
+    limitation_atoms = int(m.get("limitation_atoms") or 0)
+    limitation_exact_section_atoms = int(m.get("limitation_exact_section_atoms") or 0)
+    limitation_aggregate_section_atoms = int(m.get("limitation_aggregate_section_atoms") or 0)
     topic_gap_dg_rate = float(m.get("topic_gap_decision_grade_section_rate") or 0.0)
     no_target = m.get("topic_gap_no_target_inspection_state") or {}
     frontfill = m.get("section_frontfill_state") or {}
@@ -242,9 +274,17 @@ def build_algorithm_logic_audit(
             "Typed limitations/resolutions with evidence source, section, and weight.",
             "Abstract-only bottlenecks cannot support high-confidence Claim Cards.",
             "needs_tuning",
-            "warn" if int(m.get("limitation_atoms") or 0) else "fail",
-            f"limitation_atoms={int(m.get('limitation_atoms') or 0):,}; section coverage is still the limiting input.",
-            "Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope.",
+            "fail" if not limitation_atoms else ("fail" if limitation_aggregate_section_atoms else "warn"),
+            (
+                f"limitation_atoms={limitation_atoms:,}; exact_section_atoms={limitation_exact_section_atoms:,}; "
+                f"aggregate_section_atoms={limitation_aggregate_section_atoms:,}; section coverage is still the limiting input."
+            ),
+            (
+                "Re-run Step5c after section-source traceability repair; then retune toward typed chains from "
+                "current-contract sections and keep abstract fallback low scope."
+                if limitation_aggregate_section_atoms else
+                "Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope."
+            ),
         ),
         StepAudit(
             "Step6 fusion",
@@ -346,6 +386,9 @@ def build_algorithm_logic_audit(
             "linked_ref_rate": linked_ref_rate,
             "openalex_w_rate": openalex_w_rate,
             "primary_section_papers": primary_sections,
+            "limitation_atoms": limitation_atoms,
+            "limitation_exact_section_atoms": limitation_exact_section_atoms,
+            "limitation_aggregate_section_atoms": limitation_aggregate_section_atoms,
             "topic_gap_decision_grade_section_rate": topic_gap_dg_rate,
             "failed_topics": failed_topics,
         },
@@ -374,6 +417,8 @@ def render_markdown(result: dict[str, Any]) -> str:
         f"- linked_ref_rate: `{float(result['metrics']['linked_ref_rate']):.1%}`",
         f"- openalex_w_rate: `{float(result['metrics']['openalex_w_rate']):.1%}`",
         f"- primary_section_papers: `{int(result['metrics']['primary_section_papers']):,}`",
+        f"- limitation_exact_section_atoms: `{int(result['metrics']['limitation_exact_section_atoms']):,}`",
+        f"- limitation_aggregate_section_atoms: `{int(result['metrics']['limitation_aggregate_section_atoms']):,}`",
         f"- topic_gap_decision_grade_section_rate: `{float(result['metrics']['topic_gap_decision_grade_section_rate']):.1%}`",
         f"- failed regression topics: `{', '.join(result['metrics']['failed_topics']) or 'none'}`",
         "",

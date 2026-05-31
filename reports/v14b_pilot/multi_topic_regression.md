@@ -1,6 +1,6 @@
 # Multi-topic Topic Lens Regression
 
-- Audit: `2026-05-31T00:54:51Z`
+- Audit: `2026-05-31T01:13:42Z`
 
 | Topic | Overall | Branch Coverage | Turning Papers | 5Q Evidence | Lineage Evidence | Reading Path | Complete Claim Cards |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -19,6 +19,6 @@ This suite prevents the Topic Dossier from being tuned only for Metalens. A topi
 - key_turning_paper_missing_primary_section: 18
 - key_turning_paper_stale_parser_contract: 5
 - key_turning_paper_weak_section_provenance: 1
-- missing_bottleneck_section_evidence: 2
+- missing_bottleneck_section_evidence: 3
 
 See `multi_topic_evidence_gap_queue.csv` for section/OpenAlex/frontfill targets.

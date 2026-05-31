@@ -1,9 +1,11 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T01:00:25Z`
+- generated_at: `2026-05-31T01:15:02Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,021`
+- limitation_exact_section_atoms: `1,073`
+- limitation_aggregate_section_atoms: `0`
 - topic_gap_decision_grade_section_rate: `0.0%`
 - failed regression topics: `photonic crystal cavity, quantum light source`
 
@@ -26,7 +28,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step5a citation function | `aligned` | `warn` | Label citation roles as weak/moderate evidence for fusion, not ground truth. | citation_function_edges=38,538; evidence remains weak without citation sentences. | Prefer deterministic weak labels now; add citation-context extraction before increasing weights. |
 | Step5b calibrated future candidate generator | `aligned` | `pass` | Generate future candidates from temporal evidence; never produce conclusions directly. | future_candidate_edges=1,000; calibration_audits=1. | Continue rolling held-out-year calibration and stratified external audit; do not expose VGAE as Radar claims. |
 | Step5s section evidence | `aligned` | `fail` | Materialize section-level evidence for limitation, bottleneck, and Claim Card reasoning. | primary_section_papers=3,021; topic_gap_decision_grade=0.0%; no-target parser signal=0. | Do not loosen parser for current no-target bucket; reparse stale-contract rows and process unattempted PDF rows when the active ingest is safe. |
-| Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=730; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
+| Step5c limitation / resolution extraction | `needs_tuning` | `warn` | Extract unresolved constraints and resolution attempts from trusted sections. | limitation_atoms=1,073; exact_section_atoms=1,073; aggregate_section_atoms=0; section coverage is still the limiting input. | Retune extraction toward typed chains from current-contract sections; keep abstract fallback low scope. |
 | Step6 fusion | `aligned` | `warn` | Fuse independent evidence paths into direction candidates with explicit adequacy. | future_directions=5; high_confidence_claim_cards=0. | Raise evidence by improving inputs, not by lowering fusion thresholds. |
 | Step13 first-principles + Claim Card engine | `aligned` | `warn` | Turn candidate directions into falsifiable, evidence-scoped research claims. | Claim Cards=5; complete=1; high_confidence=0. | Bind every Claim Card answer to typed bottleneck-chain evidence and minimal validation experiment criteria. |
 | Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |

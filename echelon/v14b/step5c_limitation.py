@@ -72,6 +72,11 @@ SECONDARY_CONTEXT_SECTION_NAMES = (
     "experiments",
 )
 
+TARGET_SECTION_PRIORITY = {
+    name.lower(): idx
+    for idx, name in enumerate(PRIMARY_LIMITATION_SECTION_NAMES + SECONDARY_CONTEXT_SECTION_NAMES)
+}
+
 LIMITATION_TERMS = re.compile(
     r"\b(limit(?:ation)?s?|challenge[sd]?|bottleneck|drawback|constraint|"
     r"remain(?:s|ing)?|future work|open question|not yet|however|although|"
@@ -195,19 +200,33 @@ def get_top_papers_for_limitation(
                 WHERE paper_id IN ({ph})
                   AND lower(section_name) IN ({sec_placeholders})
             """, (*ids, *target_sections)).fetchall()
-            by_paper: dict[str, list[str]] = {}
-            section_names_by_paper: dict[str, list[str]] = {}
+            sections_by_paper: dict[str, list[dict]] = {}
             for row in rows:
-                by_paper.setdefault(row[0], []).append(row[2] or "")
-                section_names_by_paper.setdefault(row[0], []).append(row[1] or "")
+                section_name = (row[1] or "").strip()
+                section_text = (row[2] or "").strip()
+                if not section_name or not section_text:
+                    continue
+                sections_by_paper.setdefault(row[0], []).append({
+                    "section_name": section_name,
+                    "section_text": section_text,
+                })
             for paper in papers:
-                sections = "\n\n".join(by_paper.get(paper["id"], []))
-                if sections.strip():
-                    paper["limitation_text"] = sections[:6000]
+                sections = sorted(
+                    sections_by_paper.get(paper["id"], []),
+                    key=lambda item: (
+                        TARGET_SECTION_PRIORITY.get(item["section_name"].lower(), 999),
+                        item["section_name"].lower(),
+                    ),
+                )
+                if sections:
+                    paper["limitation_text_sections"] = sections
+                    paper["limitation_text"] = "\n\n".join(
+                        f"[{item['section_name']}]\n{item['section_text']}"
+                        for item in sections
+                    )[:6000]
                     paper["limitation_evidence_source"] = "structured_sections"
-                    paper["limitation_source_section_name"] = ",".join(
-                        sorted(set(section_names_by_paper.get(paper["id"], [])))
-                    )[:200]
+                    if len(sections) == 1:
+                        paper["limitation_source_section_name"] = sections[0]["section_name"][:200]
         except sqlite3.Error as exc:
             logger.warning("Structured section lookup failed: %s", exc)
 
@@ -256,38 +275,68 @@ def extract_limitation_atoms(
     if llm_client is None:
         return heuristic_limitation_atoms(paper, text)
 
-    common = _limitation_evidence_common(paper, "llm")
+    atoms = []
+    for source_section_name, chunk_text in _limitation_text_chunks(paper, text):
+        common = _limitation_evidence_common(
+            paper,
+            "llm",
+            source_section_name=source_section_name,
+        )
+        prompt = LIMITATION_EXTRACT_PROMPT.format(
+            title=paper.get("title", "")[:200],
+            abstract=chunk_text[:3000],
+        )
 
-    prompt = LIMITATION_EXTRACT_PROMPT.format(
-        title=paper.get("title", "")[:200],
-        abstract=text[:3000],
-    )
-
-    try:
-        result = llm_client.extract_json(prompt, max_tokens=800)
-        limitations = result.get("limitations", [])
-        if not isinstance(limitations, list):
-            return []
-
-        atoms = []
-        for lim in limitations[:LIMITATION_MAX_ATOMS_PER_PAPER]:
-            desc = lim.get("description", "").strip()
-            if not desc:
+        try:
+            result = llm_client.extract_json(prompt, max_tokens=800)
+            limitations = result.get("limitations", [])
+            if not isinstance(limitations, list):
                 continue
-            atoms.append({
-                "paper_id": paper["id"],
-                "description": desc,
-                "keyword": lim.get("keyword", "").strip()[:100],
-                "severity": lim.get("severity", "medium").lower(),
-                **common,
-            })
-        return atoms
-    except Exception as exc:
-        logger.warning("limitation 抽取失败 paper_id=%s: %s", paper["id"], exc)
-        return []
+
+            for lim in limitations:
+                desc = lim.get("description", "").strip()
+                if not desc:
+                    continue
+                atoms.append({
+                    "paper_id": paper["id"],
+                    "description": desc,
+                    "keyword": lim.get("keyword", "").strip()[:100],
+                    "severity": lim.get("severity", "medium").lower(),
+                    **common,
+                })
+                if len(atoms) >= LIMITATION_MAX_ATOMS_PER_PAPER:
+                    return atoms
+        except Exception as exc:
+            logger.warning(
+                "limitation 抽取失败 paper_id=%s section=%s: %s",
+                paper["id"],
+                source_section_name or "",
+                exc,
+            )
+    return atoms
 
 
-def _limitation_evidence_common(paper: dict, method: str) -> dict:
+def _limitation_text_chunks(paper: dict, fallback_text: str) -> list[tuple[str | None, str]]:
+    chunks = []
+    sections = paper.get("limitation_text_sections")
+    if isinstance(sections, list):
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            section_name = (section.get("section_name") or "").strip() or None
+            section_text = (section.get("section_text") or "").strip()
+            if section_text:
+                chunks.append((section_name, section_text[:6000]))
+    if chunks:
+        return chunks
+    return [(paper.get("limitation_source_section_name"), (fallback_text or "")[:6000])]
+
+
+def _limitation_evidence_common(
+    paper: dict,
+    method: str,
+    source_section_name: str | None = None,
+) -> dict:
     source = paper.get("limitation_evidence_source") or "abstract"
     quality = paper.get("limitation_evidence_quality")
     weight = paper.get("limitation_evidence_weight")
@@ -297,46 +346,51 @@ def _limitation_evidence_common(paper: dict, method: str) -> dict:
         "evidence_source": source,
         "evidence_quality": quality,
         "evidence_weight": float(weight),
-        "source_section_name": paper.get("limitation_source_section_name"),
+        "source_section_name": source_section_name or paper.get("limitation_source_section_name"),
         "extractor_method": method,
     }
 
 
 def heuristic_limitation_atoms(paper: dict, text: str) -> List[dict]:
     """Algorithmic limitation extraction used by the product chain by default."""
-    common = _limitation_evidence_common(paper, "heuristic")
-    sentences = [
-        s.strip()
-        for s in re.split(r"(?<=[.!?])\s+", text or "")
-        if len(s.strip()) > 40
-    ]
     atoms = []
     seen = set()
-    for sent in sentences:
-        if not LIMITATION_TERMS.search(sent):
-            continue
-        keyword_match = re.search(
-            r"\b(scalability|efficiency|loss|noise|stability|fabrication|"
-            r"power|bandwidth|resolution|temperature|integration|dispersion|"
-            r"coupling|nonlinearity|sensitivity)\b",
-            sent,
-            re.I,
+    for source_section_name, chunk_text in _limitation_text_chunks(paper, text):
+        common = _limitation_evidence_common(
+            paper,
+            "heuristic",
+            source_section_name=source_section_name,
         )
-        keyword = (keyword_match.group(1).lower() if keyword_match else "technical limitation")
-        key = (keyword, sent[:80].lower())
-        if key in seen:
-            continue
-        seen.add(key)
-        severity = "high" if re.search(r"\b(severe|critical|fundamental|major|limited|requires?)\b", sent, re.I) else "medium"
-        atoms.append({
-            "paper_id": paper["id"],
-            "description": sent[:500],
-            "keyword": keyword[:100],
-            "severity": severity,
-            **common,
-        })
-        if len(atoms) >= LIMITATION_MAX_ATOMS_PER_PAPER:
-            break
+        sentences = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+", chunk_text or "")
+            if len(s.strip()) > 40
+        ]
+        for sent in sentences:
+            if not LIMITATION_TERMS.search(sent):
+                continue
+            keyword_match = re.search(
+                r"\b(scalability|efficiency|loss|noise|stability|fabrication|"
+                r"power|bandwidth|resolution|temperature|integration|dispersion|"
+                r"coupling|nonlinearity|sensitivity)\b",
+                sent,
+                re.I,
+            )
+            keyword = (keyword_match.group(1).lower() if keyword_match else "technical limitation")
+            key = (source_section_name or "", keyword, sent[:80].lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            severity = "high" if re.search(r"\b(severe|critical|fundamental|major|limited|requires?)\b", sent, re.I) else "medium"
+            atoms.append({
+                "paper_id": paper["id"],
+                "description": sent[:500],
+                "keyword": keyword[:100],
+                "severity": severity,
+                **common,
+            })
+            if len(atoms) >= LIMITATION_MAX_ATOMS_PER_PAPER:
+                return atoms
     return atoms
 
 

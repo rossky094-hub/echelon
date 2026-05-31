@@ -14,6 +14,7 @@ import pytest
 from echelon.v14b.db_schema import init_v14b_db
 from echelon.v14b.step5c_limitation import (
     extract_limitation_atoms,
+    get_top_papers_for_limitation,
     check_resolution,
     rank_unresolved_limitations,
     LIMITATION_EXTRACT_PROMPT,
@@ -117,6 +118,98 @@ class TestExtractLimitationAtoms:
         assert atoms[0]["evidence_source"] == "structured_sections"
         assert atoms[0]["evidence_quality"] == "section_level"
         assert atoms[0]["evidence_weight"] == pytest.approx(0.75)
+        assert atoms[0]["source_section_name"] == "discussion"
+
+    def test_section_chunks_keep_exact_source_section_names(self):
+        paper = {
+            "id": "p1",
+            "title": "Paper",
+            "abstract": "Short abstract",
+            "limitation_evidence_source": "structured_sections",
+            "limitation_evidence_quality": "section_level",
+            "limitation_evidence_weight": 0.75,
+            "limitation_text_sections": [
+                {
+                    "section_name": "discussion",
+                    "section_text": (
+                        "However, scalability remains limited by fabrication noise "
+                        "and this constraint requires careful calibration."
+                    ),
+                },
+                {
+                    "section_name": "method",
+                    "section_text": (
+                        "The method requires high power and the integration "
+                        "bottleneck remains difficult for practical deployment."
+                    ),
+                },
+            ],
+        }
+        atoms = extract_limitation_atoms(paper, None)
+        assert atoms
+        source_sections = {atom["source_section_name"] for atom in atoms}
+        assert source_sections <= {"discussion", "method"}
+        assert all("," not in source for source in source_sections)
+
+    def test_structured_section_loader_preserves_section_chunks(self):
+        conn_main = sqlite3.connect(":memory:")
+        conn_main.row_factory = sqlite3.Row
+        conn_main.executescript(
+            """
+            CREATE TABLE papers (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                abstract TEXT
+            );
+            CREATE TABLE paper_sections (
+                paper_id TEXT,
+                section_name TEXT,
+                section_text TEXT
+            );
+            """
+        )
+        conn_main.execute(
+            "INSERT INTO papers VALUES (?, ?, ?)",
+            ("p1", "Paper", "This abstract is deliberately long enough for the loader to accept it. " * 3),
+        )
+        conn_main.executemany(
+            "INSERT INTO paper_sections VALUES (?, ?, ?)",
+            [
+                (
+                    "p1",
+                    "discussion",
+                    "However, scalability remains limited by fabrication noise. " * 4,
+                ),
+                (
+                    "p1",
+                    "method",
+                    "The method requires high power and this bottleneck remains difficult. " * 4,
+                ),
+            ],
+        )
+        conn_main.commit()
+
+        conn_v14 = sqlite3.connect(":memory:")
+        conn_v14.row_factory = sqlite3.Row
+        conn_v14.execute(
+            "CREATE TABLE subgraph_nodes (paper_id TEXT, keystone_score_v14 REAL, is_keystone INTEGER)"
+        )
+        conn_v14.execute("INSERT INTO subgraph_nodes VALUES (?, ?, ?)", ("p1", 1.0, 1))
+        conn_v14.commit()
+
+        papers = get_top_papers_for_limitation(conn_main, conn_v14, n=10)
+        conn_main.close()
+        conn_v14.close()
+
+        assert len(papers) == 1
+        assert [s["section_name"] for s in papers[0]["limitation_text_sections"]] == [
+            "discussion",
+            "method",
+        ]
+        assert papers[0].get("limitation_source_section_name") is None
+        atoms = extract_limitation_atoms(papers[0], None)
+        assert atoms
+        assert {atom["source_section_name"] for atom in atoms} <= {"discussion", "method"}
 
 
 # ---------------------------------------------------------------------------

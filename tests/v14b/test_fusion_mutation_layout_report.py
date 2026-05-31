@@ -401,6 +401,60 @@ class TestFusion:
         assert candidates[0]["limitation_decision_grade_section_count"] == 1
         assert SECTION_PARSER_CONTRACT_VERSION in candidates[0]["limitation_section_contract_versions"]
 
+    def test_step6_rejects_aggregate_section_name_as_decision_grade(self, tmp_path):
+        from echelon.v14b.step6_fusion import attach_limitation_section_contracts
+
+        _, conn_main = create_main_db(tmp_path)
+        conn_main.execute(
+            """
+            CREATE TABLE paper_sections (
+                paper_id TEXT,
+                section_name TEXT,
+                section_text TEXT,
+                section_meta_json TEXT
+            )
+            """
+        )
+        conn_main.execute(
+            "INSERT INTO paper_sections VALUES (?, ?, ?, ?)",
+            (
+                "2",
+                "discussion",
+                "current contract limitation evidence " * 20,
+                json.dumps(
+                    {
+                        "extraction_strategies": ["explicit_heading"],
+                        "parser_contract_version": SECTION_PARSER_CONTRACT_VERSION,
+                    }
+                ),
+            ),
+        )
+        conn_main.commit()
+
+        enriched = attach_limitation_section_contracts(
+            [
+                {
+                    "paper_id": "2",
+                    "keyword": "scalability",
+                    "evidence_quality": "section_level",
+                    "source_section_name": "discussion,method",
+                },
+                {
+                    "paper_id": "2",
+                    "keyword": "scalability",
+                    "evidence_quality": "section_level",
+                    "source_section_name": "discussion",
+                },
+            ],
+            conn_main,
+        )
+        conn_main.close()
+
+        assert enriched[0]["section_decision_grade"] is False
+        assert enriched[0]["section_parser_contract_version"] == "legacy_unknown_contract"
+        assert enriched[1]["section_decision_grade"] is True
+        assert enriched[1]["section_parser_contract_version"] == SECTION_PARSER_CONTRACT_VERSION
+
     def test_run_fusion_audit_counts_decision_grade_limitation_sections(self, tmp_path):
         from echelon.v14b.step6_fusion import run_fusion
 
