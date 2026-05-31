@@ -28,7 +28,7 @@ import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Any, Optional, List, Dict
 
 from echelon.v14b.corpus_registry import create_temp_corpus_table, ensure_corpus_schema
 from echelon.v14b.config import (
@@ -49,7 +49,58 @@ logger = logging.getLogger("echelon.v14b.step5c_limitation")
 
 LIMITATION_EVIDENCE_PROFILES = {
     "structured_sections": ("section_level", 0.75),
+    "section_atoms": ("section_level", 0.82),
     "abstract": ("weak_abstract", 0.35),
+}
+
+SECTION_ATOM_LIMITATION_TYPES = {
+    "constraint",
+    "failure_mechanism",
+    "new_constraint",
+}
+
+SECTION_ATOM_GRADE_WEIGHT = {
+    "section_atom_decision_grade": 0.90,
+    "section_atom_traced": 0.78,
+    "section_atom_weak": 0.52,
+}
+
+SECTION_ATOM_BRIDGE_VERSION = "section_atom_bridge_v6_strict_attach_filter"
+
+SECTION_ATOM_BRIDGE_TERMS = re.compile(
+    r"\b(limitations?|limited|limits|limiting|challenge[sd]?|bottleneck|drawback|constraint|"
+    r"future work|open question|not yet|cannot|"
+    r"difficult|scalab(?:le|ility)|expensive|loss|noise|unstable|"
+    r"insufficient|degrad(?:e|es|ation)|fail(?:ed|ure|s)?|fabrication error)\b",
+    re.I,
+)
+
+SECTION_ATOM_BRIDGE_RESOLUTION_TERMS = re.compile(
+    r"\b(overcome(?:s|d)?|address(?:es|ed)?|resolve(?:s|d)?|mitigate(?:s|d)?|"
+    r"enable(?:d|s)?|improv(?:e|ed|es|ement)|"
+    r"achiev(?:e|ed|es)|demonstrat(?:e|ed|es))\b",
+    re.I,
+)
+
+SECTION_ATOM_BRIDGE_OPEN_PROBLEM_TERMS = re.compile(
+    r"\b(still|remain(?:s|ing)?|yet|however|but|challenge[sd]?|bottleneck|"
+    r"constraint|insufficient|fail(?:ed|ure|s)?|cannot)\b",
+    re.I,
+)
+
+SECTION_ATOM_BRIDGE_FALSE_START = re.compile(
+    r"^\s*((fig(?:ure)?|table|eq(?:uation)?|supplementary)\b|s\d+\b|\d+[a-z]\b|\d+[a-z]?\))",
+    re.I,
+)
+
+LIMITATION_ATOM_PROVENANCE_COLUMNS = {
+    "source_section_atom_id": "TEXT",
+    "source_section_atom_type": "TEXT",
+    "source_section_atom_evidence_grade": "TEXT",
+    "source_storage_uri": "TEXT",
+    "source_page_start": "INTEGER",
+    "source_page_end": "INTEGER",
+    "source_parser_contract_version": "TEXT",
 }
 
 PRIMARY_LIMITATION_SECTION_NAMES = (
@@ -93,6 +144,35 @@ RESOLUTION_TERMS = re.compile(
 HEURISTIC_RESOLUTION_EVIDENCE_TEXT = (
     "Algorithmic lexical match between limitation keyword and resolver claim."
 )
+
+
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'virtual table') AND name = ?",
+        (table,),
+    ).fetchone() is not None
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    if not _table_exists(conn, table):
+        return set()
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def ensure_limitation_atom_provenance_schema(conn_v14: sqlite3.Connection) -> None:
+    if not _table_exists(conn_v14, "limitation_atoms"):
+        return
+    cols = _columns(conn_v14, "limitation_atoms")
+    for col, col_type in LIMITATION_ATOM_PROVENANCE_COLUMNS.items():
+        if col not in cols:
+            conn_v14.execute(f"ALTER TABLE limitation_atoms ADD COLUMN {col} {col_type}")
+    conn_v14.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
+        ON limitation_atoms (source_section_atom_id)
+        """
+    )
+    conn_v14.commit()
 
 # ---------------------------------------------------------------------------
 # Prompt 模板
@@ -234,7 +314,17 @@ def get_top_papers_for_limitation(
         except sqlite3.Error as exc:
             logger.warning("Structured section lookup failed: %s", exc)
 
-    section_ready = [p for p in papers if p.get("limitation_evidence_source") == "structured_sections"]
+    if "section_atoms" in table_names:
+        try:
+            _attach_section_atom_limitations(conn_main, papers)
+        except sqlite3.Error as exc:
+            logger.warning("Section atom limitation lookup failed: %s", exc)
+
+    section_ready = [
+        p for p in papers
+        if p.get("limitation_evidence_source") in {"structured_sections", "section_atoms"}
+        or p.get("limitation_section_atoms")
+    ]
     if LIMITATION_REQUIRE_SECTION_EVIDENCE:
         if not section_table:
             logger.warning(
@@ -260,6 +350,83 @@ def get_top_papers_for_limitation(
     return papers
 
 
+def _attach_section_atom_limitations(conn_main: sqlite3.Connection, papers: list[dict]) -> None:
+    ids = [str(p["id"]) for p in papers if p.get("id")]
+    if not ids:
+        return
+    cols = _columns(conn_main, "section_atoms")
+    required = {
+        "atom_id",
+        "paper_id",
+        "section_name",
+        "atom_type",
+        "atom_text",
+        "evidence_grade",
+    }
+    if not required <= cols:
+        return
+    placeholders = ",".join("?" * len(ids))
+    type_placeholders = ",".join("?" * len(SECTION_ATOM_LIMITATION_TYPES))
+    page_start = "page_start" if "page_start" in cols else "NULL AS page_start"
+    page_end = "page_end" if "page_end" in cols else "NULL AS page_end"
+    source_url = "source_url" if "source_url" in cols else "'' AS source_url"
+    source_storage_uri = "source_storage_uri" if "source_storage_uri" in cols else "'' AS source_storage_uri"
+    parser_contract = (
+        "parser_contract_version"
+        if "parser_contract_version" in cols
+        else "'legacy_unknown_contract' AS parser_contract_version"
+    )
+    source_delivery = "source_delivery" if "source_delivery" in cols else "'' AS source_delivery"
+    rows = conn_main.execute(
+        f"""
+        SELECT atom_id, paper_id, section_name, atom_type, atom_text,
+               evidence_grade, {page_start}, {page_end}, {source_url},
+               {source_storage_uri}, {parser_contract}, {source_delivery}
+        FROM section_atoms
+        WHERE paper_id IN ({placeholders})
+          AND atom_type IN ({type_placeholders})
+        ORDER BY
+            paper_id,
+            CASE evidence_grade
+                WHEN 'section_atom_decision_grade' THEN 0
+                WHEN 'section_atom_traced' THEN 1
+                ELSE 2
+            END,
+            CASE atom_type
+                WHEN 'constraint' THEN 0
+                WHEN 'new_constraint' THEN 1
+                ELSE 2
+            END,
+            section_name,
+            atom_id
+        """,
+        (*ids, *sorted(SECTION_ATOM_LIMITATION_TYPES)),
+    ).fetchall()
+    by_paper: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        atom_text = re.sub(r"\s+", " ", str(row["atom_text"] or "")).strip()
+        if not _is_section_atom_bridge_candidate(atom_text):
+            continue
+        paper_id = str(row["paper_id"])
+        bucket = by_paper.setdefault(paper_id, [])
+        if len(bucket) >= LIMITATION_MAX_ATOMS_PER_PAPER:
+            continue
+        item = dict(row)
+        item["atom_text"] = atom_text
+        bucket.append(item)
+    for paper in papers:
+        atoms = by_paper.get(str(paper.get("id") or ""))
+        if not atoms:
+            continue
+        paper["limitation_section_atoms"] = atoms
+        paper["limitation_evidence_source"] = "section_atoms"
+        paper["limitation_evidence_quality"] = "section_level"
+        paper["limitation_evidence_weight"] = max(
+            SECTION_ATOM_GRADE_WEIGHT.get(str(atom.get("evidence_grade") or ""), 0.52)
+            for atom in atoms
+        )
+
+
 # ---------------------------------------------------------------------------
 # Phase 2: 原子化 limitation
 # ---------------------------------------------------------------------------
@@ -275,6 +442,10 @@ def extract_limitation_atoms(
     LLM,并通过 _limitation_evidence_common 继承 weak/section evidence
     provenance,不能自动升级为决策级证据。
     """
+    section_atom_atoms = section_atom_limitation_atoms(paper)
+    if section_atom_atoms:
+        return section_atom_atoms
+
     text = (paper.get("limitation_text") or paper.get("abstract", "") or "")[:6000]
     if llm_client is None:
         return heuristic_limitation_atoms(paper, text)
@@ -318,6 +489,91 @@ def extract_limitation_atoms(
                 exc,
             )
     return atoms
+
+
+def section_atom_limitation_atoms(paper: dict) -> list[dict]:
+    """Bridge pre-materialized section_atoms into Step5c limitation_atoms."""
+    raw_atoms = paper.get("limitation_section_atoms") or []
+    if not isinstance(raw_atoms, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for raw in raw_atoms:
+        if not isinstance(raw, dict):
+            continue
+        atom_type = str(raw.get("atom_type") or "")
+        text = re.sub(r"\s+", " ", str(raw.get("atom_text") or "")).strip()
+        source_atom_id = str(raw.get("atom_id") or "")
+        if atom_type not in SECTION_ATOM_LIMITATION_TYPES or not text or not source_atom_id:
+            continue
+        if not _is_section_atom_bridge_candidate(text):
+            continue
+        key = source_atom_id or text[:120].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        evidence_grade = str(raw.get("evidence_grade") or "section_atom_weak")
+        weight = SECTION_ATOM_GRADE_WEIGHT.get(evidence_grade, 0.52)
+        out.append(
+            {
+                "paper_id": paper["id"],
+                "description": text[:500],
+                "keyword": _keyword_from_limitation_text(text),
+                "severity": _severity_from_section_atom(raw, text),
+                "evidence_source": "section_atoms",
+                "evidence_quality": "section_level",
+                "evidence_weight": weight,
+                "source_section_name": str(raw.get("section_name") or ""),
+                "extractor_method": "section_atom_bridge",
+                "source_section_atom_id": source_atom_id,
+                "source_section_atom_type": atom_type,
+                "source_section_atom_evidence_grade": evidence_grade,
+                "source_storage_uri": raw.get("source_storage_uri") or "",
+                "source_page_start": raw.get("page_start"),
+                "source_page_end": raw.get("page_end"),
+                "source_parser_contract_version": raw.get("parser_contract_version") or "legacy_unknown_contract",
+            }
+        )
+        if len(out) >= LIMITATION_MAX_ATOMS_PER_PAPER:
+            break
+    return out
+
+
+def _is_section_atom_bridge_candidate(text: str) -> bool:
+    if not text or len(text.strip()) < 50:
+        return False
+    if SECTION_ATOM_BRIDGE_FALSE_START.search(text):
+        return False
+    if (
+        SECTION_ATOM_BRIDGE_RESOLUTION_TERMS.search(text)
+        and not SECTION_ATOM_BRIDGE_OPEN_PROBLEM_TERMS.search(text)
+    ):
+        return False
+    return bool(SECTION_ATOM_BRIDGE_TERMS.search(text))
+
+
+def _keyword_from_limitation_text(text: str) -> str:
+    keyword_match = re.search(
+        r"\b(scalability|efficiency|loss|noise|stability|fabrication|"
+        r"power|bandwidth|resolution|temperature|integration|dispersion|"
+        r"coupling|nonlinearity|sensitivity|thermal|manufacturing|yield)\b",
+        text,
+        re.I,
+    )
+    return (keyword_match.group(1).lower() if keyword_match else "technical limitation")[:100]
+
+
+def _severity_from_section_atom(atom: dict, text: str) -> str:
+    evidence_grade = str(atom.get("evidence_grade") or "")
+    atom_type = str(atom.get("atom_type") or "")
+    if (
+        evidence_grade == "section_atom_decision_grade"
+        and atom_type in {"constraint", "new_constraint"}
+    ):
+        return "high"
+    if re.search(r"\b(severe|critical|fundamental|major|limited|requires?|bottleneck)\b", text, re.I):
+        return "high"
+    return "medium"
 
 
 def _limitation_text_chunks(paper: dict, fallback_text: str) -> list[tuple[str | None, str]]:
@@ -400,24 +656,38 @@ def heuristic_limitation_atoms(paper: dict, text: str) -> List[dict]:
 
 def write_atoms(conn_v14: sqlite3.Connection, atoms: List[dict]) -> List[int]:
     """写入 limitation_atoms,返回 atom_ids"""
+    ensure_limitation_atom_provenance_schema(conn_v14)
+    cols = _columns(conn_v14, "limitation_atoms")
     atom_ids = []
     for atom in atoms:
-        cursor = conn_v14.execute("""
+        row = {
+            "paper_id": atom["paper_id"],
+            "description": atom["description"],
+            "keyword": atom["keyword"],
+            "severity": atom["severity"],
+            "evidence_source": atom.get("evidence_source", "abstract"),
+            "evidence_quality": atom.get("evidence_quality", "weak_abstract"),
+            "evidence_weight": float(atom.get("evidence_weight", 0.35)),
+            "source_section_name": atom.get("source_section_name"),
+            "extractor_method": atom.get("extractor_method"),
+            "source_section_atom_id": atom.get("source_section_atom_id"),
+            "source_section_atom_type": atom.get("source_section_atom_type"),
+            "source_section_atom_evidence_grade": atom.get("source_section_atom_evidence_grade"),
+            "source_storage_uri": atom.get("source_storage_uri"),
+            "source_page_start": atom.get("source_page_start"),
+            "source_page_end": atom.get("source_page_end"),
+            "source_parser_contract_version": atom.get("source_parser_contract_version"),
+        }
+        insert_cols = [col for col in row if col in cols]
+        placeholders = ",".join("?" * len(insert_cols))
+        cursor = conn_v14.execute(
+            f"""
             INSERT OR IGNORE INTO limitation_atoms
-                (paper_id, description, keyword, severity, evidence_source,
-                 evidence_quality, evidence_weight, source_section_name, extractor_method)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            atom["paper_id"],
-            atom["description"],
-            atom["keyword"],
-            atom["severity"],
-            atom.get("evidence_source", "abstract"),
-            atom.get("evidence_quality", "weak_abstract"),
-            float(atom.get("evidence_weight", 0.35)),
-            atom.get("source_section_name"),
-            atom.get("extractor_method"),
-        ))
+                ({",".join(insert_cols)})
+            VALUES ({placeholders})
+            """,
+            tuple(row[col] for col in insert_cols),
+        )
         atom_id = cursor.lastrowid
         if atom_id:
             atom_ids.append(atom_id)
@@ -579,6 +849,10 @@ def run_limitation(
             logger.info(
                 "Step5c atoms 已完成,继续补跑 Phase3 resolution tracking"
             )
+        elif data.get("section_atom_bridge_version") != SECTION_ATOM_BRIDGE_VERSION:
+            logger.info(
+                "Step5c checkpoint predates current section_atom_bridge filter; resuming to refresh traceable section atom provenance"
+            )
         else:
             logger.info("Step5c 已完成 (%d atoms),跳过", data.get("records_n", 0))
             return data
@@ -589,7 +863,16 @@ def run_limitation(
     scoped_count = create_temp_corpus_table(conn_main, corpus_id)
 
     conn_v14 = get_v14b_conn(db_v14)
+    ensure_limitation_atom_provenance_schema(conn_v14)
     upsert_step_meta(conn_v14, step_name, "running")
+    conn_v14.execute(
+        """
+        DELETE FROM limitation_atoms
+        WHERE evidence_source = 'section_atoms'
+          AND COALESCE(extractor_method, '') != 'section_atom_bridge'
+        """
+    )
+    conn_v14.commit()
     if not resume:
         conn_v14.execute("DELETE FROM limitation_resolutions")
         conn_v14.execute("DELETE FROM limitation_atoms")
@@ -605,6 +888,7 @@ def run_limitation(
     # Phase 2: 原子化 limitation
     total_atoms = 0
     atoms_with_ids = []
+    section_atom_bridge_atoms = 0
 
     processed = 0
     with make_progress(papers, desc="Phase2 原子化") as pbar:
@@ -615,19 +899,60 @@ def run_limitation(
                 "SELECT COUNT(*) FROM limitation_atoms WHERE paper_id = ?",
                 (paper["id"],)
             ).fetchone()[0]
+            bridge_atoms = section_atom_limitation_atoms(paper)
+            bridge_source_ids = {
+                str(atom.get("source_section_atom_id") or "")
+                for atom in bridge_atoms
+                if str(atom.get("source_section_atom_id") or "")
+            }
 
             if existing > 0 and resume:
+                if bridge_source_ids:
+                    placeholders = ",".join("?" * len(bridge_source_ids))
+                    conn_v14.execute(
+                        f"""
+                        DELETE FROM limitation_atoms
+                        WHERE paper_id = ?
+                          AND extractor_method = 'section_atom_bridge'
+                          AND COALESCE(source_section_atom_id, '') NOT IN ({placeholders})
+                        """,
+                        (paper["id"], *sorted(bridge_source_ids)),
+                    )
+                else:
+                    conn_v14.execute(
+                        """
+                        DELETE FROM limitation_atoms
+                        WHERE paper_id = ?
+                          AND extractor_method = 'section_atom_bridge'
+                        """,
+                        (paper["id"],),
+                    )
+                conn_v14.commit()
                 # 已处理,从 DB 加载
                 rows = conn_v14.execute(
-                    "SELECT atom_id, paper_id, description, keyword, severity, "
-                    "evidence_source, evidence_quality, evidence_weight, "
-                    "source_section_name, extractor_method "
-                    "FROM limitation_atoms WHERE paper_id = ?",
+                    "SELECT * FROM limitation_atoms WHERE paper_id = ?",
                     (paper["id"],)
                 ).fetchall()
+                existing_bridge_source_ids = {
+                    str((dict(row).get("source_section_atom_id") or ""))
+                    for row in rows
+                    if str((dict(row).get("source_section_atom_id") or ""))
+                }
                 for row in rows:
                     atoms_with_ids.append(dict(row))
-                total_atoms += existing
+                total_atoms += len(rows)
+                missing_bridge_atoms = [
+                    atom for atom in bridge_atoms
+                    if str(atom.get("source_section_atom_id") or "") not in existing_bridge_source_ids
+                ]
+                if missing_bridge_atoms:
+                    atom_ids = write_atoms(conn_v14, missing_bridge_atoms)
+                    for atom, aid in zip(missing_bridge_atoms, atom_ids):
+                        if aid:
+                            atom["atom_id"] = aid
+                            atoms_with_ids.append(atom)
+                    total_atoms += len(atom_ids)
+                    section_atom_bridge_atoms += len(atom_ids)
                 if processed % 50 == 0:
                     logger.info("Phase2 进度: %d/%d papers, atoms=%d", processed, len(papers), total_atoms)
                 continue
@@ -640,6 +965,10 @@ def run_limitation(
                         atom["atom_id"] = aid
                         atoms_with_ids.append(atom)
                 total_atoms += len(atoms)
+                section_atom_bridge_atoms += sum(
+                    1 for atom in atoms
+                    if atom.get("extractor_method") == "section_atom_bridge"
+                )
             elif processed % 20 == 0:
                 logger.info("Phase2: paper %s 无 atoms", paper["id"])
 
@@ -715,6 +1044,9 @@ def run_limitation(
         "corpus_id": corpus_id,
         "scoped_papers": scoped_count if corpus_id else len(papers),
         "skipped_resolution": SKIP_LIMITATION_RESOLUTION,
+        "section_atom_bridge_enabled": True,
+        "section_atom_bridge_version": SECTION_ATOM_BRIDGE_VERSION,
+        "section_atom_bridge_atoms": section_atom_bridge_atoms,
         "evidence_quality": evidence_quality,
         "remaining_risk": remaining_risk,
     }
@@ -736,6 +1068,7 @@ def run_limitation(
         "evidence_quality": evidence_quality,
         "corpus_id": corpus_id,
         "scoped_papers": scoped_count if corpus_id else len(papers),
+        "section_atom_bridge_atoms": section_atom_bridge_atoms,
         "records_n": total_atoms,
     }
     logger.info(

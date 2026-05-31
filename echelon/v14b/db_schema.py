@@ -264,6 +264,13 @@ CREATE TABLE IF NOT EXISTS limitation_atoms (
     evidence_weight REAL,
     source_section_name TEXT,
     extractor_method TEXT,
+    source_section_atom_id TEXT,
+    source_section_atom_type TEXT,
+    source_section_atom_evidence_grade TEXT,
+    source_storage_uri TEXT,
+    source_page_start INTEGER,
+    source_page_end INTEGER,
+    source_parser_contract_version TEXT,
     extracted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -520,12 +527,21 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
                 evidence_weight REAL,
                 source_section_name TEXT,
                 extractor_method TEXT,
+                source_section_atom_id TEXT,
+                source_section_atom_type TEXT,
+                source_section_atom_evidence_grade TEXT,
+                source_storage_uri TEXT,
+                source_page_start INTEGER,
+                source_page_end INTEGER,
+                source_parser_contract_version TEXT,
                 extracted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_limitation_atoms_paper
                 ON limitation_atoms (paper_id);
             CREATE INDEX IF NOT EXISTS idx_limitation_atoms_severity
-                ON limitation_atoms (severity)
+                ON limitation_atoms (severity);
+            CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
+                ON limitation_atoms (source_section_atom_id)
         """),
         ("limitation_resolutions", "resolver_paper_id", """
             DROP TABLE IF EXISTS limitation_resolutions;
@@ -628,9 +644,20 @@ def ensure_v14b_text_paper_ids(conn: sqlite3.Connection) -> None:
         ("evidence_weight", "REAL", "0.35"),
         ("source_section_name", "TEXT", None),
         ("extractor_method", "TEXT", None),
+        ("source_section_atom_id", "TEXT", None),
+        ("source_section_atom_type", "TEXT", None),
+        ("source_section_atom_evidence_grade", "TEXT", None),
+        ("source_storage_uri", "TEXT", None),
+        ("source_page_start", "INTEGER", None),
+        ("source_page_end", "INTEGER", None),
+        ("source_parser_contract_version", "TEXT", None),
     ):
         if _add_column_if_missing(conn, "limitation_atoms", col, ddl_type, default_sql=default_sql):
             changed = True
+    _run_ddl_fragment(conn, """
+        CREATE INDEX IF NOT EXISTS idx_limitation_atoms_source_section_atom
+            ON limitation_atoms (source_section_atom_id)
+    """)
 
     for col, ddl_type in (
         ("raw_predicted_prob", "REAL"),

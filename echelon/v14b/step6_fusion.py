@@ -305,6 +305,24 @@ def attach_limitation_section_contracts(
             section.get("section_extraction_strategies") or item.get("section_extraction_strategies") or []
         )
         item["section_decision_grade"] = bool(section.get("section_decision_grade")) or bool(item.get("section_decision_grade"))
+        source_atom_grade = str(item.get("source_section_atom_evidence_grade") or "")
+        if item.get("source_section_atom_id"):
+            item["section_parser_contract_version"] = (
+                item.get("source_parser_contract_version")
+                or item.get("section_parser_contract_version")
+            )
+            item["section_provenance_strength"] = {
+                "section_atom_decision_grade": "strong",
+                "section_atom_traced": "moderate",
+                "section_atom_weak": "weak",
+            }.get(source_atom_grade, item.get("section_provenance_strength"))
+            item["section_decision_grade"] = item["section_decision_grade"] or (
+                source_atom_grade == "section_atom_decision_grade"
+            )
+            strategies = list(item.get("section_extraction_strategies") or [])
+            if "section_atom_bridge" not in strategies:
+                strategies.append("section_atom_bridge")
+            item["section_extraction_strategies"] = strategies
         enriched.append(item)
     return enriched
 
@@ -317,11 +335,29 @@ def load_unresolved_limitations(conn_v14: sqlite3.Connection) -> List[dict]:
         if "source_section_name" in cols
         else "'' AS source_section_name"
     )
+    optional_cols = []
+    for name in (
+        "source_section_atom_id",
+        "source_section_atom_type",
+        "source_section_atom_evidence_grade",
+        "source_parser_contract_version",
+        "source_storage_uri",
+    ):
+        optional_cols.append(
+            f"COALESCE(a.{name}, '') AS {name}" if name in cols else f"'' AS {name}"
+        )
+    optional_cols.append(
+        "a.source_page_start AS source_page_start" if "source_page_start" in cols else "NULL AS source_page_start"
+    )
+    optional_cols.append(
+        "a.source_page_end AS source_page_end" if "source_page_end" in cols else "NULL AS source_page_end"
+    )
+    optional_sql = ",\n            " + ",\n            ".join(optional_cols) if optional_cols else ""
     rows = conn_v14.execute(f"""
         SELECT
             a.atom_id, a.paper_id, a.description, a.keyword, a.severity,
             a.evidence_source, a.evidence_quality, a.evidence_weight,
-            {source_section_expr},
+            {source_section_expr}{optional_sql},
             COUNT(r.atom_id) AS n_resolutions
         FROM limitation_atoms a
         LEFT JOIN limitation_resolutions r

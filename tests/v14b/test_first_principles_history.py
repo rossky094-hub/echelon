@@ -85,6 +85,72 @@ def test_step13_load_atoms_rejects_aggregate_section_provenance(tmp_path):
     assert atoms[0]["section_decision_grade"] is False
 
 
+def test_step13_load_atoms_accepts_section_atom_bridge_provenance(tmp_path):
+    from echelon.v14b.db_schema import init_v14b_db
+    from echelon.v14b.step13_first_principles_history import load_atoms
+
+    db_main = tmp_path / "main.sqlite3"
+    conn_main = sqlite3.connect(str(db_main))
+    conn_main.row_factory = sqlite3.Row
+    conn_main.executescript(
+        """
+        CREATE TABLE papers (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            abstract TEXT,
+            publication_year INTEGER,
+            primary_field_id TEXT
+        );
+        INSERT INTO papers VALUES ('p1', 'Paper', 'Abstract', 2024, 'F1');
+        """
+    )
+    conn_main.commit()
+
+    db_v14 = tmp_path / "v14.sqlite3"
+    conn_v14 = init_v14b_db(db_v14)
+    conn_v14.execute(
+        """
+        INSERT INTO limitation_atoms
+            (paper_id, description, keyword, severity, evidence_source,
+             evidence_quality, evidence_weight, source_section_name, extractor_method,
+             source_section_atom_id, source_section_atom_type,
+             source_section_atom_evidence_grade, source_storage_uri,
+             source_page_start, source_page_end, source_parser_contract_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "p1",
+            "Fabrication remains limited.",
+            "fabrication",
+            "high",
+            "section_atoms",
+            "section_level",
+            0.9,
+            "discussion",
+            "section_atom_bridge",
+            "sa1",
+            "constraint",
+            "section_atom_decision_grade",
+            "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
+            4,
+            5,
+            SECTION_PARSER_CONTRACT_VERSION,
+        ),
+    )
+    conn_v14.commit()
+
+    atoms = load_atoms(conn_main, conn_v14)
+    conn_main.close()
+    conn_v14.close()
+
+    assert atoms
+    assert atoms[0]["section_provenance_strength"] == "strong"
+    assert atoms[0]["section_parser_contract_version"] == SECTION_PARSER_CONTRACT_VERSION
+    assert atoms[0]["section_decision_grade"] is True
+    assert "section_atom_bridge" in atoms[0]["section_extraction_strategies"]
+    assert atoms[0]["source_section_atom_id"] == "sa1"
+
+
 def test_bottleneck_lineage_triples_mark_missing_stages():
     from echelon.v14b.step13_first_principles_history import (
         HEURISTIC_RESOLUTION_EVIDENCE_TEXT,

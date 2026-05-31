@@ -15,6 +15,7 @@ from echelon.v14b.db_schema import init_v14b_db
 from echelon.v14b.step5c_limitation import (
     extract_limitation_atoms,
     get_top_papers_for_limitation,
+    section_atom_limitation_atoms,
     check_resolution,
     rank_unresolved_limitations,
     HEURISTIC_RESOLUTION_EVIDENCE_TEXT,
@@ -211,6 +212,151 @@ class TestExtractLimitationAtoms:
         atoms = extract_limitation_atoms(papers[0], None)
         assert atoms
         assert {atom["source_section_name"] for atom in atoms} <= {"discussion", "method"}
+
+    def test_section_atoms_are_preferred_as_traceable_limitation_atoms(self):
+        conn_main = sqlite3.connect(":memory:")
+        conn_main.row_factory = sqlite3.Row
+        conn_main.executescript(
+            """
+            CREATE TABLE papers (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                abstract TEXT
+            );
+            CREATE TABLE section_atoms (
+                atom_id TEXT PRIMARY KEY,
+                paper_id TEXT,
+                section_name TEXT,
+                atom_type TEXT,
+                atom_text TEXT,
+                evidence_grade TEXT,
+                page_start INTEGER,
+                page_end INTEGER,
+                source_url TEXT,
+                source_storage_uri TEXT,
+                parser_contract_version TEXT,
+                source_delivery TEXT
+            );
+            """
+        )
+        conn_main.execute(
+            "INSERT INTO papers VALUES (?, ?, ?)",
+            ("p1", "Paper", "This abstract is deliberately long enough for the loader to accept it. " * 3),
+        )
+        conn_main.execute(
+            "INSERT INTO section_atoms VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "sa1",
+                "p1",
+                "Discussion",
+                "constraint",
+                "A major fabrication bottleneck limits scalable deployment and remains unresolved.",
+                "section_atom_decision_grade",
+                4,
+                5,
+                "https://example.test/p1.pdf",
+                "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
+                "v14b_section_parser_contract_v3_toc_guard",
+                "local_raw_pdf_cache",
+            ),
+        )
+        conn_main.commit()
+
+        conn_v14 = sqlite3.connect(":memory:")
+        conn_v14.row_factory = sqlite3.Row
+        conn_v14.execute(
+            "CREATE TABLE subgraph_nodes (paper_id TEXT, keystone_score_v14 REAL, is_keystone INTEGER)"
+        )
+        conn_v14.execute("INSERT INTO subgraph_nodes VALUES (?, ?, ?)", ("p1", 1.0, 1))
+        conn_v14.commit()
+
+        papers = get_top_papers_for_limitation(conn_main, conn_v14, n=10)
+        conn_main.close()
+        conn_v14.close()
+
+        assert len(papers) == 1
+        assert papers[0]["limitation_evidence_source"] == "section_atoms"
+        atoms = extract_limitation_atoms(papers[0], None)
+        assert atoms
+        assert atoms[0]["extractor_method"] == "section_atom_bridge"
+        assert atoms[0]["source_section_atom_id"] == "sa1"
+        assert atoms[0]["source_section_atom_evidence_grade"] == "section_atom_decision_grade"
+        assert atoms[0]["source_storage_uri"].endswith("/p1.pdf")
+        assert atoms[0]["source_page_start"] == 4
+        assert atoms[0]["evidence_quality"] == "section_level"
+        assert atoms[0]["evidence_weight"] >= 0.89
+
+    def test_section_atom_bridge_rejects_non_limitation_figure_or_setup_text(self):
+        paper = {
+            "id": "p1",
+            "limitation_section_atoms": [
+                {
+                    "atom_id": "sa_fig",
+                    "section_name": "Results",
+                    "atom_type": "constraint",
+                    "atom_text": (
+                        "1a) The control sample consists of a single fluorophore attached to "
+                        "a nanoparticle and deposited on glass for comparison."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+                {
+                    "atom_id": "sa_real",
+                    "section_name": "Discussion",
+                    "atom_type": "constraint",
+                    "atom_text": (
+                        "However, fabrication error remains a major bottleneck and limits "
+                        "scalable deployment of the photonic device."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+                {
+                    "atom_id": "sa_limit_formula",
+                    "section_name": "Results",
+                    "atom_type": "constraint",
+                    "atom_text": (
+                        "The ratio is close to the BCS weak-coupling limit as expected "
+                        "for the phonon-mediated superconductor."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+                {
+                    "atom_id": "sa_resolution",
+                    "section_name": "Conclusion",
+                    "atom_type": "new_constraint",
+                    "atom_text": (
+                        "To overcome this limitation, the metasurface approach enables "
+                        "surface electromagnetic wave excitation with improved efficiency."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+                {
+                    "atom_id": "sa_overcomes_limits",
+                    "section_name": "Conclusion",
+                    "atom_type": "new_constraint",
+                    "atom_text": (
+                        "This nonlinear gating mechanism overcomes the intrinsic extinction "
+                        "limits of standard modulators and achieves high performance."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+                {
+                    "atom_id": "sa_remains_result",
+                    "section_name": "Results",
+                    "atom_type": "constraint",
+                    "atom_text": (
+                        "In the normal state, the measured response remains near zero "
+                        "as expected for this material configuration."
+                    ),
+                    "evidence_grade": "section_atom_decision_grade",
+                },
+            ],
+        }
+
+        atoms = section_atom_limitation_atoms(paper)
+
+        assert len(atoms) == 1
+        assert atoms[0]["source_section_atom_id"] == "sa_real"
 
 
 # ---------------------------------------------------------------------------

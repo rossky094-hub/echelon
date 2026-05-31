@@ -199,6 +199,12 @@ def table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return bool(row)
 
 
+def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    if not table_exists(conn, table):
+        return set()
+    return {str(row[1]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
 def ensure_schema(conn_v14: sqlite3.Connection) -> None:
     conn_v14.executescript(
         """
@@ -409,6 +415,31 @@ def load_atoms(
     if not table_exists(conn_v14, "limitation_atoms"):
         return []
 
+    atom_cols = table_columns(conn_v14, "limitation_atoms")
+    source_atom_cols = {
+        name: (
+            f"COALESCE(a.{name}, '') AS {name}"
+            if name in atom_cols
+            else f"'' AS {name}"
+        )
+        for name in (
+            "source_section_atom_id",
+            "source_section_atom_type",
+            "source_section_atom_evidence_grade",
+            "source_storage_uri",
+            "source_parser_contract_version",
+        )
+    }
+    source_page_start_col = (
+        "a.source_page_start AS source_page_start"
+        if "source_page_start" in atom_cols
+        else "NULL AS source_page_start"
+    )
+    source_page_end_col = (
+        "a.source_page_end AS source_page_end"
+        if "source_page_end" in atom_cols
+        else "NULL AS source_page_end"
+    )
     have_visual = table_exists(conn_v14, "visual_nodes")
     visual_join = (
         "LEFT JOIN visual_nodes vn ON vn.paper_id = a.paper_id"
@@ -434,6 +465,13 @@ def load_atoms(
             COALESCE(a.evidence_weight, 0.35) AS evidence_weight,
             COALESCE(a.source_section_name, '') AS source_section_name,
             COALESCE(a.extractor_method, '') AS extractor_method,
+            {source_atom_cols["source_section_atom_id"]},
+            {source_atom_cols["source_section_atom_type"]},
+            {source_atom_cols["source_section_atom_evidence_grade"]},
+            {source_atom_cols["source_storage_uri"]},
+            {source_atom_cols["source_parser_contract_version"]},
+            {source_page_start_col},
+            {source_page_end_col},
             {visual_cols}
             COALESCE(a.extracted_at, '') AS extracted_at
         FROM limitation_atoms a
@@ -510,6 +548,24 @@ def load_atoms(
             "legacy_unknown_contract" if atom["section_provenance_strength"] != "none" else "none"
         )
         atom["section_decision_grade"] = bool(provenance.get("section_decision_grade"))
+        source_atom_grade = str(atom.get("source_section_atom_evidence_grade") or "")
+        if atom.get("source_section_atom_id"):
+            atom["section_provenance_strength"] = {
+                "section_atom_decision_grade": "strong",
+                "section_atom_traced": "moderate",
+                "section_atom_weak": "weak",
+            }.get(source_atom_grade, atom["section_provenance_strength"])
+            atom["section_parser_contract_version"] = (
+                atom.get("source_parser_contract_version")
+                or atom["section_parser_contract_version"]
+            )
+            atom["section_decision_grade"] = atom["section_decision_grade"] or (
+                source_atom_grade == "section_atom_decision_grade"
+            )
+            strategies = list(atom.get("section_extraction_strategies") or [])
+            if "section_atom_bridge" not in strategies:
+                strategies.append("section_atom_bridge")
+            atom["section_extraction_strategies"] = strategies
         atom_id = int(atom.get("atom_id") or 0)
         resolved = resolved_map.get(atom_id)
         if resolved:
@@ -1013,6 +1069,12 @@ def _claim_card_evidence_objects(
             "section_provenance_strength": attempt.get("section_provenance_strength"),
             "typed_chain_complete": attempt.get("typed_chain_complete"),
             "typed_chain_completeness": attempt.get("typed_chain_completeness"),
+            "source_section_atom_id": attempt.get("source_section_atom_id"),
+            "source_section_atom_type": attempt.get("source_section_atom_type"),
+            "source_section_atom_evidence_grade": attempt.get("source_section_atom_evidence_grade"),
+            "source_storage_uri": attempt.get("source_storage_uri"),
+            "source_page_start": attempt.get("source_page_start"),
+            "source_page_end": attempt.get("source_page_end"),
             "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
         }
         objects.append(obj)
@@ -1036,6 +1098,12 @@ def _claim_card_evidence_objects(
             "section_provenance_strength": bottleneck.get("section_provenance_strength"),
             "typed_chain_complete": bottleneck.get("typed_chain_complete"),
             "typed_chain_completeness": bottleneck.get("typed_chain_completeness"),
+            "source_section_atom_id": bottleneck.get("source_section_atom_id"),
+            "source_section_atom_type": bottleneck.get("source_section_atom_type"),
+            "source_section_atom_evidence_grade": bottleneck.get("source_section_atom_evidence_grade"),
+            "source_storage_uri": bottleneck.get("source_storage_uri"),
+            "source_page_start": bottleneck.get("source_page_start"),
+            "source_page_end": bottleneck.get("source_page_end"),
             "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
         }
         objects.append(obj)
@@ -2050,6 +2118,12 @@ def build_direction_claim_cards(
                     "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                     "section_parser_contract_version": atom.get("section_parser_contract_version"),
                     "section_decision_grade": bool(atom.get("section_decision_grade")),
+                    "source_section_atom_id": atom.get("source_section_atom_id"),
+                    "source_section_atom_type": atom.get("source_section_atom_type"),
+                    "source_section_atom_evidence_grade": atom.get("source_section_atom_evidence_grade"),
+                    "source_storage_uri": atom.get("source_storage_uri"),
+                    "source_page_start": atom.get("source_page_start"),
+                    "source_page_end": atom.get("source_page_end"),
                 }
             )
             if len(attempts) >= 8:
@@ -2128,6 +2202,12 @@ def build_direction_claim_cards(
                 "section_extraction_strategies": atom.get("section_extraction_strategies") or [],
                 "section_parser_contract_version": atom.get("section_parser_contract_version"),
                 "section_decision_grade": bool(atom.get("section_decision_grade")),
+                "source_section_atom_id": atom.get("source_section_atom_id"),
+                "source_section_atom_type": atom.get("source_section_atom_type"),
+                "source_section_atom_evidence_grade": atom.get("source_section_atom_evidence_grade"),
+                "source_storage_uri": atom.get("source_storage_uri"),
+                "source_page_start": atom.get("source_page_start"),
+                "source_page_end": atom.get("source_page_end"),
                 "evidence_weight": float(atom.get("evidence_weight") or 0.35),
             }
             for atom in sorted(
@@ -2466,7 +2546,7 @@ def build_markdown(principle_rows: list[dict], totals: dict) -> str:
                         score=float(atom.get("score") or 0.0),
                         kw=(atom.get("keyword") or "N/A"),
                         resolved=int(atom.get("is_resolved") or 0),
-                        desc=(atom.get("description") or "").strip()[:220],
+                        desc=(atom.get("description") or "").strip()[:220].strip(),
                     )
                 )
         else:
