@@ -139,8 +139,8 @@ graph-prep: id-repair openalex-backfill graph-features embeddings
 	@echo ">>> Graph prep done."
 
 ## Step 0.9: Evidence-ready data before user-facing claims
-evidence-prep: openalex-backfill section-evidence section-atoms section-atom-chains
-	@echo ">>> Evidence prep done: OpenAlex backfill + section evidence atom chains are complete for configured scope."
+evidence-prep: openalex-backfill section-evidence section-atoms section-atom-embeddings section-atom-chains
+	@echo ">>> Evidence prep done: OpenAlex backfill + section evidence atom search/chains are complete for configured scope."
 
 ## Step 0.1: Reset old derived graph outputs
 reset-pilot:
@@ -550,7 +550,7 @@ llm-edge-audit-run:
 # -------------------------------------------------------
 
 ## 快速产品链路: 不等待 OpenAlex backfill, 仅用于调试/冒烟验证
-product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence section-atoms section-atom-chains limitation fusion first-principles mutation layout report visual-graph goal-audit
+product-chain-fast: id-repair graph-features embeddings quality-audit reset-pilot mainpath keystone subgraph scibert vgae section-evidence section-atoms section-atom-embeddings section-atom-chains limitation fusion first-principles mutation layout report visual-graph goal-audit
 	@echo ""
 	@echo "======================================"
 	@echo "✅ V14-B Fast Visual Graph 产品链路完成!"

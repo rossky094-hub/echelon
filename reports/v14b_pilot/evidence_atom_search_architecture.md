@@ -75,13 +75,35 @@ Current implementation:
 
 - `echelon.v14b.section_atoms` builds `section_atoms` from `paper_sections`.
 - `make section-atoms` materializes the atom table and exact FTS/BM25 index.
+- `make section-atom-embeddings` materializes deterministic atom vectors for fuzzy candidate recall.
+- `search_section_atoms_hybrid()` returns exact hits and fuzzy candidates under one retrieval contract.
 - `echelon.v14b.section_atom_chains` assembles co-located atoms into typed bottleneck-chain evidence candidates.
 - `make section-atom-chains` materializes `section_atom_chains` with explicit missing stages.
 - Search hits carry `claim_scope=retrieval_context_only`; they are retrieval context, not product claims.
 - `algorithm_logic_audit` now reports `section_atoms`, decision-grade atom count, exact atom FTS, and typed chain coverage.
 
-Next layer:
+Execution snapshot:
 
-- Add atom-level embeddings for fuzzy search.
-- Add hybrid retrieval: exact filters -> atom vectors -> graph/GNN expansion.
-- Wire Step5c/Step13 to consume typed atom chains through evidence-chain contracts.
+- DB: `db/echelon_library.sqlite3`
+- Raw PDF external store: `/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs`
+- `paper_sections`: 5,555
+- `section_atoms`: 61,708
+- `section_atom_embeddings`: 61,708 using `deterministic_hashing_atom_embedding_v1`, dim 256
+- `section_atom_chains`: 4,494
+- Full typed chains: 6
+- Exact FTS smoke check for `fabrication/loss`: 2,225 atom hits
+
+Pipeline entry:
+
+`make evidence-prep` now runs:
+
+1. `openalex-backfill`
+2. `section-evidence`
+3. `section-atoms`
+4. `section-atom-embeddings`
+5. `section-atom-chains`
+
+Remaining layer:
+
+- Wire fuzzy candidates and typed chains into Step5c/Step13 only through evidence-chain contracts.
+- Keep GNN outputs labeled as candidate expansion or `retrieval_context_only`, never as atom generation.

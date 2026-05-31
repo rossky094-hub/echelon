@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T05:57:18Z`
+- generated_at: `2026-05-31T06:05:03Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -58,44 +58,44 @@
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 293,
+    "section_frontfill_done": 297,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 293,
+    "section_frontfill_progress_done": 297,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 495,
-      "current_contract_rate": 0.16342027071640805,
-      "decision_grade_papers": 491,
-      "decision_grade_rate": 0.16209970287223507,
+      "current_contract_papers": 499,
+      "current_contract_rate": 0.16474083856058105,
+      "decision_grade_papers": 495,
+      "decision_grade_rate": 0.16342027071640805,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1230,
-        "weak": 1799
+        "strong": 1231,
+        "weak": 1798
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4426,
-        "v14b_section_parser_contract_v3_toc_guard": 1129
+        "legacy_unknown_contract": 4418,
+        "v14b_section_parser_contract_v3_toc_guard": 1137
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4426,
-        "v14b_section_ingest_v3": 1129
+        "v14b_section_ingest_v2": 4418,
+        "v14b_section_ingest_v3": 1137
       },
       "primary_section_papers": 3029,
       "primary_section_rows": 5555,
       "strategy_counts": {
         "embedded_heading": 52,
-        "explicit_heading": 1840,
-        "heading_continuation": 2390,
+        "explicit_heading": 1842,
+        "heading_continuation": 2392,
         "inline_heading": 720,
-        "legacy_unknown_strategy": 3088,
+        "legacy_unknown_strategy": 3086,
         "loose_inline_heading": 38,
         "parser_hint": 53,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1230,
-      "weak_only_papers": 1799,
-      "weak_only_rate": 0.5939253879168043
+      "strong_or_moderate_papers": 1231,
+      "weak_only_papers": 1798,
+      "weak_only_rate": 0.593595245955761
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -533,6 +533,7 @@
       "reset-pilot",
       "scibert",
       "section-atom-chains",
+      "section-atom-embeddings",
       "section-atoms",
       "section-evidence",
       "subgraph",

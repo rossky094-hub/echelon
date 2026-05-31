@@ -45,6 +45,13 @@ EXACT_SEARCH_SEMANTICS = "retrieval hit only; not a Topic Dossier or Claim Card 
 FUZZY_SEARCH_SEMANTICS = (
     "candidate recall only; retrieval_context_only; not a Topic Dossier or Claim Card conclusion"
 )
+HYBRID_SEARCH_SEMANTICS = (
+    "exact hits are retrieval evidence and fuzzy hits are candidate recall; "
+    "all outputs remain retrieval_context_only until Step5c/Step13 evidence gates"
+)
+GRAPH_EXPANSION_SEMANTICS = (
+    "graph/GNN expansion may rank or widen candidates only; it must not create atoms or promote claims"
+)
 
 TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
     "constraint": re.compile(
@@ -815,6 +822,99 @@ def search_section_atoms_fuzzy(
     return hits[: int(top_k)]
 
 
+def search_section_atoms_hybrid(
+    conn: sqlite3.Connection,
+    query_text: str,
+    *,
+    top_k: int = 20,
+    filters: dict[str, Any] | None = None,
+    exact_top_k: int | None = None,
+    fuzzy_top_k: int | None = None,
+    embedding_model: str = ATOM_EMBEDDING_MODEL,
+    embedding_dim: int = ATOM_EMBEDDING_DIM,
+    min_fuzzy_score: float = 0.0,
+) -> dict[str, Any]:
+    """Return exact atom hits plus fuzzy recall candidates under one contract."""
+    filters = filters or {}
+    exact_hits = search_section_atoms(
+        conn,
+        query_text,
+        top_k=exact_top_k or top_k,
+        filters=filters,
+    )
+    fuzzy_hits = search_section_atoms_fuzzy(
+        conn,
+        query_text,
+        top_k=fuzzy_top_k or max(top_k, len(exact_hits)),
+        filters=filters,
+        embedding_model=embedding_model,
+        embedding_dim=int(embedding_dim),
+        min_score=min_fuzzy_score,
+    )
+    merged = _merge_hybrid_hits(exact_hits, fuzzy_hits, top_k=top_k)
+    return {
+        "query": query_text,
+        "search_mode": "hybrid_exact_then_fuzzy_recall",
+        "filters": dict(filters),
+        "top_k": int(top_k),
+        "search_contract": {
+            "claim_scope": "retrieval_context_only",
+            "hybrid_semantics": HYBRID_SEARCH_SEMANTICS,
+            "exact_semantics": EXACT_SEARCH_SEMANTICS,
+            "fuzzy_semantics": FUZZY_SEARCH_SEMANTICS,
+            "graph_expansion_semantics": GRAPH_EXPANSION_SEMANTICS,
+        },
+        "exact_hits": exact_hits,
+        "fuzzy_candidate_hits": fuzzy_hits,
+        "merged_hits": merged,
+    }
+
+
+def _merge_hybrid_hits(
+    exact_hits: list[dict[str, Any]],
+    fuzzy_hits: list[dict[str, Any]],
+    *,
+    top_k: int,
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    by_atom_id: dict[str, dict[str, Any]] = {}
+
+    for hit in exact_hits:
+        item = dict(hit)
+        item["claim_scope"] = "retrieval_context_only"
+        item["search_mode"] = "hybrid_exact_then_fuzzy_recall"
+        item["retrieval_channels"] = ["exact_fts_bm25"]
+        item["hybrid_semantics"] = HYBRID_SEARCH_SEMANTICS
+        item["graph_expansion_semantics"] = GRAPH_EXPANSION_SEMANTICS
+        item["hybrid_rank_group"] = 0
+        merged.append(item)
+        by_atom_id[str(item.get("atom_id") or "")] = item
+
+    for hit in fuzzy_hits:
+        atom_id = str(hit.get("atom_id") or "")
+        existing = by_atom_id.get(atom_id)
+        if existing:
+            channels = list(existing.get("retrieval_channels") or [])
+            if "fuzzy_vector_recall" not in channels:
+                channels.append("fuzzy_vector_recall")
+            existing["retrieval_channels"] = channels
+            for key in ("similarity_score", "vector_score", "lexical_overlap_score", "embedding_model", "embedding_dim"):
+                if key in hit:
+                    existing[f"fuzzy_{key}"] = hit[key]
+            continue
+        item = dict(hit)
+        item["claim_scope"] = "retrieval_context_only"
+        item["search_mode"] = "hybrid_exact_then_fuzzy_recall"
+        item["retrieval_channels"] = ["fuzzy_vector_recall"]
+        item["hybrid_semantics"] = HYBRID_SEARCH_SEMANTICS
+        item["graph_expansion_semantics"] = GRAPH_EXPANSION_SEMANTICS
+        item["hybrid_rank_group"] = 1
+        merged.append(item)
+        by_atom_id[atom_id] = item
+
+    return merged[: int(top_k)]
+
+
 def _row_to_hit(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     item["uncertainty_reasons"] = _loads(item.pop("uncertainty_reasons_json", "[]"), [])
@@ -840,7 +940,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--embedding-model", default=ATOM_EMBEDDING_MODEL)
     parser.add_argument("--embedding-dim", type=int, default=ATOM_EMBEDDING_DIM)
     parser.add_argument("--query", default=None, help="Optional smoke-test query after building atoms.")
-    parser.add_argument("--query-mode", choices=("exact", "fuzzy"), default="exact")
+    parser.add_argument("--query-mode", choices=("exact", "fuzzy", "hybrid"), default="exact")
     args = parser.parse_args(argv)
     setup_logging("section_atoms", level=getattr(logging, args.log_level))
     db_main = Path(args.db) if args.db else DB_MAIN
@@ -865,7 +965,15 @@ def main(argv: list[str] | None = None) -> None:
     if args.query:
         conn = sqlite3.connect(str(db_main))
         conn.row_factory = sqlite3.Row
-        if args.query_mode == "fuzzy":
+        if args.query_mode == "hybrid":
+            hits = search_section_atoms_hybrid(
+                conn,
+                args.query,
+                top_k=5,
+                embedding_model=args.embedding_model,
+                embedding_dim=args.embedding_dim,
+            )
+        elif args.query_mode == "fuzzy":
             hits = search_section_atoms_fuzzy(
                 conn,
                 args.query,

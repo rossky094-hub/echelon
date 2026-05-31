@@ -11,6 +11,7 @@ from echelon.v14b.section_atoms import (
     extract_section_atoms_from_row,
     search_section_atoms,
     search_section_atoms_fuzzy,
+    search_section_atoms_hybrid,
 )
 
 
@@ -227,3 +228,71 @@ def test_build_section_atom_embeddings_and_fuzzy_search_are_context_only(tmp_pat
     assert "embedding_json" not in hits[0]
     assert metric_hits and all(hit["atom_type"] == "metric_result" for hit in metric_hits)
     assert discussion_hits and all(hit["section_key"] == "discussion" for hit in discussion_hits)
+
+
+def test_hybrid_section_atom_search_keeps_exact_and_fuzzy_contracts(tmp_path):
+    db = tmp_path / "main.sqlite3"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """
+        CREATE TABLE papers (id TEXT PRIMARY KEY, title TEXT);
+        CREATE TABLE paper_sections (
+            paper_id TEXT,
+            section_name TEXT,
+            section_text TEXT,
+            source_url TEXT,
+            section_pages_json TEXT,
+            section_meta_json TEXT
+        );
+        """
+    )
+    conn.execute("INSERT INTO papers VALUES ('p1', 'Photonic fabrication loss study')")
+    conn.execute("INSERT INTO papers VALUES ('p2', 'Efficiency benchmark study')")
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p1",
+            "Discussion",
+            (
+                "A central limitation is fabrication error, optical loss, and thermal drift in dense photonic arrays. "
+                "The authors describe this as an unresolved constraint for scalable deployment."
+            ),
+            "https://example.test/p1.pdf",
+            json.dumps([6]),
+            _meta(),
+        ),
+    )
+    conn.execute(
+        "INSERT INTO paper_sections VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            "p2",
+            "Results",
+            (
+                "Measured efficiency reached 35% at 1550 nm in a simulation benchmark and prototype validation setup. "
+                "The result is reported as a metric rather than a proof of product readiness."
+            ),
+            "https://example.test/p2.pdf",
+            json.dumps([8]),
+            _meta(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    build_section_atoms(db)
+    build_section_atom_embeddings(db, rebuild=True, embedding_dim=64)
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    result = search_section_atoms_hybrid(conn, "thermal fabrication loss", top_k=5, embedding_dim=64)
+    conn.close()
+
+    assert result["search_mode"] == "hybrid_exact_then_fuzzy_recall"
+    assert result["search_contract"]["claim_scope"] == "retrieval_context_only"
+    assert "graph/GNN expansion may rank" in result["search_contract"]["graph_expansion_semantics"]
+    assert result["exact_hits"]
+    assert result["fuzzy_candidate_hits"]
+    assert result["merged_hits"][0]["paper_id"] == "p1"
+    assert result["merged_hits"][0]["claim_scope"] == "retrieval_context_only"
+    assert "exact_fts_bm25" in result["merged_hits"][0]["retrieval_channels"]
+    assert any("fuzzy_vector_recall" in hit["retrieval_channels"] for hit in result["merged_hits"])
+    assert all("embedding_json" not in hit for hit in result["merged_hits"])
