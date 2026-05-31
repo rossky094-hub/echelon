@@ -397,11 +397,7 @@ def _bottleneck_lineage_contract_summary(lens: dict[str, Any]) -> dict[str, int]
     ]
     contracted = [c for c in constraints if _has_evidence_contract(c)]
     partial_typed = [c for c in contracted if c.get("typed_chain")]
-    typed = [
-        c
-        for c in partial_typed
-        if c.get("typed_chain_completeness") == "full"
-    ]
+    typed = [c for c in partial_typed if _promotable_full_lineage_constraint(c)]
     clickable = [c for c in contracted if _has_clickable_evidence(c)]
     return {
         "total": len(constraints),
@@ -410,6 +406,16 @@ def _bottleneck_lineage_contract_summary(lens: dict[str, Any]) -> dict[str, int]
         "with_partial_typed_chain": len(partial_typed),
         "with_clickable_evidence": len(clickable),
     }
+
+
+def _promotable_full_lineage_constraint(constraint: dict[str, Any]) -> bool:
+    grade = str(constraint.get("evidence_grade") or "")
+    return (
+        constraint.get("typed_chain_completeness") == "full"
+        and constraint.get("claim_scope") == "bottleneck_lineage_evidence"
+        and bool(grade)
+        and not grade.startswith("weak")
+    )
 
 
 def _reading_path_contract_summary(lens: dict[str, Any]) -> dict[str, Any]:

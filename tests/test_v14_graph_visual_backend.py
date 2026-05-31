@@ -554,6 +554,81 @@ def test_visual_topic_lens(tmp_path, monkeypatch):
     assert limitation["evidence_objects"][0]["type"] == "limitation_atom"
 
 
+def test_visual_topic_lens_prioritizes_promotable_typed_lineage(tmp_path, monkeypatch):
+    db_path = tmp_path / "v14_pilot.sqlite3"
+    _make_visual_db(db_path)
+    conn = sqlite3.connect(str(db_path))
+    partial_meta = json.dumps(
+        {
+            "typed_chain_complete": False,
+            "typed_chain_completeness": "sparse_stage_partial",
+            "claim_scope": "exploratory_bottleneck_lineage",
+            "evidence_grade": "partial_typed_section_lineage",
+            "source": "section_atom_chain",
+        }
+    )
+    for idx in range(25):
+        conn.execute(
+            """
+            INSERT INTO bottleneck_lineage_triples
+                (triple_id, principle_id, direction_id, atom_id, edge_order,
+                 source_stage, target_stage, source_text, target_text, relation_type,
+                 paper_id, resolver_paper_id, event_year, evidence_section,
+                 evidence_page, evidence_quality, evidence_weight, metadata_json)
+            VALUES (?, 'bp1', NULL, NULL, ?, 'constraint', 'failure_mechanism',
+                    'recent weak partial', 'missing evidence: no attempt path',
+                    'constraint_causes_failure', 'p1', NULL, 2026,
+                    'discussion', 4, 'section_level', 0.45, ?)
+            """,
+            (f"partial:{idx}", idx + 1, partial_meta),
+        )
+    full_meta = json.dumps(
+        {
+            "typed_chain_complete": True,
+            "typed_chain_completeness": "full",
+            "claim_scope": "bottleneck_lineage_evidence",
+            "evidence_grade": "typed_section_lineage_traced",
+            "source": "section_atom_chain",
+            "section_atom_chain_id": "sac_promotable",
+            "placeholder_stages": [],
+        }
+    )
+    conn.execute(
+        """
+        INSERT INTO bottleneck_lineage_triples
+            (triple_id, principle_id, direction_id, atom_id, edge_order,
+             source_stage, target_stage, source_text, target_text, relation_type,
+             paper_id, resolver_paper_id, event_year, evidence_section,
+             evidence_page, evidence_quality, evidence_weight, metadata_json)
+        VALUES ('full:old', 'bp1', NULL, NULL, 1,
+                'constraint', 'failure_mechanism',
+                'older complete typed constraint',
+                'complete failure mechanism',
+                'constraint_causes_failure', 'p1', NULL, 2020,
+                'discussion', 4, 'section_level', 0.85, ?)
+        """,
+        (full_meta,),
+    )
+    conn.commit()
+    conn.close()
+    monkeypatch.setenv("V14B_DB_V14", str(db_path))
+
+    resp = client.get(
+        "/graph/visual/topic-lens",
+        headers=VIEWER_HEADERS,
+        params={"topic": "laser optics", "top_k": 20},
+    )
+
+    assert resp.status_code == 200
+    constraint = resp.json()["bottleneck_lineage"]["constraints"][0]
+    assert constraint["typed_chain_completeness"] == "full"
+    assert constraint["claim_scope"] == "bottleneck_lineage_evidence"
+    assert constraint["evidence_grade"] == "typed_section_lineage_traced"
+    assert constraint["typed_chain"][0]["triple_id"] == "full:old"
+    assert constraint["typed_chain"][0]["typed_chain_promotable"] is True
+    assert constraint["evidence_objects"][0]["section_atom_chain_id"] == "sac_promotable"
+
+
 def test_visual_clusters_branch_lineages_carry_evidence_contract(tmp_path, monkeypatch):
     db_path = tmp_path / "v14_pilot.sqlite3"
     _make_visual_db(db_path)

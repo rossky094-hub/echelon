@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T02:53:16Z`
+- generated_at: `2026-05-31T03:05:32Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,024`
@@ -16,7 +16,7 @@
 - partial_typed_lineage_triples: `22,064`
 - lineage_completeness_counts: `{"attempted_path_partial": 1368, "constraint_failure_only": 5308, "full": 20, "local_fix_partial": 272, "resolution_candidate_partial": 1988, "sparse_stage_partial": 13128}`
 - topic_gap_decision_grade_section_rate: `29.0%`
-- failed regression topics: `metalens, metasurface holography, photonic crystal cavity, quantum light source`
+- failed regression topics: `photonic crystal cavity, quantum light source`
 
 ## Policy
 
@@ -45,7 +45,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | Step7 mutation | `needs_tuning` | `warn` | Explore evidence-backed variation paths without inventing scientific conclusions. | Mutation is useful only after Claim Card evidence objects are complete. | Retune mutation generation around minimal validation experiments rather than visual novelty. |
 | Step8 layout | `aligned` | `pass` | Lay out graph evidence for inspection, not for discovering lineage by clustering alone. | visual_nodes=55,391; branch_lineages=5,278. | Keep layout_cluster_only separate from weak/evidence-backed splits in UI/API. |
 | Step9 report | `aligned` | `warn` | Report evidence boundaries and remaining risk rather than a success narrative. | Current reports expose insufficiency; live product remains below high-confidence threshold. | Make algorithm_logic_audit a required report section before product release. |
-| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=metalens, metasurface holography, photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
+| Step10 visual graph / Topic Dossier / Radar | `aligned` | `warn` | Present Topic Dossier first, graph as explain/verify layers, Radar as gated Claim Cards. | failed regression topics=photonic crystal cavity, quantum light source. | Prioritize multi-topic dossier failures over single-topic polish. |
 | Step12 / value delivery audit | `aligned` | `fail` | Enforce acceptance gates and keep weak evidence from becoming product claims. | evidence_policy depends on linked refs, topic-gap sections, calibration, Claim Cards, and multi-corpus gates. | Use this audit as the release stop/go gate; do not redefine success around passing subsets. |
 | quarterly / multi-corpus | `aligned` | `pass` | Preserve corpus-specific builds before cross-corpus bridge graph. | corpus_registry=1; corpus_snapshots=0. | Add per-corpus algorithm-logic audit before building cross-corpus bridge claims. |
 

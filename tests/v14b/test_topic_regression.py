@@ -182,6 +182,47 @@ def test_metalens_regression_flags_missing_claim_cards_and_evidence():
     assert future_gap["candidate_paper_ids"] == "p1;p2"
 
 
+def test_topic_regression_does_not_count_weak_full_lineage_as_promotable():
+    fragments = _evidence_contract_fragments()
+    fragments["bottleneck_lineage"]["constraints"][0].update(
+        {
+            "claim_scope": "exploratory_bottleneck_lineage",
+            "evidence_grade": "weak_typed_section_lineage",
+            "typed_chain_completeness": "full",
+        }
+    )
+    lens = {
+        "ready": True,
+        **fragments,
+        "topic_dossier": {
+            **fragments["topic_dossier"],
+            "branch_splits": [_branch(name) for name in METALENS_BENCHMARK.expected_branches],
+            "bottleneck_dossiers": [
+                {"name": name, "evidence_papers": [{"paper_id": "p1"}]}
+                for name in METALENS_BENCHMARK.expected_bottlenecks
+            ],
+        },
+        "history_main_path": {
+            "key_turning_papers": [
+                {
+                    "paper_id": f"p{i}",
+                    "access_links": [{"url": "https://example.test"}],
+                    "content_availability": _decision_grade_primary_availability(),
+                }
+                for i in range(8)
+            ]
+        },
+        "rd_radar": {"claim_cards": [{"eligible": True}]},
+    }
+
+    result = run_topic_regression(lens)
+
+    assert result["bottleneck_lineage_contracts"]["with_partial_typed_chain"] == 1
+    assert result["bottleneck_lineage_contracts"]["with_typed_chain"] == 0
+    lineage_gate = next(g for g in result["gates"] if g["name"] == "bottleneck lineage typed contracts")
+    assert lineage_gate["status"] == "fail"
+
+
 def test_bottleneck_synonyms_do_not_hide_evidence():
     lens = {
         "ready": True,

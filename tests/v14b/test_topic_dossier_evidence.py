@@ -1116,6 +1116,10 @@ def test_bottleneck_lineage_constraints_are_auditable_typed_chains():
                         "typed_chain_complete": True,
                         "typed_chain_completeness": "full",
                         "placeholder_stages": [],
+                        "claim_scope": "bottleneck_lineage_evidence",
+                        "evidence_grade": "typed_section_lineage_traced",
+                        "source": "section_atom_chain",
+                        "section_atom_chain_id": "sac_full",
                     }
                 ),
             }
@@ -1124,12 +1128,80 @@ def test_bottleneck_lineage_constraints_are_auditable_typed_chains():
 
     constraint = lineage["constraints"][0]
     assert constraint["claim_scope"] == "bottleneck_lineage_evidence"
-    assert constraint["evidence_grade"] == "typed_section_lineage"
+    assert constraint["evidence_grade"] == "typed_section_lineage_traced"
     assert constraint["typed_chain_completeness"] == "full"
+    assert constraint["typed_chain"][0]["typed_chain_promotable"] is True
+    assert constraint["typed_chain"][0]["section_atom_chain_id"] == "sac_full"
     assert constraint["typed_chain"][0]["source_stage"] == "constraint"
     assert constraint["required_evidence"]
     assert constraint["evidence_objects"][0]["type"] == "bottleneck_lineage_triple"
     assert constraint["evidence_objects"][0]["click_target"] == {"kind": "paper", "id": "p1"}
+    assert constraint["evidence_objects"][0]["section_atom_chain_id"] == "sac_full"
+
+
+def test_bottleneck_lineage_weak_full_chain_stays_exploratory():
+    lineage = _build_bottleneck_lineage(
+        principles=[
+            {
+                "principle_id": "FP_OPT_GEOM",
+                "principle_name": "Optimization geometry",
+                "root_cause": "Weak full chain should not promote.",
+                "risk_label": "medium",
+                "bottleneck_score": 0.8,
+                "unresolved_atoms": 1,
+                "resolved_atoms": 0,
+                "current_backlog": 1.0,
+                "peak_backlog_year": 2024,
+                "top_keywords_json": '[{"key":"fabrication"}]',
+            }
+        ],
+        history_events=[],
+        unresolved_limitations=[
+            {
+                "paper_id": "p1",
+                "keyword": "fabrication",
+                "description": "fabrication remains limited",
+                "evidence_quality": "section_level",
+                "source_section_name": "discussion",
+            }
+        ],
+        lineage_triples=[
+            {
+                "triple_id": "t_weak_full",
+                "principle_id": "FP_OPT_GEOM",
+                "edge_order": 1,
+                "source_stage": "constraint",
+                "target_stage": "failure_mechanism",
+                "source_text": "fabrication constraint",
+                "target_text": "failure mechanism",
+                "relation_type": "constraint_causes_failure",
+                "paper_id": "p1",
+                "event_year": 2024,
+                "evidence_section": "discussion",
+                "evidence_page": 4,
+                "evidence_quality": "section_level",
+                "evidence_weight": 0.7,
+                "metadata_json": json.dumps(
+                    {
+                        "typed_chain_complete": True,
+                        "typed_chain_completeness": "full",
+                        "placeholder_stages": [],
+                        "claim_scope": "exploratory_bottleneck_lineage",
+                        "evidence_grade": "weak_typed_section_lineage",
+                        "source": "section_atom_chain",
+                        "section_atom_chain_id": "sac_weak",
+                    }
+                ),
+            }
+        ],
+    )
+
+    constraint = lineage["constraints"][0]
+    assert constraint["typed_chain_completeness"] == "full"
+    assert constraint["claim_scope"] == "exploratory_bottleneck_lineage"
+    assert constraint["evidence_grade"] == "weak_typed_section_lineage"
+    assert constraint["typed_chain"][0]["typed_chain_promotable"] is False
+    assert any("weak or exploratory" in reason for reason in constraint["uncertainty_reasons"])
 
 
 def test_bottleneck_lineage_partial_typed_chains_do_not_overclaim():
