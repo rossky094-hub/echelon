@@ -1,6 +1,6 @@
 # V14B Value Delivery Audit
 
-- generated_at: `2026-05-31T05:47:09Z`
+- generated_at: `2026-05-31T05:57:18Z`
 - evidence_policy: `insufficient_evidence`
 - gate_summary: `{"fail": 1, "pass": 13, "warn": 1}`
 
@@ -48,54 +48,54 @@
       "inserted": 6,
       "skip_existing_local_work": 4
     },
-    "linked_ref_rate": 0.14053555301792017,
+    "linked_ref_rate": 0.14053874866242644,
     "openalex_frontfill_cooldown_remaining_s": 0,
-    "openalex_frontfill_processed": 3000,
-    "openalex_frontfill_status": "stalled_after_cooldown",
-    "openalex_frontfill_total": 22643,
-    "openalex_w_rate": 0.6439053446688688,
+    "openalex_frontfill_processed": 25,
+    "openalex_frontfill_status": "completed",
+    "openalex_frontfill_total": 25,
+    "openalex_w_rate": 0.6440497463944694,
     "primary_section_papers": 3029,
     "reference_relink_exact_linkable_refs": 0,
     "reference_relink_no_local_match_refs": 2763687,
     "reference_relink_status": "local_corpus_gap_dominates",
-    "section_frontfill_done": 284,
+    "section_frontfill_done": 293,
     "section_frontfill_no_evidence_delta": 0,
-    "section_frontfill_progress_done": 284,
+    "section_frontfill_progress_done": 293,
     "section_frontfill_status": "running_or_unknown",
     "section_frontfill_total": 8373,
     "section_provenance": {
-      "current_contract_papers": 486,
-      "current_contract_rate": 0.16044899306701882,
-      "decision_grade_papers": 482,
-      "decision_grade_rate": 0.15912842522284582,
+      "current_contract_papers": 495,
+      "current_contract_rate": 0.16342027071640805,
+      "decision_grade_papers": 491,
+      "decision_grade_rate": 0.16209970287223507,
       "paper_quality_counts": {
         "moderate": 0,
-        "strong": 1229,
-        "weak": 1800
+        "strong": 1230,
+        "weak": 1799
       },
       "parser_contract_version_counts": {
-        "legacy_unknown_contract": 4440,
-        "v14b_section_parser_contract_v3_toc_guard": 1115
+        "legacy_unknown_contract": 4426,
+        "v14b_section_parser_contract_v3_toc_guard": 1129
       },
       "parser_name_counts": {
-        "v14b_section_ingest_v2": 4440,
-        "v14b_section_ingest_v3": 1115
+        "v14b_section_ingest_v2": 4426,
+        "v14b_section_ingest_v3": 1129
       },
       "primary_section_papers": 3029,
       "primary_section_rows": 5555,
       "strategy_counts": {
         "embedded_heading": 52,
-        "explicit_heading": 1839,
-        "heading_continuation": 2389,
+        "explicit_heading": 1840,
+        "heading_continuation": 2390,
         "inline_heading": 720,
-        "legacy_unknown_strategy": 3089,
+        "legacy_unknown_strategy": 3088,
         "loose_inline_heading": 38,
-        "parser_hint": 52,
+        "parser_hint": 53,
         "terminal_cue_summary": 4
       },
-      "strong_or_moderate_papers": 1229,
-      "weak_only_papers": 1800,
-      "weak_only_rate": 0.5942555298778475
+      "strong_or_moderate_papers": 1230,
+      "weak_only_papers": 1799,
+      "weak_only_rate": 0.5939253879168043
     }
   },
   "policy": "All topic, branch, bottleneck, and future conclusions must carry evidence_grade and uncertainty reasons until this gate passes.",
@@ -104,7 +104,6 @@
     "linked refs below 30%; citation backbone is incomplete",
     "section-level evidence below decision-grade target",
     "OpenAlex topic/field coverage below cross-field target",
-    "OpenAlex frontfill stalled_after_cooldown; field/topic claims need local fallback and uncertainty",
     "cited-work backfill inserted local works, but citation claims stay weak until exact relinking and graph features are rerun",
     "section evidence provenance is weak; loose/legacy parser matches must remain low-confidence evidence"
   ]

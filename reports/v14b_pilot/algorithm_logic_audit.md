@@ -1,6 +1,6 @@
 # V14B Algorithm Logic Audit
 
-- generated_at: `2026-05-31T05:46:24Z`
+- generated_at: `2026-05-31T05:55:45Z`
 - linked_ref_rate: `14.1%`
 - openalex_w_rate: `64.4%`
 - primary_section_papers: `3,029`
@@ -32,7 +32,7 @@ Algorithm fit must be judged before path execution. A step can be algorithmicall
 | step | algorithm_fit | readiness | algorithm role | challenge | next tuning |
 |---|---|---|---|---|---|
 | id-repair / relinking | `aligned` | `fail` | Build an exact provider-ID citation spine; never use fuzzy links as citation truth. | linked refs are 14.1%; the algorithm is conservative but corpus coverage is still thin. | Continue exact cited-work backfill; do not reintroduce fuzzy relinking to inflate coverage. |
-| OpenAlex / local field-topic backfill | `aligned` | `warn` | Provide field/topic context as an uncertainty-aware enrichment layer, not a product blocker. | OpenAlex W coverage is 64.4%; frontfill status=stalled_after_cooldown. | Resume conservative OpenAlex repair or strengthen local field-topic fallback before cross-field claims are promoted. |
+| OpenAlex / local field-topic backfill | `aligned` | `warn` | Provide field/topic context as an uncertainty-aware enrichment layer, not a product blocker. | OpenAlex W coverage is 64.4%; frontfill status=completed. | Resume conservative OpenAlex repair or strengthen local field-topic fallback before cross-field claims are promoted. |
 | graph-features | `aligned` | `pass` | Compute interpretable structural signals for keystone, branch, and fusion weighting. | Feature semantics are useful only if linked citation coverage remains honest. | Add feature freshness checks per corpus and expose feature-default rates in audits. |
 | embeddings | `aligned` | `pass` | Support semantic retrieval and neighborhood expansion without replacing citation evidence. | embeddings=55,391; papers=55,401. | Keep semantic layer labeled as retrieval/expansion; require citation/section evidence for claims. |
 | quality audit | `aligned` | `warn` | Stop poor coverage from becoming confident product output. | The audit layer exists, but live readiness still depends on citation and section gaps. | Promote quality-audit failures into user-visible uncertainty overlays. |

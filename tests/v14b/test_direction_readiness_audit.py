@@ -479,6 +479,23 @@ def test_direction_readiness_uses_latest_openalex_backfill_run(tmp_path):
     assert loaded["processed"] == 3000
 
 
+def test_direction_readiness_counts_completed_openalex_run_without_progress_lines(tmp_path):
+    log = tmp_path / "step0_openalex_backfill_20260531_135214.log"
+    log.write_text(
+        "2026-05-31 13:52:17 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill targets: 25\n"
+        "2026-05-31 13:55:02 [INFO] echelon.v14b.step0_openalex_backfill: OpenAlex backfill done: {'records_n': 8, 'failed': 17}\n",
+        encoding="utf-8",
+    )
+
+    loaded = load_openalex_frontfill_state(log, now=datetime(2026, 5, 31, 14, 0, 0))
+
+    assert loaded["status"] == "completed"
+    assert loaded["processed"] == 25
+    assert loaded["total"] == 25
+    assert loaded["ok"] == 8
+    assert loaded["fail"] == 17
+
+
 def test_direction_readiness_flags_openalex_frontfill_after_cooldown(tmp_path):
     metrics = {
         "linked_ref_rate": 0.31,

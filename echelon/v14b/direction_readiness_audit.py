@@ -558,6 +558,8 @@ def load_openalex_frontfill_state(
     cooldown_until = None
     if done:
         status = "completed"
+        if processed is None and ok is not None and fail is not None:
+            processed = int(ok) + int(fail)
     elif cooldown_ts is not None and cooldown_s is not None:
         cooldown_until_dt = cooldown_ts + timedelta(seconds=cooldown_s)
         cooldown_until = cooldown_until_dt.isoformat(timespec="seconds")
