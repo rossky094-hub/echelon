@@ -2872,6 +2872,7 @@ def audit_multi_topic_regression(
     section_queue_tracks_decision_grade_gap_coverage = True
     section_queue_preserves_repair_contracts = True
     section_ingest_preserves_repair_contract_provenance = True
+    section_atom_layer_preserves_repair_contract_provenance = True
     topic_regression_exports_topic_dossier_repair_plan = True
     current_plan_docs_avoid_gold_topic_language = True
     if repo_root is not None:
@@ -2879,6 +2880,9 @@ def audit_multi_topic_regression(
         product_baseline_source = repo_root / "echelon/v14b/product_baseline.py"
         section_queue_source = repo_root / "echelon/v14b/step5s_section_queue_audit.py"
         section_ingest_source = repo_root / "echelon/v14b/step5s_section_ingest.py"
+        section_atoms_source = repo_root / "echelon/v14b/section_atoms.py"
+        section_atom_chains_source = repo_root / "echelon/v14b/section_atom_chains.py"
+        step13_source = repo_root / "echelon/v14b/step13_first_principles_history.py"
         makefile_source = repo_root / "Makefile"
         topic_regression_avoids_gold_topic_aliases = _source_absent(
             topic_regression_source,
@@ -2962,6 +2966,35 @@ def audit_multi_topic_regression(
                 "candidate_repair_contract_papers",
             ),
         )
+        section_atom_layer_preserves_repair_contract_provenance = (
+            _source_contains(
+                section_atoms_source,
+                (
+                    "repair_contracts_json",
+                    "_repair_contracts_from_meta",
+                    '"repair_contracts"',
+                    "retrieval_context_only",
+                ),
+            )
+            and _source_contains(
+                section_atom_chains_source,
+                (
+                    "repair_contracts_json",
+                    "_repair_contracts",
+                    '"repair_contracts"',
+                    "evidence_objects_json",
+                ),
+            )
+            and _source_contains(
+                step13_source,
+                (
+                    "repair_contracts_json",
+                    '"repair_contracts"',
+                    "evidence_objects_json",
+                    "section_atom_chain",
+                ),
+            )
+        )
         stale_gold_topic_doc_phrases = (
             "topic gold fixtures",
             "Create gold expectations",
@@ -2988,6 +3021,7 @@ def audit_multi_topic_regression(
         and section_queue_tracks_decision_grade_gap_coverage
         and section_queue_preserves_repair_contracts
         and section_ingest_preserves_repair_contract_provenance
+        and section_atom_layer_preserves_repair_contract_provenance
         and topic_regression_exports_topic_dossier_repair_plan
         and current_plan_docs_avoid_gold_topic_language
     )
@@ -3020,6 +3054,7 @@ def audit_multi_topic_regression(
             "section_queue_tracks_decision_grade_gap_coverage": section_queue_tracks_decision_grade_gap_coverage,
             "section_queue_preserves_repair_contracts": section_queue_preserves_repair_contracts,
             "section_ingest_preserves_repair_contract_provenance": section_ingest_preserves_repair_contract_provenance,
+            "section_atom_layer_preserves_repair_contract_provenance": section_atom_layer_preserves_repair_contract_provenance,
             "topic_regression_exports_topic_dossier_repair_plan": topic_regression_exports_topic_dossier_repair_plan,
             "topic_gap_section_triage_available_when_blocking": (
                 not topic_gap_blocking or topic_gap_triage_available

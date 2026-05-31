@@ -51,6 +51,15 @@ def jdumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
+def jloads(value: Any, default: Any) -> Any:
+    if value in (None, ""):
+        return default
+    try:
+        return json.loads(str(value))
+    except Exception:
+        return default
+
+
 def ensure_section_atom_chains_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -78,10 +87,19 @@ def ensure_section_atom_chains_schema(conn: sqlite3.Connection) -> None:
             claim_scope TEXT NOT NULL,
             uncertainty_reasons_json TEXT NOT NULL,
             evidence_objects_json TEXT NOT NULL,
+            repair_contracts_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL
         )
         """
     )
+    existing_cols = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(section_atom_chains)").fetchall()
+    }
+    if "repair_contracts_json" not in existing_cols:
+        conn.execute(
+            "ALTER TABLE section_atom_chains ADD COLUMN repair_contracts_json TEXT NOT NULL DEFAULT '[]'"
+        )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_section_atom_chains_paper ON section_atom_chains(paper_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_section_atom_chains_section ON section_atom_chains(section_key)")
     conn.execute(
@@ -179,6 +197,7 @@ def _chain_row(selected: dict[str, dict[str, Any]], *, chain_index: int) -> dict
     claim_scope = "bottleneck_lineage_evidence" if complete and not grade.startswith("weak") else "exploratory_bottleneck_lineage"
     uncertainty_reasons = _uncertainty_reasons(selected, missing)
     evidence_objects = _evidence_objects(selected)
+    repair_contracts = _repair_contracts(selected)
     out: dict[str, Any] = {
         "chain_id": chain_id,
         "paper_id": paper_id,
@@ -193,6 +212,7 @@ def _chain_row(selected: dict[str, dict[str, Any]], *, chain_index: int) -> dict
         "claim_scope": claim_scope,
         "uncertainty_reasons_json": jdumps(uncertainty_reasons),
         "evidence_objects_json": jdumps(evidence_objects),
+        "repair_contracts_json": jdumps(repair_contracts),
         "created_at": utc_now(),
     }
     for stage in CHAIN_STAGES:
@@ -266,6 +286,7 @@ def _evidence_objects(selected: dict[str, dict[str, Any]]) -> list[dict[str, Any
         atom = selected.get(stage)
         if not atom:
             continue
+        repair_contracts = _atom_repair_contracts(atom)
         objects.append(
             {
                 "type": "section_atom",
@@ -279,10 +300,34 @@ def _evidence_objects(selected: dict[str, dict[str, Any]]) -> list[dict[str, Any
                 "claim_scope": atom.get("claim_scope"),
                 "source_url": atom.get("source_url"),
                 "source_storage_uri": atom.get("source_storage_uri"),
+                "repair_contracts": repair_contracts,
                 "click_target": {"kind": "paper", "id": atom.get("paper_id")},
             }
         )
     return objects
+
+
+def _atom_repair_contracts(atom: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = atom.get("repair_contracts")
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    parsed = jloads(atom.get("repair_contracts_json"), [])
+    if not isinstance(parsed, list):
+        return []
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+def _repair_contracts(selected: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    contracts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for atom in selected.values():
+        for contract in _atom_repair_contracts(atom):
+            key = jdumps(contract)
+            if key in seen:
+                continue
+            seen.add(key)
+            contracts.append(contract)
+    return contracts
 
 
 def _chain_id(paper_id: str, section_key: str, atom_ids: list[str]) -> str:
@@ -303,7 +348,7 @@ def _insert_chains(conn: sqlite3.Connection, chains: list[dict[str, Any]]) -> in
             local_fix_text, new_constraint_text,
             relation_edges_json, typed_chain_complete, typed_chain_completeness,
             missing_stages_json, evidence_grade, claim_scope,
-            uncertainty_reasons_json, evidence_objects_json, created_at
+            uncertainty_reasons_json, evidence_objects_json, repair_contracts_json, created_at
         )
         VALUES (
             :chain_id, :paper_id, :section_name, :section_key, :chain_index,
@@ -313,7 +358,7 @@ def _insert_chains(conn: sqlite3.Connection, chains: list[dict[str, Any]]) -> in
             :local_fix_text, :new_constraint_text,
             :relation_edges_json, :typed_chain_complete, :typed_chain_completeness,
             :missing_stages_json, :evidence_grade, :claim_scope,
-            :uncertainty_reasons_json, :evidence_objects_json, :created_at
+            :uncertainty_reasons_json, :evidence_objects_json, :repair_contracts_json, :created_at
         )
         """,
         chains,

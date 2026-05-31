@@ -248,6 +248,17 @@ def _write_product_sources(root: Path) -> None:
         'stats = {"candidate_repair_contract_papers": len(repair_contracts_by_paper)}\n',
         encoding="utf-8",
     )
+    (v14 / "section_atoms.py").write_text(
+        'def _repair_contracts_from_meta(meta): return meta.get("repair_contracts_json")\n'
+        'section_atom = {"repair_contracts": [], "claim_scope": "retrieval_context_only"}\n'
+        'repair_contracts_json = "[]"\n',
+        encoding="utf-8",
+    )
+    (v14 / "section_atom_chains.py").write_text(
+        'def _repair_contracts(selected): return selected\n'
+        'evidence_objects_json = {"repair_contracts": [], "repair_contracts_json": "[]"}\n',
+        encoding="utf-8",
+    )
     (v14 / "direction_readiness_audit.py").write_text(
         "def _public_latest_fusion_audit(row):\n"
         "    return {'candidate_ranking_score_avg': 0.8, 'min_candidate_score_threshold': 0.55}\n",
@@ -347,7 +358,8 @@ def _write_product_sources(root: Path) -> None:
         "SECTION_PARSER_CONTRACT_VERSION missing_high_confidence_gates "
         "candidate_score_ready \"candidate_score\": candidate_score future candidate score "
         "success_criteria falsification_conditions minimal validation experiment with success and falsification criteria "
-        "evidence_grade uncertainty_reasons_json evidence_objects_json\n",
+        "evidence_grade uncertainty_reasons_json evidence_objects_json repair_contracts_json "
+        '"repair_contracts" section_atom_chain\n',
         encoding="utf-8",
     )
     (v14 / "step9_report.py").write_text(
@@ -638,6 +650,7 @@ def test_value_delivery_audit_maps_eight_gates(tmp_path):
     assert multi_gate["checks"]["section_queue_defaults_to_multi_topic"] is True
     assert multi_gate["checks"]["section_queue_preserves_repair_contracts"] is True
     assert multi_gate["checks"]["section_ingest_preserves_repair_contract_provenance"] is True
+    assert multi_gate["checks"]["section_atom_layer_preserves_repair_contract_provenance"] is True
     assert multi_gate["checks"]["current_plan_docs_avoid_gold_topic_language"] is True
     claim_card_gate = next(g for g in result["gates"] if g["issue"] == "Claim Card Engine")
     assert claim_card_gate["status"] == "pass"

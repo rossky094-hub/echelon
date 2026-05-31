@@ -795,6 +795,7 @@ def load_section_atom_chains(
         chain["missing_stages"] = _safe_json_loads(chain.get("missing_stages_json") or "[]", [])
         chain["uncertainty_reasons"] = _safe_json_loads(chain.get("uncertainty_reasons_json") or "[]", [])
         chain["evidence_objects"] = _safe_json_loads(chain.get("evidence_objects_json") or "[]", [])
+        chain["repair_contracts"] = _safe_json_loads(chain.get("repair_contracts_json") or "[]", [])
         out.append(chain)
     return out
 
@@ -1083,6 +1084,7 @@ def _claim_card_evidence_objects(
             "source_storage_uri": attempt.get("source_storage_uri"),
             "source_page_start": attempt.get("source_page_start"),
             "source_page_end": attempt.get("source_page_end"),
+            "repair_contracts": attempt.get("repair_contracts") or [],
             "click_target": {"kind": "paper", "id": attempt.get("paper_id")} if attempt.get("paper_id") else None,
         }
         objects.append(obj)
@@ -1112,6 +1114,7 @@ def _claim_card_evidence_objects(
             "source_storage_uri": bottleneck.get("source_storage_uri"),
             "source_page_start": bottleneck.get("source_page_start"),
             "source_page_end": bottleneck.get("source_page_end"),
+            "repair_contracts": bottleneck.get("repair_contracts") or [],
             "click_target": {"kind": "paper", "id": bottleneck.get("paper_id")} if bottleneck.get("paper_id") else None,
         }
         objects.append(obj)
@@ -1991,6 +1994,9 @@ def _attempts_from_section_atom_chains(chains: list[dict[str, Any]], *, now_year
                 "typed_chain_completeness": chain.get("typed_chain_completeness"),
                 "evidence_grade": chain.get("evidence_grade"),
                 "claim_scope": chain.get("claim_scope"),
+                "repair_contracts": chain.get("repair_contracts") or _safe_json_loads(
+                    chain.get("repair_contracts_json") or "[]", []
+                ),
             }
         )
     return attempts
@@ -2021,6 +2027,9 @@ def _unresolved_from_section_atom_chains(chains: list[dict[str, Any]]) -> list[d
                 "typed_chain_completeness": chain.get("typed_chain_completeness"),
                 "evidence_grade": chain.get("evidence_grade"),
                 "claim_scope": chain.get("claim_scope"),
+                "repair_contracts": chain.get("repair_contracts") or _safe_json_loads(
+                    chain.get("repair_contracts_json") or "[]", []
+                ),
                 "evidence_weight": _chain_evidence_weight(
                     str(chain.get("evidence_grade") or ""),
                     typed_chain_complete=bool(int(chain.get("typed_chain_complete") or 0)),

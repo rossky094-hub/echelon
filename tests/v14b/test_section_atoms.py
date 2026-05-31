@@ -16,15 +16,22 @@ from echelon.v14b.section_atoms import (
 )
 
 
-def _meta(*, strategies: list[str] | None = None, contract: str = SECTION_PARSER_CONTRACT_VERSION) -> str:
-    return json.dumps(
-        {
-            "parser_contract_version": contract,
-            "extraction_strategies": strategies or ["explicit_heading"],
-            "source_delivery": "local_raw_pdf_cache",
-            "source_storage_uri": "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
-        }
-    )
+def _meta(
+    *,
+    strategies: list[str] | None = None,
+    contract: str = SECTION_PARSER_CONTRACT_VERSION,
+    repair_contracts: list[dict] | None = None,
+) -> str:
+    payload = {
+        "parser_contract_version": contract,
+        "extraction_strategies": strategies or ["explicit_heading"],
+        "source_delivery": "local_raw_pdf_cache",
+        "source_storage_uri": "/Volumes/LaCie/Echelon_Paper_Raw_Data/pdfs/p1.pdf",
+    }
+    if repair_contracts is not None:
+        payload["repair_contract_source"] = "candidate_file"
+        payload["repair_contracts"] = repair_contracts
+    return json.dumps(payload)
 
 
 def test_classify_atom_type_keeps_section_atoms_deterministic():
@@ -44,7 +51,15 @@ def test_extract_section_atoms_marks_current_traced_decision_sections_decision_g
         ),
         "source_url": "https://example.test/p1.pdf",
         "section_pages_json": json.dumps([4, 5]),
-        "section_meta_json": _meta(),
+        "section_meta_json": _meta(
+            repair_contracts=[
+                {
+                    "repair_id": "repair-p1",
+                    "source_contract": "topic_dossier_evidence_repair_plan",
+                    "claim_scope": "evidence_repair_queue_only",
+                }
+            ]
+        ),
         "title": "Photonic array constraints",
     }
 
@@ -60,6 +75,9 @@ def test_extract_section_atoms_marks_current_traced_decision_sections_decision_g
     normalized_text = re.sub(r"\s+", " ", row["section_text"]).strip()
     assert normalized_text[atoms[0]["span_start"]:atoms[0]["span_end"]] == atoms[0]["atom_text"]
     assert "deterministic heuristic classification" in atoms[0]["uncertainty_reasons_json"]
+    repair_contracts = json.loads(atoms[0]["repair_contracts_json"])
+    assert repair_contracts[0]["repair_id"] == "repair-p1"
+    assert repair_contracts[0]["contract_source"] == "candidate_file"
 
 
 def test_extract_section_atoms_marks_legacy_or_weak_sections_weak():
@@ -114,7 +132,15 @@ def test_build_and_search_section_atoms_exact_fts(tmp_path):
             ),
             "https://example.test/p1.pdf",
             json.dumps([6]),
-            _meta(),
+            _meta(
+                repair_contracts=[
+                    {
+                        "repair_id": "repair-p1",
+                        "target_pipeline_steps": ["section-atom-chains"],
+                        "claim_scope": "evidence_repair_queue_only",
+                    }
+                ]
+            ),
         ),
     )
     conn.execute(
@@ -148,6 +174,7 @@ def test_build_and_search_section_atoms_exact_fts(tmp_path):
     assert hits[0]["paper_id"] == "p1"
     assert hits[0]["claim_scope"] == "retrieval_context_only"
     assert hits[0]["search_semantics"].startswith("retrieval hit only")
+    assert hits[0]["repair_contracts"][0]["repair_id"] == "repair-p1"
     assert metric_hits and metric_hits[0]["paper_id"] == "p2"
     assert discussion_hits and discussion_hits[0]["section_key"] == "discussion"
 

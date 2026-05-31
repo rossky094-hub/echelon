@@ -225,6 +225,7 @@ def ensure_section_atoms_schema(conn: sqlite3.Connection) -> None:
             claim_scope TEXT NOT NULL,
             uncertainty_reasons_json TEXT NOT NULL,
             features_json TEXT NOT NULL,
+            repair_contracts_json TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL
         )
         """
@@ -238,6 +239,7 @@ def ensure_section_atoms_schema(conn: sqlite3.Connection) -> None:
         ("span_start", "span_start INTEGER"),
         ("span_end", "span_end INTEGER"),
         ("span_unit", f"span_unit TEXT DEFAULT '{SPAN_UNIT}'"),
+        ("repair_contracts_json", "repair_contracts_json TEXT NOT NULL DEFAULT '[]'"),
     ):
         if column_name not in existing_cols:
             conn.execute(f"ALTER TABLE section_atoms ADD COLUMN {ddl}")
@@ -402,6 +404,31 @@ def _text_hash(text: str) -> str:
     return hashlib.sha1((text or "").encode("utf-8")).hexdigest()
 
 
+def _repair_contracts_from_meta(meta: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = meta.get("repair_contracts")
+    if not isinstance(raw, list):
+        return []
+    contracts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        clean = {
+            str(key): value
+            for key, value in item.items()
+            if key not in (None, "") and value not in (None, "")
+        }
+        if not clean:
+            continue
+        clean.setdefault("contract_source", meta.get("repair_contract_source") or "section_meta")
+        key = json.dumps(clean, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        contracts.append(clean)
+    return contracts
+
+
 def _embedding_tokens(text: str) -> list[str]:
     return [token.lower() for token in re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]", text or "") if token.strip()]
 
@@ -435,6 +462,7 @@ def extract_section_atoms_from_row(row: sqlite3.Row | dict[str, Any], *, max_ato
     section_name = str(section.get("section_name") or "")
     section_key = normalize_section_key(section_name)
     evidence_grade, reasons = _section_evidence_grade(section, meta)
+    repair_contracts = _repair_contracts_from_meta(meta)
     chunks = _sentence_chunks_with_spans(str(section.get("section_text") or ""))[:max_atoms_per_section]
     atoms: list[dict[str, Any]] = []
     for idx, (chunk, span_start, span_end) in enumerate(chunks):
@@ -467,6 +495,7 @@ def extract_section_atoms_from_row(row: sqlite3.Row | dict[str, Any], *, max_ato
                 "claim_scope": "retrieval_context_only",
                 "uncertainty_reasons_json": json.dumps(reasons, ensure_ascii=False),
                 "features_json": json.dumps(features, ensure_ascii=False, sort_keys=True),
+                "repair_contracts_json": json.dumps(repair_contracts, ensure_ascii=False, sort_keys=True),
                 "created_at": utc_now(),
             }
         )
@@ -509,6 +538,7 @@ def _insert_atoms(
             a["claim_scope"],
             a["uncertainty_reasons_json"],
             a["features_json"],
+            a.get("repair_contracts_json") or "[]",
             a["created_at"],
         )
         for a in atoms
@@ -520,9 +550,9 @@ def _insert_atoms(
             atom_text, title, doi, arxiv_id, openalex_id, s2_paper_id, page_start, page_end,
             span_start, span_end, span_unit, source_url, source_storage_uri,
             parser_contract_version, source_delivery, extractor_method, evidence_grade,
-            claim_scope, uncertainty_reasons_json, features_json, created_at
+            claim_scope, uncertainty_reasons_json, features_json, repair_contracts_json, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )
@@ -1182,6 +1212,7 @@ def _row_to_hit(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     item["uncertainty_reasons"] = _loads(item.pop("uncertainty_reasons_json", "[]"), [])
     item["features"] = _loads(item.pop("features_json", "{}"), {})
+    item["repair_contracts"] = _loads(item.pop("repair_contracts_json", "[]"), [])
     item["search_semantics"] = EXACT_SEARCH_SEMANTICS
     try:
         span_start = int(item["span_start"]) if item.get("span_start") is not None else None

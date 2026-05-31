@@ -424,6 +424,7 @@ def load_section_atom_chains(
         chain = dict(row)
         chain["missing_stages"] = _safe_json_loads(chain.get("missing_stages_json") or "[]", [])
         chain["evidence_objects"] = _safe_json_loads(chain.get("evidence_objects_json") or "[]", [])
+        chain["repair_contracts"] = _safe_json_loads(chain.get("repair_contracts_json") or "[]", [])
         chains.append(chain)
     return chains
 
