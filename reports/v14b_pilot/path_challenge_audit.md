@@ -1,6 +1,6 @@
 # V14B First-Principles Path Challenge Audit
 
-- generated_at: `2026-05-31T12:34:58Z`
+- generated_at: `2026-05-31T12:44:12Z`
 - overall_status: `redirect_evidence_first`
 - verdict_counts: `{"hold": 5, "redirect": 1}`
 

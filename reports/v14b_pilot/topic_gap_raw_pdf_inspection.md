@@ -1,6 +1,6 @@
 # Topic-Gap Raw PDF Parser Inspection
 
-- audit_ts: `2026-05-31T12:34:47Z`
+- audit_ts: `2026-05-31T12:44:01Z`
 - triage_json: `reports/v14b_pilot/topic_gap_section_evidence_audit.json`
 - store_root: `/Volumes/LaCie/Echelon_Paper_Raw_Data`
 - manifest: `/Volumes/LaCie/Echelon_Paper_Raw_Data/manifests/raw_pdf_downloads.sqlite3`

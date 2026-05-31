@@ -82,6 +82,8 @@ def _release_status(
     multi_topic_counts: dict[str, int],
     section_embeddings: int | None,
     high_confidence_claim_cards: int,
+    path_challenge_available: bool,
+    path_challenge_aligned: bool,
     evidence_repair_available: bool,
     evidence_repair_blocking_p0: int,
 ) -> str:
@@ -91,6 +93,10 @@ def _release_status(
         return "post_frontfill_rebuild_required"
     if high_confidence_claim_cards <= 0:
         return "actionable_but_not_high_confidence"
+    if not path_challenge_available:
+        return "path_challenge_audit_missing"
+    if not path_challenge_aligned:
+        return "path_challenge_not_aligned"
     if not evidence_repair_available:
         return "evidence_repair_priority_missing"
     if evidence_repair_blocking_p0 > 0:
@@ -188,11 +194,16 @@ def build_release_readiness(
     evidence_repair_summary = evidence_repair_priority.get("summary") or {}
     evidence_repair_available = bool(evidence_repair_priority.get("overall_status"))
     evidence_repair_blocking_p0 = int(evidence_repair_summary.get("blocking_p0") or 0)
+    path_challenge_status = path_challenge.get("overall_status") or ""
+    path_challenge_available = bool(path_challenge_status)
+    path_challenge_aligned = path_challenge_status == "path_aligned"
     release_status = _release_status(
         value_summary=value_summary,
         multi_topic_counts=multi_topic_counts,
         section_embeddings=section_embeddings,
         high_confidence_claim_cards=high_confidence_claim_cards,
+        path_challenge_available=path_challenge_available,
+        path_challenge_aligned=path_challenge_aligned,
         evidence_repair_available=evidence_repair_available,
         evidence_repair_blocking_p0=evidence_repair_blocking_p0,
     )
@@ -208,7 +219,8 @@ def build_release_readiness(
         "value_delivery_has_no_failures": not bool(value_summary.get("fail", 0)),
         "radar_has_high_confidence_claim_card": high_confidence_claim_cards > 0,
         "raw_pdf_store_available": raw_pdf.get("status") == "pass",
-        "path_challenge_audit_available": bool(path_challenge.get("overall_status")),
+        "path_challenge_audit_available": path_challenge_available,
+        "path_challenge_path_aligned": path_challenge_available and path_challenge_aligned,
         "evidence_repair_priority_available": evidence_repair_available,
         "evidence_repair_has_no_blocking_p0": evidence_repair_available and evidence_repair_blocking_p0 == 0,
     }

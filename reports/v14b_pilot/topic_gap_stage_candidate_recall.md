@@ -1,6 +1,6 @@
 # Topic-Gap Typed Stage Candidate Recall
 
-- generated_at: `2026-05-31T12:31:54Z`
+- generated_at: `2026-05-31T12:40:54Z`
 - status: `ready`
 - claim_scope: `evidence_repair_candidate_recall_only`
 - promotion_policy: `candidate_recall_only_no_direct_promotion`

@@ -125,6 +125,7 @@ def test_release_readiness_holds_when_section_embeddings_and_multi_topic_gate_ar
     assert result["checks"]["section_embeddings_materialized"] is False
     assert result["checks"]["multi_topic_regression_passed"] is False
     assert result["checks"]["path_challenge_audit_available"] is True
+    assert result["checks"]["path_challenge_path_aligned"] is False
     assert result["checks"]["evidence_repair_priority_available"] is True
     assert result["checks"]["evidence_repair_has_no_blocking_p0"] is False
     assert result["path_challenge_status"] == "redirect_evidence_first"
@@ -147,6 +148,7 @@ def test_release_readiness_can_be_decision_grade_when_all_current_gates_are_clos
     assert result["acceptance_ready"] is True
     assert result["checks"]["evidence_repair_priority_available"] is True
     assert result["checks"]["evidence_repair_has_no_blocking_p0"] is True
+    assert result["checks"]["path_challenge_path_aligned"] is True
     assert result["path_challenge_status"] == "path_aligned"
     assert result["evidence_repair_priority_status"] == "no_blocking_repair"
     assert (report_dir / "release_readiness.json").exists()
@@ -201,3 +203,40 @@ def test_release_readiness_holds_when_evidence_repair_has_blocking_p0(tmp_path):
     assert result["checks"]["evidence_repair_priority_available"] is True
     assert result["checks"]["evidence_repair_has_no_blocking_p0"] is False
     assert result["evidence_repair_top_actions"][0]["action_id"] == "post_frontfill_retrieval_rebuild"
+
+
+def test_release_readiness_requires_path_challenge_audit(tmp_path):
+    report_dir = tmp_path / "reports"
+    _write_audit_reports(report_dir, all_pass=True)
+    (report_dir / "path_challenge_audit.json").unlink()
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = _make_db(db_main, with_section_embeddings=True, high_confidence_cards=1)
+
+    result = build_release_readiness(db_main=db_main, db_v14=db_v14, report_dir=report_dir, repo_root=tmp_path)
+
+    assert result["release_status"] == "path_challenge_audit_missing"
+    assert result["acceptance_ready"] is False
+    assert result["checks"]["path_challenge_audit_available"] is False
+    assert result["checks"]["path_challenge_path_aligned"] is False
+
+
+def test_release_readiness_holds_when_path_challenge_redirects(tmp_path):
+    report_dir = tmp_path / "reports"
+    _write_audit_reports(report_dir, all_pass=True)
+    _write_json(
+        report_dir / "path_challenge_audit.json",
+        {
+            "overall_status": "redirect_evidence_first",
+            "verdict_counts": {"hold": 5, "redirect": 1},
+        },
+    )
+    db_main = tmp_path / "main.sqlite3"
+    db_v14 = _make_db(db_main, with_section_embeddings=True, high_confidence_cards=1)
+
+    result = build_release_readiness(db_main=db_main, db_v14=db_v14, report_dir=report_dir, repo_root=tmp_path)
+
+    assert result["release_status"] == "path_challenge_not_aligned"
+    assert result["acceptance_ready"] is False
+    assert result["checks"]["path_challenge_audit_available"] is True
+    assert result["checks"]["path_challenge_path_aligned"] is False
+    assert result["path_challenge_status"] == "redirect_evidence_first"

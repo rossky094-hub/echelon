@@ -97,7 +97,7 @@
     }
   ],
   "evidence_bone_status": "warn",
-  "generated_at": "2026-05-31T12:34:58Z",
+  "generated_at": "2026-05-31T12:44:12Z",
   "overall_status": "redirect_evidence_first",
   "policy": "This audit challenges the current route before more execution. It cannot promote claims; it only redirects effort toward the evidence path most likely to produce auditable Topic Dossiers, Evolution Evidence Maps, and Claim Cards.",
   "verdict_counts": {
