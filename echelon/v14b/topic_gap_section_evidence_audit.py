@@ -91,6 +91,97 @@ def _topic_gap_tags(reasons: list[str]) -> tuple[list[str], list[str]]:
     return sorted(topics), sorted(gap_types)
 
 
+REPAIR_CONTRACT_ALIASES: dict[str, tuple[str, ...]] = {
+    "source_contract": ("source_contract", "source_contracts"),
+    "repair_id": ("repair_id", "repair_ids"),
+    "target_pipeline_steps": ("target_pipeline_steps",),
+    "retrieval_modes": ("retrieval_modes",),
+    "parser_contract": ("parser_contract", "parser_contracts"),
+    "claim_scope": ("claim_scope", "claim_scopes"),
+    "evidence_grade": ("evidence_grade", "evidence_grades"),
+    "topic": ("topic",),
+    "gap_type": ("gap_type",),
+    "bottleneck": ("bottleneck",),
+    "frontfill_query": ("frontfill_query",),
+    "required_sections": ("required_sections",),
+}
+
+
+def _compact_contract(contract: dict[str, Any], *, paper_id: str = "") -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in contract.items():
+        if key in {"candidate_paper_ids"}:
+            continue
+        if value in (None, ""):
+            continue
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                continue
+        out[str(key)] = value
+    if paper_id:
+        out.setdefault("paper_id", paper_id)
+    if out:
+        out.setdefault("contract_source", "topic_gap_queue")
+    return out
+
+
+def _dedupe_contracts(contracts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for contract in contracts:
+        clean = _compact_contract(contract)
+        if not clean:
+            continue
+        key = json.dumps(clean, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(clean)
+    return out
+
+
+def _repair_contracts_from_queue_row(row: dict[str, Any], *, paper_id: str = "") -> list[dict[str, Any]]:
+    contracts: list[dict[str, Any]] = []
+    raw_contracts = str(row.get("repair_contracts_json") or "").strip()
+    if raw_contracts:
+        parsed = _loads(raw_contracts, None)
+        if isinstance(parsed, dict):
+            contracts.append(parsed)
+        elif isinstance(parsed, list):
+            contracts.extend([item for item in parsed if isinstance(item, dict)])
+
+    fallback: dict[str, Any] = {}
+    for out_key, aliases in REPAIR_CONTRACT_ALIASES.items():
+        for alias in aliases:
+            value = row.get(alias)
+            if value not in (None, ""):
+                fallback[out_key] = value
+                break
+    if fallback:
+        if not fallback.get("source_contract") and (fallback.get("topic") or fallback.get("gap_type")):
+            fallback["source_contract"] = "multi_topic_evidence_gap_queue"
+        contracts.append(fallback)
+    return _dedupe_contracts([
+        _compact_contract(contract, paper_id=paper_id)
+        for contract in contracts
+    ])
+
+
+def _split_contract_terms(raw: Any) -> set[str]:
+    if isinstance(raw, (list, tuple, set)):
+        values = raw
+    else:
+        values = [raw]
+    out: set[str] = set()
+    for value in values:
+        for part in str(value or "").replace(",", ";").split(";"):
+            clean = part.strip().lower()
+            if clean:
+                out.add(clean)
+    return out
+
+
 def _arxiv_pdf_url(raw: Any) -> str:
     arxiv_id = str(raw or "").strip()
     if not arxiv_id:
@@ -113,7 +204,8 @@ def _load_queue_rows(path: Path, limit: int | None = None) -> list[dict[str, Any
                     if item.strip()
                 ]
                 for pid in ids:
-                    rows.append(
+                    payload = dict(raw)
+                    payload.update(
                         {
                             "paper_id": pid,
                             "priority_score": raw.get("priority") or "",
@@ -131,6 +223,13 @@ def _load_queue_rows(path: Path, limit: int | None = None) -> list[dict[str, Any
                             "eligible_pdf": "",
                         }
                     )
+                    payload["repair_contracts"] = _repair_contracts_from_queue_row(
+                        raw,
+                        paper_id=pid,
+                    )
+                    rows.append(
+                        payload
+                    )
         else:
             rows = [dict(raw) for raw in reader if str(raw.get("paper_id") or "").strip()]
 
@@ -140,13 +239,20 @@ def _load_queue_rows(path: Path, limit: int | None = None) -> list[dict[str, Any
         if not pid:
             continue
         reasons = _split_reasons(row.get("reasons"))
+        contracts = row.get("repair_contracts")
+        if not isinstance(contracts, list):
+            contracts = _repair_contracts_from_queue_row(row, paper_id=pid)
         if pid not in merged:
             merged[pid] = dict(row)
             merged[pid]["paper_id"] = pid
             merged[pid]["reasons"] = reasons
+            merged[pid]["repair_contracts"] = contracts
             continue
         existing = merged[pid]
         existing["reasons"] = sorted(set(_split_reasons(existing.get("reasons"))).union(reasons))
+        existing["repair_contracts"] = _dedupe_contracts(
+            [*(existing.get("repair_contracts") or []), *contracts]
+        )
         for key in ("title", "source_url", "doi", "arxiv_id", "openalex_id", "s2_paper_id"):
             if not existing.get(key) and row.get(key):
                 existing[key] = row.get(key)
@@ -480,6 +586,136 @@ def _classify(
     )
 
 
+def _contract_requires_atoms(contract: dict[str, Any]) -> bool:
+    terms = (
+        _split_contract_terms(contract.get("target_pipeline_steps"))
+        | _split_contract_terms(contract.get("retrieval_modes"))
+    )
+    return any(
+        marker in term
+        for term in terms
+        for marker in ("section-atoms", "section_atom", "section-atom-chains", "step5c")
+    )
+
+
+def _contract_requires_chain(contract: dict[str, Any], *, has_lineage_gap: bool) -> bool:
+    terms = _split_contract_terms(contract.get("target_pipeline_steps"))
+    gap_type = str(contract.get("gap_type") or "").lower()
+    return (
+        has_lineage_gap
+        or "bottleneck_lineage" in gap_type
+        or any("section-atom-chains" in term or "section_atom_chains" in term for term in terms)
+    )
+
+
+def _repair_contract_closure(
+    *,
+    row: dict[str, Any],
+    contract: dict[str, Any],
+    has_lineage_gap: bool,
+) -> dict[str, Any]:
+    decision_sections = int(row.get("decision_grade_primary_rows") or 0)
+    atoms = int(row.get("section_atoms") or 0)
+    decision_atoms = int(row.get("section_atom_decision_grade_atoms") or 0)
+    chains = int(row.get("section_atom_chains") or 0)
+    full_chains = int(row.get("section_atom_full_chains") or 0)
+    requires_chain = _contract_requires_chain(contract, has_lineage_gap=has_lineage_gap)
+    requires_atoms = requires_chain or _contract_requires_atoms(contract)
+
+    if decision_sections <= 0:
+        state = "open_section_evidence_not_decision_grade"
+    elif requires_chain and str(row.get("failure_mode") or "") == "topic_specific_lineage_chain_mismatch":
+        state = "open_topic_chain_mismatch"
+    elif requires_chain and full_chains > 0:
+        state = "closed_typed_chain_available"
+    elif requires_chain and chains > 0:
+        state = "partial_chain_incomplete"
+    elif requires_chain and atoms > 0:
+        state = "partial_atoms_available_no_chain"
+    elif requires_chain:
+        state = "open_atoms_missing"
+    elif requires_atoms and decision_atoms > 0:
+        state = "closed_section_atoms_available"
+    elif requires_atoms and atoms > 0:
+        state = "partial_atoms_weak_or_stale"
+    elif requires_atoms:
+        state = "open_atoms_missing"
+    else:
+        state = "closed_decision_grade_section"
+
+    if state == "open_atoms_missing":
+        next_action = "run section-atoms for this repair contract before Step5c/Step13 use."
+    elif state == "partial_atoms_available_no_chain":
+        next_action = "run section-atom-chains for this repair contract before Step13 promotion."
+    elif state == "partial_chain_incomplete":
+        next_action = "inspect missing typed stages and improve chain completeness for this repair contract."
+    elif state == "partial_atoms_weak_or_stale":
+        next_action = "reparse or manually review section atoms before closing this repair contract."
+    elif state == "open_topic_chain_mismatch":
+        next_action = "inspect topic/bottleneck-specific chain match before closing this repair contract."
+    elif state == "open_section_evidence_not_decision_grade":
+        next_action = str(row.get("next_action") or "recover decision-grade section evidence for this repair contract.")
+    else:
+        next_action = "repair contract evidence substrate is available; Step13/Claim Card gates still control promotion."
+
+    closure = dict(contract)
+    closure.update(
+        {
+            "paper_id": row.get("paper_id") or contract.get("paper_id") or "",
+            "topic": contract.get("topic") or (row.get("topics") or [""])[0],
+            "gap_type": contract.get("gap_type") or (row.get("gap_types") or [""])[0],
+            "requires_atoms": requires_atoms,
+            "requires_chain": requires_chain,
+            "closure_state": state,
+            "closed": state.startswith("closed_"),
+            "failure_mode": row.get("failure_mode"),
+            "next_action": next_action,
+        }
+    )
+    return closure
+
+
+def _repair_contract_closures(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    closures: list[dict[str, Any]] = []
+    for row in rows:
+        contracts = row.get("repair_contracts") or []
+        if not isinstance(contracts, list):
+            continue
+        has_lineage_gap = _has_topic_specific_lineage_gap(row.get("gap_types") or [])
+        for contract in contracts:
+            if not isinstance(contract, dict):
+                continue
+            closures.append(
+                _repair_contract_closure(
+                    row=row,
+                    contract=contract,
+                    has_lineage_gap=has_lineage_gap,
+                )
+            )
+    return closures
+
+
+def _repair_contract_closure_summary(closures: list[dict[str, Any]]) -> dict[str, Any]:
+    state_counts = Counter(str(item.get("closure_state") or "unknown") for item in closures)
+    source_counts = Counter(str(item.get("source_contract") or "unknown") for item in closures)
+    closed = [item for item in closures if item.get("closed")]
+    open_items = [item for item in closures if not item.get("closed")]
+    open_by_next_action = Counter(str(item.get("next_action") or "") for item in open_items)
+    return {
+        "contracts": len(closures),
+        "closed_contracts": len(closed),
+        "open_contracts": len(open_items),
+        "closure_rate": len(closed) / max(1, len(closures)),
+        "closure_state_counts": dict(state_counts),
+        "source_contract_counts": dict(source_counts),
+        "open_by_next_action": dict(open_by_next_action),
+        "policy": (
+            "Repair contracts are closed only when their required evidence substrate exists; "
+            "closed repair contracts still remain retrieval/evidence context until Step13 and Claim Card gates promote them."
+        ),
+    }
+
+
 def run_topic_gap_section_evidence_audit(
     *,
     db_main: Path = DB_MAIN,
@@ -536,6 +772,7 @@ def run_topic_gap_section_evidence_audit(
                 "topics": topics,
                 "gap_types": gap_types,
                 "reasons": reasons,
+                "repair_contracts": queue_row.get("repair_contracts") or [],
                 "failure_mode": failure_mode,
                 "promotion_policy": promotion_policy,
                 "next_action": next_action,
@@ -555,6 +792,29 @@ def run_topic_gap_section_evidence_audit(
         )
 
     failure_counts = Counter(str(row["failure_mode"]) for row in rows)
+    contract_closures = _repair_contract_closures(rows)
+    for row in rows:
+        row_closures = [
+            closure
+            for closure in contract_closures
+            if str(closure.get("paper_id") or "") == str(row.get("paper_id") or "")
+        ]
+        row["repair_contract_closures"] = row_closures
+        row["repair_contract_ids"] = sorted({
+            str(item.get("repair_id") or "")
+            for item in row_closures
+            if str(item.get("repair_id") or "")
+        })
+        row["repair_source_contracts"] = sorted({
+            str(item.get("source_contract") or "")
+            for item in row_closures
+            if str(item.get("source_contract") or "")
+        })
+        row["repair_closure_states"] = sorted({
+            str(item.get("closure_state") or "")
+            for item in row_closures
+            if str(item.get("closure_state") or "")
+        })
     policy_counts = Counter(str(row["promotion_policy"]) for row in rows)
     queue_papers = len(rows)
     decision_grade = sum(1 for row in rows if int(row.get("decision_grade_primary_rows") or 0) > 0)
@@ -610,6 +870,7 @@ def run_topic_gap_section_evidence_audit(
         "promotion_threshold": PROMOTION_THRESHOLD,
         "failure_mode_counts": dict(failure_counts),
         "lineage_failure_mode_counts": dict(lineage_failure_counts),
+        "repair_contract_closure": _repair_contract_closure_summary(contract_closures),
         "promotion_policy_counts": dict(policy_counts),
         "topic_summary": topic_summary,
         "next_actions": next_actions,
@@ -653,6 +914,9 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         "priority_score",
         "topics",
         "gap_types",
+        "repair_contract_ids",
+        "repair_source_contracts",
+        "repair_closure_states",
         "failure_mode",
         "promotion_policy",
         "next_action",
@@ -720,6 +984,22 @@ def _render_markdown(result: dict[str, Any]) -> str:
         lines.extend(["", "## Typed Chain Triage", "", "| failure_mode | papers |", "|---|---:|"])
         for mode, count in lineage_counts.most_common():
             lines.append(f"| {mode} | {count:,} |")
+    repair = summary.get("repair_contract_closure") or {}
+    if int(repair.get("contracts") or 0):
+        lines.extend(
+            [
+                "",
+                "## Repair Contract Closure",
+                "",
+                f"- closed: `{int(repair.get('closed_contracts') or 0)}/{int(repair.get('contracts') or 0)}` "
+                f"({float(repair.get('closure_rate') or 0.0) * 100:.1f}%)",
+                "",
+                "| closure_state | contracts |",
+                "|---|---:|",
+            ]
+        )
+        for state, count in Counter(repair.get("closure_state_counts") or {}).most_common():
+            lines.append(f"| {state} | {int(count):,} |")
     lines.extend(["", "## Next Actions", "", "| failure_mode | papers | action |", "|---|---:|---|"])
     for action in summary["next_actions"]:
         lines.append(
@@ -795,6 +1075,7 @@ def load_topic_gap_section_triage_state(path: Path) -> dict[str, Any]:
         "promotion_ready_rate": float(summary.get("promotion_ready_rate") or 0.0),
         "failure_mode_counts": summary.get("failure_mode_counts") or {},
         "lineage_failure_mode_counts": summary.get("lineage_failure_mode_counts") or {},
+        "repair_contract_closure": summary.get("repair_contract_closure") or {},
         "promotion_policy_counts": summary.get("promotion_policy_counts") or {},
         "topic_summary": summary.get("topic_summary") or {},
         "next_action": first_action,

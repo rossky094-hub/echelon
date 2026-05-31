@@ -3032,6 +3032,7 @@ def audit_multi_topic_regression(
     topic_gap_triage = metrics.get("topic_gap_section_triage_state") or {}
     topic_gap_triage_available = bool(topic_gap_triage.get("available"))
     topic_gap_triage_failure_modes = topic_gap_triage.get("failure_mode_counts") or {}
+    topic_gap_repair_closure = topic_gap_triage.get("repair_contract_closure") or {}
     topic_gap_no_target = metrics.get("topic_gap_no_target_inspection_state") or {}
     no_target_blocking = int(topic_gap_triage_failure_modes.get("no_target_sections_after_current_parser") or 0) > 0
     no_target_inspection_available = bool(topic_gap_no_target.get("available"))
@@ -3077,6 +3078,14 @@ def audit_multi_topic_regression(
         "topic_gap_section_triage_available": topic_gap_triage_available,
         "topic_gap_section_triage_status": topic_gap_triage.get("status") or "",
         "topic_gap_section_triage_failure_modes": topic_gap_triage_failure_modes,
+        "topic_gap_repair_contracts": int(topic_gap_repair_closure.get("contracts") or 0),
+        "topic_gap_repair_contracts_closed": int(topic_gap_repair_closure.get("closed_contracts") or 0),
+        "topic_gap_repair_contract_closure_rate": float(
+            topic_gap_repair_closure.get("closure_rate") or 0.0
+        ),
+        "topic_gap_repair_contract_closure_states": topic_gap_repair_closure.get(
+            "closure_state_counts"
+        ) or {},
         "topic_gap_no_target_inspection_available": no_target_inspection_available,
         "topic_gap_no_target_inspection_status": topic_gap_no_target.get("status") or "",
         "topic_gap_no_target_inspection_classifications": topic_gap_no_target.get("classification_counts") or {},

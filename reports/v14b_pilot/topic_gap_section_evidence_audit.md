@@ -1,6 +1,6 @@
 # Topic-Gap Section Evidence Audit
 
-- audit_ts: `2026-05-31T09:11:16Z`
+- audit_ts: `2026-05-31T09:57:33Z`
 - queue: `reports/v14b_pilot/multi_topic_evidence_gap_queue.csv`
 - parser_contract: `v14b_section_parser_contract_v3_toc_guard`
 - status: `fail`
@@ -26,6 +26,18 @@
 |---|---:|
 | lineage_full_chain_missing | 1 |
 | lineage_chains_missing_after_atoms | 1 |
+
+## Repair Contract Closure
+
+- closed: `17/215` (7.9%)
+
+| closure_state | contracts |
+|---|---:|
+| open_section_evidence_not_decision_grade | 120 |
+| partial_chain_incomplete | 66 |
+| closed_decision_grade_section | 16 |
+| partial_atoms_available_no_chain | 12 |
+| closed_typed_chain_available | 1 |
 
 ## Next Actions
 

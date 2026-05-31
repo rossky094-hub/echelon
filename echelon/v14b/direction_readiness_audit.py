@@ -886,6 +886,14 @@ def classify_blockers(m: dict[str, Any]) -> list[dict[str, str]]:
                     f"full-chain-missing={int(lineage_counts.get('lineage_full_chain_missing') or 0):,}, "
                     f"topic-mismatch={int(lineage_counts.get('topic_specific_lineage_chain_mismatch') or 0):,}."
                 )
+            repair = triage.get("repair_contract_closure") or {}
+            if int(repair.get("contracts") or 0):
+                triage_detail += (
+                    " Repair-contract closure: "
+                    f"closed={int(repair.get('closed_contracts') or 0):,}/"
+                    f"{int(repair.get('contracts') or 0):,} "
+                    f"({pct(float(repair.get('closure_rate') or 0.0))})."
+                )
             next_action = str(triage.get("next_action") or next_action)
         no_target = m.get("topic_gap_no_target_inspection_state") or {}
         if no_target.get("available"):
@@ -1135,11 +1143,19 @@ def render_markdown(metrics: dict[str, Any], blockers: list[dict[str, str]], lev
     topic_gap_triage_line = []
     if topic_gap_triage.get("available"):
         counts = topic_gap_triage.get("failure_mode_counts") or {}
+        repair = topic_gap_triage.get("repair_contract_closure") or {}
+        repair_suffix = ""
+        if int(repair.get("contracts") or 0):
+            repair_suffix = (
+                f"; repair-contract-closed={int(repair.get('closed_contracts') or 0):,}/"
+                f"{int(repair.get('contracts') or 0):,}"
+            )
         topic_gap_triage_line = [
             f"- topic-gap section triage: `{topic_gap_triage.get('status')}`; "
             f"current-parser no-target={int(counts.get('no_target_sections_after_current_parser') or 0):,}; "
             f"stale-contract={int(counts.get('stale_parser_contract') or 0):,}; "
             f"unattempted-PDF={int(counts.get('unattempted_pdf_available') or 0):,}"
+            f"{repair_suffix}"
         ]
     no_target_inspection = metrics.get("topic_gap_no_target_inspection_state") or {}
     no_target_inspection_line = []
